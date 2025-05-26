@@ -1,0 +1,27 @@
+{
+  "name": "node-server",
+  "version": "0.0.1",
+  "license": "UNLICENSED",
+  "type": "module",
+  "scripts": {
+    "build": "tsc && vite build --mode production",
+    "dev": "vite --mode dev --clearScreen false",
+    "preview": "vite preview --mode production",
+    "lint": "eslint src",
+    "lint:fix": "eslint src --fix",
+    "test": "echo \"TODO: Implement vittest\" && exit 0"
+  },
+  "dependencies": {
+    "@configs/eslint-config": "*",
+    "@configs/ts-config": "*",
+    "@configs/vite-config": "*",
+    "express": "^5.1.0"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.2",
+    "eslint": "^9.27.0",
+    "typescript": "^5.8.3",
+    "vite": "^6.3.5",
+    "vite-plugin-node": "^5.0.1"
+  }
+}

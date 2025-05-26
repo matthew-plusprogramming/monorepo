@@ -1,0 +1,12 @@
+{
+  "extends": "./tsconfig.build.json",
+  "compilerOptions": {
+    // If transpiling
+    "moduleResolution": "nodenext",
+    "module": "NodeNext",
+    "sourceMap": true,
+    "noEmit": false,
+    // Needs to be redefined
+    "outDir": "./dist"
+  }
+}
