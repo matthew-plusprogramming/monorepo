@@ -1,0 +1,9 @@
+# Ignore artifacts
+**/.git
+**/node_modules
+**/dist
+**/build
+**/coverage
+**/out
+**/package.json
+**/package-lock.json

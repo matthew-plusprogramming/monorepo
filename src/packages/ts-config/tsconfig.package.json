@@ -1,0 +1,9 @@
+{
+  "extends": "./tsconfig.build.json",
+  "compilerOptions": {
+    // Monorepo
+    "composite": true,
+    "declaration": true,
+    "declarationMap": true
+  }
+}

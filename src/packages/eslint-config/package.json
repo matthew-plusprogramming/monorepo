@@ -1,0 +1,32 @@
+{
+  "name": "@configs/eslint-config",
+  "version": "0.0.1",
+  "license": "UNLICENSED",
+  "main": "index.ts",
+  "exports": {
+    ".": "./index.ts"
+  },
+  "dependencies": {
+    "@configs/ts-config": "*",
+    "@utils/type-utils": "*",
+    "@eslint/compat": "^1.2.9",
+    "@stylistic/eslint-plugin": "^4.4.0",
+    "@types/node": "^22.15.21",
+    "@typescript-eslint/eslint-plugin": "^8.32.1",
+    "@typescript-eslint/parser": "^8.32.1",
+    "@typescript-eslint/typescript-estree": "^8.32.1",
+    "@typescript-eslint/utils": "^8.32.1",
+    "eslint": "^9.27.0",
+    "eslint-config-prettier": "^10.1.5",
+    "eslint-import-resolver-typescript": "^4.4.0",
+    "eslint-plugin-import": "^2.31.0",
+    "eslint-plugin-prettier": "^5.4.0",
+    "eslint-plugin-simple-import-sort": "^12.1.1",
+    "eslint-plugin-tsdoc": "^0.4.0",
+    "eslint-plugin-unused-imports": "^4.1.4",
+    "jiti": "^2.4.2",
+    "prettier": "^3.5.3",
+    "typescript": "^5.8.3",
+    "typescript-eslint": "^8.32.1"
+  }
+}

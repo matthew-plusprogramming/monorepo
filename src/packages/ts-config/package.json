@@ -1,0 +1,8 @@
+{
+  "name": "@configs/ts-config",
+  "version": "0.0.1",
+  "license": "UNLICENSED",
+  "peerDependencies": {
+    "@types/node": "^22.15.21"
+  }
+}
