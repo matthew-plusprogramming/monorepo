@@ -2,7 +2,6 @@
   "name": "@configs/eslint-config",
   "version": "0.0.1",
   "license": "UNLICENSED",
-  "main": "index.ts",
   "exports": {
     ".": "./index.ts"
   },

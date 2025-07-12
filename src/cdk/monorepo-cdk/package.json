@@ -4,7 +4,20 @@
   "license": "UNLICENSED",
   "type": "module",
   "scripts": {
-    "deploy": "tofu deploy"
+    "// -- 🚀 Development": "--",
+
+    "// -- 🛠️ Build & Clean": "--",
+
+    "// -- 🧪 Testing": "--",
+
+    "// -- 🧹 Linting & Formatting": "--",
+    "lint": "eslint src",
+    "lint:fix": "eslint src --fix",
+
+    "// -- ✅ Verification & CI": "--",
+    "deploy": "echo 'TODO: Implement'",
+
+    "// -- 🔧 Miscellaneous": "--",
   },
   "dependencies": {
 

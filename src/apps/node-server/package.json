@@ -4,12 +4,23 @@
   "license": "UNLICENSED",
   "type": "module",
   "scripts": {
-    "build": "tsc && vite build --mode production",
+    "// -- 🚀 Development": "--",
     "dev": "vite --mode dev --clearScreen false",
     "preview": "vite preview --mode production",
+
+    "// -- 🛠️ Build & Clean": "--",
+    "build": "tsc && vite build --mode production",
+
+    "// -- 🧪 Testing": "--",
+    "test": "echo \"TODO: Implement vitest\" && exit 0",
+
+    "// -- 🧹 Linting & Formatting": "--",
     "lint": "eslint src",
     "lint:fix": "eslint src --fix",
-    "test": "echo \"TODO: Implement vitest\" && exit 0"
+
+    "// -- ✅ Verification & CI": "--",
+
+    "// -- 🔧 Miscellaneous": "--"
   },
   "dependencies": {
     "@configs/eslint-config": "*",

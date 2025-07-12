@@ -8,7 +8,18 @@
     ".": "./dist/index.js"
   },
   "scripts": {
-    "build": "tsc"
+    "// -- 🚀 Development": "--",
+
+    "// -- 🛠️ Build & Clean": "--",
+    "build": "tsc",
+
+    "// -- 🧪 Testing": "--",
+
+    "// -- 🧹 Linting & Formatting": "--",
+
+    "// -- ✅ Verification & CI": "--",
+
+    "// -- 🔧 Miscellaneous": "--"
   },
   "dependencies": {
     "@configs/ts-config": "*",
