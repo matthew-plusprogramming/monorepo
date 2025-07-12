@@ -6,6 +6,7 @@
     "module": "NodeNext",
     "sourceMap": true,
     "noEmit": false,
+    "declaration": true,
     // Needs to be redefined
     "outDir": "./dist"
   }
