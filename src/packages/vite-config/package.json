@@ -12,7 +12,7 @@
   },
   "dependencies": {
     "@configs/ts-config": "*",
-    "vite": "^6.3.5",
-    "vite-plugin-node": "^5.0.1"
+    "vite": "^7.0.4",
+    "vite-plugin-node": "^7.0.0"
   }
 }
