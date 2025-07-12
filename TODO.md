@@ -1,8 +1,9 @@
 [ ] Integrate basic turborepo setup
-[ ] Integreate zod
+[ ] Integrate vitest
+[ ] Integrate zod
 [ ] Integrate Effect library
 [ ] Integrate authzed (spiceDB)
-[ ] Integrate IaC (OpenTF)
+[ ] Integrate IaC (OpenTofu)
 [ ] Integrate graphql (gql.tada)
 [ ] Integrate express
 [ ] Integrate db options

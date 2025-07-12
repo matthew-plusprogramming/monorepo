@@ -9,7 +9,7 @@
     "preview": "vite preview --mode production",
     "lint": "eslint src",
     "lint:fix": "eslint src --fix",
-    "test": "echo \"TODO: Implement vittest\" && exit 0"
+    "test": "echo \"TODO: Implement vitest\" && exit 0"
   },
   "dependencies": {
     "@configs/eslint-config": "*",
