@@ -1,5 +1,5 @@
 import { VitePluginNode } from 'vite-plugin-node';
-import { baseConfig } from '@packages/vite-config';
+import { baseConfig } from '@configs/vite-config';
 import { defineConfig, loadEnv, UserConfig } from 'vite';
 
 const DEFAULT_PORT = 3000;

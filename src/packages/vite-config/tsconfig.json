@@ -1,5 +1,5 @@
 {
-  "extends": "@packages/ts-config/tsconfig.transpiled.json",
+  "extends": "@configs/ts-config/tsconfig.transpiled.json",
   "include": ["index.ts"],
   "compilerOptions": {
     "outDir": "dist"
