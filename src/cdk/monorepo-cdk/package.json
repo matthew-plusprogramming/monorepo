@@ -2,7 +2,6 @@
   "name": "monorepo-cdk",
   "version": "0.0.1",
   "license": "UNLICENSED",
-  "type": "module",
   "scripts": {
     "// -- 🚀 Development": "--",
     "// -- 🛠️ Build & Clean": "--",
@@ -11,12 +10,28 @@
     "lint": "eslint src",
     "lint:fix": "eslint src --fix",
     "// -- ✅ Verification & CI": "--",
-    "deploy": "echo 'TODO: Implement'",
-    "// -- 🔧 Miscellaneous": "--"
+    "deploy": "cross-env-shell 'dotenvx run -f .env.$ENV -- cdktf deploy'",
+    "destroy": "cross-env-shell 'dotenvx run -f .env.$ENV -- cdktf destroy'",
+    "synth": "cross-env-shell 'dotenvx run -f .env.$ENV -- cdktf synth'",
+    "deploy:dev": "cross-env ENV=dev npm run deploy",
+    "deploy:prod": "cross-env ENV=production npm run deploy",
+    "destroy:dev": "cross-env ENV=dev npm run destroy",
+    "destroy:prod": "cross-env ENV=production npm run destroy",
+    "synth:dev": "cross-env ENV=dev npm run synth",
+    "synth:prod": "cross-env ENV=production npm run synth",
+    "// -- 🔧 Miscellaneous": "--",
+    "encrypt-envs": "dotenvx encrypt -f .env.dev .env.production",
+    "decrypt-envs": "dotenvx decrypt -f .env.dev .env.production&& echo 'WARNING: DO NOT COMMIT decrypted .env files to the repository!'"
   },
   "devDependencies": {
+    "@cdktf/provider-aws": "^21.2.0",
     "@configs/eslint-config": "*",
-    "@configs/ts-config": "^0.0.1",
-    "@configs/vite-config": "*"
+    "@configs/ts-config": "*",
+    "@dotenvx/dotenvx": "^1.47.5",
+    "cdktf": "^0.21.0",
+    "constructs": "^10.4.2",
+    "cross-env": "^7.0.3",
+    "tsx": "^4.20.3",
+    "typescript": "^5.8.3"
   }
 }

@@ -1,4 +1,13 @@
 {
   "extends": "@configs/ts-config/tsconfig.build.json",
-  "include": ["src/**/*.ts"]
+  "compilerOptions": {
+    "paths": {
+      "@constants/*": ["./src/constants/*"],
+      "@stacks/*": ["./src/stacks/*"],
+      "@type/*": ["./src/types/*"],
+      "@utils/*": ["./src/utils/*"]
+    }
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": ["cdktf.out"]
 }
