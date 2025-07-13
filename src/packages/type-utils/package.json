@@ -6,7 +6,7 @@
   "exports": {
     ".": "./index.ts"
   },
-  "dependencies": {
-    "@configs/ts-config": "*"
+  "devDependencies": {
+    "@configs/ts-config": "^0.0.1"
   }
 }

@@ -9,21 +9,17 @@
   },
   "scripts": {
     "// -- 🚀 Development": "--",
-
     "// -- 🛠️ Build & Clean": "--",
     "build": "tsc",
-
     "// -- 🧪 Testing": "--",
-
     "// -- 🧹 Linting & Formatting": "--",
-
     "// -- ✅ Verification & CI": "--",
-
     "// -- 🔧 Miscellaneous": "--"
   },
-  "dependencies": {
-    "@configs/ts-config": "*",
-    "vite": "^7.0.4",
-    "vite-plugin-node": "^7.0.0"
+  "devDependencies": {
+    "@configs/ts-config": "*"
+  },
+  "peerDependencies": {
+    "vite": "^7.0.4"
   }
 }

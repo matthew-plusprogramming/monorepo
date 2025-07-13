@@ -5,24 +5,18 @@
   "type": "module",
   "scripts": {
     "// -- 🚀 Development": "--",
-
     "// -- 🛠️ Build & Clean": "--",
-
     "// -- 🧪 Testing": "--",
-
     "// -- 🧹 Linting & Formatting": "--",
     "lint": "eslint src",
     "lint:fix": "eslint src --fix",
-
     "// -- ✅ Verification & CI": "--",
     "deploy": "echo 'TODO: Implement'",
-
-    "// -- 🔧 Miscellaneous": "--",
-  },
-  "dependencies": {
-
+    "// -- 🔧 Miscellaneous": "--"
   },
   "devDependencies": {
-
+    "@configs/eslint-config": "*",
+    "@configs/ts-config": "^0.0.1",
+    "@configs/vite-config": "*"
   }
 }

@@ -7,30 +7,23 @@
     "// -- 🚀 Development": "--",
     "dev": "vite --mode dev --clearScreen false",
     "preview": "vite preview --mode production",
-
     "// -- 🛠️ Build & Clean": "--",
     "build": "tsc && vite build --mode production",
-
     "// -- 🧪 Testing": "--",
     "test": "echo \"TODO: Implement vitest\" && exit 0",
-
     "// -- 🧹 Linting & Formatting": "--",
     "lint": "eslint src",
     "lint:fix": "eslint src --fix",
-
     "// -- ✅ Verification & CI": "--",
-
     "// -- 🔧 Miscellaneous": "--"
   },
-  "dependencies": {
+  "devDependencies": {
     "@configs/eslint-config": "*",
     "@configs/ts-config": "*",
     "@configs/vite-config": "*",
-    "express": "^5.1.0"
-  },
-  "devDependencies": {
     "@types/express": "^5.0.2",
     "eslint": "^9.31.0",
+    "express": "^5.1.0",
     "typescript": "^5.8.3",
     "vite": "^7.0.4",
     "vite-plugin-node": "^7.0.0"
