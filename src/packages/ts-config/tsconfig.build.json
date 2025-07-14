@@ -8,18 +8,21 @@
     "allowJs": true,
     "resolveJsonModule": true,
     "moduleDetection": "force",
+    "isolatedModules": true,
+
+    // Monorepo
     "incremental": true,
     "tsBuildInfoFile": ".node_modules/.cache/tsconfig.build.tsbuildinfo",
 
     // Strictness
     "strict": true,
     "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
 
     // If not transpiling
     "moduleResolution": "bundler",
     "module": "ESNext",
     "noEmit": true,
-    "isolatedModules": true,
 
     "lib": ["ES2024"],
     "types": ["node"]
