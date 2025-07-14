@@ -7,6 +7,6 @@
     ".": "./index.ts"
   },
   "devDependencies": {
-    "@configs/ts-config": "^0.0.1"
+    "@configs/ts-config": "*"
   }
 }

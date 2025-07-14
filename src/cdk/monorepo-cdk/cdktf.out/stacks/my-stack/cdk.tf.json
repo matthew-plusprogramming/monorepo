@@ -1,0 +1,48 @@
+{
+  "//": {
+    "metadata": {
+      "backend": "s3",
+      "stackName": "my-stack",
+      "version": "0.21.0"
+    },
+    "outputs": {
+    }
+  },
+  "provider": {
+    "aws": [
+      {
+        "region": "us-west-1"
+      }
+    ]
+  },
+  "resource": {
+    "aws_s3_bucket": {
+      "bucket": {
+        "//": {
+          "metadata": {
+            "path": "my-stack/bucket",
+            "uniqueId": "bucket"
+          }
+        },
+        "bucket_prefix": "my-example-bucket"
+      }
+    }
+  },
+  "terraform": {
+    "backend": {
+      "s3": {
+        "bucket": "mycompany-myproject-cdktf-state-00001",
+        "dynamodb_table": "mycompany-myproject-cdktf-lock-00001",
+        "encrypt": true,
+        "key": "stack/my-stack/terraform.tfstate",
+        "region": "us-west-1"
+      }
+    },
+    "required_providers": {
+      "aws": {
+        "source": "aws",
+        "version": "6.3.0"
+      }
+    }
+  }
+}
