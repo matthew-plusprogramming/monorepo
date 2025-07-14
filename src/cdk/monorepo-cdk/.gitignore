@@ -1,4 +1,3 @@
 cdktf.out
 *.tfstate
 *.tfstate.backup
-*.keys

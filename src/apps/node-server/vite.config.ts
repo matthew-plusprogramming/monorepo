@@ -1,20 +1,26 @@
+import '@dotenvx/dotenvx/config';
+
 import { VitePluginNode } from 'vite-plugin-node';
 import { baseConfig } from '@configs/vite-config';
 import { defineConfig, loadEnv, UserConfig } from 'vite';
 
-const DEFAULT_PORT = 3000;
+const port = process.env.PORT;
+
+if (!port) {
+  throw new Error('Environment variable PORT is not set');
+}
+
+if (isNaN(Number(port))) {
+  throw new Error('Environment variable PORT must be a number');
+}
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
 
   return {
     ...baseConfig,
-    define: {
-      __PORT__: parseInt(env.PORT) || DEFAULT_PORT,
-      __TEST_DEFINE__: JSON.stringify(env.TEST_DEFINE),
-    },
     server: {
-      port: parseInt(env.PORT) || DEFAULT_PORT,
+      port: parseInt(port),
     },
     plugins: [
       ...VitePluginNode({
