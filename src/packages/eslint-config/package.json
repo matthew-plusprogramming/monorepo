@@ -10,8 +10,6 @@
     "@stylistic/eslint-plugin": "^5.1.0",
     "@typescript-eslint/eslint-plugin": "^8.36.0",
     "@typescript-eslint/parser": "^8.36.0",
-    "@typescript-eslint/typescript-estree": "^8.36.0",
-    "@typescript-eslint/utils": "^8.36.0",
     "eslint-config-prettier": "^10.1.5",
     "eslint-import-resolver-typescript": "^4.4.4",
     "eslint-plugin-import": "^2.32.0",
