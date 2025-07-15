@@ -6,9 +6,9 @@
   "scripts": {
     "// -- 🚀 Development": "--",
     "dev": "dotenvx run -f .env.dev -- vite --mode dev --clearScreen false",
-    "preview": "dotenvx run -f .env.production-- vite preview --mode production",
+    "preview": "dotenvx run -f .env.production -- vite preview --mode production",
     "// -- 🛠️ Build & Clean": "--",
-    "build": "tsc && dotenvx run -f .env.production-- vite build --mode production",
+    "build": "tsc && dotenvx run -f .env.production -- vite build --mode production",
     "// -- 🧪 Testing": "--",
     "test": "echo \"TODO: Implement vitest\" && exit 0",
     "// -- 🧹 Linting & Formatting": "--",
