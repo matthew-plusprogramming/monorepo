@@ -27,7 +27,7 @@ const eslintIgnorePatterns = [
 ];
 
 const gitignorePath = fileURLToPath(
-  new URL('../../../.gitignore', import.meta.url),
+  new URL('../../.gitignore', import.meta.url),
 );
 
 export const baseConfig: FlatConfig.Config[] = [

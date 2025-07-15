@@ -2,32 +2,32 @@
   "folders": [
     {
       "name": "✨ monorepo",
-      "path": "src"
+      "path": ".",
     },
     {
       "name": "🚀 node-server",
-      "path": "src/apps/node-server"
+      "path": "apps/node-server",
     },
     {
       "name": "⚙️ monorepo-cdk",
-      "path": "src/cdk/monorepo-cdk"
+      "path": "cdk/monorepo-cdk",
     },
     {
       "name": "⚙️ @configs/eslint-config",
-      "path": "src/packages/eslint-config"
+      "path": "packages/eslint-config",
     },
     {
       "name": "⚙️ @configs/ts-config",
-      "path": "src/packages/ts-config"
+      "path": "packages/ts-config",
     },
     {
       "name": "📚 @utils/type-utils",
-      "path": "src/packages/type-utils"
+      "path": "packages/type-utils",
     },
     {
       "name": "⚙️ @configs/vite-config",
-      "path": "src/packages/vite-config"
-    }
+      "path": "packages/vite-config",
+    },
   ],
-  "settings": {}
+  "settings": {},
 }
