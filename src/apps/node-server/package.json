@@ -9,6 +9,7 @@
     "preview": "dotenvx run -f .env.production -- vite preview --mode production",
     "// -- 🛠️ Build & Clean": "--",
     "build": "tsc && dotenvx run -f .env.production -- vite build --mode production",
+    "clean": "rm -rf dist && rm -rf node_modules && rm -rf .turbo",
     "// -- 🧪 Testing": "--",
     "test": "echo \"TODO: Implement vitest\" && exit 0",
     "// -- 🧹 Linting & Formatting": "--",
