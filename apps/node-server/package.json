@@ -27,6 +27,7 @@
     "@dotenvx/dotenvx": "^1.47.6",
     "@types/express": "^5.0.3",
     "cross-env": "^7.0.3",
+    "effect": "^3.16.14",
     "eslint": "^9.31.0",
     "express": "^5.1.0",
     "typescript": "^5.8.3",

@@ -1,16 +1,29 @@
+import { Effect } from 'effect';
 import type { Handler } from 'express';
 import express from 'express';
 
-const app = express();
+import { parseIntHandler } from './handlers/parseInt.handler';
+import { jsonErrorMiddleware } from './middleware/jsonError.middleware';
 
-const handleRoot: Handler = (_, res) => {
-  console.info('Received a request at /');
-  console.info(`Defined env variable: ${__TEST_DEFINE__}`);
-  res.send('Hello from Node.js server!');
+const app = express();
+app.use(express.json());
+app.use(jsonErrorMiddleware);
+
+const handleParseInt: Handler = async (req, res) => {
+  const result = Effect.succeed(req)
+    .pipe(parseIntHandler)
+    .pipe(
+      Effect.catchTag('ParseError', (error) => {
+        console.error('Parse error:', error.message);
+        return Effect.succeed(`Error: ${error.message}`);
+      }),
+    );
+
+  res.send(Effect.runSync(result));
 };
 
-app.get('/', handleRoot);
+app.post('/parse-int', handleParseInt);
 
-app.listen(__PORT__);
+app.listen(process.env.PORT);
 
 export const viteNodeApp = app;

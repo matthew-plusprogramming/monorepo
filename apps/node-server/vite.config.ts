@@ -2,7 +2,7 @@ import '@dotenvx/dotenvx/config';
 
 import { VitePluginNode } from 'vite-plugin-node';
 import { baseConfig } from '@configs/vite-config';
-import { defineConfig, loadEnv, UserConfig } from 'vite';
+import { defineConfig, UserConfig } from 'vite';
 
 const port = process.env.PORT;
 
