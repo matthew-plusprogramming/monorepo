@@ -12,6 +12,7 @@ import { globalIgnores } from 'eslint/config';
 import { includeIgnoreFile } from '@eslint/compat';
 import { fileURLToPath } from 'node:url';
 import type { FlatConfig } from '@typescript-eslint/utils/ts-eslint';
+import { ESLint } from 'eslint';
 
 const eslintIgnorePatterns = [
   '**/.git',
@@ -30,7 +31,7 @@ const gitignorePath = fileURLToPath(
   new URL('../../.gitignore', import.meta.url),
 );
 
-export const baseConfig: FlatConfig.Config[] = [
+export const baseConfig = (tsconfigDirectory: string) => [
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
@@ -38,6 +39,7 @@ export const baseConfig: FlatConfig.Config[] = [
       parser: tseslint.parser,
       parserOptions: {
         project: ['tsconfig.json'],
+        tsconfigRootDir: tsconfigDirectory,
       },
     },
     plugins: {
@@ -45,7 +47,7 @@ export const baseConfig: FlatConfig.Config[] = [
       import: importPlugin,
       'simple-import-sort': simpleImportSort,
       'unused-imports': unusedImports,
-      tsdoc: tsdoc,
+      tsdoc: tsdoc as ESLint.Plugin,
       prettier: prettierPlugin,
       '@stylistic': stylistic,
     },

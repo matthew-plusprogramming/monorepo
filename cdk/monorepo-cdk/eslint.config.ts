@@ -1,3 +1,3 @@
 import { baseConfig } from '@configs/eslint-config';
 
-export default [...baseConfig];
+export default [...baseConfig(__dirname)];
