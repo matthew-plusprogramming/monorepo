@@ -15,8 +15,6 @@ if (isNaN(Number(port))) {
 }
 
 export default defineConfig(({ mode }) => {
-  const env = loadEnv(mode, process.cwd(), '');
-
   return {
     ...baseConfig,
     server: {
@@ -29,5 +27,8 @@ export default defineConfig(({ mode }) => {
         tsCompiler: 'esbuild',
       }),
     ],
+    build: {
+      minify: mode === 'production' ? 'esbuild' : false,
+    },
   } as UserConfig;
 });
