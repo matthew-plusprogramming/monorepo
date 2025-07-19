@@ -4,7 +4,7 @@
   "license": "UNLICENSED",
   "packageManager": "npm@11.2.0",
   "devDependencies": {
-    "turbo": "^2.5.4"
+    "turbo": "^2.5.5"
   },
   "workspaces": [
     "packages/**",
