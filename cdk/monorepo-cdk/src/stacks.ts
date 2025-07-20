@@ -2,7 +2,7 @@ import { BootstrapStack, type BootstrapStackProps } from '@stacks/bootstrap';
 import { MyStack, type MyStackProps } from '@stacks/my-stack';
 import type { Stack } from '@type/stack';
 
-// eslint-disable @typescript-eslint/no-explicit-any
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const stacks: Stack<any>[] = [
   {
     name: 'bootstrap',
