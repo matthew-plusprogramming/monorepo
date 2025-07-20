@@ -17,6 +17,10 @@
       "path": "packages/eslint-config",
     },
     {
+      "name": "📚 @packages/schemas",
+      "path": "packages/schemas",
+    },
+    {
       "name": "⚙️ @configs/ts-config",
       "path": "packages/ts-config",
     },

@@ -1,0 +1,23 @@
+{
+  "name": "@packages/schemas",
+  "version": "0.0.1",
+  "license": "UNLICENSED",
+  "exports": {
+    "./User": "./schemas/User.ts"
+  },
+  "scripts": {
+    "// -- 🚀 Development": "--",
+    "// -- 🛠️ Build & Clean": "--",
+    "clean": "rm -rf node_modules && rm -rf .turbo",
+    "// -- 🧪 Testing": "--",
+    "// -- 🧹 Linting & Formatting": "--",
+    "// -- ✅ Verification & CI": "--",
+    "// -- 🔧 Miscellaneous": "--"
+  },
+  "dependencies": {
+  },
+  "devDependencies": {
+  },
+  "peerDependencies": {
+  }
+}
