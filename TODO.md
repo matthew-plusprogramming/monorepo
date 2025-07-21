@@ -14,6 +14,7 @@ Backend:
 - [ ] Integrate db options
 - [ ] Redis
 - [ ] Mongo
+- [ ] Integration test suite to ensure configuration setup correctly
 
 Frontend:
 

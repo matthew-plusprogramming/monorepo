@@ -1,3 +1,10 @@
 import { baseConfig } from '@configs/eslint-config';
 
-export default [...baseConfig(__dirname)];
+export default [
+  ...baseConfig(__dirname),
+  {
+    rules: {
+      'require-yield': 'warn',
+    },
+  },
+];
