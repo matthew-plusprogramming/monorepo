@@ -1,9 +1,7 @@
-import { Effect } from 'effect';
-import type { Handler } from 'express';
 import express from 'express';
 import { prettifyError, ZodError } from 'zod';
 
-import { parseIntHandler } from './handlers/parseInt.handler';
+import { parseIntRequestHandler } from './handlers/parseInt.handler';
 import { jsonErrorMiddleware } from './middleware/jsonError.middleware';
 import { EnvironmentSchema } from './types/environment';
 
@@ -23,20 +21,7 @@ const app = express();
 app.use(express.json());
 app.use(jsonErrorMiddleware);
 
-const handleParseInt: Handler = async (req, res) => {
-  const result = Effect.succeed(req)
-    .pipe(parseIntHandler)
-    .pipe(
-      Effect.catchTag('ParseError', (error) => {
-        console.error('Parse error:', error.message);
-        return Effect.succeed(`Error: ${error.message}`);
-      }),
-    );
-
-  res.send(Effect.runSync(result));
-};
-
-app.post('/parse-int', handleParseInt);
+app.post('/parse-int', parseIntRequestHandler);
 
 app.listen(process.env.PORT);
 
