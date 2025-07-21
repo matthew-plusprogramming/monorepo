@@ -25,6 +25,7 @@ export default defineConfig(({ mode }) => {
         adapter: 'express',
         appPath: './src/index.ts',
         tsCompiler: 'esbuild',
+        initAppOnBoot: true,
       }),
     ],
     build: {
