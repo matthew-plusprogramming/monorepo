@@ -15,7 +15,7 @@ if (isNaN(Number(port))) {
 }
 
 export default defineConfig(({ mode }) => {
-  return {
+  const config = {
     ...baseConfig,
     server: {
       port: parseInt(port),
@@ -31,5 +31,7 @@ export default defineConfig(({ mode }) => {
     build: {
       minify: mode === 'production' ? 'esbuild' : false,
     },
-  } as UserConfig;
+  } satisfies UserConfig;
+
+  return config;
 });
