@@ -28,7 +28,7 @@
     "@cdktf/provider-aws": "^21.3.0",
     "@configs/eslint-config": "*",
     "@configs/ts-config": "*",
-    "@dotenvx/dotenvx": "^1.48.1",
+    "@dotenvx/dotenvx": "^1.48.3",
     "cdktf": "^0.21.0",
     "constructs": "^10.4.2",
     "cross-env": "^7.0.3",
