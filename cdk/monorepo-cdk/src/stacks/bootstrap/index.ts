@@ -7,19 +7,26 @@ import {
   BACKING_LOCK_TABLE_NAME,
 } from '@constants/backend';
 import type { UniversalStackProps } from '@type/stack';
+import { StandardBackend } from '@utils/standard-backend';
 import { TerraformStack } from 'cdktf';
 import type { Construct } from 'constructs';
 
-export type BootstrapStackProps = UniversalStackProps;
+export interface BootstrapStackProps extends UniversalStackProps {
+  migrateStateToBootstrappedBackend?: boolean;
+}
 
 export class BootstrapStack extends TerraformStack {
   public constructor(scope: Construct, id: string, props: BootstrapStackProps) {
     super(scope, id);
-    const { region } = props;
+    const { region, migrateStateToBootstrappedBackend } = props;
 
-    new AwsProvider(this, 'AWS', {
-      region,
-    });
+    if (migrateStateToBootstrappedBackend) {
+      new StandardBackend(this, id, region);
+    } else {
+      new AwsProvider(this, 'AWS', {
+        region,
+      });
+    }
 
     new DynamodbTable(this, 'lock', {
       name: BACKING_LOCK_TABLE_NAME,

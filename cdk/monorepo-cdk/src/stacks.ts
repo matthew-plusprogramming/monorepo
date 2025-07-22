@@ -8,7 +8,9 @@ export const stacks: Stack<any>[] = [
     name: 'bootstrap',
     description: 'Bootstrap stack for CdkTF projects',
     Stack: BootstrapStack,
-    props: {},
+    props: {
+      migrateStateToBootstrappedBackend: false,
+    },
   } satisfies Stack<BootstrapStackProps>,
   {
     name: 'my-stack',
