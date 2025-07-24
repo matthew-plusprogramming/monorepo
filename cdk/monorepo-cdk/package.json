@@ -2,6 +2,9 @@
   "name": "monorepo-cdk",
   "version": "0.0.1",
   "license": "UNLICENSED",
+  "exports": {
+    ".": "./src/consumer/index.ts"
+  },
   "scripts": {
     "// -- 🚀 Development": "--",
     "// -- 🛠️ Build & Clean": "--",
@@ -12,10 +15,11 @@
     "lint:fix": "eslint src --fix --cache",
     "lint:no-cache": "eslint src",
     "// -- ✅ Verification & CI": "--",
-    "cdk:bootstrap:migrate": "cd cdktf.out/stacks/bootstrap && cross-env-shell 'dotenvx run -f ../../../.env.$ENV -- tofu init -migrate-state' && cd ../../..",
+    "cdk:bootstrap:migrate": "tsx scripts/cdk-bootstrap-migrate.ts",
     "cdk:deploy": "cross-env-shell 'dotenvx run -f .env.$ENV -- cdktf deploy'",
     "cdk:destroy": "cross-env-shell 'dotenvx run -f .env.$ENV -- cdktf destroy'",
     "cdk:synth": "cross-env-shell 'dotenvx run -f .env.$ENV -- cdktf synth'",
+    "cdk:output": "cross-env-shell 'dotenvx run -f .env.$ENV -- cdktf output --outputs-file cdktf.out/stacks/$STACK/outputs.json $STACK'",
     "cdk:bootstrap:migrate:dev": "cross-env ENV=dev npm run cdk:bootstrap:migrate",
     "cdk:bootstrap:migrate:prod": "cross-env ENV=production npm run cdk:bootstrap:migrate",
     "cdk:deploy:dev": "cross-env ENV=dev npm run cdk:deploy",
@@ -24,6 +28,8 @@
     "cdk:destroy:prod": "cross-env ENV=production npm run cdk:destroy",
     "cdk:synth:dev": "cross-env ENV=dev npm run cdk:synth",
     "cdk:synth:prod": "cross-env ENV=production npm run cdk:synth",
+    "cdk:output:dev": "cross-env ENV=dev tsx scripts/cdk-output.ts",
+    "cdk:output:prod": "cross-env ENV=production tsx scripts/cdk-output.ts",
     "// -- 🔧 Miscellaneous": "--",
     "encrypt-envs": "dotenvx encrypt -f .env.dev .env.production",
     "decrypt-envs": "dotenvx decrypt -f .env.dev .env.production&& echo 'WARNING: DO NOT COMMIT decrypted .env files to the repository!'"
@@ -36,7 +42,9 @@
     "cdktf": "^0.21.0",
     "constructs": "^10.4.2",
     "cross-env": "^10.0.0",
+    "eslint": "^9.32.0",
     "tsx": "^4.20.3",
-    "typescript": "^5.8.3"
+    "typescript": "^5.8.3",
+    "zod": "^4.0.10"
   }
 }
