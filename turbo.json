@@ -23,7 +23,7 @@
       "cache": false
     },
     "cdk:deploy": {
-      "dependsOn": ["node-server:build"],
+      "dependsOn": ["node-server#build"],
       "cache": false
     }
   }
