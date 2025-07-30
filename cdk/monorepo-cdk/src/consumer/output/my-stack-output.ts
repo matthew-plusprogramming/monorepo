@@ -6,5 +6,3 @@ export const MyStackOutputSchema = z.object({
     verificationTableName: z.string(),
   }),
 });
-
-export type MyStackOutput = z.infer<typeof MyStackOutputSchema>;
