@@ -1,6 +1,6 @@
-import { BootstrapStack, type BootstrapStackProps } from '@stacks/bootstrap';
-import { MyStack, type MyStackProps } from '@stacks/my-stack';
-import type { Stack } from '@type/stack';
+import { BootstrapStack, type BootstrapStackProps } from './stacks/bootstrap';
+import { MyStack, type MyStackProps } from './stacks/my-stack';
+import type { Stack } from './types/stack';
 
 export const stacks = [
   {

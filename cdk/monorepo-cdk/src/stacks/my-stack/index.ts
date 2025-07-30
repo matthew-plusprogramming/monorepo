@@ -1,8 +1,9 @@
 import { DynamodbTable } from '@cdktf/provider-aws/lib/dynamodb-table';
-import type { UniversalStackProps } from '@type/stack';
-import { StandardBackend } from '@utils/standard-backend';
 import { TerraformOutput, TerraformStack } from 'cdktf';
 import type { Construct } from 'constructs';
+
+import type { UniversalStackProps } from '../../types/stack';
+import { StandardBackend } from '../../utils/standard-backend';
 
 export interface MyStackProps extends UniversalStackProps {
   bucketName?: string;

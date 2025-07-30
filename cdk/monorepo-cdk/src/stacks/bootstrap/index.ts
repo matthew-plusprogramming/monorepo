@@ -2,14 +2,15 @@ import { DynamodbTable } from '@cdktf/provider-aws/lib/dynamodb-table';
 import { AwsProvider } from '@cdktf/provider-aws/lib/provider';
 import { S3Bucket } from '@cdktf/provider-aws/lib/s3-bucket';
 import { S3BucketVersioningA } from '@cdktf/provider-aws/lib/s3-bucket-versioning';
+import { TerraformStack } from 'cdktf';
+import type { Construct } from 'constructs';
+
 import {
   BACKING_BUCKET_NAME,
   BACKING_LOCK_TABLE_NAME,
-} from '@constants/backend';
-import type { UniversalStackProps } from '@type/stack';
-import { StandardBackend } from '@utils/standard-backend';
-import { TerraformStack } from 'cdktf';
-import type { Construct } from 'constructs';
+} from '../../constants/backend';
+import type { UniversalStackProps } from '../../types/stack';
+import { StandardBackend } from '../../utils/standard-backend';
 
 export interface BootstrapStackProps extends UniversalStackProps {
   migrateStateToBootstrappedBackend?: boolean;

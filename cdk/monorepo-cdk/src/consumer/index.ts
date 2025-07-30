@@ -1,10 +1,18 @@
 import fs from 'fs';
 import path from 'path';
+import { dirname } from 'path';
+import { fileURLToPath } from 'url';
 import type { output, ZodObject } from 'zod';
 
 import type { stacks } from '../stacks';
 
-type ConsumableStack = Exclude<(typeof stacks)[number]['name'], 'bootstrap'>;
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+export type ConsumableStack = Exclude<
+  (typeof stacks)[number]['name'],
+  'bootstrap'
+>;
 
 export const loadOutput = <T extends ZodObject>(
   schema: T,

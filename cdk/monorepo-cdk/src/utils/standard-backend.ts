@@ -1,10 +1,11 @@
 import { AwsProvider } from '@cdktf/provider-aws/lib/provider';
+import type { TerraformStack } from 'cdktf';
+import { S3Backend } from 'cdktf';
+
 import {
   BACKING_BUCKET_NAME,
   BACKING_LOCK_TABLE_NAME,
-} from '@constants/backend';
-import type { TerraformStack } from 'cdktf';
-import { S3Backend } from 'cdktf';
+} from '../constants/backend';
 
 export class StandardBackend {
   public constructor(stack: TerraformStack, stackId: string, region: string) {
