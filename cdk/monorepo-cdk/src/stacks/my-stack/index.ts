@@ -27,6 +27,17 @@ export class MyStack extends TerraformStack {
           name: 'id',
           type: 'S',
         },
+        {
+          name: 'email',
+          type: 'S',
+        },
+      ],
+      globalSecondaryIndex: [
+        {
+          name: 'email-index',
+          hashKey: 'email',
+          projectionType: 'ALL',
+        },
       ],
       region,
     });
