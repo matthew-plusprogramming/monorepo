@@ -1,7 +1,7 @@
 import { RegisterInputSchema, type User } from '@packages/schemas/user';
 import { Effect, Either } from 'effect';
 import type { RequestHandler } from 'express';
-import { loadOutput } from 'monorepo-cdk';
+import { loadOutput } from '@cdk/monorepo-cdk';
 import { v4 as uuidV4 } from 'uuid';
 import z, { ZodError } from 'zod';
 

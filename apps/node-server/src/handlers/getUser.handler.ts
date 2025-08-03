@@ -1,3 +1,4 @@
+import { loadOutput } from '@cdk/monorepo-cdk';
 import {
   GetUserSchema,
   type User,
@@ -5,7 +6,6 @@ import {
 } from '@packages/schemas/user';
 import { Effect, Either } from 'effect';
 import type { RequestHandler } from 'express';
-import { loadOutput } from 'monorepo-cdk';
 import z, { ZodError } from 'zod';
 
 import {
