@@ -1,4 +1,4 @@
-import { loadOutput } from '@cdk/monorepo-cdk';
+import { loadCDKOutput } from '@cdk/monorepo-cdk';
 import {
   GetUserSchema,
   type User,
@@ -16,9 +16,7 @@ import { InternalServerError, NotFoundError } from '../types/errors/http';
 import type { handlerInput } from '../types/handler';
 import { HTTP_RESPONSE } from '../types/http';
 
-// TODO: Move this to a shared location
-const usersTableName =
-  loadOutput<'my-stack'>('my-stack')['my-stack'].userTableName;
+const usersTableName = loadCDKOutput<'my-stack'>('my-stack').userTableName;
 
 const getUserHandler = (
   input: handlerInput,
@@ -87,7 +85,6 @@ const getUserHandler = (
       },
     }).pipe(
       Effect.catchAll((e) => {
-        console.error('hi');
         console.error(e);
         // TODO: Implement logging
         return Effect.fail(new InternalServerError({ message: e.message }));

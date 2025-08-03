@@ -1,7 +1,7 @@
+import { loadCDKOutput } from '@cdk/monorepo-cdk';
 import { RegisterInputSchema, type User } from '@packages/schemas/user';
 import { Effect, Either } from 'effect';
 import type { RequestHandler } from 'express';
-import { loadOutput } from '@cdk/monorepo-cdk';
 import { v4 as uuidV4 } from 'uuid';
 import z, { ZodError } from 'zod';
 
@@ -13,9 +13,7 @@ import { InternalServerError } from '../types/errors/http';
 import type { handlerInput } from '../types/handler';
 import { HTTP_RESPONSE } from '../types/http';
 
-// TODO: Move this to a shared location
-const usersTableName =
-  loadOutput<'my-stack'>('my-stack')['my-stack'].userTableName;
+const usersTableName = loadCDKOutput<'my-stack'>('my-stack').userTableName;
 
 const registerHandler = (
   input: handlerInput,

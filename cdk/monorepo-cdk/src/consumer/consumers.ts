@@ -18,9 +18,9 @@ type OutputByName = {
 
 export type ConsumableStack = keyof OutputByName;
 
-export const loadOutput = <T extends ConsumableStack>(
+const loadOutput = <T extends ConsumableStack>(
   stack: T,
-): OutputByName[T] => {
+): OutputByName[T][T] => {
   const stackOutputPath = path.resolve(
     __dirname,
     `../../cdktf.out/stacks/${stack}/outputs.json`,
@@ -46,5 +46,16 @@ export const loadOutput = <T extends ConsumableStack>(
     throw new Error(`Failed to parse output for stack: ${stack}`);
   }
 
-  return parsed;
+  return parsed[stack];
+};
+
+const loadedOutputs: { [K in ConsumableStack]?: OutputByName[K][K] } = {};
+
+export const loadCDKOutput = <T extends ConsumableStack>(
+  stack: T,
+): OutputByName[T][T] => {
+  if (!loadedOutputs[stack]) {
+    loadedOutputs[stack] = loadOutput<typeof stack>(stack);
+  }
+  return loadedOutputs[stack]!;
 };
