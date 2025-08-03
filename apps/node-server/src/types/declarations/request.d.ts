@@ -1,9 +1,9 @@
-import type { User } from '@schemas/User';
+import type { UserToken } from '@packages/schemas/user';
 
 declare global {
   namespace Express {
     interface Request {
-      user?: User;
+      user?: UserToken;
     }
   }
 }

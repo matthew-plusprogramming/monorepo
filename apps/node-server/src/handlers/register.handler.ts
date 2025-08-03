@@ -1,22 +1,34 @@
-import { RegisterInputSchema, type User } from '@packages/schemas/user';
+import { RegisterInputSchema, type UserToken } from '@packages/schemas/user';
 import { Effect, Either } from 'effect';
 import type { RequestHandler } from 'express';
+import { sign } from 'jsonwebtoken';
 import { v4 as uuidV4 } from 'uuid';
 import z, { ZodError } from 'zod';
 
 import { usersTableName } from '../clients/cdkOutputs';
+import { JWT_AUDIENCE, JWT_ISSUER } from '../constants/jwt';
+import { USER_ROLE } from '../constants/roles';
 import { parseInput } from '../helpers/zodParser';
 import {
   DynamoDbService,
   LiveDynamoDbService,
 } from '../services/dynamodb.service';
+import {
+  ApplicationLoggerService,
+  LoggerService,
+} from '../services/logger.service';
 import { InternalServerError } from '../types/errors/http';
+import { ConflictError } from '../types/errors/http';
 import type { handlerInput } from '../types/handler';
 import { HTTP_RESPONSE } from '../types/http';
 
 const registerHandler = (
   input: handlerInput,
-): Effect.Effect<Partial<User>, InternalServerError | ZodError, never> => {
+): Effect.Effect<
+  string,
+  ConflictError | InternalServerError | ZodError,
+  never
+> => {
   return Effect.gen(function* () {
     const req = yield* input;
 
@@ -26,13 +38,41 @@ const registerHandler = (
     );
 
     const databaseService = yield* DynamoDbService;
+    const loggerService = yield* LoggerService;
+    const userId = uuidV4();
 
-    // TODO: Implement duplicate checking
+    const existingUserCheck = yield* databaseService
+      .query({
+        TableName: usersTableName,
+        // TODO: put this in a schema somewhere in @schemas
+        IndexName: 'email-index',
+        KeyConditionExpression: '#email = :email',
+        ExpressionAttributeNames: {
+          '#email': 'email',
+        },
+        ExpressionAttributeValues: {
+          ':email': { S: parsedInput.email },
+        },
+        Limit: 1,
+      })
+      .pipe(
+        Effect.catchAll((e) => {
+          loggerService.logError(e);
+          return Effect.fail(new InternalServerError({ message: e.message }));
+        }),
+      );
+
+    if (!existingUserCheck.Count || existingUserCheck.Count > 0) {
+      return yield* new ConflictError({
+        message: 'User with email already exists',
+      });
+    }
+
     yield* databaseService
       .putItem({
         TableName: usersTableName,
         Item: {
-          id: { S: uuidV4() },
+          id: { S: userId },
           username: { S: parsedInput.username },
           email: { S: parsedInput.email },
           // ! In production, never store passwords in plain text
@@ -41,13 +81,28 @@ const registerHandler = (
       })
       .pipe(
         Effect.catchAll((e) => {
-          // TODO: Implement logging
+          loggerService.logError(e);
           return Effect.fail(new InternalServerError({ message: e.message }));
         }),
       );
 
-    return parsedInput;
-  }).pipe(Effect.provide(LiveDynamoDbService));
+    const now = Date.now();
+    const inOneHour = now + 60 * 60 * 1000;
+
+    const userToken = {
+      iss: JWT_ISSUER,
+      sub: userId,
+      aud: JWT_AUDIENCE,
+      exp: inOneHour,
+      iat: now,
+      jti: uuidV4(),
+      role: USER_ROLE,
+    } satisfies UserToken;
+
+    return sign(userToken, process.env.JWT_SECRET);
+  })
+    .pipe(Effect.provide(LiveDynamoDbService))
+    .pipe(Effect.provide(ApplicationLoggerService));
 };
 
 export const registerRequestHandler: RequestHandler = async (req, res) => {
@@ -61,10 +116,12 @@ export const registerRequestHandler: RequestHandler = async (req, res) => {
     if (error instanceof ZodError) {
       res.status(HTTP_RESPONSE.BAD_REQUEST).send(z.prettifyError(error));
       return;
+    } else if (error instanceof ConflictError) {
+      res.status(HTTP_RESPONSE.CONFLICT).send(error.message);
     }
 
-    res.status(HTTP_RESPONSE.INTERNAL_SERVER_ERROR).send();
+    res.status(HTTP_RESPONSE.INTERNAL_SERVER_ERROR).send(error.message);
   } else {
-    res.status(HTTP_RESPONSE.CREATED).send();
+    res.status(HTTP_RESPONSE.CREATED).send(result.right);
   }
 };
