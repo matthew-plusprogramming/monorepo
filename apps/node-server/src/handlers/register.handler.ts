@@ -5,6 +5,7 @@ import type { RequestHandler } from 'express';
 import { v4 as uuidV4 } from 'uuid';
 import z, { ZodError } from 'zod';
 
+import { parseInput } from '../helpers/zodParser';
 import {
   DynamoDbService,
   LiveDynamoDbService,
@@ -21,23 +22,10 @@ const registerHandler = (
   return Effect.gen(function* () {
     const req = yield* input;
 
-    const parsedInput = yield* Effect.try({
-      try: () => RegisterInputSchema.parse(req.body),
-      catch: (error) => {
-        if (error instanceof Error) {
-          if (error instanceof ZodError) {
-            return error;
-          }
-          // TODO: Implement logging
-          return new InternalServerError({
-            message: `Internal server error: ${error.message}`,
-          });
-        }
-        return new InternalServerError({
-          message: 'An unknown error occurred',
-        });
-      },
-    });
+    const parsedInput = yield* parseInput<typeof RegisterInputSchema>(
+      RegisterInputSchema,
+      req.body,
+    );
 
     const databaseService = yield* DynamoDbService;
 

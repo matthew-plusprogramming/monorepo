@@ -8,6 +8,7 @@ import { Effect, Either } from 'effect';
 import type { RequestHandler } from 'express';
 import z, { ZodError } from 'zod';
 
+import { parseInput } from '../helpers/zodParser';
 import {
   DynamoDbService,
   LiveDynamoDbService,
@@ -28,23 +29,10 @@ const getUserHandler = (
   return Effect.gen(function* () {
     const req = yield* input;
 
-    const parsedInput = yield* Effect.try({
-      try: () => GetUserSchema.parse(req?.params?.identifier),
-      catch: (error) => {
-        if (error instanceof Error) {
-          if (error instanceof ZodError) {
-            return error;
-          }
-          // TODO: Implement logging
-          return new InternalServerError({
-            message: `Internal server error: ${error.message}`,
-          });
-        }
-        return new InternalServerError({
-          message: 'An unknown error occurred',
-        });
-      },
-    });
+    const parsedInput = yield* parseInput<typeof GetUserSchema>(
+      GetUserSchema,
+      req.params?.identifier,
+    );
 
     const databaseService = yield* DynamoDbService;
 
