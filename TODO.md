@@ -19,6 +19,7 @@ Backend:
 Frontend:
 
 - [ ] Integrate basic react setup w/ zustand, react query
+- [ ] Integrate single-spa (why not)
 
 Chores:
 
