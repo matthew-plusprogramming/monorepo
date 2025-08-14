@@ -6,7 +6,24 @@ Monorepo Infra:
 
 Backend:
 
+Auth Package (Lambda)
+
+- [ ] Set low concurrency (10)
+- [ ] Coarse rate limiting
+- [ ] Authenticates user
+- [ ] Deny-list check
 - [ ] Integrate authzed (spiceDB)
+
+Control Package (Lambda)
+
+- Only callable from the auth lambda
+
+- [ ] Emergency "kill switch" lambda that throttles auth lambda to 1 or 0 concurrency
+
+Node Server (Lambda)
+
+- Only callable from the auth lambda
+
 - [ ] Integrate Effect library
 - [ ] Integrate zod
 - [ ] Integrate graphql (gql.tada)
