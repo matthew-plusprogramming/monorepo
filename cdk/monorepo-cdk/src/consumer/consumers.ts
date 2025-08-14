@@ -18,14 +18,23 @@ type OutputByName = {
 
 export type ConsumableStack = keyof OutputByName;
 
-const loadOutput = <T extends ConsumableStack>(
-  stack: T,
-): OutputByName[T][T] => {
-  const stackOutputPath = path.resolve(
+const generateOutputPath = (
+  stack: ConsumableStack,
+  outputsPath?: string,
+): string => {
+  if (outputsPath) {
+    return path.resolve(outputsPath, `cdktf.out/stacks/${stack}/outputs.json`);
+  }
+  return path.resolve(
     __dirname,
     `../../cdktf.out/stacks/${stack}/outputs.json`,
   );
+};
 
+const loadOutput = <T extends ConsumableStack>(
+  stack: T,
+  stackOutputPath: string,
+): OutputByName[T][T] => {
   if (!fs.existsSync(stackOutputPath)) {
     throw new Error(`Stack output file not found: ${stackOutputPath}`);
   }
@@ -53,9 +62,13 @@ const loadedOutputs: { [K in ConsumableStack]?: OutputByName[K][K] } = {};
 
 export const loadCDKOutput = <T extends ConsumableStack>(
   stack: T,
+  outputsPath?: string,
 ): OutputByName[T][T] => {
   if (!loadedOutputs[stack]) {
-    loadedOutputs[stack] = loadOutput<typeof stack>(stack);
+    loadedOutputs[stack] = loadOutput<typeof stack>(
+      stack,
+      generateOutputPath(stack, outputsPath),
+    );
   }
   return loadedOutputs[stack]!;
 };

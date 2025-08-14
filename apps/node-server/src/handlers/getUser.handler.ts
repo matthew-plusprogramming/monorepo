@@ -1,4 +1,3 @@
-import { loadCDKOutput } from '@cdk/monorepo-cdk';
 import {
   GetUserSchema,
   type User,
@@ -8,6 +7,7 @@ import { Effect, Either } from 'effect';
 import type { RequestHandler } from 'express';
 import z, { ZodError } from 'zod';
 
+import { usersTableName } from '../clients/cdkOutputs';
 import { parseInput } from '../helpers/zodParser';
 import {
   DynamoDbService,
@@ -16,8 +16,6 @@ import {
 import { InternalServerError, NotFoundError } from '../types/errors/http';
 import type { handlerInput } from '../types/handler';
 import { HTTP_RESPONSE } from '../types/http';
-
-const usersTableName = loadCDKOutput<'my-stack'>('my-stack').userTableName;
 
 const getUserHandler = (
   input: handlerInput,

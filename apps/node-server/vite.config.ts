@@ -14,11 +14,14 @@ if (isNaN(Number(port))) {
   throw new Error('Environment variable PORT must be a number');
 }
 
-export default defineConfig(({ mode }) => {
+export default defineConfig(({ mode, command }) => {
   const config = {
     ...baseConfig,
     server: {
       port: parseInt(port),
+    },
+    define: {
+      __BUNDLED__: command === 'build',
     },
     plugins: [
       ...VitePluginNode({
