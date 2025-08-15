@@ -1,5 +1,9 @@
 import { execSync } from 'child_process';
-import path from 'path';
+import { dirname, resolve } from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 const ENV = process.env.ENV;
 if (!ENV) {
@@ -7,7 +11,7 @@ if (!ENV) {
   process.exit(1);
 }
 
-const workDir = path.resolve(__dirname, '../cdktf.out/stacks/bootstrap');
+const workDir = resolve(__dirname, '../cdktf.out/stacks/bootstrap');
 
 try {
   // Change to working directory

@@ -1,6 +1,5 @@
 {
   "extends": "@configs/ts-config/tsconfig.build.json",
-  "compilerOptions": {},
   "include": ["src/**/*.ts"],
   "exclude": ["cdktf.out"]
 }

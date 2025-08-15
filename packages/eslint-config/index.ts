@@ -31,14 +31,17 @@ const gitignorePath = fileURLToPath(
   new URL('../../.gitignore', import.meta.url),
 );
 
-export const baseConfig = (tsconfigDirectory: string) => [
+export const baseConfig = (
+  tsconfigDirectory: string,
+  projectOverride?: string[],
+) => [
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
     languageOptions: {
       parser: tseslint.parser,
       parserOptions: {
-        project: ['tsconfig.json'],
+        project: projectOverride ?? ['tsconfig.json'],
         tsconfigRootDir: tsconfigDirectory,
       },
     },
