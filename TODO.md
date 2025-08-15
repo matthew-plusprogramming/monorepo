@@ -8,6 +8,8 @@ Backend:
 
 Auth Package (Lambda)
 
+- [ ] Error obfuscation for default routes and unauthenticated routes
+  - [ ] Customizable to send 500 or 502 to mask 400 level errors
 - [ ] Set low concurrency (10)
 - [ ] Coarse rate limiting
 - [ ] Authenticates user
