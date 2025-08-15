@@ -1,3 +1,5 @@
+import { CloudwatchLogGroup } from '@cdktf/provider-aws/lib/cloudwatch-log-group';
+import { CloudwatchLogStream } from '@cdktf/provider-aws/lib/cloudwatch-log-stream';
 import { DynamodbTable } from '@cdktf/provider-aws/lib/dynamodb-table';
 import { TerraformOutput, TerraformStack } from 'cdktf';
 import type { Construct } from 'constructs';
@@ -59,6 +61,19 @@ export class MyStack extends TerraformStack {
       region,
     });
 
+    const applicationLogGroup = new CloudwatchLogGroup(
+      this,
+      'application-logs',
+      {
+        name: 'application-logs',
+      },
+    );
+
+    const serverLogStream = new CloudwatchLogStream(this, 'server-logs', {
+      name: 'server-logs',
+      logGroupName: applicationLogGroup.name,
+    });
+
     new TerraformOutput(this, 'userTableName', {
       value: userTable.name,
       description: 'The name of the user table',
@@ -66,6 +81,14 @@ export class MyStack extends TerraformStack {
     new TerraformOutput(this, 'verificationTableName', {
       value: verificationTable.name,
       description: 'The name of the verification table',
+    });
+    new TerraformOutput(this, 'applicationLogGroupName', {
+      value: applicationLogGroup.name,
+      description: 'The name of the application log group',
+    });
+    new TerraformOutput(this, 'serverLogStreamName', {
+      value: serverLogStream.name,
+      description: 'The name of the server log stream',
     });
   }
 }
