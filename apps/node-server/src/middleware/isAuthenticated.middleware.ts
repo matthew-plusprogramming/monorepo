@@ -1,8 +1,13 @@
-import { Effect, Either, pipe } from 'effect';
+import { UserTokenSchema } from '@packages/schemas/user';
+import { Effect } from 'effect';
 import type { RequestHandler } from 'express';
-import { type JwtPayload, verify } from 'jsonwebtoken';
+import { verify } from 'jsonwebtoken';
 import z from 'zod';
 
+import {
+  ApplicationLoggerService,
+  LoggerService,
+} from '../services/logger.service';
 import {
   UserNotAuthenticatedError,
   UserTokenInvalidError,
@@ -12,57 +17,54 @@ import { HTTP_RESPONSE } from '../types/http';
 
 const isAuthenticatedMiddlewareHandler = (
   input: handlerInput,
-): Effect.Effect<
-  string | JwtPayload,
-  UserNotAuthenticatedError | UserTokenInvalidError
-> => {
-  return pipe(
-    input,
-    Effect.flatMap((req) => {
-      const authorization = req.headers.authorization;
+): Effect.Effect<void, UserNotAuthenticatedError | UserTokenInvalidError> =>
+  Effect.gen(function* () {
+    const logger = yield* LoggerService;
+    const req = yield* input;
 
-      return Effect.if(!!authorization, {
-        onFalse: () =>
-          Effect.fail(
-            new UserNotAuthenticatedError({
-              message: 'Authorization header not provided',
-            }),
-          ),
-        onTrue: () => {
-          const token = authorization!.split(' ')[1];
-
-          return Effect.if(
-            !token || z.jwt().safeParse(token).success === false,
-            {
-              onTrue: () =>
-                Effect.fail(
-                  new UserTokenInvalidError({
-                    message: 'Authorization token invalid',
-                  }),
-                ),
-              onFalse: () =>
-                Effect.try({
-                  try: () => verify(token!, process.env.JWT_SECRET),
-                  // TODO: implement logging
-                  catch: () =>
-                    new UserNotAuthenticatedError({
-                      message: 'Error validating token',
-                    }),
-                }),
-            },
-          );
-        },
+    const auth = req.headers.authorization;
+    if (!auth) {
+      return yield* new UserNotAuthenticatedError({
+        message: 'Authorization header not provided',
       });
-    }),
-  );
-};
+    } else {
+      const token = auth.split(' ')[1];
+
+      if (!token || z.jwt().safeParse(token).success === false) {
+        return yield* new UserTokenInvalidError({
+          message: 'Authorization token invalid',
+        });
+      } else {
+        const decodedJWT = yield* Effect.try({
+          try: () => verify(token, process.env.JWT_SECRET),
+          catch: () =>
+            new UserNotAuthenticatedError({
+              message: 'Error validating token',
+            }),
+        });
+
+        const userToken = yield* Effect.try({
+          try: () => UserTokenSchema.parse(decodedJWT),
+          catch: () =>
+            new UserTokenInvalidError({
+              message: 'Authorization token invalid',
+            }),
+        });
+
+        req.user = userToken;
+        logger.log(
+          `User: ${userToken.sub}, Role: ${userToken.role} Authenticated`,
+        );
+      }
+    }
+  }).pipe(Effect.provide(ApplicationLoggerService));
 
 export const isAuthenticatedMiddlewareRequestHandler: RequestHandler = async (
   req,
   res,
   next,
 ) => {
-  const result = Effect.succeed(req)
+  await Effect.succeed(req)
     .pipe(isAuthenticatedMiddlewareHandler)
     .pipe(
       Effect.catchTag('UserNotAuthenticatedError', () =>
@@ -74,10 +76,6 @@ export const isAuthenticatedMiddlewareRequestHandler: RequestHandler = async (
         Effect.fail(res.status(HTTP_RESPONSE.BAD_REQUEST).send()),
       ),
     )
-    .pipe(Effect.either)
-    .pipe(Effect.runSync);
-
-  if (Either.isRight(result)) {
-    next();
-  }
+    .pipe(Effect.tap(() => next()))
+    .pipe(Effect.runPromise);
 };
