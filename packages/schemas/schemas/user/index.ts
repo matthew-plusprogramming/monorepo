@@ -1,5 +1,6 @@
 // Base types
 export * from './user';
+export * from './userToken';
 export * from './verification';
 
 // Commands
