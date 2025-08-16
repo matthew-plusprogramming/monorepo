@@ -17,6 +17,10 @@
       "path": "packages/schemas",
     },
     {
+      "name": "📚 @utils/ts-utils",
+      "path": "packages/ts-utils",
+    },
+    {
       "name": "📚 @utils/type-utils",
       "path": "packages/type-utils",
     },
