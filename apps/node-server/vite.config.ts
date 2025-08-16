@@ -1,6 +1,5 @@
 import '@dotenvx/dotenvx/config';
 
-import { VitePluginNode } from 'vite-plugin-node';
 import { baseConfig } from '@configs/vite-config';
 import { defineConfig, UserConfig } from 'vite';
 
@@ -23,16 +22,18 @@ export default defineConfig(({ mode, command }) => {
     define: {
       __BUNDLED__: command === 'build',
     },
-    plugins: [
-      ...VitePluginNode({
-        adapter: 'express',
-        appPath: './src/index.ts',
-        tsCompiler: 'esbuild',
-        initAppOnBoot: true,
-      }),
-    ],
+    plugins: [],
     build: {
       minify: mode === 'production' ? 'esbuild' : false,
+      target: 'es2024',
+      ssr: true,
+      outDir: 'dist',
+      rollupOptions: {
+        input: 'src/index.ts',
+        output: {
+          format: 'cjs',
+        },
+      },
     },
   } satisfies UserConfig;
 
