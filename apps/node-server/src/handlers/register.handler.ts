@@ -1,7 +1,8 @@
+import { generateRequestHandler } from '@packages/backend-core';
 import { RegisterInputSchema, type UserToken } from '@packages/schemas/user';
 import { USER_SCHEMA_CONSTANTS } from '@packages/schemas/user';
-import { Effect, Either } from 'effect';
-import type { RequestHandler } from 'express';
+import { exists } from '@utils/ts-utils';
+import { Effect } from 'effect';
 import { sign } from 'jsonwebtoken';
 import { v4 as uuidV4 } from 'uuid';
 import z, { ZodError } from 'zod';
@@ -62,7 +63,7 @@ const registerHandler = (
         }),
       );
 
-    if (!existingUserCheck.Count || existingUserCheck.Count > 0) {
+    if (!exists(existingUserCheck.Count) || existingUserCheck.Count > 0) {
       return yield* new ConflictError({
         message: 'User with email already exists',
       });
@@ -105,23 +106,24 @@ const registerHandler = (
     .pipe(Effect.provide(ApplicationLoggerService));
 };
 
-export const registerRequestHandler: RequestHandler = async (req, res) => {
-  const result = await Effect.succeed(req)
-    .pipe(registerHandler)
-    .pipe(Effect.either)
-    .pipe(Effect.runPromise);
-
-  if (Either.isLeft(result)) {
-    const error = result.left;
-    if (error instanceof ZodError) {
-      res.status(HTTP_RESPONSE.BAD_REQUEST).send(z.prettifyError(error));
-      return;
-    } else if (error instanceof ConflictError) {
-      res.status(HTTP_RESPONSE.CONFLICT).send(error.message);
-    }
-
-    res.status(HTTP_RESPONSE.INTERNAL_SERVER_ERROR).send(error.message);
-  } else {
-    res.status(HTTP_RESPONSE.CREATED).send(result.right);
-  }
-};
+export const registerRequestHandler = generateRequestHandler<
+  string,
+  ConflictError | InternalServerError | ZodError
+>({
+  effectfulHandler: registerHandler,
+  statusCodesToErrors: {
+    [HTTP_RESPONSE.BAD_REQUEST]: {
+      errorType: ZodError,
+      mapper: (e) => z.prettifyError(e as ZodError),
+    },
+    [HTTP_RESPONSE.CONFLICT]: {
+      errorType: ConflictError,
+      mapper: (e) => e.message,
+    },
+    [HTTP_RESPONSE.INTERNAL_SERVER_ERROR]: {
+      errorType: InternalServerError,
+      mapper: (e) => e.message,
+    },
+  },
+  successCode: HTTP_RESPONSE.CREATED,
+});

@@ -1,3 +1,4 @@
+import { generateRequestHandler } from '@packages/backend-core';
 import {
   GetUserSchema,
   type User,
@@ -5,8 +6,7 @@ import {
   UserEmailSchema,
   type UserTableKey,
 } from '@packages/schemas/user';
-import { Effect, Either } from 'effect';
-import type { RequestHandler } from 'express';
+import { Effect } from 'effect';
 import z, { ZodError } from 'zod';
 
 import { usersTableName } from '../clients/cdkOutputs';
@@ -101,24 +101,24 @@ const getUserHandler = (
     .pipe(Effect.provide(ApplicationLoggerService));
 };
 
-export const getUserRequestHandler: RequestHandler = async (req, res) => {
-  const result = await Effect.succeed(req)
-    .pipe(getUserHandler)
-    .pipe(Effect.either)
-    .pipe(Effect.runPromise);
-
-  if (Either.isLeft(result)) {
-    const error = result.left;
-    if (error instanceof ZodError) {
-      res.status(HTTP_RESPONSE.BAD_REQUEST).send(z.prettifyError(error));
-      return;
-    } else if (error instanceof NotFoundError) {
-      res.status(HTTP_RESPONSE.NOT_FOUND).send(error.message);
-      return;
-    }
-
-    res.status(HTTP_RESPONSE.INTERNAL_SERVER_ERROR).send(error.message);
-  } else {
-    res.status(HTTP_RESPONSE.SUCCESS).send(result.right);
-  }
-};
+export const getUserRequestHandler = generateRequestHandler<
+  User,
+  NotFoundError | InternalServerError | ZodError
+>({
+  effectfulHandler: getUserHandler,
+  statusCodesToErrors: {
+    [HTTP_RESPONSE.BAD_REQUEST]: {
+      errorType: ZodError,
+      mapper: (e) => z.prettifyError(e as ZodError),
+    },
+    [HTTP_RESPONSE.NOT_FOUND]: {
+      errorType: NotFoundError,
+      mapper: (e) => e.message,
+    },
+    [HTTP_RESPONSE.INTERNAL_SERVER_ERROR]: {
+      errorType: InternalServerError,
+      mapper: (e) => e.message,
+    },
+  },
+  successCode: HTTP_RESPONSE.SUCCESS,
+});

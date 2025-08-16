@@ -1,0 +1,8 @@
+{
+  "my-stack": {
+    "applicationLogGroupName": "application-logs",
+    "serverLogStreamName": "server-logs",
+    "userTableName": "my-example-bucket-user-table",
+    "verificationTableName": "my-example-bucket-verification-table"
+  }
+}

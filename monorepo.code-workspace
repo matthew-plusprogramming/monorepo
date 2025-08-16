@@ -13,6 +13,10 @@
       "path": "cdk/backend-server-cdk",
     },
     {
+      "name": "📚 @packages/backend-core",
+      "path": "packages/backend-core",
+    },
+    {
       "name": "📚 @packages/schemas",
       "path": "packages/schemas",
     },
