@@ -1,4 +1,10 @@
-import { generateRequestHandler } from '@packages/backend-core';
+import type { handlerInput } from '@packages/backend-core';
+import {
+  ConflictError,
+  generateRequestHandler,
+  HTTP_RESPONSE,
+  InternalServerError,
+} from '@packages/backend-core';
 import { RegisterInputSchema, type UserToken } from '@packages/schemas/user';
 import { USER_SCHEMA_CONSTANTS } from '@packages/schemas/user';
 import { exists } from '@utils/ts-utils';
@@ -19,10 +25,6 @@ import {
   ApplicationLoggerService,
   LoggerService,
 } from '../services/logger.service';
-import { InternalServerError } from '../types/errors/http';
-import { ConflictError } from '../types/errors/http';
-import type { handlerInput } from '../types/handler';
-import { HTTP_RESPONSE } from '../types/http';
 
 const registerHandler = (
   input: handlerInput,

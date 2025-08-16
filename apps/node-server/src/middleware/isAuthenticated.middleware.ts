@@ -1,3 +1,9 @@
+import type { handlerInput } from '@packages/backend-core';
+import {
+  HTTP_RESPONSE,
+  UserNotAuthenticatedError,
+  UserTokenInvalidError,
+} from '@packages/backend-core';
 import { UserTokenSchema } from '@packages/schemas/user';
 import { Effect } from 'effect';
 import type { RequestHandler } from 'express';
@@ -8,12 +14,6 @@ import {
   ApplicationLoggerService,
   LoggerService,
 } from '../services/logger.service';
-import {
-  UserNotAuthenticatedError,
-  UserTokenInvalidError,
-} from '../types/errors/user';
-import type { handlerInput } from '../types/handler';
-import { HTTP_RESPONSE } from '../types/http';
 
 const isAuthenticatedMiddlewareHandler = (
   input: handlerInput,

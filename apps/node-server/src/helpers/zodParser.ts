@@ -1,8 +1,7 @@
+import { InternalServerError } from '@packages/backend-core';
 import { Effect } from 'effect';
 import type { ZodType } from 'zod';
 import { type output, ZodError } from 'zod';
-
-import { InternalServerError } from '../types/errors/http';
 
 export const parseInput = <T extends ZodType>(
   schema: T,

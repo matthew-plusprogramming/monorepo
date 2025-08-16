@@ -1,4 +1,10 @@
-import { generateRequestHandler } from '@packages/backend-core';
+import type { handlerInput } from '@packages/backend-core';
+import {
+  generateRequestHandler,
+  HTTP_RESPONSE,
+  InternalServerError,
+  NotFoundError,
+} from '@packages/backend-core';
 import {
   GetUserSchema,
   type User,
@@ -19,9 +25,6 @@ import {
   ApplicationLoggerService,
   LoggerService,
 } from '../services/logger.service';
-import { InternalServerError, NotFoundError } from '../types/errors/http';
-import type { handlerInput } from '../types/handler';
-import { HTTP_RESPONSE } from '../types/http';
 
 const getUserHandler = (
   input: handlerInput,

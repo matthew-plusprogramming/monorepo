@@ -1,6 +1,6 @@
 import { Data } from 'effect';
 
-import type { GenericErrorPayload } from '../errors';
+import type { GenericErrorPayload } from '.';
 
 // Login
 
