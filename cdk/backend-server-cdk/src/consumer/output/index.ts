@@ -1,1 +1,1 @@
-export * from './my-stack-output';
+export * from './api-stack-output';

@@ -1,8 +1,8 @@
 import z from 'zod';
 
-import { MyStackOutputSchema } from './consumer/output';
+import { ApiStackOutputSchema } from './consumer/output';
+import { ApiStack, type ApiStackProps } from './stacks/api-stack';
 import { BootstrapStack, type BootstrapStackProps } from './stacks/bootstrap';
-import { MyStack, type MyStackProps } from './stacks/my-stack';
 import type { Stack } from './types/stack';
 
 export const stacks = [
@@ -16,13 +16,11 @@ export const stacks = [
     outputSchema: z.object(),
   } as const satisfies Stack<BootstrapStackProps>,
   {
-    name: 'my-stack',
-    description: 'Example stack for demonstration purposes',
-    Stack: MyStack,
-    props: {
-      bucketName: 'my-example-bucket',
-    },
-    outputSchema: MyStackOutputSchema,
-  } as const satisfies Stack<MyStackProps>,
+    name: 'api-stack',
+    description: 'API stack for the application',
+    Stack: ApiStack,
+    props: {},
+    outputSchema: ApiStackOutputSchema,
+  } as const satisfies Stack<ApiStackProps>,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
 ] as const satisfies Stack<any>[];

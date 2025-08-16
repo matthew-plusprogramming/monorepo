@@ -68,8 +68,9 @@ export class LoggerService extends Context.Tag('LoggerService')<
 >() {}
 
 const logGroupName =
-  loadCDKOutput<'my-stack'>('my-stack').applicationLogGroupName;
-const logStreamName = loadCDKOutput<'my-stack'>('my-stack').serverLogStreamName;
+  loadCDKOutput<'api-stack'>('api-stack').applicationLogGroupName;
+const logStreamName =
+  loadCDKOutput<'api-stack'>('api-stack').serverLogStreamName;
 export const ApplicationLoggerService = Layer.effect(
   LoggerService,
   makeLoggerService(logGroupName, logStreamName),
