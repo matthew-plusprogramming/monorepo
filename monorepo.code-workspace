@@ -9,24 +9,24 @@
       "path": "apps/node-server",
     },
     {
-      "name": "⚙️ monorepo-cdk",
+      "name": "⚙️ @cdk/monorepo-cdk",
       "path": "cdk/monorepo-cdk",
-    },
-    {
-      "name": "⚙️ @configs/eslint-config",
-      "path": "packages/eslint-config",
     },
     {
       "name": "📚 @packages/schemas",
       "path": "packages/schemas",
     },
     {
-      "name": "⚙️ @configs/ts-config",
-      "path": "packages/ts-config",
-    },
-    {
       "name": "📚 @utils/type-utils",
       "path": "packages/type-utils",
+    },
+    {
+      "name": "⚙️ @configs/eslint-config",
+      "path": "packages/eslint-config",
+    },
+    {
+      "name": "⚙️ @configs/ts-config",
+      "path": "packages/ts-config",
     },
     {
       "name": "⚙️ @configs/vite-config",
