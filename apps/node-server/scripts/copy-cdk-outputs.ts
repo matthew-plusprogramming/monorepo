@@ -19,8 +19,10 @@ const outputsDirectory = resolve(
 const distDirectory = resolve(__dirname, '../dist');
 
 if (!existsSync(outputsDirectory)) {
-  console.error('❌ CDK outputs directory not found');
-  process.exit(1);
+  console.error(
+    '❌ CDK outputs directory not found. Please build CDK and retry',
+  );
+  process.exit(0);
 }
 
 if (!existsSync(distDirectory)) {
