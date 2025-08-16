@@ -29,4 +29,4 @@ app.get('/user/:identifier', getUserRequestHandler);
 
 app.listen(process.env.PORT);
 
-export const viteNodeApp = app;
+export { app };

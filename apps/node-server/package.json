@@ -26,6 +26,7 @@
     "@aws-sdk/client-cloudwatch-logs": "^3.864.0",
     "@aws-sdk/client-dynamodb": "^3.868.0",
     "@cdk/backend-server-cdk": "*",
+    "@codegenie/serverless-express": "^4.17.0",
     "@configs/eslint-config": "*",
     "@configs/ts-config": "*",
     "@configs/vite-config": "*",

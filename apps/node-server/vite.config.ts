@@ -3,10 +3,14 @@ import '@dotenvx/dotenvx/config';
 import { baseConfig } from '@configs/vite-config';
 import { defineConfig, UserConfig } from 'vite';
 
+const lambda = process.env.LAMBDA;
 const port = process.env.PORT;
 
 if (!port) {
   throw new Error('Environment variable PORT is not set');
+}
+if (!lambda) {
+  throw new Error('Environment variable LAMBDA is not set');
 }
 
 if (isNaN(Number(port))) {
@@ -29,7 +33,7 @@ export default defineConfig(({ mode, command }) => {
       ssr: true,
       outDir: 'dist',
       rollupOptions: {
-        input: 'src/index.ts',
+        input: lambda ? 'src/lambda.ts' : 'src/index.ts',
         output: {
           format: 'cjs',
         },
