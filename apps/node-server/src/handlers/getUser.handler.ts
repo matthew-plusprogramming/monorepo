@@ -13,6 +13,10 @@ import {
   DynamoDbService,
   LiveDynamoDbService,
 } from '../services/dynamodb.service';
+import {
+  ApplicationLoggerService,
+  LoggerService,
+} from '../services/logger.service';
 import { InternalServerError, NotFoundError } from '../types/errors/http';
 import type { handlerInput } from '../types/handler';
 import { HTTP_RESPONSE } from '../types/http';
@@ -33,7 +37,9 @@ const getUserHandler = (
     );
 
     const databaseService = yield* DynamoDbService;
+    const loggerService = yield* LoggerService;
 
+    // TODO: Figure out if I can put these in a schema
     const key = ((): 'email-index' | 'id' => {
       if (UserEmailSchema.safeParse(parsedInput).success) {
         return 'email-index';
@@ -59,6 +65,7 @@ const getUserHandler = (
         return databaseService
           .query({
             TableName: usersTableName,
+            // TODO: Same as above
             IndexName: 'email-index',
             KeyConditionExpression: 'email = :email',
             ExpressionAttributeValues: {
@@ -71,8 +78,7 @@ const getUserHandler = (
       },
     }).pipe(
       Effect.catchAll((e) => {
-        console.error(e);
-        // TODO: Implement logging
+        loggerService.logError(e);
         return Effect.fail(new InternalServerError({ message: e.message }));
       }),
     );
@@ -88,7 +94,9 @@ const getUserHandler = (
     );
 
     return parsed as unknown as User;
-  }).pipe(Effect.provide(LiveDynamoDbService));
+  })
+    .pipe(Effect.provide(LiveDynamoDbService))
+    .pipe(Effect.provide(ApplicationLoggerService));
 };
 
 export const getUserRequestHandler: RequestHandler = async (req, res) => {
@@ -107,7 +115,7 @@ export const getUserRequestHandler: RequestHandler = async (req, res) => {
       return;
     }
 
-    res.status(HTTP_RESPONSE.INTERNAL_SERVER_ERROR).send();
+    res.status(HTTP_RESPONSE.INTERNAL_SERVER_ERROR).send(error.message);
   } else {
     res.status(HTTP_RESPONSE.SUCCESS).send(result.right);
   }
