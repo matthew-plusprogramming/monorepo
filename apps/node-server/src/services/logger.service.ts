@@ -4,7 +4,7 @@ import {
   PutLogEventsCommand,
   type PutLogEventsCommandOutput,
 } from '@aws-sdk/client-cloudwatch-logs';
-import { loadCDKOutput } from '@cdk/monorepo-cdk';
+import { loadCDKOutput } from '@cdk/backend-server-cdk';
 import { Effect, Layer } from 'effect';
 import { Context } from 'effect';
 

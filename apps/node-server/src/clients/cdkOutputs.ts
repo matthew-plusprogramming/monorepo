@@ -1,4 +1,4 @@
-import { loadCDKOutput } from '@cdk/monorepo-cdk';
+import { loadCDKOutput } from '@cdk/backend-server-cdk';
 
 const baseCdkOutputsPath = __BUNDLED__ ? '.' : undefined;
 

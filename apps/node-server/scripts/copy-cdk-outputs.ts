@@ -13,7 +13,7 @@ if (!ENV) {
 
 const outputsDirectory = resolve(
   __dirname,
-  '../../../cdk/monorepo-cdk/cdktf.out',
+  '../../../cdk/backend-server-cdk/cdktf.out',
 );
 
 const distDirectory = resolve(__dirname, '../dist');

@@ -1,4 +1,4 @@
-# monorepo-cdk
+# @cdk/backend-server-cdk
 
 CDK setup for this monorepo with OpenTofu (Terraform fork)
 
