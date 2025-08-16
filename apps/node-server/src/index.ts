@@ -4,7 +4,6 @@ import express from 'express';
 import { prettifyError, ZodError } from 'zod';
 
 import { getUserRequestHandler } from './handlers/getUser.handler';
-import { parseIntRequestHandler } from './handlers/parseInt.handler';
 import { registerRequestHandler } from './handlers/register.handler';
 import { jsonErrorMiddleware } from './middleware/jsonError.middleware';
 import { EnvironmentSchema } from './types/environment';
@@ -25,7 +24,6 @@ const app = express();
 app.use(express.json());
 app.use(jsonErrorMiddleware);
 
-app.post('/parse-int', parseIntRequestHandler);
 app.post('/register', registerRequestHandler);
 app.get('/user/:identifier', getUserRequestHandler);
 
