@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { UserEmailSchema, UserIdSchema } from './user';
+import { UserEmailSchema, UserIdSchema } from './components';
 
 export const UserVerificationSchema = z.object({
   id: z.uuid().meta({ description: 'Verification identifier' }),

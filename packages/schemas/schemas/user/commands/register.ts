@@ -3,7 +3,7 @@ import {
   UserEmailSchema,
   UserPlaintextPasswordSchema,
   UserUsernameSchema,
-} from './user';
+} from '../components';
 
 export const RegisterInputSchema = z.object({
   username: UserUsernameSchema,

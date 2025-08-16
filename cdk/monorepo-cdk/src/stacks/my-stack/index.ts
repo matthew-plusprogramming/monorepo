@@ -1,6 +1,10 @@
 import { CloudwatchLogGroup } from '@cdktf/provider-aws/lib/cloudwatch-log-group';
 import { CloudwatchLogStream } from '@cdktf/provider-aws/lib/cloudwatch-log-stream';
 import { DynamodbTable } from '@cdktf/provider-aws/lib/dynamodb-table';
+import {
+  USER_SCHEMA_CONSTANTS,
+  VERIFICATION_SCHEMA_CONSTANTS,
+} from '@packages/schemas/user';
 import { TerraformOutput, TerraformStack } from 'cdktf';
 import type { Construct } from 'constructs';
 
@@ -22,22 +26,21 @@ export class MyStack extends TerraformStack {
     const userTable = new DynamodbTable(this, 'user-table', {
       name: `${bucketName}-user-table`,
       billingMode: 'PAY_PER_REQUEST',
-      hashKey: 'id',
-      // TODO: Implement a way to generate these attributes from the schema
+      hashKey: USER_SCHEMA_CONSTANTS.key.id,
       attribute: [
         {
-          name: 'id',
+          name: USER_SCHEMA_CONSTANTS.key.id,
           type: 'S',
         },
         {
-          name: 'email',
+          name: USER_SCHEMA_CONSTANTS.key.email,
           type: 'S',
         },
       ],
       globalSecondaryIndex: [
         {
-          name: 'email-index',
-          hashKey: 'email',
+          name: USER_SCHEMA_CONSTANTS.gsi.email,
+          hashKey: USER_SCHEMA_CONSTANTS.key.email,
           projectionType: 'ALL',
         },
       ],
@@ -47,10 +50,10 @@ export class MyStack extends TerraformStack {
     const verificationTable = new DynamodbTable(this, 'verification-table', {
       name: `${bucketName}-verification-table`,
       billingMode: 'PAY_PER_REQUEST',
-      hashKey: 'id',
+      hashKey: VERIFICATION_SCHEMA_CONSTANTS.key.id,
       attribute: [
         {
-          name: 'id',
+          name: VERIFICATION_SCHEMA_CONSTANTS.key.id,
           type: 'S',
         },
       ],

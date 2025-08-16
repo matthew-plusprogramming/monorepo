@@ -1,7 +1,9 @@
 import {
   GetUserSchema,
   type User,
+  USER_SCHEMA_CONSTANTS,
   UserEmailSchema,
+  type UserTableKey,
 } from '@packages/schemas/user';
 import { Effect, Either } from 'effect';
 import type { RequestHandler } from 'express';
@@ -39,8 +41,9 @@ const getUserHandler = (
     const databaseService = yield* DynamoDbService;
     const loggerService = yield* LoggerService;
 
-    // TODO: Figure out if I can put these in a schema
-    const key = ((): 'email-index' | 'id' => {
+    // TODO: refactor out all configs to commons
+    // TODO: refactor out request handlers to a commons
+    const key = ((): UserTableKey => {
       if (UserEmailSchema.safeParse(parsedInput).success) {
         return 'email-index';
       }
@@ -65,8 +68,7 @@ const getUserHandler = (
         return databaseService
           .query({
             TableName: usersTableName,
-            // TODO: Same as above
-            IndexName: 'email-index',
+            IndexName: USER_SCHEMA_CONSTANTS.gsi.email,
             KeyConditionExpression: 'email = :email',
             ExpressionAttributeValues: {
               ':email': {

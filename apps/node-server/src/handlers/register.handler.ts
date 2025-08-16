@@ -1,4 +1,5 @@
 import { RegisterInputSchema, type UserToken } from '@packages/schemas/user';
+import { USER_SCHEMA_CONSTANTS } from '@packages/schemas/user';
 import { Effect, Either } from 'effect';
 import type { RequestHandler } from 'express';
 import { sign } from 'jsonwebtoken';
@@ -44,8 +45,7 @@ const registerHandler = (
     const existingUserCheck = yield* databaseService
       .query({
         TableName: usersTableName,
-        // TODO: put this in a schema somewhere in @schemas
-        IndexName: 'email-index',
+        IndexName: USER_SCHEMA_CONSTANTS.gsi.email,
         KeyConditionExpression: '#email = :email',
         ExpressionAttributeNames: {
           '#email': 'email',

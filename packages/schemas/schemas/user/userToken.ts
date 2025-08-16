@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { UserIdSchema } from './user';
+import { UserIdSchema } from './components';
 
 export const UserTokenSchema = z.object({
   // Standard claims

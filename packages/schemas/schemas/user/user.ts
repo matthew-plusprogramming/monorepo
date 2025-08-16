@@ -1,29 +1,10 @@
 import { z } from 'zod';
-
-export const USER_PASSWORD_MIN_LENGTH = 8;
-export const USER_USERNAME_MIN_LENGTH = 1;
-// ! Consider using a more restrictive email policy
-export const UserIdSchema = z.uuid().meta({
-  description: 'User identifier',
-});
-export const UserEmailSchema = z
-  .email()
-  .meta({ description: 'User email address' });
-export const UserPlaintextPasswordSchema = z
-  .string()
-  .min(USER_PASSWORD_MIN_LENGTH)
-  .meta({
-    description: 'User password',
-  });
-export const UserPasswordHashSchema = z.string().meta({
-  description: 'User password hash',
-});
-export const UserUsernameSchema = z
-  .string()
-  .min(USER_USERNAME_MIN_LENGTH)
-  .meta({
-    description: 'User username',
-  });
+import {
+  UserEmailSchema,
+  UserIdSchema,
+  UserPasswordHashSchema,
+  UserUsernameSchema,
+} from './components';
 
 export const UserSchema = z.object({
   id: UserIdSchema,
