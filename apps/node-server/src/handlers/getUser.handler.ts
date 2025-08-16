@@ -45,7 +45,6 @@ const getUserHandler = (
     const loggerService = yield* LoggerService;
 
     // TODO: refactor out all configs to commons
-    // TODO: refactor out request handlers to a commons
     const key = ((): UserTableKey => {
       if (UserEmailSchema.safeParse(parsedInput).success) {
         return 'email-index';
