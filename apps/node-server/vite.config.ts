@@ -2,15 +2,19 @@ import '@dotenvx/dotenvx/config';
 
 import { baseConfig } from '@configs/vite-config';
 import { defineConfig, UserConfig } from 'vite';
+import z from 'zod';
 
 const lambda = process.env.LAMBDA;
 const port = process.env.PORT;
 
-if (!port) {
-  throw new Error('Environment variable PORT is not set');
+const lambdaParsed = z.stringbool().safeParse(lambda);
+const portParsed = z.coerce.number().safeParse(port);
+
+if (!portParsed.success) {
+  throw new Error('Environment variable PORT is not set or is not number');
 }
-if (!lambda) {
-  throw new Error('Environment variable LAMBDA is not set');
+if (!lambdaParsed.success) {
+  throw new Error('Environment variable LAMBDA is not set or is not boolean');
 }
 
 if (isNaN(Number(port))) {
@@ -21,7 +25,7 @@ export default defineConfig(({ mode, command }) => {
   const config = {
     ...baseConfig,
     server: {
-      port: parseInt(port),
+      port: portParsed.data,
     },
     define: {
       __BUNDLED__: command === 'build',
@@ -32,12 +36,17 @@ export default defineConfig(({ mode, command }) => {
       target: 'es2024',
       ssr: true,
       outDir: 'dist',
+      emptyOutDir: mode !== 'dev',
       rollupOptions: {
-        input: lambda ? 'src/lambda.ts' : 'src/index.ts',
+        input: lambdaParsed.data ? 'src/lambda.ts' : 'src/index.ts',
         output: {
           format: 'cjs',
         },
+        external: [],
       },
+    },
+    ssr: {
+      noExternal: true,
     },
   } satisfies UserConfig;
 

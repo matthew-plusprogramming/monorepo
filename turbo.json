@@ -21,14 +21,6 @@
       "dependsOn": ["^build"],
       "persistent": true,
       "cache": false
-    },
-    "cdk:deploy:dev": {
-      "dependsOn": ["node-server#build"],
-      "cache": false
-    },
-    "cdk:deploy:prod": {
-      "dependsOn": ["node-server#build"],
-      "cache": false
     }
   }
 }

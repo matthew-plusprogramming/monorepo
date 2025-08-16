@@ -4,9 +4,10 @@ import {
   PutLogEventsCommand,
   type PutLogEventsCommandOutput,
 } from '@aws-sdk/client-cloudwatch-logs';
-import { loadCDKOutput } from '@cdk/backend-server-cdk';
 import { Effect, Layer } from 'effect';
 import { Context } from 'effect';
+
+import { logGroupName, logStreamName } from '../clients/cdkOutputs';
 
 type LoggerServiceSchema = {
   readonly log: (
@@ -67,10 +68,6 @@ export class LoggerService extends Context.Tag('LoggerService')<
   LoggerServiceSchema
 >() {}
 
-const logGroupName =
-  loadCDKOutput<'api-stack'>('api-stack').applicationLogGroupName;
-const logStreamName =
-  loadCDKOutput<'api-stack'>('api-stack').serverLogStreamName;
 export const ApplicationLoggerService = Layer.effect(
   LoggerService,
   makeLoggerService(logGroupName, logStreamName),

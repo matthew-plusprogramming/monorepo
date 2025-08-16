@@ -1,0 +1,9 @@
+{
+  "extends": ["//"],
+  "tasks": {
+    "copy-assets-for-cdk": {
+      "dependsOn": ["node-server#build"],
+      "outputs": ["dist/**"]
+    }
+  }
+}

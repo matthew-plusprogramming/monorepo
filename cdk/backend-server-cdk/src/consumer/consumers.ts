@@ -27,6 +27,7 @@ const generateOutputPath = (
   }
   return path.resolve(
     __dirname,
+    // TODO: Create a base project dir export at src
     `../../cdktf.out/stacks/${stack}/outputs.json`,
   );
 };
