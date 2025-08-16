@@ -24,7 +24,7 @@
   },
   "devDependencies": {
     "@aws-sdk/client-cloudwatch-logs": "^3.864.0",
-    "@aws-sdk/client-dynamodb": "^3.864.0",
+    "@aws-sdk/client-dynamodb": "^3.868.0",
     "@cdk/monorepo-cdk": "*",
     "@configs/eslint-config": "*",
     "@configs/ts-config": "*",
