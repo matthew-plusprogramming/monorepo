@@ -2,6 +2,7 @@
   "name": "@packages/schemas",
   "version": "0.0.1",
   "license": "UNLICENSED",
+  "type": "module",
   "exports": {
     "./user": "./schemas/user/index.ts"
   },

@@ -2,7 +2,7 @@
   "name": "@utils/type-utils",
   "version": "0.0.1",
   "license": "UNLICENSED",
-  "main": "index.ts",
+  "type": "module",
   "exports": {
     ".": "./index.ts"
   },

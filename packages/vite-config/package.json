@@ -3,7 +3,6 @@
   "version": "0.0.1",
   "license": "UNLICENSED",
   "type": "module",
-  "main": "index.ts",
   "exports": {
     ".": "./dist/index.js"
   },
