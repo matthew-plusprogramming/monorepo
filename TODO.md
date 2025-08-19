@@ -3,6 +3,7 @@ Monorepo Infra:
 - [ ] Integrate vitest
 - [ ] Integrate IaC (OpenTofu)
 - [ ] Docs generation?
+- [ ] Prettier formatting via config.ts and cli
 
 Backend:
 
