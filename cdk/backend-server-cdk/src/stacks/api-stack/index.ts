@@ -11,16 +11,13 @@ import {
   Token,
 } from 'cdktf';
 import type { Construct } from 'constructs';
-import { dirname, resolve } from 'path';
-import { fileURLToPath } from 'url';
+import { resolve } from 'path';
 
+import { packageRootDir } from '../../location';
 import type { UniversalStackProps } from '../../types/stack';
 import { StandardBackend } from '../../utils/standard-backend';
 
 import { generateUserAndVerificationTable } from './generate-user-and-verification-table';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
 
 export type ApiStackProps = UniversalStackProps;
 
@@ -45,7 +42,7 @@ const generate = (scope: Construct) => {
   });
 
   const asset = new TerraformAsset(scope, 'lambda-asset', {
-    path: resolve(__dirname, '../../../dist/lambda.zip'),
+    path: resolve(packageRootDir, 'dist/lambda.zip'),
     type: AssetType.FILE,
   });
   // TODO get this to work

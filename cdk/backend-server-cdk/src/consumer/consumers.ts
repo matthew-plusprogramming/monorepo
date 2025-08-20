@@ -1,13 +1,9 @@
-import fs from 'fs';
-import path from 'path';
-import { dirname } from 'path';
-import { fileURLToPath } from 'url';
+import { existsSync, readFileSync } from 'fs';
+import { resolve } from 'path';
 import type { output } from 'zod';
 
+import { packageRootDir } from '../location';
 import { stacks } from '../stacks';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
 
 type StackConfig = (typeof stacks)[number];
 type StackConfigWithoutBootstrap = Exclude<StackConfig, { name: 'bootstrap' }>;
@@ -23,23 +19,19 @@ const generateOutputPath = (
   outputsPath?: string,
 ): string => {
   if (outputsPath) {
-    return path.resolve(outputsPath, `cdktf.out/stacks/${stack}/outputs.json`);
+    return resolve(outputsPath, `cdktf.out/stacks/${stack}/outputs.json`);
   }
-  return path.resolve(
-    __dirname,
-    // TODO: Create a base project dir export at src
-    `../../cdktf.out/stacks/${stack}/outputs.json`,
-  );
+  return resolve(packageRootDir, `cdktf.out/stacks/${stack}/outputs.json`);
 };
 
 const loadOutput = <T extends ConsumableStack>(
   stack: T,
   stackOutputPath: string,
 ): OutputByName[T][T] => {
-  if (!fs.existsSync(stackOutputPath)) {
+  if (!existsSync(stackOutputPath)) {
     throw new Error(`Stack output file not found: ${stackOutputPath}`);
   }
-  const stackOutputData = fs.readFileSync(stackOutputPath, 'utf-8');
+  const stackOutputData = readFileSync(stackOutputPath, 'utf-8');
   const stackOutput = JSON.parse(stackOutputData);
 
   const stackConfig = stacks.find(

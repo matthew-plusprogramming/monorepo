@@ -1,9 +1,7 @@
 import { execSync } from 'child_process';
-import { dirname, resolve } from 'path';
-import { fileURLToPath } from 'url';
+import { resolve } from 'path';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
+import { packageRootDir } from '../src/location';
 
 const ENV = process.env.ENV;
 if (!ENV) {
@@ -11,14 +9,15 @@ if (!ENV) {
   process.exit(1);
 }
 
-const workDir = resolve(__dirname, '../cdktf.out/stacks/bootstrap');
+const workDir = resolve(packageRootDir, 'cdktf.out/stacks/bootstrap');
+const envFile = resolve(packageRootDir, `.env.${ENV}`);
 
 try {
   // Change to working directory
   process.chdir(workDir);
 
   // Run dotenvx + tofu command
-  execSync(`dotenvx run -f ../../../.env.${ENV} -- tofu init -migrate-state`, {
+  execSync(`dotenvx run -f ${envFile} -- tofu init -migrate-state`, {
     stdio: 'inherit',
     env: process.env,
   });

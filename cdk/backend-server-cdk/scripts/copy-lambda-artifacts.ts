@@ -1,14 +1,10 @@
 import { copyFileSync, cpSync, existsSync, mkdirSync, readdirSync } from 'fs';
 import { dirname, join, relative, resolve } from 'path';
-import { fileURLToPath } from 'url';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
+import { monorepoRootDir, packageRootDir } from '../src/location';
 
-// TODO: Create a base project dir export at src
-const lambdaArtifacts = resolve(__dirname, '../../../apps/node-server/dist');
-
-const distDirectory = resolve(__dirname, '../dist');
+const lambdaArtifacts = resolve(monorepoRootDir, 'apps/node-server/dist');
+const distDirectory = resolve(packageRootDir, 'dist');
 
 if (!existsSync(lambdaArtifacts)) {
   console.error(
@@ -51,7 +47,7 @@ if (!existsSync(destRoot)) {
     return copied;
   };
 
-  const outputsDirectory = resolve(__dirname, '../cdktf.out');
+  const outputsDirectory = resolve(packageRootDir, 'cdktf.out');
 
   if (!existsSync(outputsDirectory)) {
     console.error('❌ CDK outputs directory not found. Please pull and retry');

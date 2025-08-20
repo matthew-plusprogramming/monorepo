@@ -1,12 +1,10 @@
 import { cpSync, existsSync } from 'fs';
-import { dirname, resolve } from 'path';
-import { fileURLToPath } from 'url';
+import { resolve } from 'path';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
+import { packageRootDir } from '../../../cdk/backend-server-cdk/src/location';
 
-const envFile = resolve(__dirname, '../.env');
-const distDirectory = resolve(__dirname, '../dist');
+const envFile = resolve(packageRootDir, '.env');
+const distDirectory = resolve(packageRootDir, 'dist');
 
 if (!existsSync(distDirectory)) {
   console.error('❌ Dist directory not found. Did you build?');

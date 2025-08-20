@@ -1,10 +1,8 @@
 import { exists } from '@utils/ts-utils';
 import { copyFileSync, existsSync, mkdirSync, readdirSync } from 'fs';
 import { dirname, join, relative, resolve } from 'path';
-import { fileURLToPath } from 'url';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
+import { monorepoRootDir, packageRootDir } from '../src/location';
 
 const LAMBDA = process.env.LAMBDA;
 const ENV = process.env.ENV;
@@ -19,12 +17,11 @@ if (!exists(LAMBDA)) {
 }
 
 const outputsDirectory = resolve(
-  __dirname,
-  // TODO: Create a base project dir export at src
-  '../../../cdk/backend-server-cdk/cdktf.out',
+  monorepoRootDir,
+  'cdk/backend-server-cdk/cdktf.out',
 );
 
-const distDirectory = resolve(__dirname, '../dist');
+const distDirectory = resolve(packageRootDir, 'dist');
 const destRoot = resolve(distDirectory, 'cdktf.out');
 
 if (!existsSync(outputsDirectory)) {
@@ -57,7 +54,7 @@ const copyOutputsJson = (srcRoot: string, destRoot: string): number => {
       if (entry.isDirectory()) {
         stack.push(fullPath);
       } else if (entry.isFile() && entry.name === 'outputs.json') {
-        const rel = relative(srcRoot, fullPath); // e.g. "stackA/outputs.json"
+        const rel = relative(srcRoot, fullPath);
         const destPath = join(destRoot, rel);
         mkdirSync(dirname(destPath), { recursive: true });
         copyFileSync(fullPath, destPath);
