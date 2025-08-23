@@ -1,5 +1,5 @@
-import serverlessExpress from '@codegenie/serverless-express';
+import serverless from 'serverless-http';
 
 import { app } from '.';
 
-export const handler = serverlessExpress({ app });
+export const handler = serverless(app);
