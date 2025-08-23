@@ -17,8 +17,8 @@
     "// -- 🔧 Miscellaneous": "--"
   },
   "dependencies": {
-    "zod": "^4.0.17",
-    "effect": "^3.17.7",
+    "zod": "^4.1.0",
+    "effect": "^3.17.9",
     "express": "^5.1.0",
     "typescript": "^5.9.2"
   },
@@ -26,6 +26,6 @@
     "@configs/eslint-config": "*",
     "@configs/ts-config": "*",
     "@types/express": "^5.0.3",
-    "eslint": "^9.33.0"
+    "eslint": "^9.34.0"
   }
 }

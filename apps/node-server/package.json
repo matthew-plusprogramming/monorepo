@@ -24,14 +24,14 @@
     "decrypt-envs": "dotenvx decrypt -f .env.dev .env.production&& echo 'WARNING: DO NOT COMMIT decrypted .env files to the repository!'"
   },
   "devDependencies": {
-    "@aws-sdk/client-cloudwatch-logs": "^3.864.0",
-    "@aws-sdk/client-dynamodb": "^3.868.0",
+    "@aws-sdk/client-cloudwatch-logs": "^3.873.0",
+    "@aws-sdk/client-dynamodb": "^3.873.0",
     "@cdk/backend-server-cdk": "*",
     "@codegenie/serverless-express": "^4.17.0",
     "@configs/eslint-config": "*",
     "@configs/ts-config": "*",
     "@configs/vite-config": "*",
-    "@dotenvx/dotenvx": "^1.48.4",
+    "@dotenvx/dotenvx": "^1.49.0",
     "@packages/backend-core": "*",
     "@packages/schemas": "*",
     "@types/express": "^5.0.3",
@@ -39,13 +39,13 @@
     "@utils/ts-utils": "*",
     "concurrently": "^9.2.0",
     "cross-env": "^10.0.0",
-    "effect": "^3.17.7",
-    "eslint": "^9.33.0",
+    "effect": "^3.17.9",
+    "eslint": "^9.34.0",
     "express": "^5.1.0",
     "jsonwebtoken": "^9.0.2",
     "typescript": "^5.9.2",
     "uuid": "^11.1.0",
-    "vite": "^7.1.2",
-    "zod": "^4.0.17"
+    "vite": "^7.1.3",
+    "zod": "^4.1.0"
   }
 }
