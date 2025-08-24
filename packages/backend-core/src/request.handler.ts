@@ -14,6 +14,8 @@ export type GenerateRequestHandlerProps<R, E extends Error> = {
   successCode: number;
 };
 
+// TODO: Allow for a obfuscate config to be passed (either all, or condition and
+// TODO: what the obfuscation error resolves to)
 export const generateRequestHandler = <R, E extends Error>({
   effectfulHandler,
   statusCodesToErrors,

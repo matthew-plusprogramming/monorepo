@@ -27,6 +27,7 @@ const LOG_FAILED_METADATA = {
   },
 } satisfies __MetadataBearer;
 
+// TODO: Implement context (ip, userId, tokenId) for logging that can be passed
 const makeLoggerService = (
   logGroupName: string,
   logStreamName: string,
