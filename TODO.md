@@ -7,7 +7,7 @@ Monorepo Infra:
 
 Backend:
 
-Auth Package (Lambda)
+Auth Package (Integrated into node server)
 
 - [ ] Error obfuscation for default routes and unauthenticated routes
   - [ ] Customizable to send 500 or 502 to mask 400 level errors
@@ -16,12 +16,9 @@ Auth Package (Lambda)
 - [ ] Authenticates user
 - [ ] Deny-list check
 - [ ] Integrate authzed (spiceDB)
-
-Control Package (Lambda)
-
-- Only callable from the auth lambda
-
-- [ ] Emergency "kill switch" lambda that throttles auth lambda to 1 or 0 concurrency
+- [ ] Configurable kill switch based on conditions or manual action
+  - [ ] Cuts reserved concurrency to 0 or 1 depending on the condition
+  - [ ] Triggers an alert to be sent to the administrator
 
 Node Server (Lambda)
 
