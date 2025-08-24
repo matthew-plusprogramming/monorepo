@@ -1,4 +1,4 @@
-import type { handlerInput } from '@packages/backend-core';
+import { type handlerInput } from '@packages/backend-core';
 import {
   ConflictError,
   generateRequestHandler,
@@ -116,6 +116,7 @@ export const registerRequestHandler = generateRequestHandler<
   ConflictError | InternalServerError | ZodError
 >({
   effectfulHandler: registerHandler,
+  shouldObfuscate: () => true,
   statusCodesToErrors: {
     [HTTP_RESPONSE.BAD_REQUEST]: {
       errorType: ZodError,

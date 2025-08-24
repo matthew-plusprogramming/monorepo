@@ -15,3 +15,7 @@ export class ConflictError extends Data.TaggedError(
 export class InternalServerError extends Data.TaggedError(
   'InternalServerError',
 )<GenericErrorPayload> {}
+
+export class BadGatewayError extends Data.TaggedError(
+  'BadGatewayError',
+)<GenericErrorPayload> {}

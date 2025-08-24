@@ -22,6 +22,7 @@ export const generateApiLambda = (scope: Construct, region: string): void => {
       },
     ],
   });
+  // TODO: Implement aws_iam_role_policy_attachment
   const iamRole = new IamRole(scope, 'lambda_iam', {
     assumeRolePolicy: Token.asString(assumeRole.json),
     managedPolicyArns: [

@@ -108,6 +108,7 @@ export const getUserRequestHandler = generateRequestHandler<
   NotFoundError | InternalServerError | ZodError
 >({
   effectfulHandler: getUserHandler,
+  shouldObfuscate: () => true,
   statusCodesToErrors: {
     [HTTP_RESPONSE.BAD_REQUEST]: {
       errorType: ZodError,

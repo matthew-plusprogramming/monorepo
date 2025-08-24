@@ -6,18 +6,24 @@ import { HTTP_RESPONSE } from './types/http';
 
 export type GenerateRequestHandlerProps<R, E extends Error> = {
   effectfulHandler: (input: handlerInput) => Effect.Effect<R, E>;
+  shouldObfuscate: (error: E) => boolean;
   statusCodesToErrors: Record<
     number,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    { errorType: new (...args: any[]) => E; mapper: (error: E) => any }
+    {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      errorType: new (...args: any[]) => E;
+      obfuscatedErrorStatus?: number;
+      obfuscatedErrorMessage?: string;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      mapper: (error: E) => any;
+    }
   >;
   successCode: number;
 };
 
-// TODO: Allow for a obfuscate config to be passed (either all, or condition and
-// TODO: what the obfuscation error resolves to)
 export const generateRequestHandler = <R, E extends Error>({
   effectfulHandler,
+  shouldObfuscate,
   statusCodesToErrors,
   successCode,
 }: GenerateRequestHandlerProps<R, E>): RequestHandler => {
@@ -30,14 +36,24 @@ export const generateRequestHandler = <R, E extends Error>({
     if (Either.isLeft(result)) {
       const error = result.left;
       let errorMatch = false;
-      for (const [statusCode, { errorType, mapper }] of Object.entries(
-        statusCodesToErrors,
-      )) {
+      for (const [
+        statusCode,
+        {
+          errorType,
+          obfuscatedErrorStatus = 502,
+          obfuscatedErrorMessage = 'Bad Gateway',
+          mapper,
+        },
+      ] of Object.entries(statusCodesToErrors)) {
         Effect.try({
           try: () => {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             if (error instanceof (errorType as any)) {
-              res.status(parseInt(statusCode)).send(mapper(error));
+              if (shouldObfuscate(error)) {
+                res.status(obfuscatedErrorStatus).send(obfuscatedErrorMessage);
+              } else {
+                res.status(parseInt(statusCode)).send(mapper(error));
+              }
               errorMatch = true;
               return;
             }
