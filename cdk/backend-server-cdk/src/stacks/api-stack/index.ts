@@ -1,62 +1,15 @@
 import { CloudwatchLogGroup } from '@cdktf/provider-aws/lib/cloudwatch-log-group';
 import { CloudwatchLogStream } from '@cdktf/provider-aws/lib/cloudwatch-log-stream';
-import { DataAwsIamPolicyDocument } from '@cdktf/provider-aws/lib/data-aws-iam-policy-document';
-import { IamRole } from '@cdktf/provider-aws/lib/iam-role';
-import { LambdaFunction } from '@cdktf/provider-aws/lib/lambda-function';
-import {
-  AssetType,
-  TerraformAsset,
-  TerraformOutput,
-  TerraformStack,
-  Token,
-} from 'cdktf';
+import { TerraformOutput, TerraformStack } from 'cdktf';
 import type { Construct } from 'constructs';
-import { resolve } from 'path';
 
-import { packageRootDir } from '../../location';
 import type { UniversalStackProps } from '../../types/stack';
 import { StandardBackend } from '../../utils/standard-backend';
 
+import { generateApiLambda } from './generate-api-lambda';
 import { generateUserAndVerificationTable } from './generate-user-and-verification-table';
 
 export type ApiStackProps = UniversalStackProps;
-
-const generate = (scope: Construct) => {
-  const assumeRole = new DataAwsIamPolicyDocument(scope, 'assume_role', {
-    statement: [
-      {
-        actions: ['sts:AssumeRole'],
-        effect: 'Allow',
-        principals: [
-          {
-            identifiers: ['lambda.amazonaws.com'],
-            type: 'Service',
-          },
-        ],
-      },
-    ],
-  });
-  const iamRole = new IamRole(scope, 'lambda_iam', {
-    assumeRolePolicy: Token.asString(assumeRole.json),
-    name: 'lambda_execution_role',
-  });
-
-  const asset = new TerraformAsset(scope, 'lambda-asset', {
-    path: resolve(packageRootDir, 'dist/lambda.zip'),
-    type: AssetType.FILE,
-  });
-  // TODO get this to work
-  new LambdaFunction(scope, 'my-lambda-function', {
-    functionName: 'my-lambda-function',
-    filename: asset.path,
-    handler: 'lambda.handler',
-    runtime: 'nodejs22.x',
-    memorySize: 128,
-    timeout: 10,
-    environment: {},
-    role: iamRole.arn,
-  });
-};
 
 export class ApiStack extends TerraformStack {
   public constructor(scope: Construct, id: string, props: ApiStackProps) {
@@ -68,9 +21,8 @@ export class ApiStack extends TerraformStack {
 
     generateUserAndVerificationTable(this, region);
 
-    // TODO: see if I can get stack outputs BEFORE deploying
-    // IF IT IS, I can totally make node-server rely on the outputs FIRST
-    generate(this);
+    // TODO: Put lambdas into their own stack since they rely on outputs
+    generateApiLambda(this, region);
 
     const applicationLogGroup = new CloudwatchLogGroup(
       this,
