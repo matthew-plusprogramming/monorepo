@@ -5,6 +5,11 @@ import {
   HTTP_RESPONSE,
   InternalServerError,
 } from '@packages/backend-core';
+import {
+  JWT_AUDIENCE,
+  JWT_ISSUER,
+  USER_ROLE,
+} from '@packages/backend-core/auth';
 import { RegisterInputSchema, type UserToken } from '@packages/schemas/user';
 import { USER_SCHEMA_CONSTANTS } from '@packages/schemas/user';
 import { exists } from '@utils/ts-utils';
@@ -14,8 +19,6 @@ import { v4 as uuidV4 } from 'uuid';
 import z, { ZodError } from 'zod';
 
 import { usersTableName } from '../clients/cdkOutputs';
-import { JWT_AUDIENCE, JWT_ISSUER } from '../constants/jwt';
-import { USER_ROLE } from '../constants/roles';
 import { parseInput } from '../helpers/zodParser';
 import {
   DynamoDbService,
