@@ -21,6 +21,7 @@ try {
 }
 
 const app = express();
+// Remove after: https://github.com/dougmoscrop/serverless-http/pull/306
 // https://github.com/dougmoscrop/serverless-http/issues/305#issuecomment-3222386259
 app.use((req, _res, next) => {
   if (
