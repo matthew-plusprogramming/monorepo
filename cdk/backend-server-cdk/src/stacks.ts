@@ -4,7 +4,7 @@ import { ApiStackOutputSchema } from './consumer/output';
 import { ApiLambdaStack } from './stacks/api-lambda-stack';
 import { ApiStack, type ApiStackProps } from './stacks/api-stack';
 import { BootstrapStack, type BootstrapStackProps } from './stacks/bootstrap';
-import type { Stack } from './types/stack';
+import type { Stack, UniversalStackProps } from './types/stack';
 
 export const stacks = [
   {
@@ -30,5 +30,4 @@ export const stacks = [
     props: {},
     outputSchema: z.object(),
   },
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-] as const satisfies Stack<any>[];
+] as const satisfies Stack<UniversalStackProps>[];

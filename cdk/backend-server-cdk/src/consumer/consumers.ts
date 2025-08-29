@@ -14,6 +14,13 @@ type OutputByName = {
 
 export type ConsumableStack = keyof OutputByName;
 
+// Flattened output type by stack name so union keys work without double indexing
+type OutputValueByName = {
+  [K in keyof OutputByName]: OutputByName[K] extends Record<K, infer V>
+    ? V
+    : never;
+};
+
 const generateOutputPath = (
   stack: ConsumableStack,
   outputsPath?: string,
@@ -27,7 +34,7 @@ const generateOutputPath = (
 const loadOutput = <T extends ConsumableStack>(
   stack: T,
   stackOutputPath: string,
-): OutputByName[T][T] => {
+): OutputValueByName[T] => {
   if (!existsSync(stackOutputPath)) {
     throw new Error(`Stack output file not found: ${stackOutputPath}`);
   }
@@ -42,21 +49,23 @@ const loadOutput = <T extends ConsumableStack>(
     throw new Error(`Unknown stack: ${stack}`);
   }
 
-  const parsed = stackConfig?.outputSchema.parse(stackOutput);
+  const parsed = stackConfig?.outputSchema.parse(
+    stackOutput,
+  ) as OutputByName[T];
 
   if (!parsed) {
     throw new Error(`Failed to parse output for stack: ${stack}`);
   }
 
-  return parsed[stack];
+  return (parsed as Record<T, OutputValueByName[T]>)[stack];
 };
 
-const loadedOutputs: { [K in ConsumableStack]?: OutputByName[K][K] } = {};
+const loadedOutputs: { [K in ConsumableStack]?: OutputValueByName[K] } = {};
 
 export const loadCDKOutput = <T extends ConsumableStack>(
   stack: T,
   outputsPath?: string,
-): OutputByName[T][T] => {
+): OutputValueByName[T] => {
   if (!loadedOutputs[stack]) {
     loadedOutputs[stack] = loadOutput<typeof stack>(
       stack,

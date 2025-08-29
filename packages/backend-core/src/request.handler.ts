@@ -14,8 +14,7 @@ export type GenerateRequestHandlerProps<R, E extends Error> = {
       errorType: new (...args: any[]) => E;
       obfuscatedErrorStatus?: number;
       obfuscatedErrorMessage?: string;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      mapper: (error: E) => any;
+      mapper: (error: E) => unknown;
     }
   >;
   successCode: number;
@@ -47,8 +46,7 @@ export const generateRequestHandler = <R, E extends Error>({
       ] of Object.entries(statusCodesToErrors)) {
         Effect.try({
           try: () => {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            if (error instanceof (errorType as any)) {
+            if (error instanceof errorType) {
               if (shouldObfuscate(error)) {
                 res.status(obfuscatedErrorStatus).send(obfuscatedErrorMessage);
               } else {

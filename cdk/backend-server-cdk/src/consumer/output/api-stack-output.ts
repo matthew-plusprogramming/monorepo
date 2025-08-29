@@ -8,3 +8,7 @@ export const ApiStackOutputSchema = z.object({
     serverLogStreamName: z.string(),
   }),
 });
+
+export const ApiLambdaStackOutputSchema = z.object({
+  'api-lambda-stack': z.object(),
+});
