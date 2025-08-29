@@ -6,7 +6,6 @@ import type { Construct } from 'constructs';
 import type { UniversalStackProps } from '../../types/stack';
 import { StandardBackend } from '../../utils/standard-backend';
 
-import { generateApiLambda } from './generate-api-lambda';
 import { generateUserAndVerificationTable } from './generate-user-and-verification-table';
 
 export type ApiStackProps = UniversalStackProps;
@@ -20,9 +19,6 @@ export class ApiStack extends TerraformStack {
     new StandardBackend(this, id, region);
 
     generateUserAndVerificationTable(this, region);
-
-    // TODO: Put lambdas into their own stack since they rely on outputs
-    generateApiLambda(this, region);
 
     const applicationLogGroup = new CloudwatchLogGroup(
       this,

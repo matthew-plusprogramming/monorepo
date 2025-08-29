@@ -1,6 +1,7 @@
 import z from 'zod';
 
 import { ApiStackOutputSchema } from './consumer/output';
+import { ApiLambdaStack } from './stacks/api-lambda-stack';
 import { ApiStack, type ApiStackProps } from './stacks/api-stack';
 import { BootstrapStack, type BootstrapStackProps } from './stacks/bootstrap';
 import type { Stack } from './types/stack';
@@ -22,5 +23,12 @@ export const stacks = [
     props: {},
     outputSchema: ApiStackOutputSchema,
   } as const satisfies Stack<ApiStackProps>,
+  {
+    name: 'api-lambda-stack',
+    description: 'Lambdas for API stack',
+    Stack: ApiLambdaStack,
+    props: {},
+    outputSchema: z.object(),
+  },
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
 ] as const satisfies Stack<any>[];
