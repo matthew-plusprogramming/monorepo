@@ -4,6 +4,7 @@
   "license": "UNLICENSED",
   "type": "module",
   "exports": {
+    "./security": "./schemas/security/index.ts",
     "./user": "./schemas/user/index.ts"
   },
   "scripts": {

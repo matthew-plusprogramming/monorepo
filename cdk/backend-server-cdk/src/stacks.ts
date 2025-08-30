@@ -1,7 +1,11 @@
 import z from 'zod';
 
-import { ApiStackOutputSchema } from './consumer/output';
+import {
+  ApiSecurityStackOutputSchema,
+  ApiStackOutputSchema,
+} from './consumer/output';
 import { ApiLambdaStack } from './stacks/api-lambda-stack';
+import { ApiSecurityStack } from './stacks/api-security-stack';
 import { ApiStack, type ApiStackProps } from './stacks/api-stack';
 import { BootstrapStack, type BootstrapStackProps } from './stacks/bootstrap';
 import type { Stack, UniversalStackProps } from './types/stack';
@@ -29,5 +33,12 @@ export const stacks = [
     Stack: ApiLambdaStack,
     props: {},
     outputSchema: z.object(),
+  },
+  {
+    name: 'api-security-stack',
+    description: 'Security stack for API',
+    Stack: ApiSecurityStack,
+    props: {},
+    outputSchema: ApiSecurityStackOutputSchema,
   },
 ] as const satisfies Stack<UniversalStackProps>[];
