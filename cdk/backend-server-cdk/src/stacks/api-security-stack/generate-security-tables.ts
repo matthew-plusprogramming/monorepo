@@ -20,6 +20,10 @@ export const generateSecurityTables = (
         type: 'S',
       },
     ],
+    ttl: {
+      attributeName: 'ttl',
+      enabled: true,
+    },
     region,
   });
 
@@ -33,6 +37,10 @@ export const generateSecurityTables = (
         type: 'S',
       },
     ],
+    ttl: {
+      attributeName: 'ttl',
+      enabled: true,
+    },
     region,
   });
 

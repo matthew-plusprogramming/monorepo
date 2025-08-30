@@ -7,7 +7,10 @@ import {
 import { Effect, Layer } from 'effect';
 import { Context } from 'effect';
 
-import { logGroupName, logStreamName } from '../clients/cdkOutputs';
+import {
+  applicationLogGroupName,
+  serverLogStreamName,
+} from '../clients/cdkOutputs';
 
 type LoggerServiceSchema = {
   readonly log: (
@@ -71,5 +74,5 @@ export class LoggerService extends Context.Tag('LoggerService')<
 
 export const ApplicationLoggerService = Layer.effect(
   LoggerService,
-  makeLoggerService(logGroupName, logStreamName),
+  makeLoggerService(applicationLogGroupName, serverLogStreamName),
 );

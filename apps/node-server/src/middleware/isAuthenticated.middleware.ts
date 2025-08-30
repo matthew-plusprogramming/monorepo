@@ -59,6 +59,7 @@ const isAuthenticatedMiddlewareHandler = (
     }
   }).pipe(Effect.provide(ApplicationLoggerService));
 
+// TODO: Refactor to middleware request handler (make in backend-core)
 export const isAuthenticatedMiddlewareRequestHandler: RequestHandler = async (
   req,
   res,

@@ -31,6 +31,7 @@ export const generateApiLambda = (scope: Construct, region: string): void => {
     ],
     name: 'lambda_execution_role',
   });
+  // TODO: Implement public URL
 
   const asset = new TerraformAsset(scope, 'lambda-asset', {
     path: resolve(packageRootDir, 'dist/lambda.zip'),

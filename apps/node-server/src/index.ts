@@ -5,6 +5,7 @@ import { prettifyError, ZodError } from 'zod';
 
 import { getUserRequestHandler } from './handlers/getUser.handler';
 import { registerRequestHandler } from './handlers/register.handler';
+import { ipRateLimitingMiddlewareRequestHandler } from './middleware/ipRateLimiting.middleware';
 import { jsonErrorMiddleware } from './middleware/jsonError.middleware';
 import { EnvironmentSchema } from './types/environment';
 
@@ -21,6 +22,7 @@ try {
 }
 
 const app = express();
+app.use(ipRateLimitingMiddlewareRequestHandler);
 // Remove after: https://github.com/dougmoscrop/serverless-http/pull/306
 // https://github.com/dougmoscrop/serverless-http/issues/305#issuecomment-3222386259
 app.use((req, _res, next) => {
