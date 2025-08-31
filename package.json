@@ -17,6 +17,8 @@
     "clean": "turbo run clean && rm -rf node_modules && rm -rf .turbo",
     "lint": "turbo run lint",
     "lint:fix": "turbo run lint:fix",
-    "test": "turbo run test"
+    "test": "turbo run test",
+    "memory:validate": "node agents/scripts/validate-memory-bank.mjs",
+    "memory:drift": "node agents/scripts/check-memory-drift.mjs"
   }
 }
