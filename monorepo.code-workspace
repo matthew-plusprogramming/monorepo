@@ -5,40 +5,24 @@
       "path": ".",
     },
     {
-      "name": "🚀 node-server",
-      "path": "apps/node-server",
+      "name": "🚀 apps",
+      "path": "apps",
     },
     {
-      "name": "⚙️ @cdk/backend-server-cdk",
-      "path": "cdk/backend-server-cdk",
+      "name": "⚙️ cdk",
+      "path": "cdk",
     },
     {
-      "name": "📚 @packages/backend-core",
-      "path": "packages/backend-core",
+      "name": "🌎 packages/core",
+      "path": "packages/core",
     },
     {
-      "name": "📚 @packages/schemas",
-      "path": "packages/schemas",
+      "name": "🔋 @packages/utils",
+      "path": "packages/utils",
     },
     {
-      "name": "📚 @utils/ts-utils",
-      "path": "packages/ts-utils",
-    },
-    {
-      "name": "📚 @utils/type-utils",
-      "path": "packages/type-utils",
-    },
-    {
-      "name": "⚙️ @configs/eslint-config",
-      "path": "packages/eslint-config",
-    },
-    {
-      "name": "⚙️ @configs/ts-config",
-      "path": "packages/ts-config",
-    },
-    {
-      "name": "⚙️ @configs/vite-config",
-      "path": "packages/vite-config",
+      "name": "🛠️ @packages/configs",
+      "path": "packages/configs",
     },
   ],
   "settings": {},
