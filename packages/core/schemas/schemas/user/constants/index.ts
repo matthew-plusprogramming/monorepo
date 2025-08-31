@@ -1,2 +1,2 @@
-export * from './userCdk';
-export * from './user';
+export * from './userCdk.js';
+export * from './user.js';
