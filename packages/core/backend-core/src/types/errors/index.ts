@@ -8,6 +8,6 @@ export class ParseError extends Data.TaggedError(
   'ParseError',
 )<GenericErrorPayload> {}
 
-export * from './http.js';
-export * from './security.js';
-export * from './user.js';
+export * from '@/types/errors/http.js';
+export * from '@/types/errors/security.js';
+export * from '@/types/errors/user.js';

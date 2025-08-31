@@ -82,6 +82,7 @@
 - **Logging:** Prefer `LoggerService.log`/`logError` to emit to CloudWatch; degrade gracefully to console on failure. (invariant)
 - **Auth:** JWT claims shape is fixed by `UserTokenSchema`; auth middleware attaches `req.user`. JWT signing uses `JWT_ISSUER`, `JWT_AUDIENCE`, `USER_ROLE` constants. (invariant)
 - **Imports:** Use `@` alias for `apps/node-server/src`. Packages export named entrypoints (e.g., `@packages/backend-core/auth`). (evolving)
+ - **Imports:** Use `@` alias for `apps/node-server/src`. In `packages/core/backend-core`, internal imports now use `@/*` pointing to `src/*` (e.g., `@/types/http.js`). Build resolves aliases to relative paths via `tsc-alias` after `tsc`, so published JS/DTS never contain `@/` specifiers. (evolving)
 - **Lint/Format:** Shared ESLint flat config with import sorting, unused imports, TSDoc, Prettier integration. (evolving)
 - **TypeScript:** Strict settings, `ES2024` target, incremental builds; shared configs from `@configs/ts-config`. (evolving)
 

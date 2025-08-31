@@ -1,6 +1,10 @@
 {
   "extends": "@configs/ts-config/tsconfig.transpiled.json",
   "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"]
+    },
     "outDir": "./dist",
     "rootDir": "./src",
     "tsBuildInfoFile": "node_modules/.cache/tsconfig.build.tsbuildinfo"
