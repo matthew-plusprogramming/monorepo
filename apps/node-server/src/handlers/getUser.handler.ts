@@ -1,6 +1,6 @@
-import type { handlerInput } from '@packages/backend-core';
 import {
   generateRequestHandler,
+  type handlerInput,
   HTTP_RESPONSE,
   InternalServerError,
   NotFoundError,

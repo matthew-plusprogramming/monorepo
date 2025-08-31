@@ -1,5 +1,5 @@
-import type { handlerInput } from '@packages/backend-core';
 import {
+  type handlerInput,
   HTTP_RESPONSE,
   UserNotAuthenticatedError,
   UserTokenInvalidError,

@@ -1,7 +1,7 @@
-import { type handlerInput } from '@packages/backend-core';
 import {
   ConflictError,
   generateRequestHandler,
+  type handlerInput,
   HTTP_RESPONSE,
   InternalServerError,
 } from '@packages/backend-core';

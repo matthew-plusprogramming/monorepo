@@ -4,8 +4,7 @@ import {
   PutLogEventsCommand,
   type PutLogEventsCommandOutput,
 } from '@aws-sdk/client-cloudwatch-logs';
-import { Effect, Layer } from 'effect';
-import { Context } from 'effect';
+import { Context, Effect, Layer } from 'effect';
 
 import {
   applicationLogGroupName,
