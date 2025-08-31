@@ -1,5 +1,5 @@
 {
   "extends": "@configs/ts-config/tsconfig.build.json",
-  "include": ["src/**/*.ts"],
+  "include": ["src", "scripts"],
   "exclude": ["cdktf.out"]
 }

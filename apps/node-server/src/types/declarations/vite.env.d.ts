@@ -1,1 +1,1 @@
-declare const __BUNDLED__;
+declare const __BUNDLED__: boolean;

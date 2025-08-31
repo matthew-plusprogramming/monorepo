@@ -17,12 +17,12 @@ Cdk:
 
 Packages:
 
-- `@packages/backend-core`:
-- `@packages/schemas`:
-- `@utils/ts-utils`:
-- `@utils/type-utils`:
-- `@configs/eslint-config`:
-- `@configs/ts-config`:
-- `@configs/vite-config`:
+- `@packages/backend-core`: Shared backend utilities including an Effect-powered Express request handler generator, standardized HTTP codes, typed error classes, and basic auth constants.
+- `@packages/schemas`: Zod-based domain schemas and constants (users, tokens, verifications, security keys/rate limiting) for validation and typing across services.
+- `@utils/ts-utils`: Small runtime helpers like existence checks and TTL utilities (timestamp calculation and expiry checks).
+- `@utils/type-utils`: Type-only utilities such as `Prettify<T>` to simplify complex inferred types.
+- `@configs/eslint-config`: Shareable ESLint flat config with TypeScript, import sorting, unused-import pruning, TSDoc rules, and Prettier integration.
+- `@configs/ts-config`: Centralized TypeScript config bases for the monorepo (strict settings, build/transpile presets, incremental builds).
+- `@configs/vite-config`: Base Vite config export with sensible build defaults (ES2024 target, esbuild minify, sourcemaps off).
 
 TODO: Provide setup instructions and link to sub READMEs
