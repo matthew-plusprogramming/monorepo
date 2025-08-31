@@ -4,7 +4,7 @@
   "license": "UNLICENSED",
   "type": "module",
   "exports": {
-    ".": "./dist/index.js"
+    ".": "./index.ts"
   },
   "scripts": {
     "// -- 🚀 Development": "--",
