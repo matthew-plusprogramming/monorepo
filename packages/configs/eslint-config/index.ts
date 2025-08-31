@@ -7,11 +7,10 @@ import prettierPlugin from 'eslint-plugin-prettier';
 import simpleImportSort from 'eslint-plugin-simple-import-sort';
 import tsdoc from 'eslint-plugin-tsdoc';
 import unusedImports from 'eslint-plugin-unused-imports';
-import tseslint from 'typescript-eslint';
+import tseslint, { type ConfigWithExtends } from 'typescript-eslint';
 import { globalIgnores } from 'eslint/config';
 import { includeIgnoreFile } from '@eslint/compat';
 import { fileURLToPath } from 'node:url';
-import type { FlatConfig } from '@typescript-eslint/utils/ts-eslint';
 import { ESLint } from 'eslint';
 
 const eslintIgnorePatterns = [
@@ -28,13 +27,13 @@ const eslintIgnorePatterns = [
 ];
 
 const gitignorePath = fileURLToPath(
-  new URL('../../.gitignore', import.meta.url),
+  new URL('../../../.gitignore', import.meta.url),
 );
 
 export const baseConfig = (
   tsconfigDirectory: string,
   projectOverride?: string[],
-) => [
+): Array<ConfigWithExtends> => [
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
