@@ -1,24 +1,69 @@
 # @cdk/backend-server-cdk
 
-CDK setup for this monorepo with OpenTofu (Terraform fork)
+Infrastructure for the monorepo using CDK for Terraform (CDKTF). Targets AWS (DynamoDB, CloudWatch Logs, Lambda packaging) and supports OpenTofu/Terraform.
 
-_note: Terraform support may be dropped in the future, this monorepo
-aims to follow OpenTofu compatibility (which as of July 2025
-includes Terraform compatibility)_
+Stacks ([src/stacks.ts](src/stacks.ts)):
+- `bootstrap`: CDKTF backend/resources bootstrap (WIP migration helper)
+- `api-stack`: App tables + app log group/stream
+- `api-security-stack`: Security tables (rate limiting, deny list) + security logs
+- `api-lambda-stack`: Lambda infra consuming `dist/lambda.zip` artifact
 
-### Prerequisites
+## Prerequisites
 
-- OpenTofu CLI installed and in PATH
+- Node.js (repo uses workspaces)
+- AWS credentials and `AWS_REGION`
+- Dotenvx (provided via devDependency)
+- One of: OpenTofu or Terraform. For OpenTofu, you may set `TERRAFORM_BINARY_NAME=tofu` when needed.
 
-### Usage
+Install deps (root): `npm install`
 
-1. Run `npm run boostrap`
-1. Uncomment the contents of `backend.tf`
-1. Run `tofu init`
-1. Ensure `export TERRAFORM_BINARY_NAME=tofu` if using OpenTofu
+## Environment
 
-TODO:
+Encrypted env files provide AWS settings:
+- [`.env.dev`](.env.dev): keys/region for dev
+- [`.env.production`](.env.production): keys/region for prod
 
-- Fix the above usage
-- Fix the bootstrap stack to use all the right non deprecated stuff
-- Fix
+Scripts set `ENV=dev|production` and load `.env.$ENV` with `dotenvx`. You can prefix any command with `STACK=<name>` to operate on a single stack.
+
+Encrypted envs (dotenvx):
+- The checked-in encrypted files are examples. If you don't have the private key, decryption will fail. In that case, delete the existing [`.env.dev`](.env.dev) and [`.env.production`](.env.production) and create your own with the required variables.
+- Manage secrets with scripts:
+  - Decrypt to edit locally: `npm -w @cdk/backend-server-cdk run decrypt-envs` (do not commit decrypted files)
+  - Re-encrypt after edits: `npm -w @cdk/backend-server-cdk run encrypt-envs`
+  - Note: the decrypt script prints a warning. Ensure decrypted `.env` files are excluded from commits.
+
+## Common Tasks
+
+- Synthesize: `npm -w @cdk/backend-server-cdk run cdk:synth:dev`
+- Deploy all (interactive): `npm -w @cdk/backend-server-cdk run cdk:deploy:dev`
+- Deploy one stack: `STACK=api-stack npm -w @cdk/backend-server-cdk run cdk:deploy:dev`
+- Destroy: `npm -w @cdk/backend-server-cdk run cdk:destroy:dev`
+- Output JSON for app consumption:
+  - `npm -w @cdk/backend-server-cdk run cdk:output:dev api-stack`
+  - `npm -w @cdk/backend-server-cdk run cdk:output:dev api-security-stack`
+
+Outputs are written under [`cdktf.out/stacks`](cdktf.out/stacks) and validated by schemas in [src/consumer/output](src/consumer/output). The app reads these via `@cdk/backend-server-cdk`’s `loadCDKOutput` ([src/consumer/consumers.ts](src/consumer/consumers.ts)).
+
+## Lambda Artifact
+
+To package the app Lambda:
+1) Build the app with `LAMBDA=true`: `npm -w node-server run build`
+2) Copy + zip artifacts here: `npm -w @cdk/backend-server-cdk run copy-assets-for-cdk`
+   - Produces [dist/lambda.zip](dist/lambda.zip)
+
+The copy script ([scripts/copy-lambda-artifacts.ts](scripts/copy-lambda-artifacts.ts)) also brings `cdktf.out/**/outputs.json` alongside the bundle so runtime discovery works when `__BUNDLED__` is true.
+
+## Bootstrap/Migration (WIP)
+
+- `npm -w @cdk/backend-server-cdk run cdk:bootstrap:migrate:dev`
+- Use when migrating to a bootstrapped backend; review script [scripts/cdk-bootstrap-migrate.ts](scripts/cdk-bootstrap-migrate.ts) before use.
+
+## Cleaning
+
+- `npm -w @cdk/backend-server-cdk run clean` removes local deps, `cdktf.out`, `.turbo`, `dist`
+
+## Troubleshooting
+
+- Credentials/region errors: verify `.env.$ENV` contains `AWS_REGION`, access key and secret, or rely on instance role
+- OpenTofu vs Terraform: if using OpenTofu, export `TERRAFORM_BINARY_NAME=tofu`
+- Missing outputs for the app: run the `cdk:output:<stage> <stack>` commands above

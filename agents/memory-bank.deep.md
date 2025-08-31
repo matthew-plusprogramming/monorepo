@@ -14,6 +14,10 @@
 - **Infra as Code:** CDKTF + Constructs; OpenTofu/Terraform compatible (`cdk/backend-server-cdk`). (evolving)
 - **Tooling:** Turborepo (`turbo.json`, root `package.json`), ESLint flat config, shared TS/Vite configs, dotenvx for envs. (evolving)
 
+**Docs**
+- App README: `apps/node-server/README.md` — dev, build, env, endpoints.
+- Infra README: `cdk/backend-server-cdk/README.md` — stacks, deploy, outputs, Lambda artifact.
+
 **Codebase Map**
 - `apps/node-server`
   - Server entry: `src/index.ts`; Lambda entry: `src/lambda.ts` (wraps Express via `serverless-http`).
@@ -87,13 +91,13 @@
   - Lint: `npm run lint`/`lint:fix` (root) → `turbo run lint[:fix]`.
   - Clean: `npm run clean` (root) removes `.turbo` and `node_modules`.
 - **App: Node Server (`apps/node-server`)** (evolving)
-  - Dev: `npm run dev` → copies CDK outputs, ensures `dist/`, copies `.env` + stage file, runs Vite SSR build in watch and `node --watch dist/index.cjs`.
+  - Dev: `npm -w node-server run dev` → copies CDK outputs, ensures `dist/`, copies `.env` + stage file, runs Vite SSR build in watch and `node --watch dist/index.cjs`.
   - Build: `npm run build` → Vite SSR build (`mode=production`); `prebuild: tsc`; `postbuild` copies CDK outputs and stage env.
   - Preview: `npm run preview` → `dotenvx` + `node --watch dist/index.cjs`.
   - Env management: `encrypt-envs` / `decrypt-envs` (dotenvx). Copies merged envs to `dist/.env` via `scripts/copy-env.ts`.
 - **Infra: CDKTF (`cdk/backend-server-cdk`)** (evolving)
   - Requirements: `AWS_REGION` env set; OpenTofu CLI recommended (README notes WIP).
-  - Deploy/synth/destroy: `cdk:*` scripts with `:dev`/`:prod` variants. Example: `npm run cdk:deploy:dev`.
+  - Deploy/synth/destroy: `cdk:*` scripts with `:dev`/`:prod` variants. Example: `npm -w @cdk/backend-server-cdk run cdk:deploy:dev`.
   - Outputs: `npm run cdk:output:<stage>` then `scripts/cdk-output.ts <stack>` to write `cdktf.out/stacks/<stack>/outputs.json`.
   - Lambda packaging: `scripts/copy-lambda-artifacts.ts` copies the built server output and ensures `cdktf.out` outputs inside the CDK distribution; zip produced as `dist/lambda.zip` for `api-lambda-stack`.
   - Bootstrap migration: `npm run cdk:bootstrap:migrate:<stage>` (WIP).

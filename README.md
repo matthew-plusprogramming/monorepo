@@ -1,34 +1,59 @@
 # @matthewlin/monorepo
 
-An opinionated monorepo setup with a selection of packages and apps to kickstart
-any project
+Opinionated TypeScript monorepo. Express 5 server (optionally packaged for AWS Lambda) and CDK for Terraform (CDKTF) infra. WIP, not production-ready.
 
-**⚠️ Warning:** This repository is very heavily WIP and is not production ready
+## Quick Start
 
-## Architecture
+- Install deps: `npm install`
+- Generate CDK outputs for dev (so the app can find table/log names):
+  - `npm -w @cdk/backend-server-cdk run cdk:output:dev api-stack`
+  - `npm -w @cdk/backend-server-cdk run cdk:output:dev api-security-stack`
+- Run the server in dev: `npm -w node-server run dev`
 
-Apps:
+The dev server uses Vite SSR to build to `dist/index.cjs` (see [apps/node-server/vite.config.ts](apps/node-server/vite.config.ts)) and runs `node --watch`. Env files are managed with dotenvx (encrypted [apps/node-server/.env.dev](apps/node-server/.env.dev)/[apps/node-server/.env.production](apps/node-server/.env.production)).
 
-- `node-server`: An express-based server that can also run as a lambda
+Encrypted envs (dotenvx):
+- The encrypted `.env.dev`/`.env.production` files under each workspace are examples. If you don't have the private key, delete them and create your own env files with the required variables.
+- Manage secrets with workspace scripts:
+  - Server: `npm -w node-server run decrypt-envs` / `npm -w node-server run encrypt-envs`
+  - CDK: `npm -w @cdk/backend-server-cdk run decrypt-envs` / `npm -w @cdk/backend-server-cdk run encrypt-envs`
+  - Do not commit decrypted `.env` files. The scripts print a warning after decrypt.
 
-Cdk:
+## Workspaces
 
-- `backend-server-cdk`: A CDK built on cdktf for managing AWS resources
+- Apps
+  - `node-server` — Express server with optional Lambda entry. See [apps/node-server/README.md](apps/node-server/README.md).
+- CDK/Infra
+  - `@cdk/backend-server-cdk` — CDKTF stacks (DynamoDB, CloudWatch, Lambda packaging). See [cdk/backend-server-cdk/README.md](cdk/backend-server-cdk/README.md).
+- Packages (selected)
+  - `@packages/backend-core` — Effect-powered Express adapter, HTTP/status, error types, auth constants.
+  - `@packages/schemas` — Zod schemas for user/security domains and constants (keys, GSIs).
+  - `@utils/*`, `@configs/*` — Utilities and shared TS/ESLint/Vite configs.
 
-Packages/Core:
+## Common Commands
 
-- `@packages/backend-core`: Shared backend utilities including an Effect-powered Express request handler generator, standardized HTTP codes, typed error classes, and basic auth constants.
-- `@packages/schemas`: Zod-based domain schemas and constants (users, tokens, verifications, security keys/rate limiting) for validation and typing across services.
+- Build all: `npm run build`
+- Lint all: `npm run lint` (fix: `npm run lint:fix`)
+- Clean all: `npm run clean`
+- Run a workspace script: `npm -w <package-name> run <script>`
+  - Examples: `npm -w node-server run build`, `npm -w @cdk/backend-server-cdk run cdk:deploy:dev`
 
-Packages/Utils:
+## Lambda Packaging (overview)
 
-- `@utils/ts-utils`: Small runtime helpers like existence checks and TTL utilities (timestamp calculation and expiry checks).
-- `@utils/type-utils`: Type-only utilities such as `Prettify<T>` to simplify complex inferred types.
+1) Ensure `LAMBDA=true` in the server’s env for the build stage
+2) Build server: `npm -w node-server run build`
+3) Prepare Lambda zip in CDK pkg: `npm -w @cdk/backend-server-cdk run copy-assets-for-cdk`
+   - Produces [cdk/backend-server-cdk/dist/lambda.zip](cdk/backend-server-cdk/dist/lambda.zip)
 
-Packages/Configs:
+## Memory Bank (for contributors/agents)
 
-- `@configs/eslint-config`: Shareable ESLint flat config with TypeScript, import sorting, unused-import pruning, TSDoc rules, and Prettier integration.
-- `@configs/ts-config`: Centralized TypeScript config bases for the monorepo (strict settings, build/transpile presets, incremental builds).
-- `@configs/vite-config`: Base Vite config export with sensible build defaults (ES2024 target, esbuild minify, sourcemaps off).
+- Read: [agents/memory-bank.core.md](agents/memory-bank.core.md) (then [agents/memory-bank.deep.md](agents/memory-bank.deep.md))
+- After changes, update front matter in [agents/memory-bank.core.md](agents/memory-bank.core.md):
+  - `generated_at`: YYYY-MM-DD
+  - `repo_git_sha`: `git rev-parse HEAD`
+- Validate links/paths: `npm run memory:validate`
+- Drift check vs stamped SHA: `npm run memory:drift`
 
-TODO: Provide setup instructions and link to sub READMEs
+## Status
+
+⚠️ Active WIP; tests are stubbed for the app, and bootstrap/migration for CDKTF is in progress.

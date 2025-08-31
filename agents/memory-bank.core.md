@@ -1,7 +1,7 @@
 ---
 memory_bank: v1
 generated_at: 2025-08-31
-repo_git_sha: 261bfdeb327df4178d8ed357879b8d34871da237
+repo_git_sha: 56dbedf550ee4f4514792ba1ed06bd116f24187d
 ---
 
 **Core**
@@ -36,14 +36,14 @@ repo_git_sha: 261bfdeb327df4178d8ed357879b8d34871da237
 - Add endpoint
   - Steps: Define schema in `packages/core/schemas/schemas/**`; implement handler in `apps/node-server/src/handlers/**` using `parseInput`; wrap via `generateRequestHandler`; add route in `apps/node-server/src/index.ts`; run dev.
   - Files: `packages/core/schemas/schemas/**`, `apps/node-server/src/handlers/**`, `apps/node-server/src/index.ts`.
-  - Commands: `npm -w apps/node-server run dev`
+  - Commands: `npm -w node-server run dev`
 - Add table/GSI
   - Steps: Update constants in `packages/core/schemas/schemas/user/constants/*`; add table/index in `cdk/backend-server-cdk/src/stacks/**`; deploy; output; ensure app consumes via `apps/node-server/src/clients/cdkOutputs.ts`.
   - Files: `packages/core/schemas/schemas/user/constants/*`, `cdk/backend-server-cdk/src/stacks/**`, `cdk/backend-server-cdk/src/consumer/consumers.ts`, `apps/node-server/src/clients/cdkOutputs.ts`.
-  - Commands: `npm -w cdk/backend-server-cdk run cdk:deploy:dev`, `npm -w cdk/backend-server-cdk run cdk:output:dev`, `npm -w apps/node-server run build`
+  - Commands: `npm -w @cdk/backend-server-cdk run cdk:deploy:dev`, `npm -w @cdk/backend-server-cdk run cdk:output:dev`, `npm -w node-server run build`
 - Add middleware
   - Steps: Implement Effect middleware in `apps/node-server/src/middleware/**`; wrap as `RequestHandler`; register in `apps/node-server/src/index.ts`.
   - Files: `apps/node-server/src/middleware/**`, `apps/node-server/src/index.ts`.
-  - Commands: `npm -w apps/node-server run dev`
+  - Commands: `npm -w node-server run dev`
 
 See Deep Reference: `agents/memory-bank.deep.md`
