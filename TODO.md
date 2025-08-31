@@ -1,18 +1,20 @@
 Monorepo Infra:
 
 - [ ] Integrate vitest
-- [ ] Integrate IaC (OpenTofu)
 - [ ] Docs generation?
-- [ ] Prettier formatting via config.ts and cli
+  - [ ] Perhaps OpenAPI or smth else?
+- [x] Integrate IaC (OpenTofu)
+- [x] Prettier formatting via config.ts and cli
 
 Backend:
 
 Auth Package (Integrated into node server)
 
-- [ ] Error obfuscation for default routes and unauthenticated routes
-  - [ ] Customizable to send 500 or 502 to mask 400 level errors
+- [x] Error obfuscation for default routes and unauthenticated routes
+  - [x] Customizable to send 500 or 502 to mask 400 level errors
 - [ ] Set low concurrency (10)
-- [ ] Coarse rate limiting
+- [x] Coarse rate limiting
+  - [ ] Global config
 - [ ] Authenticates user
 - [ ] Deny-list check
 - [ ] Integrate authzed (spiceDB)
@@ -22,16 +24,21 @@ Auth Package (Integrated into node server)
 
 Node Server (Lambda)
 
-- Only callable from the auth lambda
-
-- [ ] Integrate Effect library
-- [ ] Integrate zod
-- [ ] Integrate graphql (gql.tada)
-- [ ] Integrate express
-- [ ] Integrate db options
-- [ ] Redis
-- [ ] Mongo
+- [x] Integrate Effect library
+- [x] Integrate zod
+- [x] Integrate express
+- [x] Integrate db options
+  - [x] Dynamo
+  - [ ] Mongo
+    - [ ] Maybe later?
 - [ ] Integration test suite to ensure configuration setup correctly
+  - [ ] Test behavior, not implementation. Mock only true boundaries (network, DB, clock, randomness, filesystem, process env).
+  - [ ] Prefer small, deterministic units + a few integration tests that exercise real wiring.
+  - [ ] Standardize patterns: dependency injection, test data builders, and strict AAA (Arrange-Act-Assert).
+- [ ] Integrate graphql (gql.tada)
+  - [ ] Maybe later?
+- [ ] Redis
+  - [ ] Maybe later?
 
 Frontend:
 
