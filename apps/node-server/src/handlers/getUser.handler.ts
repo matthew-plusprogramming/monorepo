@@ -15,16 +15,16 @@ import {
 import { Effect } from 'effect';
 import z, { ZodError } from 'zod';
 
-import { usersTableName } from '../clients/cdkOutputs';
-import { parseInput } from '../helpers/zodParser';
+import { usersTableName } from '@/clients/cdkOutputs';
+import { parseInput } from '@/helpers/zodParser';
 import {
   DynamoDbService,
   LiveDynamoDbService,
-} from '../services/dynamodb.service';
+} from '@/services/dynamodb.service';
 import {
   ApplicationLoggerService,
   LoggerService,
-} from '../services/logger.service';
+} from '@/services/logger.service';
 
 const getUserHandler = (
   input: handlerInput,

@@ -3,11 +3,11 @@ import '@dotenvx/dotenvx/config';
 import express from 'express';
 import { prettifyError, ZodError } from 'zod';
 
-import { getUserRequestHandler } from './handlers/getUser.handler';
-import { registerRequestHandler } from './handlers/register.handler';
-import { ipRateLimitingMiddlewareRequestHandler } from './middleware/ipRateLimiting.middleware';
-import { jsonErrorMiddleware } from './middleware/jsonError.middleware';
-import { EnvironmentSchema } from './types/environment';
+import { getUserRequestHandler } from '@/handlers/getUser.handler';
+import { registerRequestHandler } from '@/handlers/register.handler';
+import { ipRateLimitingMiddlewareRequestHandler } from '@/middleware/ipRateLimiting.middleware';
+import { jsonErrorMiddleware } from '@/middleware/jsonError.middleware';
+import { EnvironmentSchema } from '@/types/environment';
 
 try {
   EnvironmentSchema.parse(process.env);

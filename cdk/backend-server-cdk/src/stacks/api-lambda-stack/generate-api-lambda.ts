@@ -1,9 +1,10 @@
+import { resolve } from 'node:path';
+
 import { DataAwsIamPolicyDocument } from '@cdktf/provider-aws/lib/data-aws-iam-policy-document';
 import { IamRole } from '@cdktf/provider-aws/lib/iam-role';
 import { LambdaFunction } from '@cdktf/provider-aws/lib/lambda-function';
 import { AssetType, TerraformAsset, Token } from 'cdktf';
 import type { Construct } from 'constructs';
-import { resolve } from 'path';
 
 import { packageRootDir } from '../../location';
 

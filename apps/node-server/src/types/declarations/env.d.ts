@@ -1,4 +1,4 @@
-import type { Environment } from '../environment';
+import type { Environment } from '@/types/environment';
 
 declare global {
   namespace NodeJS {

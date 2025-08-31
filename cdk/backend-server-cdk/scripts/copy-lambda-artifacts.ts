@@ -1,5 +1,5 @@
-import { copyFileSync, cpSync, existsSync, mkdirSync, readdirSync } from 'fs';
-import { dirname, join, relative, resolve } from 'path';
+import { copyFileSync, cpSync, existsSync, mkdirSync, readdirSync } from 'node:fs';
+import { dirname, join, relative, resolve } from 'node:path';
 
 import { monorepoRootDir, packageRootDir } from '../src/location';
 

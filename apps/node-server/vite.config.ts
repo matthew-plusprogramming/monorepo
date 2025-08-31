@@ -1,6 +1,8 @@
 import '@dotenvx/dotenvx/config';
 
 import { baseConfig } from '@configs/vite-config';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { defineConfig, UserConfig } from 'vite';
 import z from 'zod';
 
@@ -22,8 +24,16 @@ if (isNaN(Number(port))) {
 }
 
 export default defineConfig(({ mode, command }) => {
+  const __filename = fileURLToPath(import.meta.url);
+  const __dirname = dirname(__filename);
+
   const config = {
     ...baseConfig,
+    resolve: {
+      alias: {
+        '@': resolve(__dirname, 'src'),
+      },
+    },
     server: {
       port: portParsed.data,
     },

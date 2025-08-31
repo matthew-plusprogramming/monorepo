@@ -1,6 +1,6 @@
-import { cpSync, existsSync } from 'fs';
-import { appendFileSync, readFileSync } from 'fs';
-import { resolve } from 'path';
+import { cpSync, existsSync } from 'node:fs';
+import { appendFileSync, readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 
 import { packageRootDir } from '../src/location';
 

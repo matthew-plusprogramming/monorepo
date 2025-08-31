@@ -9,7 +9,7 @@ import { Context, Effect, Layer } from 'effect';
 import {
   applicationLogGroupName,
   serverLogStreamName,
-} from '../clients/cdkOutputs';
+} from '@/clients/cdkOutputs';
 
 type LoggerServiceSchema = {
   readonly log: (

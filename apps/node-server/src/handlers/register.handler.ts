@@ -10,24 +10,27 @@ import {
   JWT_ISSUER,
   USER_ROLE,
 } from '@packages/backend-core/auth';
-import { RegisterInputSchema, type UserToken } from '@packages/schemas/user';
-import { USER_SCHEMA_CONSTANTS } from '@packages/schemas/user';
+import {
+  RegisterInputSchema,
+  USER_SCHEMA_CONSTANTS,
+  type UserToken,
+} from '@packages/schemas/user';
 import { exists } from '@utils/ts-utils';
 import { Effect } from 'effect';
 import { sign } from 'jsonwebtoken';
 import { v4 as uuidV4 } from 'uuid';
 import z, { ZodError } from 'zod';
 
-import { usersTableName } from '../clients/cdkOutputs';
-import { parseInput } from '../helpers/zodParser';
+import { usersTableName } from '@/clients/cdkOutputs';
+import { parseInput } from '@/helpers/zodParser';
 import {
   DynamoDbService,
   LiveDynamoDbService,
-} from '../services/dynamodb.service';
+} from '@/services/dynamodb.service';
 import {
   ApplicationLoggerService,
   LoggerService,
-} from '../services/logger.service';
+} from '@/services/logger.service';
 
 const registerHandler = (
   input: handlerInput,

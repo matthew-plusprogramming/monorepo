@@ -9,15 +9,15 @@ import { isTTLExpiredSeconds, secondsFromNowTimestamp } from '@utils/ts-utils';
 import { Effect } from 'effect';
 import type { RequestHandler } from 'express';
 
-import { rateLimitTableName } from '../clients/cdkOutputs';
+import { rateLimitTableName } from '@/clients/cdkOutputs';
 import {
   DynamoDbService,
   LiveDynamoDbService,
-} from '../services/dynamodb.service';
+} from '@/services/dynamodb.service';
 import {
   ApplicationLoggerService,
   LoggerService,
-} from '../services/logger.service';
+} from '@/services/logger.service';
 
 const ipRateLimitingMiddlewareHandler = (
   input: handlerInput,

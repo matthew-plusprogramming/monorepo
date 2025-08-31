@@ -13,7 +13,7 @@ import z from 'zod';
 import {
   ApplicationLoggerService,
   LoggerService,
-} from '../services/logger.service';
+} from '@/services/logger.service';
 
 const isAuthenticatedMiddlewareHandler = (
   input: handlerInput,

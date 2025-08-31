@@ -1,6 +1,7 @@
+import { copyFileSync, existsSync, mkdirSync, readdirSync } from 'node:fs';
+import { dirname, join, relative, resolve } from 'node:path';
+
 import { exists } from '@utils/ts-utils';
-import { copyFileSync, existsSync, mkdirSync, readdirSync } from 'fs';
-import { dirname, join, relative, resolve } from 'path';
 
 import { monorepoRootDir, packageRootDir } from '../src/location';
 
