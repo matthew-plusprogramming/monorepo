@@ -3,20 +3,35 @@
   "version": "0.0.1",
   "license": "UNLICENSED",
   "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "exports": {
-    ".": "./src/index.ts",
-    "./auth": "./src/auth/index.ts",
-    "./types": "./src/types/index.ts"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./auth": {
+      "types": "./dist/auth/index.d.ts",
+      "import": "./dist/auth/index.js"
+    },
+    "./types": {
+      "types": "./dist/types/index.d.ts",
+      "import": "./dist/types/index.js"
+    }
   },
   "scripts": {
     "// -- 🚀 Development": "--",
     "// -- 🛠️ Build & Clean": "--",
-    "clean": "rm -rf node_modules && rm -rf .turbo",
+    "build": "tsc -p tsconfig.json",
+    "clean": "rm -rf node_modules && rm -rf .turbo && rm -rf dist",
     "// -- 🧪 Testing": "--",
     "// -- 🧹 Linting & Formatting": "--",
     "// -- ✅ Verification & CI": "--",
     "// -- 🔧 Miscellaneous": "--"
   },
+  "files": [
+    "dist"
+  ],
   "dependencies": {
     "zod": "^4.1.0",
     "effect": "^3.17.9",

@@ -1,2 +1,2 @@
-export * from './request.handler';
-export * from './types';
+export * from './request.handler.js';
+export * from './types/index.js';

@@ -1,4 +1,9 @@
 {
-  "extends": "@configs/ts-config/tsconfig.build.json",
+  "extends": "@configs/ts-config/tsconfig.transpiled.json",
+  "compilerOptions": {
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "tsBuildInfoFile": "node_modules/.cache/tsconfig.build.tsbuildinfo"
+  },
   "include": ["src"]
 }

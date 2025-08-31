@@ -1,8 +1,8 @@
 import { Effect, Either } from 'effect';
 import type { RequestHandler } from 'express';
 
-import type { handlerInput } from './types/handler';
-import { HTTP_RESPONSE } from './types/http';
+import type { handlerInput } from './types/handler.js';
+import { HTTP_RESPONSE } from './types/http.js';
 
 export type GenerateRequestHandlerProps<R, E extends Error> = {
   effectfulHandler: (input: handlerInput) => Effect.Effect<R, E>;

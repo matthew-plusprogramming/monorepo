@@ -1,6 +1,6 @@
 import { Data } from 'effect';
 
-import type { GenericErrorPayload } from '.';
+import type { GenericErrorPayload } from './index.js';
 
 // 400 level errors
 export class NotFoundError extends Data.TaggedError(
