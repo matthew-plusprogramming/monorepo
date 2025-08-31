@@ -1,4 +1,4 @@
-import { USER_SCHEMA_CONSTANTS } from './user';
+import { USER_SCHEMA_CONSTANTS } from './user.js';
 
 const UserTableKeys = [
   USER_SCHEMA_CONSTANTS.key.id,

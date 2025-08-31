@@ -4,7 +4,7 @@ import {
   UserIdSchema,
   UserPasswordHashSchema,
   UserUsernameSchema,
-} from './components';
+} from './components/index.js';
 
 export const UserSchema = z.object({
   id: UserIdSchema,

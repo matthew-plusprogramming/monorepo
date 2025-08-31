@@ -4,21 +4,34 @@
   "license": "UNLICENSED",
   "type": "module",
   "exports": {
-    "./security": "./schemas/security/index.ts",
-    "./user": "./schemas/user/index.ts"
+    "./security": {
+      "types": "./dist/security/index.d.ts",
+      "import": "./dist/security/index.js"
+    },
+    "./user": {
+      "types": "./dist/user/index.d.ts",
+      "import": "./dist/user/index.js"
+    }
   },
   "scripts": {
     "// -- 🚀 Development": "--",
     "// -- 🛠️ Build & Clean": "--",
-    "clean": "rm -rf node_modules && rm -rf .turbo",
+    "build": "tsc -p tsconfig.json",
+    "clean": "rm -rf node_modules && rm -rf .turbo && rm -rf dist",
     "// -- 🧪 Testing": "--",
     "// -- 🧹 Linting & Formatting": "--",
     "// -- ✅ Verification & CI": "--",
     "// -- 🔧 Miscellaneous": "--"
   },
+  "files": [
+    "dist"
+  ],
   "dependencies": {
+    "zod": "^4.1.0",
+    "typescript": "^5.9.2"
   },
   "devDependencies": {
+    "@configs/ts-config": "*"
   },
   "peerDependencies": {
   }

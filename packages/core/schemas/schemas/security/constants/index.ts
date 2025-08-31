@@ -1,2 +1,2 @@
-export * from './denyList';
-export * from './rateLimiting';
+export * from './denyList.js';
+export * from './rateLimiting.js';

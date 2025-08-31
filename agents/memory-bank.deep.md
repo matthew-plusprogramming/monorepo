@@ -45,7 +45,7 @@
 - `packages/core/schemas`
   - User domain: `schemas/user/*` (user, verification, token; commands: register/getUser; constants including GSI names). (invariant)
   - Security constants: `schemas/security/constants/*` (rate limiting, deny list key shapes). (invariant)
-  - Package exports: `package.json` exposes `./user` and `./security`. (invariant)
+  - Build/exports: transpiles TS (`schemas/**`) to ESM in `dist/**` and exports subpaths with `.js` and `types` entries for `./user` and `./security`.
 - `packages/utils`
   - `ts-utils`: simple TTL utils and `exists` helper. (invariant)
   - `type-utils`: typing helpers (e.g., `Prettify<T>` referenced in CDK types). (invariant)
