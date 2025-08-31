@@ -95,7 +95,7 @@
   - Requirements: `AWS_REGION` env set; OpenTofu CLI recommended (README notes WIP).
   - Deploy/synth/destroy: `cdk:*` scripts with `:dev`/`:prod` variants. Example: `npm run cdk:deploy:dev`.
   - Outputs: `npm run cdk:output:<stage>` then `scripts/cdk-output.ts <stack>` to write `cdktf.out/stacks/<stack>/outputs.json`.
-  - Lambda packaging: `scripts/copy-lambda-artifacts.ts` copies `apps/node-server/dist` and ensures `cdktf.out` outputs inside `cdk` dist; zip produced as `dist/lambda.zip` for `api-lambda-stack`.
+  - Lambda packaging: `scripts/copy-lambda-artifacts.ts` copies the built server output and ensures `cdktf.out` outputs inside the CDK distribution; zip produced as `dist/lambda.zip` for `api-lambda-stack`.
   - Bootstrap migration: `npm run cdk:bootstrap:migrate:<stage>` (WIP).
 
 **Cross-Cutting Concerns**

@@ -4,8 +4,8 @@ import { resolve, dirname } from 'node:path';
 const root = process.cwd();
 
 const filesToScan = [
-  'memory-bank.core.md',
-  'memory-bank.deep.md',
+  'agents/memory-bank.core.md',
+  'agents/memory-bank.deep.md',
 ];
 
 const ROOT_BASENAMES = new Set([
@@ -70,4 +70,3 @@ if (missing.length) {
 }
 
 console.info('✅ Memory bank paths validated');
-

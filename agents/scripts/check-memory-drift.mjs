@@ -3,7 +3,7 @@ import { resolve } from 'node:path';
 import { execSync } from 'node:child_process';
 
 const root = process.cwd();
-const corePath = resolve(root, 'memory-bank.core.md');
+const corePath = resolve(root, 'agents/memory-bank.core.md');
 
 if (!existsSync(corePath)) {
   console.warn('⚠️ memory-bank.core.md not found. Skipping drift check.');
@@ -58,4 +58,3 @@ if (changed) {
 }
 
 console.info('✅ No impactful changes under apps/ cdk/ packages/ since stamped SHA.');
-

@@ -1,7 +1,7 @@
 ---
 memory_bank: v1
 generated_at: 2025-08-31
-repo_git_sha: a51d10f14be70b17a107858b106d26038f49444e
+repo_git_sha: 261bfdeb327df4178d8ed357879b8d34871da237
 ---
 
 **Core**
@@ -46,4 +46,4 @@ repo_git_sha: a51d10f14be70b17a107858b106d26038f49444e
   - Files: `apps/node-server/src/middleware/**`, `apps/node-server/src/index.ts`.
   - Commands: `npm -w apps/node-server run dev`
 
-See Deep Reference: `memory-bank.deep.md`
+See Deep Reference: `agents/memory-bank.deep.md`
