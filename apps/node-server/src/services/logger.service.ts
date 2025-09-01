@@ -8,6 +8,8 @@ import { Context, Effect, Layer } from 'effect';
 
 import {
   applicationLogGroupName,
+  securityLogGroupName,
+  securityLogStreamName,
   serverLogStreamName,
 } from '@/clients/cdkOutputs';
 
@@ -74,4 +76,9 @@ export class LoggerService extends Context.Tag('LoggerService')<
 export const ApplicationLoggerService = Layer.effect(
   LoggerService,
   makeLoggerService(applicationLogGroupName, serverLogStreamName),
+);
+
+export const SecurityLoggerService = Layer.effect(
+  LoggerService,
+  makeLoggerService(securityLogGroupName, securityLogStreamName),
 );

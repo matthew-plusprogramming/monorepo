@@ -15,8 +15,8 @@ import {
   LiveDynamoDbService,
 } from '@/services/dynamodb.service';
 import {
-  ApplicationLoggerService,
   LoggerService,
+  SecurityLoggerService,
 } from '@/services/logger.service';
 
 const ipRateLimitingMiddlewareHandler = (
@@ -53,8 +53,6 @@ const ipRateLimitingMiddlewareHandler = (
           return Effect.fail(new InternalServerError({ message: e.message }));
         }),
       );
-
-    yield* loggerService.log(JSON.stringify(rateLimitEntry));
 
     yield* databaseService
       .putItem({
@@ -114,6 +112,9 @@ const ipRateLimitingMiddlewareHandler = (
       );
 
     if (newNumCalls > RATE_LIMIT_CALLS) {
+      yield* loggerService.log(
+        `[RATE_LIMIT_EXCEEDED] ${ip} - ${newNumCalls} calls`,
+      );
       return yield* Effect.fail(
         new RateLimitExceededError({
           message: 'Rate limit exceeded',
@@ -121,7 +122,7 @@ const ipRateLimitingMiddlewareHandler = (
       );
     }
   })
-    .pipe(Effect.provide(ApplicationLoggerService))
+    .pipe(Effect.provide(SecurityLoggerService))
     .pipe(Effect.provide(LiveDynamoDbService));
 
 // TODO: Refactor to middleware request handler (make in backend-core)
