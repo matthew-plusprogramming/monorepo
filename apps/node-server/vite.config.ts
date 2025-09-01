@@ -53,7 +53,6 @@ export default defineConfig(({ mode, command }) => {
           format: 'cjs',
         },
         external: [
-          /^@aws-sdk\//,
           /^@configs\//,
           /^@types\//,
           /^eslint.*/,

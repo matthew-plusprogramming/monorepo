@@ -5,7 +5,6 @@ import {
   RateLimitExceededError,
 } from '@packages/backend-core';
 import { RATE_LIMITING_SCHEMA_CONSTANTS } from '@packages/schemas/security';
-import { isTTLExpiredSeconds, secondsFromNowTimestamp } from '@utils/ts-utils';
 import { Effect } from 'effect';
 import type { RequestHandler } from 'express';
 
@@ -37,16 +36,34 @@ const ipRateLimitingMiddlewareHandler = (
       );
     }
 
-    const rateLimitEntry = yield* databaseService
-      .getItem({
+    // Single-UpdateItem approach using a fixed 60s window bucket in the key
+    const WINDOW_SECONDS = 60;
+    const nowSec = Math.floor(Date.now() / 1000);
+    const windowStart = Math.floor(nowSec / WINDOW_SECONDS) * WINDOW_SECONDS;
+    const windowEndTtl = windowStart + WINDOW_SECONDS;
+
+    const partitionKeyValue = `${
+      RATE_LIMITING_SCHEMA_CONSTANTS.key.suffix.ip
+    }#${ip}#${windowStart}`;
+
+    const updated = yield* databaseService
+      .updateItem({
         TableName: rateLimitTableName,
         Key: {
-          [RATE_LIMITING_SCHEMA_CONSTANTS.key.base]: {
-            S: `${RATE_LIMITING_SCHEMA_CONSTANTS.key.suffix.ip}#${ip}`,
-          },
+          [RATE_LIMITING_SCHEMA_CONSTANTS.key.base]: { S: partitionKeyValue },
         },
+        UpdateExpression:
+          'SET calls = if_not_exists(calls, :zero) + :one, #ttl = :ttl',
+        ExpressionAttributeNames: {
+          '#ttl': 'ttl',
+        },
+        ExpressionAttributeValues: {
+          ':zero': { N: '0' },
+          ':one': { N: '1' },
+          ':ttl': { N: windowEndTtl.toString() },
+        },
+        ReturnValues: 'ALL_NEW',
       })
-      .pipe(Effect.map((res) => res.Item))
       .pipe(
         Effect.catchAll((e) => {
           loggerService.logError(e);
@@ -54,63 +71,12 @@ const ipRateLimitingMiddlewareHandler = (
         }),
       );
 
-    yield* databaseService
-      .putItem({
-        TableName: rateLimitTableName,
-        Item: {
-          [RATE_LIMITING_SCHEMA_CONSTANTS.key.base]: {
-            S: `${RATE_LIMITING_SCHEMA_CONSTANTS.key.suffix.ip}#${ip}`,
-          },
-          calls: {
-            N: '1',
-          },
-          ttl: {
-            N: secondsFromNowTimestamp(60).toString(),
-          },
-        },
-      })
-      .pipe(
-        Effect.catchAll((e) => {
-          loggerService.logError(e);
-          return Effect.fail(new InternalServerError({ message: e.message }));
-        }),
-      );
+    // Parse the updated call count
+    const callsN = updated.Attributes?.calls?.N ?? '0';
+    const newNumCalls = parseInt(callsN);
 
     // TODO: refactor out to constants
     const RATE_LIMIT_CALLS = 5;
-    let newTtl = secondsFromNowTimestamp(60).toString();
-    let newNumCalls = 1;
-    if (rateLimitEntry) {
-      const ttl = parseInt(rateLimitEntry.ttl?.N ?? '');
-      if (!isTTLExpiredSeconds(isNaN(ttl) ? 0 : ttl)) {
-        // TTL has not expired, increment the rate limit
-        newNumCalls = parseInt(rateLimitEntry.calls?.N ?? '0') + 1;
-        newTtl = ttl.toString();
-      }
-    }
-
-    yield* databaseService
-      .putItem({
-        TableName: rateLimitTableName,
-        Item: {
-          [RATE_LIMITING_SCHEMA_CONSTANTS.key.base]: {
-            S: `${RATE_LIMITING_SCHEMA_CONSTANTS.key.suffix.ip}#${ip}`,
-          },
-          calls: {
-            N: newNumCalls.toString(),
-          },
-          ttl: {
-            N: newTtl,
-          },
-        },
-      })
-      .pipe(
-        Effect.catchAll((e) => {
-          loggerService.logError(e);
-          return Effect.fail(new InternalServerError({ message: e.message }));
-        }),
-      );
-
     if (newNumCalls > RATE_LIMIT_CALLS) {
       yield* loggerService.log(
         `[RATE_LIMIT_EXCEEDED] ${ip} - ${newNumCalls} calls`,

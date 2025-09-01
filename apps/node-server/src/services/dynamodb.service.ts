@@ -8,6 +8,9 @@ import {
   PutItemCommand,
   type PutItemCommandInput,
   type PutItemCommandOutput,
+  UpdateItemCommand,
+  type UpdateItemCommandInput,
+  type UpdateItemCommandOutput,
   QueryCommand,
   type QueryCommandInput,
   type QueryCommandOutput,
@@ -27,6 +30,10 @@ type DynamoDbServiceSchema = {
   readonly query: (
     input: QueryCommandInput,
   ) => Effect.Effect<QueryCommandOutput, Error>;
+
+  readonly updateItem: (
+    input: UpdateItemCommandInput,
+  ) => Effect.Effect<UpdateItemCommandOutput, Error>;
 };
 
 // TODO: move to constants
@@ -60,6 +67,13 @@ const makeDynamoDbService = (): Effect.Effect<
       putItem: (input): Effect.Effect<PutItemCommandOutput, Error> => {
         return Effect.tryPromise({
           try: () => client.send(new PutItemCommand(input)),
+          // TODO: Check what error types we can make
+          catch: (error) => new Error(error as string),
+        });
+      },
+      updateItem: (input): Effect.Effect<UpdateItemCommandOutput, Error> => {
+        return Effect.tryPromise({
+          try: () => client.send(new UpdateItemCommand(input)),
           // TODO: Check what error types we can make
           catch: (error) => new Error(error as string),
         });
