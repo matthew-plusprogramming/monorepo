@@ -63,6 +63,7 @@ const getUserHandler = (
                 S: value,
               },
             },
+            ProjectionExpression: 'username, email',
           })
           .pipe(Effect.map((response) => response.Item));
       },
@@ -77,6 +78,7 @@ const getUserHandler = (
                 S: value,
               },
             },
+            ProjectionExpression: 'username, email',
           })
           .pipe(Effect.map((response) => response.Items?.[0]));
       },
