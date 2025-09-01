@@ -40,6 +40,7 @@ export const generateApiLambda = (scope: Construct, region: string): void => {
   });
 
   // TODO: Move these constants (memory size, reserved concurrency, etc) to config
+  // TODO: Set auto expiration for logs
   new LambdaFunction(scope, 'my-lambda-function', {
     functionName: 'my-lambda-function',
     filename: asset.path,

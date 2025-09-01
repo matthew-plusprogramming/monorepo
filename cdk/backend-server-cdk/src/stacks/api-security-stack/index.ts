@@ -24,6 +24,7 @@ export class ApiSecurityStack extends TerraformStack {
 
     generateSecurityTables(this, region);
 
+    // TODO: Set auto expiration
     const securityLogGroup = new CloudwatchLogGroup(this, 'security-logs', {
       name: 'security-logs',
     });
