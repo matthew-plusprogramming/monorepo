@@ -69,7 +69,7 @@
   - `DynamoDbService`: Effect service wrapping GetItem/PutItem/Query (AWS SDK v3). (invariant)
   - `LoggerService`: Effect service sending `PutLogEvents` to CloudWatch Logs; fallback to console on failures. (invariant)
 - CDK Output Consumer (`cdk/backend-server-cdk/src/consumer/consumers.ts`):
-  - `loadCDKOutput(stack, outputsPath?)`: Reads `cdktf.out/stacks/<stack>/outputs.json`, validates with stack-specific zod schema, caches per process. Used by `apps/node-server/src/clients/cdkOutputs.ts`. (invariant)
+  - `loadCDKOutput(stack, outputsPath?)`: Reads `cdktf-outputs/stacks/<stack>/outputs.json`, validates with stack-specific zod schema, caches per process. Used by `apps/node-server/src/clients/cdkOutputs.ts`. (invariant)
 - Vite Config (`apps/node-server/vite.config.ts`): (evolving)
   - Uses shared `@configs/vite-config` base; defines alias `@ -> src`; `ssr: true`; output CJS; selects entry `src/lambda.ts` when `LAMBDA=true` else `src/index.ts`; defines `__BUNDLED__`.
 
@@ -99,8 +99,8 @@
 - **Infra: CDKTF (`cdk/backend-server-cdk`)** (evolving)
   - Requirements: `AWS_REGION` env set; OpenTofu CLI recommended (README notes WIP).
   - Deploy/synth/destroy: `cdk:*` scripts with `:dev`/`:prod` variants. Example: `npm -w @cdk/backend-server-cdk run cdk:deploy:dev`.
-  - Outputs: `npm run cdk:output:<stage>` then `scripts/cdk-output.ts <stack>` to write `cdktf.out/stacks/<stack>/outputs.json`.
-  - Lambda packaging: `scripts/copy-lambda-artifacts.ts` copies the built server output and ensures `cdktf.out` outputs inside the CDK distribution; zip produced as `dist/lambda.zip` for `api-lambda-stack`.
+  - Outputs: `npm run cdk:output:<stage>` then `scripts/cdk-output.ts <stack>` to write `cdktf-outputs/stacks/<stack>/outputs.json`.
+  - Lambda packaging: `scripts/copy-lambda-artifacts.ts` copies the built server output and ensures `cdktf-outputs` outputs inside the CDK distribution; zip produced as `dist/lambda.zip` for `api-lambda-stack`.
   - Bootstrap migration: `npm run cdk:bootstrap:migrate:<stage>` (WIP).
 
 **Cross-Cutting Concerns**
@@ -122,7 +122,7 @@
 - **USER_SCHEMA_CONSTANTS / VERIFICATION_SCHEMA_CONSTANTS:** Keys and GSIs for user and verification tables.
 - **RATE_LIMITING_SCHEMA_CONSTANTS / DENY_LIST_SCHEMA_CONSTANTS:** Partition key names and suffixes for security tables.
 - **CDK stacks:** `api-stack`, `api-lambda-stack`, `api-security-stack`, `bootstrap` defined in `cdk/backend-server-cdk/src/stacks.ts`.
-- **loadCDKOutput:** Reads and validates `cdktf.out/stacks/<stack>/outputs.json`; used by app to discover resource names.
+- **loadCDKOutput:** Reads and validates `cdktf-outputs/stacks/<stack>/outputs.json`; used by app to discover resource names.
 - **__BUNDLED__ (define):** Vite-defined flag to adjust CDK outputs path at runtime (`apps/node-server/src/clients/cdkOutputs.ts`).
 - **LAMBDA env:** Switches server entry from `src/index.ts` to `src/lambda.ts` at build time (`vite.config.ts`).
 - **Required envs (server):** `PORT`, `JWT_SECRET`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION` (`apps/node-server/src/types/environment.ts`).

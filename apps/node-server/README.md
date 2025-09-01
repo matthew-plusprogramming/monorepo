@@ -46,7 +46,7 @@ Encrypted envs (dotenvx):
 
 Helpers:
 - On build/dev, [scripts/copy-env.ts](scripts/copy-env.ts) writes a merged [dist/.env](dist) for runtime
-- [scripts/copy-cdk-outputs.ts](scripts/copy-cdk-outputs.ts) copies outputs from [../../cdk/backend-server-cdk/cdktf.out](../../cdk/backend-server-cdk/cdktf.out) into [dist/cdktf.out](dist/cdktf.out)
+- [scripts/copy-cdk-outputs.ts](scripts/copy-cdk-outputs.ts) copies outputs from [../../cdk/backend-server-cdk/cdktf-outputs](../../cdk/backend-server-cdk/cdktf-outputs) into [dist/cdktf-outputs](dist/cdktf-outputs)
 
 Tip: If `copy-cdk-outputs` fails in dev, run the two `cdk:output:dev` commands above first.
 

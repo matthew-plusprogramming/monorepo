@@ -42,7 +42,7 @@ Encrypted envs (dotenvx):
   - `npm -w @cdk/backend-server-cdk run cdk:output:dev api-stack`
   - `npm -w @cdk/backend-server-cdk run cdk:output:dev api-security-stack`
 
-Outputs are written under [`cdktf.out/stacks`](cdktf.out/stacks) and validated by schemas in [src/consumer/output](src/consumer/output). The app reads these via `@cdk/backend-server-cdk`’s `loadCDKOutput` ([src/consumer/consumers.ts](src/consumer/consumers.ts)).
+Outputs are written under [`cdktf-outputs/stacks`](cdktf-outputs/stacks) and validated by schemas in [src/consumer/output](src/consumer/output). The app reads these via `@cdk/backend-server-cdk`’s `loadCDKOutput` ([src/consumer/consumers.ts](src/consumer/consumers.ts)).
 
 ## Lambda Artifact
 
@@ -51,7 +51,7 @@ To package the app Lambda:
 2) Copy + zip artifacts here: `npm -w @cdk/backend-server-cdk run copy-assets-for-cdk`
    - Produces [dist/lambda.zip](dist/lambda.zip)
 
-The copy script ([scripts/copy-lambda-artifacts.ts](scripts/copy-lambda-artifacts.ts)) also brings `cdktf.out/**/outputs.json` alongside the bundle so runtime discovery works when `__BUNDLED__` is true.
+The copy script ([scripts/copy-lambda-artifacts.ts](scripts/copy-lambda-artifacts.ts)) also brings `cdktf-outputs/**/outputs.json` alongside the bundle so runtime discovery works when `__BUNDLED__` is true.
 
 ## Bootstrap/Migration (WIP)
 
@@ -60,7 +60,7 @@ The copy script ([scripts/copy-lambda-artifacts.ts](scripts/copy-lambda-artifact
 
 ## Cleaning
 
-- `npm -w @cdk/backend-server-cdk run clean` removes local deps, `cdktf.out`, `.turbo`, `dist`
+- `npm -w @cdk/backend-server-cdk run clean` removes local deps, `cdktf.out`, `cdktf-outputs`, `.turbo`, `dist`
 
 ## Troubleshooting
 
