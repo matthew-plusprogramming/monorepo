@@ -23,19 +23,6 @@ try {
 
 const app = express();
 app.use(ipRateLimitingMiddlewareRequestHandler);
-// Remove after: https://github.com/dougmoscrop/serverless-http/pull/306
-// https://github.com/dougmoscrop/serverless-http/issues/305#issuecomment-3222386259
-app.use((req, _res, next) => {
-  if (
-    req.socket &&
-    !req.socket.readable &&
-    req.body &&
-    Buffer.isBuffer(req.body)
-  ) {
-    req.socket.readable = true;
-  }
-  next();
-});
 app.use(express.json());
 app.use(jsonErrorMiddleware);
 
