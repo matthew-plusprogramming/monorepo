@@ -1,4 +1,10 @@
-import { copyFileSync, cpSync, existsSync, mkdirSync, readdirSync } from 'node:fs';
+import {
+  copyFileSync,
+  cpSync,
+  existsSync,
+  mkdirSync,
+  readdirSync,
+} from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 
 import { monorepoRootDir, packageRootDir } from '../src/location';
@@ -15,7 +21,7 @@ if (!existsSync(lambdaArtifacts)) {
 
 cpSync(lambdaArtifacts, distDirectory, { recursive: true });
 
-const destRoot = resolve(distDirectory, 'cdktf.out');
+const destRoot = resolve(distDirectory, 'cdktf-outputs');
 if (!existsSync(destRoot)) {
   /**
    * Recursively copy only `outputs.json` files from srcRoot to destRoot,
@@ -47,7 +53,7 @@ if (!existsSync(destRoot)) {
     return copied;
   };
 
-  const outputsDirectory = resolve(packageRootDir, 'cdktf.out');
+  const outputsDirectory = resolve(packageRootDir, 'cdktf-outputs');
 
   if (!existsSync(outputsDirectory)) {
     console.error('❌ CDK outputs directory not found. Please pull and retry');

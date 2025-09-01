@@ -19,11 +19,11 @@ if (!exists(LAMBDA)) {
 
 const outputsDirectory = resolve(
   monorepoRootDir,
-  'cdk/backend-server-cdk/cdktf.out',
+  'cdk/backend-server-cdk/cdktf-outputs',
 );
 
 const distDirectory = resolve(packageRootDir, 'dist');
-const destRoot = resolve(distDirectory, 'cdktf.out');
+const destRoot = resolve(distDirectory, 'cdktf-outputs');
 
 if (!existsSync(outputsDirectory)) {
   console.error(

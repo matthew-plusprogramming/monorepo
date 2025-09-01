@@ -1,3 +1,4 @@
 cdktf.out
 *.tfstate
 *.tfstate.backup
+cdktf-outputs

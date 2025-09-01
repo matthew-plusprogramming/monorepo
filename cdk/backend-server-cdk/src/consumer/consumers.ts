@@ -27,9 +27,9 @@ const generateOutputPath = (
   outputsPath?: string,
 ): string => {
   if (outputsPath) {
-    return resolve(outputsPath, `cdktf.out/stacks/${stack}/outputs.json`);
+    return resolve(outputsPath, `cdktf-outputs/stacks/${stack}/outputs.json`);
   }
-  return resolve(packageRootDir, `cdktf.out/stacks/${stack}/outputs.json`);
+  return resolve(packageRootDir, `cdktf-outputs/stacks/${stack}/outputs.json`);
 };
 
 const loadOutput = <T extends ConsumableStack>(
