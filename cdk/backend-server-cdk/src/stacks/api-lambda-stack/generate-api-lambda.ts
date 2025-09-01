@@ -46,7 +46,7 @@ export const generateApiLambda = (scope: Construct, region: string): void => {
     filename: asset.path,
     handler: 'lambda.handler',
     runtime: 'nodejs22.x',
-    memorySize: 128,
+    memorySize: 256,
     timeout: 10,
     environment: {},
     role: iamRole.arn,

@@ -52,12 +52,21 @@ export default defineConfig(({ mode, command }) => {
         output: {
           format: 'cjs',
         },
-        external: ['@node-rs/argon2'],
+        external: [
+          /^@aws-sdk\//,
+          /^@configs\//,
+          /^@types\//,
+          /^eslint.*/,
+          '@node-rs/argon2',
+          'concurrently',
+          'cross-env',
+          'jiti',
+        ],
       },
     },
     ssr: {
       noExternal: true,
-      external: ['@node-rs/argon2'],
+      external: ['@node-rs/argon2', 'concurrently', 'cross-env', 'jiti'],
     },
   } satisfies UserConfig;
 

@@ -1,3 +1,5 @@
+import { Agent } from 'node:https';
+
 import {
   DynamoDBClient,
   GetItemCommand,
@@ -10,6 +12,7 @@ import {
   type QueryCommandInput,
   type QueryCommandOutput,
 } from '@aws-sdk/client-dynamodb';
+import { NodeHttpHandler } from '@smithy/node-http-handler';
 import { Context, Effect, Layer } from 'effect';
 
 type DynamoDbServiceSchema = {
@@ -26,13 +29,25 @@ type DynamoDbServiceSchema = {
   ) => Effect.Effect<QueryCommandOutput, Error>;
 };
 
+// TODO: move to constants
+const httpHandler = new NodeHttpHandler({
+  connectionTimeout: 300,
+  socketTimeout: 1000,
+  requestTimeout: 1500,
+  httpsAgent: new Agent({ keepAlive: true }),
+});
+
 const makeDynamoDbService = (): Effect.Effect<
   DynamoDbServiceSchema,
   never,
   never
 > => {
   return Effect.sync(() => {
-    const client = new DynamoDBClient();
+    const client = new DynamoDBClient({
+      region: process.env.AWS_REGION,
+      requestHandler: httpHandler,
+      maxAttempts: 2,
+    });
 
     const service = {
       getItem: (input): Effect.Effect<GetItemCommandOutput, Error> => {

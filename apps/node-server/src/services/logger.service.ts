@@ -1,9 +1,12 @@
+import { Agent } from 'node:https';
+
 import {
   type __MetadataBearer,
   CloudWatchLogsClient,
   PutLogEventsCommand,
   type PutLogEventsCommandOutput,
 } from '@aws-sdk/client-cloudwatch-logs';
+import { NodeHttpHandler } from '@smithy/node-http-handler';
 import { Context, Effect, Layer } from 'effect';
 
 import {
@@ -23,13 +26,19 @@ type LoggerServiceSchema = {
   ) => Effect.Effect<PutLogEventsCommandOutput, never>;
 };
 
-const client = new CloudWatchLogsClient();
-
 const LOG_FAILED_METADATA = {
   $metadata: {
     httpStatusCode: 500,
   },
 } satisfies __MetadataBearer;
+
+// TODO: move to constants
+const httpHandler = new NodeHttpHandler({
+  connectionTimeout: 300,
+  socketTimeout: 1000,
+  requestTimeout: 1500,
+  httpsAgent: new Agent({ keepAlive: true }),
+});
 
 // TODO: Implement context (ip, userId, tokenId) for logging that can be passed
 const makeLoggerService = (
@@ -37,6 +46,12 @@ const makeLoggerService = (
   logStreamName: string,
 ): Effect.Effect<LoggerServiceSchema, never, never> =>
   Effect.sync(() => {
+    const client = new CloudWatchLogsClient({
+      region: process.env.AWS_REGION,
+      requestHandler: httpHandler,
+      maxAttempts: 2,
+    });
+
     const service = {
       log: (input): Effect.Effect<PutLogEventsCommandOutput, never> =>
         Effect.gen(function* () {
