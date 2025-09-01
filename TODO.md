@@ -1,8 +1,7 @@
 Monorepo Infra:
 
-- [ ] Integrate vitest
-- [ ] Docs generation?
-  - [ ] Perhaps OpenAPI or smth else?
+- [ ] Docs generation
+  - [ ] OpenAPI
 - [x] Integrate IaC (OpenTofu)
 - [ ] CI pipeline of some kind
 - [ ] Prettier formatting via config.ts and cli
@@ -14,7 +13,7 @@ Auth Package (Integrated into node server)
 
 - [x] Error obfuscation for default routes and unauthenticated routes
   - [x] Customizable to send 500 or 502 to mask 400 level errors
-- [ ] Set low concurrency (10)
+- [x] Set low concurrency (10)
 - [x] Coarse rate limiting
   - [ ] Global config
 - [ ] Authenticates user
@@ -45,10 +44,11 @@ Node Server (Lambda)
 Frontend:
 
 - [ ] Integrate basic react setup w/ zustand, react query
-- [ ] Integrate single-spa (why not)
 - [ ] Scss
   - [ ] Classnames
+- [ ] Integrate single-spa (why not)
+  - [ ] Maybe later? (too cumbersome for now)
 
 Chores:
 
-- [ ] Setup guide on README
+- [x] Setup guide on README
