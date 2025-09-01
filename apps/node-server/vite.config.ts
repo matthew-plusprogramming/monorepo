@@ -52,11 +52,12 @@ export default defineConfig(({ mode, command }) => {
         output: {
           format: 'cjs',
         },
-        external: [],
+        external: ['argon2'],
       },
     },
     ssr: {
       noExternal: true,
+      external: ['argon2'],
     },
   } satisfies UserConfig;
 

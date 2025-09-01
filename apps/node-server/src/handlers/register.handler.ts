@@ -16,6 +16,7 @@ import {
   type UserToken,
 } from '@packages/schemas/user';
 import { exists } from '@utils/ts-utils';
+import argon2 from 'argon2';
 import { Effect } from 'effect';
 import { sign } from 'jsonwebtoken';
 import { v4 as uuidV4 } from 'uuid';
@@ -77,6 +78,12 @@ const registerHandler = (
       });
     }
 
+    const hashedPassword = yield* Effect.promise(() =>
+      argon2.hash(parsedInput.password, {
+        secret: Buffer.from(process.env.PEPPER),
+      }),
+    );
+
     yield* databaseService
       .putItem({
         TableName: usersTableName,
@@ -84,8 +91,7 @@ const registerHandler = (
           id: { S: userId },
           username: { S: parsedInput.username },
           email: { S: parsedInput.email },
-          // ! In production, never store passwords in plain text
-          password: { S: parsedInput.password },
+          password: { S: hashedPassword },
         },
       })
       .pipe(

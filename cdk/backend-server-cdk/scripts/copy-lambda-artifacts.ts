@@ -4,6 +4,7 @@ import {
   existsSync,
   mkdirSync,
   readdirSync,
+  rmSync,
 } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 
@@ -11,6 +12,9 @@ import { monorepoRootDir, packageRootDir } from '../src/location';
 
 const lambdaArtifacts = resolve(monorepoRootDir, 'apps/node-server/dist');
 const distDirectory = resolve(packageRootDir, 'dist');
+if (existsSync(distDirectory)) {
+  rmSync(distDirectory, { recursive: true });
+}
 
 if (!existsSync(lambdaArtifacts)) {
   console.error(
