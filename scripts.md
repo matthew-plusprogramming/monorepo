@@ -1,0 +1,11 @@
+Scripts that may help during development:
+
+Build and deploy lambda (node-server)
+
+```
+npm -w node-server run decrypt-envs
+npm -w node-server run build
+npm -w @cdk/backend-server-cdk run copy-assets-for-cdk
+npm -w @cdk/backend-server-cdk run cdk:deploy:dev api-lambda-stack
+npm -w node-server run encrypt-envs
+```
