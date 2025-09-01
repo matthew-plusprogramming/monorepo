@@ -12,8 +12,16 @@ const main = async (): Promise<void> => {
     process.exit(1);
   }
 
-  const npmCmd = 'npm';
-  const npmCmdArgs = ['i', 'argon2', '--prefix', '.'];
+  const npmCmd = 'env';
+  const npmCmdArgs = [
+    'npm_config_force=true',
+    'npm',
+    'i',
+    '@node-rs/argon2',
+    '@node-rs/argon2-linux-x64-gnu',
+    '--prefix',
+    '.',
+  ];
 
   console.info(`Installing argon2 in ${distDir}...`);
   await new Promise<void>((resolve, reject) => {
@@ -31,7 +39,12 @@ const main = async (): Promise<void> => {
   });
 
   const rmCmd = 'rm';
-  const rmCmdArgs = ['-rf', 'package-lock.json', 'package.json'];
+  const rmCmdArgs = [
+    '-rf',
+    'package-lock.json',
+    'package.json',
+    'node_modules/@node-rs/argon2-darwin-arm64',
+  ];
 
   console.info(
     `Removing package.json and package-lock.json from ${distDir}...`,

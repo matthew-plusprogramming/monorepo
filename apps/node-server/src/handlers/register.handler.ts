@@ -1,3 +1,4 @@
+import argon2 from '@node-rs/argon2';
 import {
   ConflictError,
   generateRequestHandler,
@@ -16,7 +17,6 @@ import {
   type UserToken,
 } from '@packages/schemas/user';
 import { exists } from '@utils/ts-utils';
-import argon2 from 'argon2';
 import { Effect } from 'effect';
 import { sign } from 'jsonwebtoken';
 import { v4 as uuidV4 } from 'uuid';
