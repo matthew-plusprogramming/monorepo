@@ -48,6 +48,13 @@ Frontend:
   - [ ] Classnames
 - [ ] Integrate single-spa (why not)
   - [ ] Maybe later? (too cumbersome for now)
+- [ ] React hookform
+- [ ] Create a barebones component suite for common usecases
+  - [ ] Button
+  - [ ] Navbar
+  - [ ] Footer
+  - [ ] Sidebar
+  - [ ] Sidenav
 
 Chores:
 
