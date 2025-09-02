@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto';
+
 import argon2 from '@node-rs/argon2';
 import {
   ConflictError,
@@ -19,7 +21,6 @@ import {
 import { exists } from '@utils/ts-utils';
 import { Effect } from 'effect';
 import { sign } from 'jsonwebtoken';
-import { v4 as uuidV4 } from 'uuid';
 import z, { ZodError } from 'zod';
 
 import { usersTableName } from '@/clients/cdkOutputs';
@@ -50,7 +51,7 @@ const registerHandler = (
 
     const databaseService = yield* DynamoDbService;
     const loggerService = yield* LoggerService;
-    const userId = uuidV4();
+    const userId = randomUUID();
 
     const existingUserCheck = yield* databaseService
       .query({
@@ -110,7 +111,7 @@ const registerHandler = (
       aud: JWT_AUDIENCE,
       exp: inOneHour,
       iat: now,
-      jti: uuidV4(),
+      jti: randomUUID(),
       role: USER_ROLE,
     } satisfies UserToken;
 
