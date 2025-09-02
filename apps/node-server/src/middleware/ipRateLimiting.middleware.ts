@@ -18,6 +18,7 @@ import {
   SecurityLoggerService,
 } from '@/services/logger.service';
 
+// TODO: refactor out to backend-core with deps
 const ipRateLimitingMiddlewareHandler = (
   input: handlerInput,
 ): Effect.Effect<void, InternalServerError | RateLimitExceededError> =>
