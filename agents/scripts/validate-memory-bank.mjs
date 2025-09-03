@@ -1,32 +1,51 @@
-import { readFileSync, existsSync } from 'node:fs';
-import { resolve, dirname } from 'node:path';
+import { readFileSync, existsSync, readdirSync, statSync } from 'node:fs';
+import { resolve, join } from 'node:path';
+import {
+  MEMORY_OVERVIEW,
+  MEMORY_DIR,
+  ROOT_BASENAMES,
+  PATH_PREFIXES,
+  CODE_SPAN_REGEX,
+} from './constants.js';
 
 const root = process.cwd();
 
-const filesToScan = [
-  'agents/memory-bank.core.md',
-  'agents/memory-bank.deep.md',
-];
+// Collect all Memory Bank markdown files under MEMORY_DIR/** and the overview file
+const collectMemoryBankFiles = () => {
+  const acc = new Set([resolve(root, MEMORY_OVERVIEW)]);
+  const base = resolve(root, MEMORY_DIR);
+  const walk = (dir) => {
+    let entries = [];
+    try {
+      entries = readdirSync(dir);
+    } catch {
+      return;
+    }
+    for (const name of entries) {
+      const p = join(dir, name);
+      try {
+        const st = statSync(p);
+        if (st.isDirectory()) walk(p);
+        else if (st.isFile() && name.endsWith('.md')) acc.add(p);
+      } catch {
+        // ignore unreadable entries
+      }
+    }
+  };
+  walk(base);
+  return [...acc];
+};
 
-const ROOT_BASENAMES = new Set([
-  'README.md',
-  'package.json',
-  'package-lock.json',
-  'turbo.json',
-  'memory-bank.md',
-  'memory-bank.core.md',
-  'memory-bank.deep.md',
-  'monorepo.code-workspace',
-]);
+const filesToScan = collectMemoryBankFiles();
 
-const PREFIXES = ['apps/', 'packages/', 'cdk/'];
+// ROOT_BASENAMES and PATH_PREFIXES are sourced from ./constants.js
 
 const extractCandidates = (md) => {
   const set = new Set();
-  const codeMatches = md.matchAll(/`([^`]+)`/g);
+  const codeMatches = md.matchAll(CODE_SPAN_REGEX);
   for (const m of codeMatches) {
     const token = m[1].trim();
-    const startsWithPrefix = PREFIXES.some((p) => token.startsWith(p));
+    const startsWithPrefix = PATH_PREFIXES.some((p) => token.startsWith(p));
     const isRootFile = ROOT_BASENAMES.has(token);
     if (!startsWithPrefix && !isRootFile) continue;
     set.add(token);
@@ -47,19 +66,16 @@ const checkPath = (p) => {
 };
 
 let missing = [];
-for (const rel of filesToScan) {
-  const abs = resolve(root, rel);
+for (const abs of filesToScan) {
   if (!existsSync(abs)) {
-    console.error(`❌ Missing reference file: ${rel}`);
-    missing.push(rel);
+    console.error(`❌ Missing reference file: ${abs.replace(root + '/', '')}`);
+    missing.push(abs);
     continue;
   }
   const md = readFileSync(abs, 'utf-8');
   const candidates = extractCandidates(md);
   for (const c of candidates) {
-    if (!checkPath(c)) {
-      missing.push(c);
-    }
+    if (!checkPath(c)) missing.push(c);
   }
 }
 

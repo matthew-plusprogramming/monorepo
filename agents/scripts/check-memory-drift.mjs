@@ -1,16 +1,17 @@
 import { readFileSync, existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { execSync } from 'node:child_process';
+import { MEMORY_OVERVIEW, DRIFT_TRACKED_DIRS } from './constants.js';
 
 const root = process.cwd();
-const corePath = resolve(root, 'agents/memory-bank.core.md');
+const stampPath = resolve(root, MEMORY_OVERVIEW);
 
-if (!existsSync(corePath)) {
-  console.warn('⚠️ memory-bank.core.md not found. Skipping drift check.');
+if (!existsSync(stampPath)) {
+  console.warn('⚠️ agents/memory-bank.md not found. Skipping drift check.');
   process.exit(0);
 }
 
-const text = readFileSync(corePath, 'utf-8');
+const text = readFileSync(stampPath, 'utf-8');
 
 // Parse simple front matter block
 const fmMatch = text.match(/^---[\s\S]*?---/);
@@ -22,7 +23,7 @@ if (!fmMatch) {
 const fm = fmMatch[0];
 const shaMatch = fm.match(/repo_git_sha:\s*([a-f0-9]{7,40})/);
 if (!shaMatch) {
-  console.warn('⚠️ repo_git_sha not found in front matter. Skipping drift check.');
+  console.warn('⚠️ repo_git_sha not found in agents/memory-bank.md front matter. Skipping drift check.');
   process.exit(0);
 }
 
@@ -37,9 +38,8 @@ if (stampedSha === headSha) {
 // Check if there are changes under these dirs between stampedSha and HEAD
 let changed = '';
 try {
-  changed = execSync(
-    `git diff --name-only ${stampedSha} ${headSha} -- apps cdk packages`,
-  )
+  const tracked = DRIFT_TRACKED_DIRS.join(' ');
+  changed = execSync(`git diff --name-only ${stampedSha} ${headSha} -- ${tracked}`)
     .toString()
     .trim();
 } catch (e) {
@@ -52,9 +52,9 @@ if (changed) {
   console.error('❌ Memory bank drift detected in tracked areas since stamped SHA:');
   console.error(changed);
   console.error(
-    '\nUpdate memory-bank.core.md (repo_git_sha/generated_at) and review memory-bank.deep.md.',
+    `\nUpdate ${MEMORY_OVERVIEW} front matter (repo_git_sha/generated_at) and review canonical files under ${DRIFT_TRACKED_DIRS.join(', ')}.`,
   );
   process.exit(1);
 }
 
-console.info('✅ No impactful changes under apps/ cdk/ packages/ since stamped SHA.');
+console.info(`✅ No impactful changes under ${DRIFT_TRACKED_DIRS.join('/ ')} since stamped SHA.`);
