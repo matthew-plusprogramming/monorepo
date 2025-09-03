@@ -1,4 +1,7 @@
-Title: Default Software Change Workflow
+| key | value |
+| --- | --- |
+| Title | Default Software Change Workflow |
+
 
 Intent
 - Orchestrate end-to-end changes with visible, diff-able phases, artifacts, and gates. Keeps memory updated across phases.

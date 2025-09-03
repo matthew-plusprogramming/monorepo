@@ -1,4 +1,7 @@
-Title: <Pattern Name> Workflow
+| key | value |
+| --- | --- |
+| Title | <Pattern Name> Workflow |
+
 
 Intent
 - Encapsulate a high-importance procedural pattern discovered in `agents/memory-bank/system.patterns.md` as a reusable, diff-able workflow.

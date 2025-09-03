@@ -1,5 +1,8 @@
-last_reviewed: 2025-09-03
-stage: planning
+| key | value |
+| --- | --- |
+| last_reviewed | 2025-09-03 |
+| stage | planning |
+
 
 # Project Brief
 Opinionated TypeScript monorepo: Express 5 server (optionally packaged for AWS Lambda) and CDK for Terraform (CDKTF) infrastructure, with repo‑native agent workflows and a durable Memory Bank for knowledge capture.

@@ -1,5 +1,8 @@
-last_reviewed: 2025-09-03
-stage: implementation
+| key | value |
+| --- | --- |
+| last_reviewed | 2025-09-03 |
+| stage | implementation |
+
 
 # ADR-0001: Adopt Memory Bank + Workflow Process Files
 Status: Proposed

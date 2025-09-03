@@ -1,5 +1,8 @@
-last_reviewed: 2025-09-03
-stage: planning
+| key | value |
+| --- | --- |
+| last_reviewed | 2025-09-03 |
+| stage | planning |
+
 
 # ADR-0000: <Decision>
 Status: Proposed | Accepted | Superseded
