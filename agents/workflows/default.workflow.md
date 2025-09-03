@@ -92,6 +92,10 @@ Phase: documenter
   - Update canonical files under `agents/memory-bank/` as needed.
   - Add/Update ADRs for accepted decisions.
   - Append Reflexion and progress log entries.
+  - Workflow Synthesis: If `agents/memory-bank/system.patterns.md` contains new high-importance procedural patterns, then either:
+    - Modify an existing workflow under `agents/workflows/*.workflow.md` (augment the relevant phase), or
+    - Create a new workflow from `agents/workflows/templates/pattern.workflow.template.md` as `agents/workflows/<slug>.workflow.md`.
+  - For workflow changes that alter team/system behavior, open an ADR stub.
 - Outputs: Updated docs; Memory Bank updates.
 - Done_when: Memory validated and drift-free.
 - Gates:
