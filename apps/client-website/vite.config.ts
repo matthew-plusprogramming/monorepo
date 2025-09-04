@@ -5,4 +5,9 @@ import { baseConfig } from '@configs/vite-config';
 export default defineConfig({
   ...baseConfig,
   plugins: [react()],
+  css: {
+    modules: {
+      localsConvention: 'camelCaseOnly',
+    },
+  },
 });
