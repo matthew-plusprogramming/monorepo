@@ -1,6 +1,6 @@
-| key | value |
-| --- | --- |
-| Title | <Pattern Name> Workflow |
+---
+Title: <Pattern Name> Workflow
+---
 
 
 Intent
@@ -72,4 +72,3 @@ Phase: documenter
 
 End
 - Close with a brief summary and any follow-ups.
-

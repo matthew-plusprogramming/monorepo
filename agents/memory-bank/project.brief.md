@@ -1,7 +1,7 @@
-| key | value |
-| --- | --- |
-| last_reviewed | 2025-09-03 |
-| stage | planning |
+---
+last_reviewed: 2025-09-03
+stage: planning
+---
 
 
 # Project Brief
