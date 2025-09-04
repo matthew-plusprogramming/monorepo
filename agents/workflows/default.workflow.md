@@ -1,6 +1,6 @@
-| key | value |
-| --- | --- |
-| Title | Default Software Change Workflow |
+---
+Title: Default Software Change Workflow
+---
 
 
 Intent
