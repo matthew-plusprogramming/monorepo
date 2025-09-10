@@ -20,3 +20,6 @@ Reflexion
 - What happened: Introduced canonical Memory Bank files and default workflow structure; opened ADR-0001 (Proposed) to adopt them.
 - What worked: Clear tiering, retrieval policy, and phase gates make orchestration transparent.
 - Next time: Expand process templates as patterns emerge (e.g., bug/feature variants).
+\n+- What happened (2025-09-10): Extracted Logger/DynamoDB service definitions to backend-core; left live implementations in node-server for reuse across projects.
+- What worked: Centralized Effect service tags without disrupting existing app layers; minimal import churn by re-exporting tags from node-server.
+- Next time: Consider decoupling service schemas from AWS SDK types to keep core lightweight.

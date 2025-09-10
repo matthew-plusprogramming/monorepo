@@ -3,38 +3,20 @@ import { Agent } from 'node:https';
 import {
   DynamoDBClient,
   GetItemCommand,
-  type GetItemCommandInput,
   type GetItemCommandOutput,
   PutItemCommand,
-  type PutItemCommandInput,
   type PutItemCommandOutput,
   QueryCommand,
-  type QueryCommandInput,
   type QueryCommandOutput,
   UpdateItemCommand,
-  type UpdateItemCommandInput,
   type UpdateItemCommandOutput,
 } from '@aws-sdk/client-dynamodb';
+import {
+  DynamoDbService,
+  type DynamoDbServiceSchema,
+} from '@packages/backend-core';
 import { NodeHttpHandler } from '@smithy/node-http-handler';
-import { Context, Effect, Layer } from 'effect';
-
-type DynamoDbServiceSchema = {
-  readonly getItem: (
-    input: GetItemCommandInput,
-  ) => Effect.Effect<GetItemCommandOutput, Error>;
-
-  readonly putItem: (
-    input: PutItemCommandInput,
-  ) => Effect.Effect<PutItemCommandOutput, Error>;
-
-  readonly query: (
-    input: QueryCommandInput,
-  ) => Effect.Effect<QueryCommandOutput, Error>;
-
-  readonly updateItem: (
-    input: UpdateItemCommandInput,
-  ) => Effect.Effect<UpdateItemCommandOutput, Error>;
-};
+import { Effect, Layer } from 'effect';
 
 // TODO: move to constants
 const httpHandler = new NodeHttpHandler({
@@ -91,12 +73,9 @@ const makeDynamoDbService = (): Effect.Effect<
   });
 };
 
-export class DynamoDbService extends Context.Tag('DynamoDbService')<
-  DynamoDbService,
-  DynamoDbServiceSchema
->() {}
-
 export const LiveDynamoDbService = Layer.effect(
   DynamoDbService,
   makeDynamoDbService(),
 );
+
+export { DynamoDbService } from '@packages/backend-core';

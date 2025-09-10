@@ -6,8 +6,12 @@ import {
   PutLogEventsCommand,
   type PutLogEventsCommandOutput,
 } from '@aws-sdk/client-cloudwatch-logs';
+import {
+  LoggerService,
+  type LoggerServiceSchema,
+} from '@packages/backend-core';
 import { NodeHttpHandler } from '@smithy/node-http-handler';
-import { Context, Effect, Layer } from 'effect';
+import { Effect, Layer } from 'effect';
 
 import {
   applicationLogGroupName,
@@ -15,16 +19,6 @@ import {
   securityLogStreamName,
   serverLogStreamName,
 } from '@/clients/cdkOutputs';
-
-type LoggerServiceSchema = {
-  readonly log: (
-    input?: string,
-  ) => Effect.Effect<PutLogEventsCommandOutput, never>;
-
-  readonly logError: (
-    input: Error,
-  ) => Effect.Effect<PutLogEventsCommandOutput, never>;
-};
 
 const LOG_FAILED_METADATA = {
   $metadata: {
@@ -103,11 +97,6 @@ const ConsoleLoggerService = {
     }),
 };
 
-export class LoggerService extends Context.Tag('LoggerService')<
-  LoggerService,
-  LoggerServiceSchema
->() {}
-
 export const ApplicationLoggerService = __BUNDLED__
   ? Layer.succeed(LoggerService, ConsoleLoggerService)
   : Layer.effect(
@@ -119,3 +108,5 @@ export const SecurityLoggerService = Layer.effect(
   LoggerService,
   makeLoggerService(securityLogGroupName, securityLogStreamName),
 );
+
+export { LoggerService } from '@packages/backend-core';
