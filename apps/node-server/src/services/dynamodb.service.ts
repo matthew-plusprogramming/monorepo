@@ -8,12 +8,12 @@ import {
   PutItemCommand,
   type PutItemCommandInput,
   type PutItemCommandOutput,
-  UpdateItemCommand,
-  type UpdateItemCommandInput,
-  type UpdateItemCommandOutput,
   QueryCommand,
   type QueryCommandInput,
   type QueryCommandOutput,
+  UpdateItemCommand,
+  type UpdateItemCommandInput,
+  type UpdateItemCommandOutput,
 } from '@aws-sdk/client-dynamodb';
 import { NodeHttpHandler } from '@smithy/node-http-handler';
 import { Context, Effect, Layer } from 'effect';
