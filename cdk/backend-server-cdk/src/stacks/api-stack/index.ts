@@ -25,10 +25,10 @@ export class ApiStack extends TerraformStack {
       'application-logs',
       {
         name: 'application-logs',
+        retentionInDays: 14,
       },
     );
 
-    // TODO: Set auto expiration
     const serverLogStream = new CloudwatchLogStream(this, 'server-logs', {
       name: 'server-logs',
       logGroupName: applicationLogGroup.name,
