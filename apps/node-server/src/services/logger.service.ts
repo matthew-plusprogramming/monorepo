@@ -32,6 +32,12 @@ const LOG_FAILED_METADATA = {
   },
 } satisfies __MetadataBearer;
 
+const LOG_SUCCESS_METADATA = {
+  $metadata: {
+    httpStatusCode: 200,
+  },
+} satisfies __MetadataBearer;
+
 // TODO: move to constants
 const httpHandler = new NodeHttpHandler({
   connectionTimeout: 300,
@@ -83,15 +89,31 @@ const makeLoggerService = (
     return service;
   });
 
+const ConsoleLoggerService = {
+  log: (input?: string): Effect.Effect<PutLogEventsCommandOutput, never> =>
+    Effect.sync(() => {
+      console.info(input);
+      return LOG_SUCCESS_METADATA;
+    }),
+  logError: (input: Error): Effect.Effect<PutLogEventsCommandOutput, never> =>
+    Effect.sync(() => {
+      console.error('[ERROR]', input.message);
+      console.error(input.stack);
+      return LOG_SUCCESS_METADATA;
+    }),
+};
+
 export class LoggerService extends Context.Tag('LoggerService')<
   LoggerService,
   LoggerServiceSchema
 >() {}
 
-export const ApplicationLoggerService = Layer.effect(
-  LoggerService,
-  makeLoggerService(applicationLogGroupName, serverLogStreamName),
-);
+export const ApplicationLoggerService = __BUNDLED__
+  ? Layer.succeed(LoggerService, ConsoleLoggerService)
+  : Layer.effect(
+      LoggerService,
+      makeLoggerService(applicationLogGroupName, serverLogStreamName),
+    );
 
 export const SecurityLoggerService = Layer.effect(
   LoggerService,
