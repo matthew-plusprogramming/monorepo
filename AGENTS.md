@@ -45,7 +45,7 @@ Update Requirements (per task)
 
 One LLM executes work by following process markdowns in `agents/workflows/`.
 
-- Phases: planner → retriever → architect → implementer → reviewer → tester → documenter
+- Phases: plan → build → verify
 - Each process file defines checklists, inputs/outputs, and quality gates.
 - The LLM loads the process .md (+ linked partials), executes the current phase, writes artifacts, updates phase state, advances when gates pass, and logs a short Reflexion to the Memory Bank.
 - External tools: prefer GitHub MCP for git workflows.

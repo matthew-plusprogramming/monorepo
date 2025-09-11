@@ -16,3 +16,4 @@ stage: implementation
 - 2025-09-11: Moved default Layer management to node-server; deleted backend-core `defaultLayer.ts`; `generateRequestHandler` now assumes fully-provided effects; handlers wrap with `Effect.provide(AppLayer)`; added ADR-0003 (Proposed).
 - 2025-09-11: Added root script `format:markdown` using Prettier (CommonMark) to format `agents/**/*.md`; wired via prelint hooks so it runs with `lint`/`lint:fix`; updated default workflow and docs accordingly.
 - 2025-09-11: Ops check after dependency updates — lint passed, Turbo builds for apps/packages passed, tests via `turbo run test` surfaced missing-task errors for workspaces without `test` scripts; recommended making root test resilient or adding no-op tests.
+- 2025-09-11: Consolidated workflows to three phases (plan → build → verify); updated default workflow, pattern template, and overview; added ADR-0004.

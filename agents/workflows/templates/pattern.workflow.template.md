@@ -8,75 +8,45 @@ Intent
 
 State
 
-- current_phase: planner
+- current_phase: plan
 - last_actor: <set by agent>
 - derived_from_pattern: <PAT-YYYYMMDD-slug>
 
 Global Prompts
 
-- Follow the same phase structure as default; customize checklists to the pattern’s steps.
+- Follow the same three-phase structure as default; customize checklists to the pattern’s steps.
 - Keep unrelated changes out; update Memory Bank as needed.
 
-Phase: planner
+Phase: plan
 
-- Goal: Frame when to apply this pattern.
+- Goal: Frame applicability, gather context, and tailor the approach.
 - Inputs: Pattern entry; relevant context files.
 - Checklist:
   - Identify applicability and success criteria for pattern use.
   - Note constraints and risks.
-- Outputs: Scope and criteria for using this workflow.
-- Next: retriever
+  - Map impacted components/interfaces specific to this pattern.
+  - Adapt the pattern steps for the task; consider perf/security implications.
+- Outputs: Scope and criteria; tailored plan for this pattern.
+- Next: build
 
-Phase: retriever
+Phase: build
 
-- Goal: Gather context specific to this pattern.
-- Inputs: Pattern Steps and Signals; tech/product context.
-- Checklist:
-  - Map impacted components/interfaces for this pattern.
-- Outputs: Focused context.
-- Next: architect
-
-Phase: architect
-
-- Goal: Adapt the pattern steps to current task.
-- Checklist:
-  - Validate the steps; adjust for constraints.
-  - Consider performance/security implications.
-- Outputs: Tailored plan.
-- Next: implementer
-
-Phase: implementer
-
-- Goal: Execute the pattern steps minimally.
+- Goal: Execute the tailored pattern steps minimally.
 - Checklist:
   - Implement scoped changes according to the pattern.
   - Keep diffs minimal and consistent with repo style.
 - Outputs: Code changes.
-- Next: reviewer
+- Next: verify
 
-Phase: reviewer
+Phase: verify
 
-- Goal: Ensure clarity and minimalism.
+- Goal: Ensure clarity, validate behavior, and update memory.
 - Checklist:
   - Self-review diffs against pattern intent and criteria.
-- Outputs: Fixups; notes.
-- Next: tester
-
-Phase: tester
-
-- Goal: Validate behavior and edge cases.
-- Checklist:
-  - Run targeted tests; validate signals from the pattern.
-- Outputs: Test results.
-- Next: documenter
-
-Phase: documenter
-
-- Goal: Update docs and memory.
-- Checklist:
+  - Run targeted tests; validate pattern signals and edge cases.
   - Record outcomes; update `agents/memory-bank` as needed.
   - If the workflow template evolved, capture those changes here.
-- Outputs: Updated docs; notes.
+- Outputs: Fixups; test results; updated docs/notes.
 - Next: done
 
 End
