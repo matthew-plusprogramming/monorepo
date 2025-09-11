@@ -16,6 +16,7 @@ Global Prompts
 - Reflexion note: After each phase, add a 3-line Reflexion to `active.context.md` and append a succinct entry to `progress.log.md`.
 - External tools: Use GitHub MCP for git operations.
 - Linting habit: After completing a task, run `npm run lint:fix` to auto-fix style issues across the monorepo.
+- Branch & commit flow: After confirming with the requester, create a branch named `codex/<meaningful-slug>`, commit with a Conventional Commit title under 70 chars, and push upstream to that branch. Offer this step proactively at the start of implementation.
 
 Phase: planner
 - Goal: Clarify scope, constraints, success metrics, and plan.
@@ -24,6 +25,7 @@ Phase: planner
   - Define problem statement and desired outcome.
   - Identify constraints, risks, and assumptions.
   - Draft high-level plan and acceptance criteria.
+  - Propose a branch name `codex/<meaningful-slug>` and ask for confirmation to branch.
 - Outputs: Brief plan; acceptance criteria; updated `active.context.md` next steps.
 - Done_when: Stakeholders agree on scope and criteria.
 - Gates: Scope clear; criteria testable; risks noted.
@@ -61,6 +63,7 @@ Phase: implementer
   - Keep unrelated changes out; follow repo style.
   - Update `agents/memory-bank` canonical files if required.
   - Run `npm run lint:fix` to format/fix lint issues.
+  - With confirmation, create `codex/<slug>` branch, make a Conventional Commit (title < 70 chars), and push to the remote branch.
 - Outputs: Code changes; updated docs; migrations/scripts as needed.
 - Done_when: Changes compile and meet plan scope.
 - Gates: Lint/build pass locally.
