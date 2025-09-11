@@ -5,7 +5,8 @@
   "packageManager": "npm@11.6.0",
   "type": "module",
   "devDependencies": {
-    "turbo": "^2.5.6"
+    "turbo": "^2.5.6",
+    "prettier": "^3.6.2"
   },
   "workspaces": [
     "packages/**",
@@ -15,9 +16,12 @@
   "scripts": {
     "build": "turbo run build",
     "clean": "turbo run clean && rm -rf node_modules && rm -rf .turbo",
+    "prelint": "npm run format:markdown",
     "lint": "turbo run lint",
+    "prelint:fix": "npm run format:markdown",
     "lint:fix": "turbo run lint:fix",
     "test": "turbo run test",
+    "format:markdown": "prettier --write \"agents/**/*.md\"",
     "memory:validate": "node agents/scripts/validate-memory-bank.mjs",
     "memory:drift": "node agents/scripts/check-memory-drift.mjs"
   }
