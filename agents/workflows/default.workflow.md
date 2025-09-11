@@ -20,7 +20,6 @@ Global Prompts
 - Linting habit: After completing a task, run `npm run lint:fix` and `npm run format:markdown` (Markdown in `agents/**`). Running `npm run lint` or `npm run lint:fix` at the repo root will automatically format `agents/**/*.md` via prelint hooks.
 - Branch & commit flow: After confirming with the requester, create a branch named `codex/<meaningful-slug>`, commit with a Conventional Commit title under 70 chars, and push upstream to that branch. Offer this step proactively at the start of implementation.
 - Commit confirmation: Before each commit (including fixups), present the proposed Conventional Commit title (< 70 chars) and body, and ask for explicit approval. Do not commit without approval.
-- Markdown standards: When editing `.md` files, follow CommonMark. Use ATX headings (`#`), one space after `#`, a blank line before and after headings when appropriate, `- ` for lists, fenced code blocks with language tags, inline code in backticks, no trailing spaces, and a final newline. Use Prettier to format Markdown (`npm run format:markdown`).
 
 Phase: planner
 
@@ -112,7 +111,6 @@ Phase: documenter
   - Update canonical files under `agents/memory-bank/` as needed.
   - Add/Update ADRs for accepted decisions.
   - Append Reflexion and progress log entries.
-  - Ensure Markdown changes follow CommonMark and repo style (headings, lists, code fences, inline code, final newline). Validate links and paths.
   - Workflow Synthesis: If `agents/memory-bank/system.patterns.md` contains new high-importance procedural patterns, then either:
     - Modify an existing workflow under `agents/workflows/*.workflow.md` (augment the relevant phase), or
     - Create a new workflow from `agents/workflows/templates/pattern.workflow.template.md` as `agents/workflows/<slug>.workflow.md`.

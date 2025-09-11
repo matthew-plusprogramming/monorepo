@@ -15,4 +15,4 @@ Policies
 - Retrieval: always consult `project.brief.md`, recent `progress.log.md`, and `active.context.md`; include additional canonical files as needed for task type.
 - External tools: prefer GitHub MCP for git actions (branching, commits, PRs).
 - Commit confirmation: always ask for explicit approval before each commit (share the Conventional Commit title under 70 chars and a brief body preview) and before pushing.
-- Markdown standards: follow CommonMark for `.md` updates — proper ATX headings with a space, blank line separation where appropriate, `- ` list markers, fenced code blocks with language, inline code in backticks, no trailing spaces, and a final newline. Use Prettier (`npm run format:markdown`) to format Markdown in `agents/**`. Running `npm run lint` or `npm run lint:fix` at the repo root automatically formats Markdown via a prelint hook.
+- Markdown: use Prettier (`npm run format:markdown`) to format Markdown in `agents/**`. Running `npm run lint` or `npm run lint:fix` at the repo root automatically formats Markdown via a prelint hook.
