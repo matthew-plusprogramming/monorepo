@@ -35,3 +35,6 @@ Reflexion
 - What happened (2025-09-11, types): Cleaned up unsafe casts — removed `as unknown as` in `defaultLayer`, replaced `any` with AWS `AttributeValue` in `userRepo.service`, and returned `UserPublic` directly in `getUser`.
 - What worked: Stronger types eliminated noisy casts; handlers/readers stayed simple; lint/build green.
 - Next time: Tighten `generateRequestHandler` generics to align with `Effect.Effect<A, E, R>` order and remove any residual type looseness.
+- What happened (2025-09-11, refactor): Moved default Layer handling from backend-core to node-server; deleted `defaultLayer.ts`; `generateRequestHandler` now expects fully-provided effects with no env deps.
+- What worked: Clearer ownership boundary; handlers now explicitly `Effect.provide(AppLayer)`; build stayed green.
+- Next time: Add a local helper in node-server to DRY the `provide(AppLayer)` wrapping for handlers and middleware.

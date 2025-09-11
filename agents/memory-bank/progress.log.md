@@ -14,3 +14,4 @@ stage: implementation
 - 2025-09-11: Moved `UserPublic` type and projection into `@packages/schemas/user`; added `UserCreate` schema; updated repo to use `@aws-sdk/util-dynamodb` marshall/unmarshall and added `create(user)`; refactored register handler to use repo.create.
 - 2025-09-11: Updated default workflow to mandate `npm run lint:fix` after tasks; executed lint:fix across workspaces.
 - 2025-09-11: Removed unsafe `as unknown as` cast in `defaultLayer`; enforced default layer presence; eliminated `any` usage in `userRepo.service` with precise AWS types; returned `UserPublic` directly in `getUser` handler and cleaned imports; lint and build clean.
+- 2025-09-11: Moved default Layer management to node-server; deleted backend-core `defaultLayer.ts`; `generateRequestHandler` now assumes fully-provided effects; handlers wrap with `Effect.provide(AppLayer)`; added ADR-0003 (Proposed).

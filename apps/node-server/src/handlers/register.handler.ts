@@ -23,6 +23,7 @@ import { sign } from 'jsonwebtoken';
 import z, { ZodError } from 'zod';
 
 import { parseInput } from '@/helpers/zodParser';
+import { AppLayer } from '@/layers/app.layer';
 import { UserRepo } from '@/services/userRepo.service';
 
 const registerHandler = (
@@ -85,7 +86,8 @@ export const registerRequestHandler = generateRequestHandler<
   string,
   ConflictError | InternalServerError | ZodError
 >({
-  effectfulHandler: registerHandler,
+  effectfulHandler: (input) =>
+    registerHandler(input).pipe(Effect.provide(AppLayer)),
   shouldObfuscate: () => true,
   statusCodesToErrors: {
     [HTTP_RESPONSE.BAD_REQUEST]: {

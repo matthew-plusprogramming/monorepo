@@ -10,6 +10,7 @@ import { Effect } from 'effect';
 import z, { ZodError } from 'zod';
 
 import { parseInput } from '@/helpers/zodParser';
+import { AppLayer } from '@/layers/app.layer';
 import { UserRepo } from '@/services/userRepo.service';
 
 const getUserHandler = (
@@ -44,7 +45,8 @@ export const getUserRequestHandler = generateRequestHandler<
   UserPublic,
   NotFoundError | InternalServerError | ZodError
 >({
-  effectfulHandler: getUserHandler,
+  effectfulHandler: (input) =>
+    getUserHandler(input).pipe(Effect.provide(AppLayer)),
   shouldObfuscate: () => true,
   statusCodesToErrors: {
     [HTTP_RESPONSE.BAD_REQUEST]: {
