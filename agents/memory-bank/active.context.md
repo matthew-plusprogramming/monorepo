@@ -47,3 +47,6 @@ Reflexion
 - What happened (2025-09-11, ops): Post-dependency update verification: ran lint (green), full builds via Turbo (green), and attempted tests. `turbo run test` failed due to missing test scripts in some workspaces.
 - What worked: Build pipeline validated SSR/client apps and packages; environment injection and postbuild steps executed successfully.
 - Next time: Make root `test` resilient (e.g., use `npm -ws run test --if-present`) or add no-op `test` scripts to all workspaces to avoid Turbo missing-task errors.
+- What happened (2025-09-11, workflows): Consolidated workflows to 3 phases (plan → build → verify); updated default, template, overview; recorded ADR-0004.
+- What worked: Simpler handoffs and fewer transitions while preserving quality gates and Memory Bank updates.
+- Next time: Monitor usage and, if needed, add optional sub-checklists per task type without increasing phase count.

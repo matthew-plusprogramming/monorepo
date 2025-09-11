@@ -3,7 +3,7 @@ Workflows
 It is very important you strictly follow the agent workflows.
 
 - Default workflow: `agents/workflows/default.workflow.md`
-- Purpose: drive multi-phase execution (planner → retriever → architect → implementer → reviewer → tester → documenter) with explicit inputs/outputs and gates.
+- Purpose: drive three-phase execution (plan → build → verify) with explicit inputs/outputs and gates.
 
 Usage
 

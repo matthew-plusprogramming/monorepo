@@ -8,9 +8,7 @@ Intent
 
 State
 
-- current_phase: planner
-- last_actor: <set by agent>
-- started_at: <YYYY-MM-DD>
+- current_phase: plan
 
 Global Prompts
 
@@ -21,102 +19,49 @@ Global Prompts
 - Branch & commit flow: After confirming with the requester, create a branch named `codex/<meaningful-slug>`, commit with a Conventional Commit title under 70 chars, and push upstream to that branch. Offer this step proactively at the start of implementation.
 - Commit confirmation: Before each commit (including fixups), present the proposed Conventional Commit title (< 70 chars) and body, and ask for explicit approval. Do not commit without approval.
 
-Phase: planner
+Phase: plan
 
-- Goal: Clarify scope, constraints, success metrics, and plan.
-- Inputs: Issue/ask, `project.brief.md`, `product.context.md`.
+- Goal: Clarify scope, gather context, and choose an approach.
+- Inputs: Issue/ask; `project.brief.md`; `product.context.md`; `tech.context.md`; recent `progress.log.md`; `active.context.md`; ADR template.
 - Checklist:
-  - Define problem statement and desired outcome.
+  - Define problem statement, desired outcome, and acceptance criteria.
   - Identify constraints, risks, and assumptions.
-  - Draft high-level plan and acceptance criteria.
+  - Map impacted components, interfaces, and invariants; list candidate files/tests.
+  - Sketch design/options; justify chosen approach; note perf/security/migration implications.
+  - If system-impacting, open ADR stub from `agents/memory-bank/decisions/ADR-0000-template.md`.
   - Propose a branch name `codex/<meaningful-slug>` and ask for confirmation to branch.
-- Outputs: Brief plan; acceptance criteria; updated `active.context.md` next steps.
-- Done_when: Stakeholders agree on scope and criteria.
-- Gates: Scope clear; criteria testable; risks noted.
-- Next: retriever
+- Outputs: Brief plan; criteria; context notes; design notes; ADR stub (if needed); updated `active.context.md` next steps.
+- Done_when: Scope and approach are agreed and testable.
+- Gates: Scope clear; criteria testable; no critical gaps; risks noted.
+- Next: build
 
-Phase: retriever
+Phase: build
 
-- Goal: Gather relevant context from code and docs.
-- Inputs: `system.patterns.md`, `tech.context.md`, recent `progress.log.md`.
+- Goal: Apply minimal, focused changes per plan.
+- Inputs: Plan/design; file list.
 - Checklist:
-  - Map impacted components and critical paths.
-  - Identify interfaces, contracts, and invariants.
-  - List candidate files and tests to touch.
-- Outputs: Context notes; file list; invariants list.
-- Done_when: Coverage of relevant areas is credible.
-- Gates: No critical gaps; invariants confirmed.
-- Next: architect (or loop to planner if gaps found)
-
-Phase: architect
-
-- Goal: Propose changes with tradeoffs.
-- Inputs: Planner+Retriever outputs; ADR template.
-- Checklist:
-  - Sketch design/options; justify chosen approach.
-  - Note performance, security, and migration implications.
-  - If system-impacting, open ADR stub.
-- Outputs: Design notes; ADR stub (if needed).
-- Done_when: Approach addresses criteria and constraints.
-- Gates: Risks mitigated; migration path identified.
-- Next: implementer
-
-Phase: implementer
-
-- Goal: Apply minimal, focused changes.
-- Inputs: Design; file list.
-- Checklist:
-  - Implement code and docs surgically.
-  - Keep unrelated changes out; follow repo style.
+  - Implement code and docs surgically; keep unrelated changes out.
   - Update `agents/memory-bank` canonical files if required.
   - Run `npm run lint:fix` and `npm run format:markdown` to format/fix lint and Markdown.
   - With confirmation, create `codex/<slug>` branch. Before each commit, ask for approval with the proposed Conventional Commit title (< 70 chars) and body; then push to the remote branch when confirmed.
 - Outputs: Code changes; updated docs; migrations/scripts as needed.
 - Done_when: Changes compile and meet plan scope.
 - Gates: Lint/build pass locally.
-- Next: reviewer
+- Next: verify
 
-Phase: reviewer
+Phase: verify
 
-- Goal: Validate correctness and clarity.
-- Inputs: Diff; design notes; acceptance criteria.
+- Goal: Review, test, document, and finalize memory.
+- Inputs: Diff; design notes; plan/criteria; test harness; `agents/memory-bank/*`.
 - Checklist:
-  - Self-review diff for clarity and minimalism.
-  - Verify naming, comments, and docs.
-  - Re-check invariants and contracts.
-  - Before committing review fixups, ask for commit approval with the proposed Conventional Commit title (< 70 chars) and body.
-- Outputs: Review notes; fixups.
-- Done_when: No blocking issues remain.
-- Gates: All comments addressed.
-- Next: tester
-
-Phase: tester
-
-- Goal: Verify behavior against acceptance criteria.
-- Inputs: Plan; criteria; test harness.
-- Checklist:
-  - Run targeted tests; add missing ones nearby if pattern exists.
-  - Validate error paths and edge cases.
-  - Re-run build and `npm run lint:fix` (Markdown formatting runs automatically via prelint, or run `npm run format:markdown`).
-- Outputs: Test results; fixes.
-- Done_when: Criteria met; no regressions visible.
-- Gates: CI passes (if applicable).
-- Next: documenter
-
-Phase: documenter
-
-- Goal: Update docs and memory bank.
-- Inputs: All prior outputs; `agents/memory-bank/*`.
-- Checklist:
-  - Update canonical files under `agents/memory-bank/` as needed.
-  - Add/Update ADRs for accepted decisions.
+  - Self-review diffs for clarity and minimalism; verify naming and docs; re-check invariants/contracts.
+  - Run targeted tests; validate error paths/edge cases.
+  - Update canonical files under `agents/memory-bank/` as needed; add/update ADRs for accepted decisions.
   - Append Reflexion and progress log entries.
-  - Workflow Synthesis: If `agents/memory-bank/system.patterns.md` contains new high-importance procedural patterns, then either:
-    - Modify an existing workflow under `agents/workflows/*.workflow.md` (augment the relevant phase), or
-    - Create a new workflow from `agents/workflows/templates/pattern.workflow.template.md` as `agents/workflows/<slug>.workflow.md`.
-  - For workflow changes that alter team/system behavior, open an ADR stub.
-- Outputs: Updated docs; Memory Bank updates.
-- Done_when: Memory validated and drift-free.
+  - Run memory validation and drift checks: `npm run memory:validate` and `npm run memory:drift`.
+  - Ensure `npm run lint:fix` and `npm run format:markdown` have been run.
+- Outputs: Review notes; test results; Memory Bank updates.
+- Done_when: Criteria met; no regressions visible; memory validated and drift-free.
 - Gates:
   - `npm run memory:validate`
   - `npm run memory:drift`
