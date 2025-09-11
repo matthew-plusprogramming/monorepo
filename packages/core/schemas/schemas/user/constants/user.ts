@@ -6,6 +6,9 @@ export const USER_SCHEMA_CONSTANTS = {
   gsi: {
     email: 'email-index',
   },
+  projection: {
+    userPublic: 'id, username, email',
+  },
   username: {
     minLength: 1,
   },

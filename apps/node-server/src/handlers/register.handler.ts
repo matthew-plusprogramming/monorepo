@@ -15,31 +15,22 @@ import {
 } from '@packages/backend-core/auth';
 import {
   RegisterInputSchema,
-  USER_SCHEMA_CONSTANTS,
+  type UserCreate,
   type UserToken,
 } from '@packages/schemas/user';
-import { exists } from '@utils/ts-utils';
 import { Effect } from 'effect';
 import { sign } from 'jsonwebtoken';
 import z, { ZodError } from 'zod';
 
-import { usersTableName } from '@/clients/cdkOutputs';
 import { parseInput } from '@/helpers/zodParser';
-import {
-  DynamoDbService,
-  LiveDynamoDbService,
-} from '@/services/dynamodb.service';
-import {
-  ApplicationLoggerService,
-  LoggerService,
-} from '@/services/logger.service';
+import { UserRepo } from '@/services/userRepo.service';
 
 const registerHandler = (
   input: handlerInput,
 ): Effect.Effect<
   string,
   ConflictError | InternalServerError | ZodError,
-  never
+  UserRepo
 > => {
   return Effect.gen(function* () {
     const req = yield* input;
@@ -49,31 +40,11 @@ const registerHandler = (
       req.body,
     );
 
-    const databaseService = yield* DynamoDbService;
-    const loggerService = yield* LoggerService;
+    const userRepo = yield* UserRepo;
     const userId = randomUUID();
 
-    const existingUserCheck = yield* databaseService
-      .query({
-        TableName: usersTableName,
-        IndexName: USER_SCHEMA_CONSTANTS.gsi.email,
-        KeyConditionExpression: '#email = :email',
-        ExpressionAttributeNames: {
-          '#email': 'email',
-        },
-        ExpressionAttributeValues: {
-          ':email': { S: parsedInput.email },
-        },
-        Limit: 1,
-      })
-      .pipe(
-        Effect.catchAll((e) => {
-          loggerService.logError(e);
-          return Effect.fail(new InternalServerError({ message: e.message }));
-        }),
-      );
-
-    if (!exists(existingUserCheck.Count) || existingUserCheck.Count > 0) {
+    const maybeExisting = yield* userRepo.findByIdentifier(parsedInput.email);
+    if (maybeExisting._tag === 'Some') {
       return yield* new ConflictError({
         message: 'User with email already exists',
       });
@@ -85,22 +56,13 @@ const registerHandler = (
       }),
     );
 
-    yield* databaseService
-      .putItem({
-        TableName: usersTableName,
-        Item: {
-          id: { S: userId },
-          username: { S: parsedInput.username },
-          email: { S: parsedInput.email },
-          password: { S: hashedPassword },
-        },
-      })
-      .pipe(
-        Effect.catchAll((e) => {
-          loggerService.logError(e);
-          return Effect.fail(new InternalServerError({ message: e.message }));
-        }),
-      );
+    const userToCreate: UserCreate = {
+      id: userId,
+      username: parsedInput.username,
+      email: parsedInput.email,
+      passwordHash: hashedPassword,
+    };
+    yield* userRepo.create(userToCreate);
 
     const now = Date.now();
     const inOneHour = now + 60 * 60 * 1000;
@@ -116,9 +78,7 @@ const registerHandler = (
     } satisfies UserToken;
 
     return sign(userToken, process.env.JWT_SECRET);
-  })
-    .pipe(Effect.provide(LiveDynamoDbService))
-    .pipe(Effect.provide(ApplicationLoggerService));
+  });
 };
 
 export const registerRequestHandler = generateRequestHandler<

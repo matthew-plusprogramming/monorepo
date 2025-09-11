@@ -1,5 +1,6 @@
 // Base types
 export * from './user.js';
+export * from './userCreate.js';
 export * from './userToken.js';
 export * from './verification.js';
 export * from './components/index.js';

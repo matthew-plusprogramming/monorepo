@@ -23,3 +23,11 @@ export const UserSchema = z.object({
 });
 
 export type User = z.infer<typeof UserSchema>;
+
+export const UserPublicSchema = z.object({
+  id: UserIdSchema,
+  username: UserUsernameSchema,
+  email: UserEmailSchema,
+});
+
+export type UserPublic = z.infer<typeof UserPublicSchema>;

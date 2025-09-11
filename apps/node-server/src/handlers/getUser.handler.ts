@@ -8,30 +8,20 @@ import {
 import {
   GetUserSchema,
   type User,
-  USER_SCHEMA_CONSTANTS,
-  UserEmailSchema,
-  type UserTableKey,
+  type UserPublic,
 } from '@packages/schemas/user';
 import { Effect } from 'effect';
 import z, { ZodError } from 'zod';
 
-import { usersTableName } from '@/clients/cdkOutputs';
 import { parseInput } from '@/helpers/zodParser';
-import {
-  DynamoDbService,
-  LiveDynamoDbService,
-} from '@/services/dynamodb.service';
-import {
-  ApplicationLoggerService,
-  LoggerService,
-} from '@/services/logger.service';
+import { UserRepo } from '@/services/userRepo.service';
 
 const getUserHandler = (
   input: handlerInput,
 ): Effect.Effect<
-  User,
+  UserPublic,
   InternalServerError | ZodError | NotFoundError,
-  never
+  UserRepo
 > => {
   return Effect.gen(function* () {
     const req = yield* input;
@@ -41,72 +31,21 @@ const getUserHandler = (
       req.params?.identifier,
     );
 
-    const databaseService = yield* DynamoDbService;
-    const loggerService = yield* LoggerService;
+    const userRepo = yield* UserRepo;
+    const maybeUser = yield* userRepo.findByIdentifier(parsedInput);
 
-    // TODO: refactor out all configs to commons
-    const key = ((): UserTableKey => {
-      if (UserEmailSchema.safeParse(parsedInput).success) {
-        return 'email-index';
-      }
-      return 'id';
-    })();
-    const value = parsedInput;
-
-    const getUserResponse = yield* Effect.if(key === 'id', {
-      onTrue: () => {
-        return databaseService
-          .getItem({
-            TableName: usersTableName,
-            Key: {
-              id: {
-                S: value,
-              },
-            },
-            ProjectionExpression: 'username, email',
-          })
-          .pipe(Effect.map((response) => response.Item));
-      },
-      onFalse: () => {
-        return databaseService
-          .query({
-            TableName: usersTableName,
-            IndexName: USER_SCHEMA_CONSTANTS.gsi.email,
-            KeyConditionExpression: 'email = :email',
-            ExpressionAttributeValues: {
-              ':email': {
-                S: value,
-              },
-            },
-            ProjectionExpression: 'id, username, email',
-          })
-          .pipe(Effect.map((response) => response.Items?.[0]));
-      },
-    }).pipe(
-      Effect.catchAll((e) => {
-        loggerService.logError(e);
-        return Effect.fail(new InternalServerError({ message: e.message }));
-      }),
-    );
-
-    if (!getUserResponse) {
+    if (maybeUser._tag === 'None') {
       return yield* new NotFoundError({
         message: `User not found for identifier: ${parsedInput}`,
       });
     }
 
-    const parsed = Object.fromEntries(
-      Object.entries(getUserResponse).map(([key, value]) => [key, value?.S]),
-    );
-
-    return parsed as unknown as User;
-  })
-    .pipe(Effect.provide(LiveDynamoDbService))
-    .pipe(Effect.provide(ApplicationLoggerService));
+    return maybeUser.value as unknown as User;
+  });
 };
 
 export const getUserRequestHandler = generateRequestHandler<
-  User,
+  UserPublic,
   NotFoundError | InternalServerError | ZodError
 >({
   effectfulHandler: getUserHandler,

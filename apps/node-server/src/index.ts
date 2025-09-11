@@ -1,10 +1,12 @@
 import '@dotenvx/dotenvx/config';
 
+import { setDefaultLayer } from '@packages/backend-core';
 import express from 'express';
 import { prettifyError, ZodError } from 'zod';
 
 import { getUserRequestHandler } from '@/handlers/getUser.handler';
 import { registerRequestHandler } from '@/handlers/register.handler';
+import { AppLayer } from '@/layers/app.layer';
 import { ipRateLimitingMiddlewareRequestHandler } from '@/middleware/ipRateLimiting.middleware';
 import { jsonErrorMiddleware } from '@/middleware/jsonError.middleware';
 import { EnvironmentSchema } from '@/types/environment';
@@ -22,6 +24,7 @@ try {
 }
 
 const app = express();
+setDefaultLayer(AppLayer);
 app.use(ipRateLimitingMiddlewareRequestHandler);
 app.use(express.json());
 app.use(jsonErrorMiddleware);

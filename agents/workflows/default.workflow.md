@@ -15,6 +15,7 @@ Global Prompts
 - Retrieval setup: Identify task type (bug|feature|refactor|ops). Always include `agents/memory-bank/project.brief.md`, recent `agents/memory-bank/progress.log.md`, and `agents/memory-bank/active.context.md`. Add more canonical files by relevance. For system-impacting changes, create an ADR stub PR.
 - Reflexion note: After each phase, add a 3-line Reflexion to `active.context.md` and append a succinct entry to `progress.log.md`.
 - External tools: Use GitHub MCP for git operations.
+- Linting habit: After completing a task, run `npm run lint:fix` to auto-fix style issues across the monorepo.
 
 Phase: planner
 - Goal: Clarify scope, constraints, success metrics, and plan.
@@ -59,6 +60,7 @@ Phase: implementer
   - Implement code and docs surgically.
   - Keep unrelated changes out; follow repo style.
   - Update `agents/memory-bank` canonical files if required.
+  - Run `npm run lint:fix` to format/fix lint issues.
 - Outputs: Code changes; updated docs; migrations/scripts as needed.
 - Done_when: Changes compile and meet plan scope.
 - Gates: Lint/build pass locally.
@@ -82,7 +84,7 @@ Phase: tester
 - Checklist:
   - Run targeted tests; add missing ones nearby if pattern exists.
   - Validate error paths and edge cases.
-  - Re-run build/lint.
+  - Re-run build and `npm run lint:fix`.
 - Outputs: Test results; fixes.
 - Done_when: Criteria met; no regressions visible.
 - Gates: CI passes (if applicable).
@@ -108,3 +110,4 @@ Phase: documenter
 
 End
 - Close with summary and next steps.
+ - Always run `npm run lint:fix` before handing off.
