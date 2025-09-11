@@ -12,7 +12,7 @@ State
 
 Global Prompts
 
-- Retrieval setup: Identify task type (bug|feature|refactor|ops). Always include `agents/memory-bank/project.brief.md`, recent `agents/memory-bank/progress.log.md`, and `agents/memory-bank/active.context.md`. Add more canonical files by relevance. For system-impacting changes, create an ADR stub PR.
+- Retrieval setup: Follow the canonical policy in `agents/memory-bank.md` — always include the workflow file, `project.brief.md`, recent `progress.log.md`, and `active.context.md`; include `tech.context.md`, `system.patterns.md`, and ADRs only when substantively relevant.
 - Reflexion note: After each phase, add a 3-line Reflexion to `active.context.md` and append a succinct entry to `progress.log.md`.
 - External tools: Use GitHub MCP for git operations.
 - Linting habit: After completing a task, run `npm run lint:fix` and `npm run format:markdown` (Markdown in `agents/**`). Running `npm run lint` or `npm run lint:fix` at the repo root will automatically format `agents/**/*.md` via prelint hooks.
@@ -22,7 +22,7 @@ Global Prompts
 Phase: plan
 
 - Goal: Clarify scope, gather context, and choose an approach.
-- Inputs: Issue/ask; `project.brief.md`; `product.context.md`; `tech.context.md`; recent `progress.log.md`; `active.context.md`; ADR template.
+- Inputs: Issue/ask; core context per Memory Bank policy (workflow file, `project.brief.md`, recent `progress.log.md`, `active.context.md`); optionally `product.context.md`; include `tech.context.md`/`system.patterns.md`/ADRs only if substantively relevant.
 - Checklist:
   - Define problem statement, desired outcome, and acceptance criteria.
   - Identify constraints, risks, and assumptions.

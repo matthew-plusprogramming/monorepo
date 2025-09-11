@@ -31,7 +31,7 @@ Synthesis Rule
 
 - If Type=procedural and Importance>=medium and recurring across ≥2 tasks (per `agents/memory-bank/progress.log.md` or Reflexion), then:
   - Propose Workflow_Impact=modify:<existing> if pattern naturally augments an existing workflow phase; else Workflow_Impact=create:<slug>.
-  - In the Documenter phase, perform "Workflow Synthesis":
+  - During the verify phase, perform "Workflow Synthesis":
     - Modify an existing workflow under `agents/workflows/*.workflow.md`, or
     - Create a new workflow from `agents/workflows/templates/pattern.workflow.template.md` as `agents/workflows/<slug>.workflow.md`.
   - For system-impacting changes, open ADR stub via `agents/memory-bank/decisions/ADR-0000-template.md`.

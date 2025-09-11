@@ -57,4 +57,3 @@ Task Recipes
 - Add endpoint: define schema → implement handler using `parseInput` → wrap with `generateRequestHandler` → wire route → run dev.
 - Add table/GSI: update schema constants → add stack changes → deploy → load outputs → update app client.
 - Add middleware: implement Effect middleware → wrap as `RequestHandler` → register in server entry.
-
