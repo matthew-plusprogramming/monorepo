@@ -44,3 +44,6 @@ Reflexion
 - What happened (2025-09-11, docs/ops): Introduced `format:markdown` (Prettier) for `agents/**/*.md` and hooked it to run with lint tasks; updated workflow/docs.
 - What worked: Markdown stays consistently formatted to CommonMark with minimal overhead.
 - Next time: Consider adding a pre-commit hook to run `format:markdown` on changed `.md` files.
+- What happened (2025-09-11, ops): Post-dependency update verification: ran lint (green), full builds via Turbo (green), and attempted tests. `turbo run test` failed due to missing test scripts in some workspaces.
+- What worked: Build pipeline validated SSR/client apps and packages; environment injection and postbuild steps executed successfully.
+- Next time: Make root `test` resilient (e.g., use `npm -ws run test --if-present`) or add no-op `test` scripts to all workspaces to avoid Turbo missing-task errors.
