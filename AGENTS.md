@@ -50,4 +50,6 @@ One LLM executes work by following process markdowns in `agents/workflows/`.
 - The LLM loads the process .md (+ linked partials), executes the current phase, writes artifacts, updates phase state, advances when gates pass, and logs a short Reflexion to the Memory Bank.
 - External tools: prefer GitHub MCP for git workflows.
 
+It is very important you strictly follow the agent workflows.
+
 Start with: `agents/workflows/default.workflow.md`

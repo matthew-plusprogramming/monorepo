@@ -22,28 +22,28 @@ Environment
 
 Entrypoints
 
-- Server: apps/node-server/src/index.ts (dev) | apps/node-server/src/lambda.ts (Lambda)
-- Infra: cdk/backend-server-cdk/src/index.ts
+- Server: `apps/node-server/src/index.ts` (dev) | `apps/node-server/src/lambda.ts` (Lambda)
+- Infra: `cdk/backend-server-cdk/src/index.ts`
 
 Where To Look First
 
-- Handlers: apps/node-server/src/handlers/\*
-- Schemas: packages/core/schemas/schemas/\*\*
-- Infra stacks: cdk/backend-server-cdk/src/stacks/\*\*
+- Handlers: `apps/node-server/src/handlers/*`
+- Schemas: `packages/core/schemas/schemas/**/*`
+- Infra stacks: `cdk/backend-server-cdk/src/stacks/**/*`
 
 Codebase Map
 
-- apps/node-server: Express app, middleware, handlers, Lambda wrapper.
-- cdk/backend-server-cdk: Stacks, consumers, outputs loader.
-- packages/core/backend-core: Effect→Express adapter, services, types.
-- packages/core/schemas: Zod domain schemas and constants.
-- Shared configs: packages/configs/\*.
+- `apps/node-server`: Express app, middleware, handlers, Lambda wrapper.
+- `cdk/backend-server-cdk`: Stacks, consumers, outputs loader.
+- `packages/core/backend-core`: Effect→Express adapter, services, types.
+- `packages/core/schemas`: Zod domain schemas and constants.
+- Shared configs: `packages/configs/*`.
 
 Tech Stack Details
 
-- Validation: Zod 4 for inputs and env (apps/node-server/src/types/environment.ts).
-- Effects: Effect 3 for typed effects/layers/errors (packages/core/backend-core).
-- Auth: JWT with custom claims (packages/core/schemas/schemas/user/userToken.ts).
+- Validation: Zod 4 for inputs and env `apps/node-server/src/types/environment.ts`.
+- Effects: Effect 3 for typed effects/layers/errors `packages/core/backend-core`.
+- Auth: JWT with custom claims `packages/core/schemas/schemas/user/userToken.ts`.
 - Build: Vite SSR to CJS; TS strict, shared configs.
 
 Workflows
@@ -57,3 +57,4 @@ Task Recipes
 - Add endpoint: define schema → implement handler using `parseInput` → wrap with `generateRequestHandler` → wire route → run dev.
 - Add table/GSI: update schema constants → add stack changes → deploy → load outputs → update app client.
 - Add middleware: implement Effect middleware → wrap as `RequestHandler` → register in server entry.
+
