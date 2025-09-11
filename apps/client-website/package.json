@@ -45,6 +45,6 @@
     "sass": "^1.92.0",
     "typed-scss-modules": "^8.1.1",
     "typescript": "^5.9.2",
-    "vite": "^7.1.4"
+    "vite": "^7.1.5"
   }
 }

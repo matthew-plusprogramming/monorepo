@@ -51,7 +51,7 @@
     "jsonwebtoken": "^9.0.2",
     "serverless-http": "^4.0.0",
     "typescript": "^5.9.2",
-    "vite": "^7.1.4",
+    "vite": "^7.1.5",
     "zod": "^4.1.5"
   }
 }
