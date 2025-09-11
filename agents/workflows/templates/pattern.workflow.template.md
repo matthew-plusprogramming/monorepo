@@ -2,20 +2,23 @@
 Title: <Pattern Name> Workflow
 ---
 
-
 Intent
+
 - Encapsulate a high-importance procedural pattern discovered in `agents/memory-bank/system.patterns.md` as a reusable, diff-able workflow.
 
 State
+
 - current_phase: planner
 - last_actor: <set by agent>
 - derived_from_pattern: <PAT-YYYYMMDD-slug>
 
 Global Prompts
+
 - Follow the same phase structure as default; customize checklists to the pattern’s steps.
 - Keep unrelated changes out; update Memory Bank as needed.
 
 Phase: planner
+
 - Goal: Frame when to apply this pattern.
 - Inputs: Pattern entry; relevant context files.
 - Checklist:
@@ -25,6 +28,7 @@ Phase: planner
 - Next: retriever
 
 Phase: retriever
+
 - Goal: Gather context specific to this pattern.
 - Inputs: Pattern Steps and Signals; tech/product context.
 - Checklist:
@@ -33,6 +37,7 @@ Phase: retriever
 - Next: architect
 
 Phase: architect
+
 - Goal: Adapt the pattern steps to current task.
 - Checklist:
   - Validate the steps; adjust for constraints.
@@ -41,6 +46,7 @@ Phase: architect
 - Next: implementer
 
 Phase: implementer
+
 - Goal: Execute the pattern steps minimally.
 - Checklist:
   - Implement scoped changes according to the pattern.
@@ -49,6 +55,7 @@ Phase: implementer
 - Next: reviewer
 
 Phase: reviewer
+
 - Goal: Ensure clarity and minimalism.
 - Checklist:
   - Self-review diffs against pattern intent and criteria.
@@ -56,6 +63,7 @@ Phase: reviewer
 - Next: tester
 
 Phase: tester
+
 - Goal: Validate behavior and edge cases.
 - Checklist:
   - Run targeted tests; validate signals from the pattern.
@@ -63,6 +71,7 @@ Phase: tester
 - Next: documenter
 
 Phase: documenter
+
 - Goal: Update docs and memory.
 - Checklist:
   - Record outcomes; update `agents/memory-bank` as needed.
@@ -71,4 +80,5 @@ Phase: documenter
 - Next: done
 
 End
+
 - Close with a brief summary and any follow-ups.

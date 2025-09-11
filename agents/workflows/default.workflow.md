@@ -2,25 +2,28 @@
 Title: Default Software Change Workflow
 ---
 
-
 Intent
+
 - Orchestrate end-to-end changes with visible, diff-able phases, artifacts, and gates. Keeps memory updated across phases.
 
 State
+
 - current_phase: planner
 - last_actor: <set by agent>
 - started_at: <YYYY-MM-DD>
 
 Global Prompts
+
 - Retrieval setup: Identify task type (bug|feature|refactor|ops). Always include `agents/memory-bank/project.brief.md`, recent `agents/memory-bank/progress.log.md`, and `agents/memory-bank/active.context.md`. Add more canonical files by relevance. For system-impacting changes, create an ADR stub PR.
 - Reflexion note: After each phase, add a 3-line Reflexion to `active.context.md` and append a succinct entry to `progress.log.md`.
 - External tools: Use GitHub MCP for git operations.
-- Linting habit: After completing a task, run `npm run lint:fix` to auto-fix style issues across the monorepo.
+- Linting habit: After completing a task, run `npm run lint:fix` and `npm run format:markdown` (Markdown in `agents/**`). Running `npm run lint` or `npm run lint:fix` at the repo root will automatically format `agents/**/*.md` via prelint hooks.
 - Branch & commit flow: After confirming with the requester, create a branch named `codex/<meaningful-slug>`, commit with a Conventional Commit title under 70 chars, and push upstream to that branch. Offer this step proactively at the start of implementation.
 - Commit confirmation: Before each commit (including fixups), present the proposed Conventional Commit title (< 70 chars) and body, and ask for explicit approval. Do not commit without approval.
-- Markdown standards: When editing `.md` files, follow CommonMark. Use ATX headings (`#`), one space after `#`, a blank line before and after headings when appropriate, `- ` for lists, fenced code blocks with language tags, inline code in backticks, no trailing spaces, and a final newline.
+- Markdown standards: When editing `.md` files, follow CommonMark. Use ATX headings (`#`), one space after `#`, a blank line before and after headings when appropriate, `- ` for lists, fenced code blocks with language tags, inline code in backticks, no trailing spaces, and a final newline. Use Prettier to format Markdown (`npm run format:markdown`).
 
 Phase: planner
+
 - Goal: Clarify scope, constraints, success metrics, and plan.
 - Inputs: Issue/ask, `project.brief.md`, `product.context.md`.
 - Checklist:
@@ -34,6 +37,7 @@ Phase: planner
 - Next: retriever
 
 Phase: retriever
+
 - Goal: Gather relevant context from code and docs.
 - Inputs: `system.patterns.md`, `tech.context.md`, recent `progress.log.md`.
 - Checklist:
@@ -46,6 +50,7 @@ Phase: retriever
 - Next: architect (or loop to planner if gaps found)
 
 Phase: architect
+
 - Goal: Propose changes with tradeoffs.
 - Inputs: Planner+Retriever outputs; ADR template.
 - Checklist:
@@ -58,13 +63,14 @@ Phase: architect
 - Next: implementer
 
 Phase: implementer
+
 - Goal: Apply minimal, focused changes.
 - Inputs: Design; file list.
 - Checklist:
   - Implement code and docs surgically.
   - Keep unrelated changes out; follow repo style.
   - Update `agents/memory-bank` canonical files if required.
-  - Run `npm run lint:fix` to format/fix lint issues.
+  - Run `npm run lint:fix` and `npm run format:markdown` to format/fix lint and Markdown.
   - With confirmation, create `codex/<slug>` branch. Before each commit, ask for approval with the proposed Conventional Commit title (< 70 chars) and body; then push to the remote branch when confirmed.
 - Outputs: Code changes; updated docs; migrations/scripts as needed.
 - Done_when: Changes compile and meet plan scope.
@@ -72,6 +78,7 @@ Phase: implementer
 - Next: reviewer
 
 Phase: reviewer
+
 - Goal: Validate correctness and clarity.
 - Inputs: Diff; design notes; acceptance criteria.
 - Checklist:
@@ -85,18 +92,20 @@ Phase: reviewer
 - Next: tester
 
 Phase: tester
+
 - Goal: Verify behavior against acceptance criteria.
 - Inputs: Plan; criteria; test harness.
 - Checklist:
   - Run targeted tests; add missing ones nearby if pattern exists.
   - Validate error paths and edge cases.
-  - Re-run build and `npm run lint:fix`.
+  - Re-run build and `npm run lint:fix` (Markdown formatting runs automatically via prelint, or run `npm run format:markdown`).
 - Outputs: Test results; fixes.
 - Done_when: Criteria met; no regressions visible.
 - Gates: CI passes (if applicable).
 - Next: documenter
 
 Phase: documenter
+
 - Goal: Update docs and memory bank.
 - Inputs: All prior outputs; `agents/memory-bank/*`.
 - Checklist:
@@ -116,5 +125,6 @@ Phase: documenter
 - Next: done
 
 End
+
 - Close with summary and next steps.
- - Always run `npm run lint:fix` before handing off.
+- Always run `npm run lint:fix` and ensure Markdown is formatted (`npm run format:markdown`).

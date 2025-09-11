@@ -3,7 +3,6 @@ last_reviewed: 2025-09-03
 stage: implementation
 ---
 
-
 # Progress Log
 
 - 2025-09-03: Scaffolded Memory Bank canonical files, workflows overview, and default workflow. Updated AGENTS.md to direct usage; stamped core metadata; added Reflexion entries.
@@ -15,3 +14,4 @@ stage: implementation
 - 2025-09-11: Updated default workflow to mandate `npm run lint:fix` after tasks; executed lint:fix across workspaces.
 - 2025-09-11: Removed unsafe `as unknown as` cast in `defaultLayer`; enforced default layer presence; eliminated `any` usage in `userRepo.service` with precise AWS types; returned `UserPublic` directly in `getUser` handler and cleaned imports; lint and build clean.
 - 2025-09-11: Moved default Layer management to node-server; deleted backend-core `defaultLayer.ts`; `generateRequestHandler` now assumes fully-provided effects; handlers wrap with `Effect.provide(AppLayer)`; added ADR-0003 (Proposed).
+- 2025-09-11: Added root script `format:markdown` using Prettier (CommonMark) to format `agents/**/*.md`; wired via prelint hooks so it runs with `lint`/`lint:fix`; updated default workflow and docs accordingly.
