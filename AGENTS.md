@@ -25,7 +25,7 @@ Storage Tiers
 Retrieval Policy
 
 - Identify task type: bug | feature | refactor | ops.
-- Always load: `agents/memory-bank/project.brief.md`, recent `agents/memory-bank/progress.log.md` entries, `agents/memory-bank/active.context.md`.
+- Always load: `agents/workflows/default.workflow.md` or a different workflow if more applicable, `agents/memory-bank/project.brief.md`, recent `agents/memory-bank/progress.log.md` entries, `agents/memory-bank/active.context.md`.
 - Add by relevance: `agents/memory-bank/tech.context.md`, `agents/memory-bank/system.patterns.md`, and ADRs under `agents/memory-bank/decisions/`.
 - For system‑impacting changes: open an ADR stub PR using `agents/memory-bank/decisions/ADR-0000-template.md`.
 - After each phase: append a 3‑line Reflexion to `agents/memory-bank/active.context.md`; when stable, roll up into an ADR or `agents/memory-bank/system.patterns.md`.
