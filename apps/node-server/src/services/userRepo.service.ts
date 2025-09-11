@@ -1,3 +1,4 @@
+import type { AttributeValue } from '@aws-sdk/client-dynamodb';
 import { marshall, unmarshall } from '@aws-sdk/util-dynamodb';
 import { InternalServerError, LoggerService } from '@packages/backend-core';
 import {
@@ -27,11 +28,10 @@ export class UserRepo extends Context.Tag('UserRepo')<
 >() {}
 
 const unmarshallUser = (
-  item?: Record<string, unknown>,
+  item?: Record<string, AttributeValue>,
 ): Option.Option<UserPublic> => {
   if (!item) return Option.none();
-  // TODO: Use correct types here
-  const obj = unmarshall(item as any) as unknown;
+  const obj = unmarshall(item);
   const parsed = UserPublicSchema.safeParse(obj);
   if (!parsed.success) return Option.none();
   return Option.some(parsed.data);
@@ -60,7 +60,11 @@ const makeUserRepo = (): Effect.Effect<
               ProjectionExpression: USER_SCHEMA_CONSTANTS.projection.userPublic,
             })
             .pipe(
-              Effect.map((res) => unmarshallUser(res.Items?.[0] as any)),
+              Effect.map((res) =>
+                unmarshallUser(
+                  res.Items?.[0] as Record<string, AttributeValue> | undefined,
+                ),
+              ),
               Effect.tapError((e) => logger.logError(e)),
               Effect.mapError(
                 (e) => new InternalServerError({ message: e.message }),
@@ -74,7 +78,7 @@ const makeUserRepo = (): Effect.Effect<
               ProjectionExpression: USER_SCHEMA_CONSTANTS.projection.userPublic,
             })
             .pipe(
-              Effect.map((res) => unmarshallUser(res.Item as any)),
+              Effect.map((res) => unmarshallUser(res.Item ?? undefined)),
               Effect.tapError((e) => logger.logError(e)),
               Effect.mapError(
                 (e) => new InternalServerError({ message: e.message }),

@@ -13,3 +13,4 @@ stage: implementation
 - 2025-09-11: Introduced `UserRepo.findByIdentifier` with centralized projection and error mapping; refactored `getUser` and `register` handlers; added default Layer hook in backend-core and applied at app bootstrap.
 - 2025-09-11: Moved `UserPublic` type and projection into `@packages/schemas/user`; added `UserCreate` schema; updated repo to use `@aws-sdk/util-dynamodb` marshall/unmarshall and added `create(user)`; refactored register handler to use repo.create.
 - 2025-09-11: Updated default workflow to mandate `npm run lint:fix` after tasks; executed lint:fix across workspaces.
+- 2025-09-11: Removed unsafe `as unknown as` cast in `defaultLayer`; enforced default layer presence; eliminated `any` usage in `userRepo.service` with precise AWS types; returned `UserPublic` directly in `getUser` handler and cleaned imports; lint and build clean.

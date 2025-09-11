@@ -32,3 +32,6 @@ Reflexion
 - What happened (2025-09-11, policy): Updated default.workflow to always run `npm run lint:fix` after tasks and executed it.
 - What worked: Keeps style consistent and avoids noisy diffs later.
 - Next time: Consider pre-commit hooks to enforce this automatically.
+- What happened (2025-09-11, types): Cleaned up unsafe casts — removed `as unknown as` in `defaultLayer`, replaced `any` with AWS `AttributeValue` in `userRepo.service`, and returned `UserPublic` directly in `getUser`.
+- What worked: Stronger types eliminated noisy casts; handlers/readers stayed simple; lint/build green.
+- Next time: Tighten `generateRequestHandler` generics to align with `Effect.Effect<A, E, R>` order and remove any residual type looseness.

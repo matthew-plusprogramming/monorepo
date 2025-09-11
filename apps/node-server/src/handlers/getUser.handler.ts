@@ -5,11 +5,7 @@ import {
   InternalServerError,
   NotFoundError,
 } from '@packages/backend-core';
-import {
-  GetUserSchema,
-  type User,
-  type UserPublic,
-} from '@packages/schemas/user';
+import { GetUserSchema, type UserPublic } from '@packages/schemas/user';
 import { Effect } from 'effect';
 import z, { ZodError } from 'zod';
 
@@ -40,7 +36,7 @@ const getUserHandler = (
       });
     }
 
-    return maybeUser.value as unknown as User;
+    return maybeUser.value;
   });
 };
 
