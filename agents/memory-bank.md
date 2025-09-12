@@ -35,9 +35,9 @@ Retrieval Policy
 
 Stage Metadata Policy
 
-- To avoid drift, do not track “stage”/phase in every Memory Bank file.
-- Ground truth for phase lives in the active workflow file under `agents/workflows/*`.
-- Memory files should use `last_reviewed` to indicate freshness; `stage` is optional and, if used, should be limited to `agents/memory-bank/active.context.md` only.
+- Prefer omitting `stage` in Memory Bank files to avoid drift; rely on `last_reviewed` for freshness.
+- Ground truth for the current phase lives in the active workflow file under `agents/workflows/*`.
+- If `stage` is used, it must be one of `plan|build|verify` and should be limited to `agents/memory-bank/active.context.md` only.
 
 Validation scripts
 

@@ -35,3 +35,6 @@ One LLM executes work by following process markdowns in `agents/workflows/`.
 It is very important you strictly follow the agent workflows.
 
 Start with: `agents/workflows/default.workflow.md`
+## Conventions
+
+- Markdown: use Prettier via `npm run format:markdown` for `agents/**`; `npm run lint`/`lint:fix` runs it via prelint hook.
