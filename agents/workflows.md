@@ -15,7 +15,7 @@ Usage
 
 Policies
 
-- Retrieval: follow the canonical policy in `agents/memory-bank.md` (avoid duplicating rules here).
+- Retrieval: Follow Retrieval Policy in `agents/memory-bank.md`.
 - External tools: prefer GitHub MCP for git actions (branching, commits, PRs).
 - Commit confirmation: always ask for explicit approval before each commit (share the Conventional Commit title under 70 chars and a brief body preview) and before pushing.
 - Markdown: use Prettier (`npm run format:markdown`) to format Markdown in `agents/**`. Running `npm run lint` or `npm run lint:fix` at the repo root automatically formats Markdown via a prelint hook.

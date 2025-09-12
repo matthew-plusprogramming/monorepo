@@ -12,17 +12,15 @@ State
 
 Global Prompts
 
-- Retrieval setup: Follow the canonical policy in `agents/memory-bank.md` — always include the workflow file, `project.brief.md`, recent `progress.log.md`, and `active.context.md`; include `tech.context.md`, `system.patterns.md`, and ADRs only when substantively relevant.
-- Reflexion note: After each phase, add a 3-line Reflexion to `active.context.md` and append a succinct entry to `progress.log.md`.
-- External tools: Use GitHub MCP for git operations.
-- Linting habit: After completing a task, run `npm run lint:fix` and `npm run format:markdown` (Markdown in `agents/**`). Running `npm run lint` or `npm run lint:fix` at the repo root will automatically format `agents/**/*.md` via prelint hooks.
-- Branch & commit flow: After confirming with the requester, create a branch named `codex/<meaningful-slug>`, commit with a Conventional Commit title under 70 chars, and push upstream to that branch. Offer this step proactively at the start of implementation.
-- Commit confirmation: Before each commit (including fixups), present the proposed Conventional Commit title (< 70 chars) and body, and ask for explicit approval. Do not commit without approval.
+- Retrieval: Follow Retrieval Policy in `agents/memory-bank.md`.
+- Reflexion: After each phase, add a 3-line Reflexion to `active.context.md` and a brief `progress.log.md` entry.
+- Tools/Standards: See `AGENTS.md` for MCP usage and Markdown formatting.
+- Commit approvals: If interactive approvals are enabled, request commit confirmation; otherwise proceed with clear, conventional commit messages.
 
 Phase: plan
 
 - Goal: Clarify scope, gather context, and choose an approach.
-- Inputs: Issue/ask; core context per Memory Bank policy (workflow file, `project.brief.md`, recent `progress.log.md`, `active.context.md`); optionally `product.context.md`; include `tech.context.md`/`system.patterns.md`/ADRs only if substantively relevant.
+- Inputs: Issue/ask; core context per Memory Bank policy.
 - Checklist:
   - Define problem statement, desired outcome, and acceptance criteria.
   - Identify constraints, risks, and assumptions.
@@ -42,8 +40,8 @@ Phase: build
 - Checklist:
   - Implement code and docs surgically; keep unrelated changes out.
   - Update `agents/memory-bank` canonical files if required.
-  - Run `npm run lint:fix` and `npm run format:markdown` to format/fix lint and Markdown.
-  - With confirmation, create `codex/<slug>` branch. Before each commit, ask for approval with the proposed Conventional Commit title (< 70 chars) and body; then push to the remote branch when confirmed.
+  - Run `npm run lint:fix` and `npm run format:markdown`.
+  - Branching/commits: follow `AGENTS.md` conventions; if interactive approvals are enabled, request commit confirmation; otherwise proceed with clear Conventional Commits.
 - Outputs: Code changes; updated docs; migrations/scripts as needed.
 - Done_when: Changes compile and meet plan scope.
 - Gates: Lint/build pass locally.
