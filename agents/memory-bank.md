@@ -33,12 +33,6 @@ Retrieval Policy
 - For system‑impacting changes, open an ADR stub using `agents/memory-bank/decisions/ADR-0000-template.md`.
 - After each phase, append a 3‑line Reflexion to `agents/memory-bank/active.context.md`; when stable, roll up into an ADR or `agents/memory-bank/system.patterns.md`.
 
-Stage Metadata Policy
-
-- Prefer omitting `stage` in Memory Bank files to avoid drift; rely on `last_reviewed` for freshness.
-- Ground truth for the current phase lives in the active workflow file under `agents/workflows/*`.
-- If `stage` is used, it must be one of `plan|build|verify` and should be limited to `agents/memory-bank/active.context.md` only.
-
 Validation scripts
 
 - Validate file paths across all Memory Bank files: `npm run memory:validate`
