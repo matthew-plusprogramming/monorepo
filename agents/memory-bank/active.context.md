@@ -49,3 +49,6 @@ Reflexion
 - What happened (2025-09-11, workflows): Consolidated workflows to 3 phases (plan → build → verify); updated default, template, overview; recorded ADR-0004.
 - What worked: Simpler handoffs and fewer transitions while preserving quality gates and Memory Bank updates.
 - Next time: Monitor usage and, if needed, add optional sub-checklists per task type without increasing phase count.
+- What happened (2025-09-13, workflows): Required Given/When/Then acceptance criteria and Non-goals in plan; tightened gates and verify tracing; added ADR-0005 (Proposed).
+- What worked: Clearer testability and scope boundaries; easier verification and review.
+- Next time: Consider lightweight lint/template checks to ensure G/W/T and Non-goals presence.

@@ -22,15 +22,26 @@ Phase: plan
 - Goal: Clarify scope, gather context, and choose an approach.
 - Inputs: Issue/ask; core context per Memory Bank policy.
 - Checklist:
-  - Define problem statement, desired outcome, and acceptance criteria.
+  - Define problem statement, desired outcome, and explicit, testable acceptance criteria with a short Given/When/Then block.
+  - Capture Non-goals to clarify what is out of scope for this change.
   - Identify constraints, risks, and assumptions.
   - Map impacted components, interfaces, and invariants; list candidate files/tests.
   - Sketch design/options; justify chosen approach; note perf/security/migration implications.
   - If system-impacting, open ADR stub from `agents/memory-bank/decisions/ADR-0000-template.md`.
   - Propose a branch name `codex/<meaningful-slug>` and ask for confirmation to branch.
-- Outputs: Brief plan; criteria; context notes; design notes; ADR stub (if needed); updated `active.context.md` next steps.
+- Example format (keep 1–3 concise lines):
+
+  ```text
+  Acceptance Criteria (Given/When/Then):
+  - Given <precondition>; When <action>; Then <measurable outcome>
+
+  Non-goals:
+  - <explicitly out of scope item>
+  ```
+
+- Outputs: Brief plan; acceptance criteria (Given/When/Then); Non-goals; context notes; design notes; ADR stub (if needed); updated `active.context.md` next steps.
 - Done_when: Scope and approach are agreed and testable.
-- Gates: Scope clear; criteria testable; no critical gaps; risks noted.
+- Gates: Scope clear; Given/When/Then present, specific, and testable; Non-goals captured; no critical gaps; risks noted.
 - Next: build
 
 Phase: build
@@ -53,6 +64,7 @@ Phase: verify
 - Inputs: Diff; design notes; plan/criteria; test harness; `agents/memory-bank/*`.
 - Checklist:
   - Self-review diffs for clarity and minimalism; verify naming and docs; re-check invariants/contracts.
+  - Trace each Given/When/Then to a verification step; confirm Non-goals remain out of scope.
   - Run targeted tests; validate error paths/edge cases.
   - Update canonical files under `agents/memory-bank/` as needed; add/update ADRs for accepted decisions.
   - Append Reflexion and progress log entries.
