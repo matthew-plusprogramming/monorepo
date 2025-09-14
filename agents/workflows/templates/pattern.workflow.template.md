@@ -6,12 +6,6 @@ Intent
 
 - Encapsulate a high-importance procedural pattern discovered in `agents/memory-bank/system.patterns.md` as a reusable, diff-able workflow.
 
-State
-
-- current_phase: plan
-- last_actor: <set by agent>
-- derived_from_pattern: <PAT-YYYYMMDD-slug>
-
 Global Prompts
 
 - Follow the same three-phase structure as default; customize checklists to the pattern’s steps.

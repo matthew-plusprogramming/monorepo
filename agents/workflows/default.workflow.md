@@ -6,10 +6,6 @@ Intent
 
 - Orchestrate end-to-end changes with visible, diff-able phases, artifacts, and gates. Keeps memory updated across phases.
 
-State
-
-- current_phase: plan
-
 Global Prompts
 
 - Retrieval: Follow Retrieval Policy in `agents/memory-bank.md`.
