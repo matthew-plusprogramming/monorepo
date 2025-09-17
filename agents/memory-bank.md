@@ -1,37 +1,32 @@
 ---
 memory_bank: v1
-generated_at: 2025-09-13
-repo_git_sha: 8985ae8c80ca06709451686183f41405f8394122
+generated_at: 2025-09-16
+repo_git_sha: 5ce65a5f1e573678668dbe2e4e4786feab286d55
 ---
 
 Memory Bank
 
 - Canonical: `agents/memory-bank/*`
+- Single source of truth: This file defines the canonical Storage Tiers and Retrieval Policy. Other docs should reference (not duplicate) these rules.
 
-Source of Truth
+Procedural vs Declarative
 
-- Retrieval and tier policies are defined here. Other docs should reference this file rather than duplicating the rules.
+- Declarative knowledge (facts, mappings, invariants) is recorded in canonical files under `agents/memory-bank/*` and does not change workflow definitions.
+- Procedural learnings (repeatable steps) are captured as patterns in `agents/memory-bank/system.patterns.md`. High-importance procedural patterns may modify/create workflows per the synthesis rule.
 
 Storage Tiers
 
 - Tier 0 — Task Context: ephemeral notes in the active workflow.
 - Tier 1 — Active Context Ring: rolling buffer summarized in `agents/memory-bank/active.context.md`; Reflexion entries appended per phase.
-- Tier 2 — Canonical Files: `agents/memory-bank/` (PR‑reviewed only).
+- Tier 2 — Canonical Files: `agents/memory-bank/` (PR-reviewed only).
 
 Retrieval Policy
 
 - Identify task type: bug | feature | refactor | ops.
-- Always include (non‑negotiable):
-  - `agents/workflows/default.workflow.md` (or a more applicable workflow under `agents/workflows/`)
-  - `agents/memory-bank/project.brief.md`
-  - Recent `agents/memory-bank/progress.log.md`
-  - `agents/memory-bank/active.context.md`
-- Gate by non‑empty relevance:
-  - Include `agents/memory-bank/tech.context.md` only if it contains substantive, task‑relevant content beyond boilerplate (e.g., concrete constraints, entrypoints, or codebase map used by the task).
-  - Include `agents/memory-bank/system.patterns.md` only if there are adopted/proposed patterns that materially guide the task.
-  - Pull ADRs from `agents/memory-bank/decisions/` only when directly relevant to the task.
-- For system‑impacting changes, open an ADR stub using `agents/memory-bank/decisions/ADR-0000-template.md`.
-- After each phase, append a 3‑line Reflexion to `agents/memory-bank/active.context.md`; when stable, roll up into an ADR or `agents/memory-bank/system.patterns.md`.
+- Always include: `agents/workflows/default.workflow.md`, `agents/memory-bank/project.brief.md`, recent `agents/memory-bank/progress.log.md`, and `agents/memory-bank/active.context.md`.
+- Gate optional files by substance: include `agents/memory-bank/tech.context.md` and `agents/memory-bank/system.patterns.md` only when they contain substantive, non-placeholder content (more than headings/TBDs). Include relevant ADRs under `agents/memory-bank/decisions/` when directly applicable.
+- For system-impacting changes, open an ADR stub using `agents/memory-bank/decisions/ADR-0000-template.md`.
+- After each phase, append a 3-line Reflexion to `agents/memory-bank/active.context.md`; when stable, roll up into an ADR or a relevant stable memory bank file.
 
 Validation scripts
 

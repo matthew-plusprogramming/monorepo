@@ -17,3 +17,6 @@ last_reviewed: 2025-09-03
 - 2025-09-11: Ops check after dependency updates — lint passed, Turbo builds for apps/packages passed, tests via `turbo run test` surfaced missing-task errors for workspaces without `test` scripts; recommended making root test resilient or adding no-op tests.
 - 2025-09-11: Consolidated workflows to three phases (plan → build → verify); updated default workflow, pattern template, and overview; added ADR-0004.
 - 2025-09-13: Required Given/When/Then acceptance criteria and Non-goals in plan; tightened gates and verify checklist; added ADR-0005; stamped Memory Bank metadata.
+- 2025-09-16: Planned alignment of agents Markdown with updated template while preserving repo-specific instructions.
+- 2025-09-16: Updated agents Markdown to latest template format while retaining repo-specific policies.
+- 2025-09-16: Ran formatting, lint, and memory validation scripts to confirm agents template refresh.

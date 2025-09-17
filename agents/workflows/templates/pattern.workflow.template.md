@@ -1,6 +1,6 @@
----
-Title: <Pattern Name> Workflow
----
+| key   | value                   |
+| ----- | ----------------------- |
+| Title | <Pattern Name> Workflow |
 
 Intent
 
@@ -8,39 +8,41 @@ Intent
 
 Global Prompts
 
-- Follow the same three-phase structure as default; customize checklists to the pattern’s steps.
+- Follow the same phase structure as default; customize checklists to the pattern’s steps.
 - Keep unrelated changes out; update Memory Bank as needed.
 
 Phase: plan
 
 - Goal: Frame applicability, gather context, and tailor the approach.
-- Inputs: Pattern entry; relevant context files.
+- Inputs: Pattern entry in `agents/memory-bank/system.patterns.md`; relevant tech/product context; recent progress and active context.
 - Checklist:
-  - Identify applicability and success criteria for pattern use.
-  - Note constraints and risks.
-  - Map impacted components/interfaces specific to this pattern.
-  - Adapt the pattern steps for the task; consider perf/security implications.
-- Outputs: Scope and criteria; tailored plan for this pattern.
+  - Identify when to apply this pattern and success criteria.
+  - Note constraints and risks; map impacted components/interfaces.
+  - Validate pattern steps; adjust for current constraints; consider performance and security implications.
+- Outputs: Tailored plan; scope and criteria for using this workflow; focused context notes.
 - Next: build
 
 Phase: build
 
-- Goal: Execute the tailored pattern steps minimally.
+- Goal: Execute the pattern steps with minimal diffs and high clarity.
 - Checklist:
-  - Implement scoped changes according to the pattern.
-  - Keep diffs minimal and consistent with repo style.
-- Outputs: Code changes.
+  - Implement scoped changes according to the pattern; follow repo style.
+  - Keep diffs minimal; update docs as needed.
+  - Self-review diffs against pattern intent, criteria, and invariants.
+- Outputs: Code changes; documentation updates; fixups.
 - Next: verify
 
 Phase: verify
 
-- Goal: Ensure clarity, validate behavior, and update memory.
+- Goal: Validate behavior, edge cases, and update Memory Bank.
 - Checklist:
-  - Self-review diffs against pattern intent and criteria.
-  - Run targeted tests; validate pattern signals and edge cases.
-  - Record outcomes; update `agents/memory-bank` as needed.
-  - If the workflow template evolved, capture those changes here.
-- Outputs: Fixups; test results; updated docs/notes.
+  - Run targeted tests; validate signals from the pattern.
+  - Update `agents/memory-bank` as needed; record outcomes.
+  - If the workflow template evolved or a new procedural pattern emerged, update/create a workflow and consider an ADR stub.
+  - Run memory validation and drift checks:
+    - `npm run memory:validate`
+    - `npm run memory:drift`
+- Outputs: Test results; updated Memory Bank; notes.
 - Next: done
 
 End

@@ -10,8 +10,8 @@ Current Focus
 
 Next Steps
 
-- Use `agents/workflows/default.workflow.md` for future tasks.
-- Record ADRs when changes impact architecture or policy.
+- Monitor agents_template for further updates and capture intentional deviations inline.
+- Use ADRs when template shifts require policy changes.
 
 Open Decisions
 
@@ -52,3 +52,12 @@ Reflexion
 - What happened (2025-09-13, workflows): Required Given/When/Then acceptance criteria and Non-goals in plan; tightened gates and verify tracing; added ADR-0005 (Proposed).
 - What worked: Clearer testability and scope boundaries; easier verification and review.
 - Next time: Consider lightweight lint/template checks to ensure G/W/T and Non-goals presence.
+- What happened (2025-09-16, plan): Reviewed agents template updates and scoped required Markdown alignment.
+- What worked: Template diff highlighted format deltas; project-specific instructions cataloged for preservation.
+- Next time: Mark repo-specific deviations inline to simplify future refreshes.
+- What happened (2025-09-16, build): Updated agents Markdown files to match template structure while keeping project-specific policies.
+- What worked: Direct rewrite kept diffs clean and ensured repo standards like commit confirmations stayed in place.
+- Next time: Consider scripted sync to flag intentional deviations explicitly.
+- What happened (2025-09-16, verify): Ran formatting, lint, and memory validation to confirm template alignment.
+- What worked: Required scripts and drift checks passed cleanly, validating front matter updates.
+- Next time: Bundle template diff/validation steps into a helper checklist to speed verification.

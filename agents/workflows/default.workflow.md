@@ -8,72 +8,73 @@ Intent
 
 Global Prompts
 
-- Retrieval: Follow Retrieval Policy in `agents/memory-bank.md`.
-- Reflexion: After each phase, add a 3-line Reflexion to `active.context.md` and a brief `progress.log.md` entry.
-- Tools/Standards: See `AGENTS.md` for MCP usage and Markdown formatting.
-- Commit approvals: If interactive approvals are enabled, request commit confirmation; otherwise proceed with clear, conventional commit messages.
+- Retrieval: Follow the Retrieval Policy in `agents/memory-bank.md`.
+- Reflexion note: After each phase, add a 3-line Reflexion to `active.context.md` and append a succinct entry to `progress.log.md`; doc-only or advisory tasks may batch these updates upon completion when no canonical files change.
+- External tools: See `AGENTS.md` for MCP guidance.
+- Commit confirmations: If interactive approvals are enabled, request commit confirmation; otherwise proceed with clear, conventional commit messages.
+- Markdown standards: See `AGENTS.md`.
 
 Phase: plan
 
-- Goal: Clarify scope, gather context, and choose an approach.
-- Inputs: Issue/ask; core context per Memory Bank policy.
+- Goal: Clarify scope, gather context, and propose approach.
+- Inputs: Issue/ask; `agents/memory-bank/project.brief.md`; `agents/memory-bank/product.context.md` (if present); `agents/memory-bank/system.patterns.md`; `agents/memory-bank/tech.context.md`; recent `agents/memory-bank/progress.log.md`; ADR template for system-impacting changes.
 - Checklist:
-  - Define problem statement, desired outcome, and explicit, testable acceptance criteria with a short Given/When/Then block.
-  - Capture Non-goals to clarify what is out of scope for this change.
+  - Define problem statement, desired outcome, and acceptance criteria using a short Given/When/Then block; add a Non-goals bullet.
   - Identify constraints, risks, and assumptions.
-  - Map impacted components, interfaces, and invariants; list candidate files/tests.
-  - Sketch design/options; justify chosen approach; note perf/security/migration implications.
-  - If system-impacting, open ADR stub from `agents/memory-bank/decisions/ADR-0000-template.md`.
-  - Propose a branch name `codex/<meaningful-slug>` and ask for confirmation to branch.
-- Example format (keep 1–3 concise lines):
+  - Map impacted components and critical paths.
+  - Identify interfaces, contracts, and invariants; list candidate files and tests to touch.
+  - Sketch design/options; choose and justify approach; note performance, security, and migration implications.
+  - If system-impacting, open ADR stub.
+- Example format:
 
-  ```text
-  Acceptance Criteria (Given/When/Then):
-  - Given <precondition>; When <action>; Then <measurable outcome>
+  ```md
+  Acceptance Criteria (Given/When/Then)
 
-  Non-goals:
-  - <explicitly out of scope item>
+  - Given X; When Y; Then measurable Z
+
+  Non-goals
+
+  - Explicitly out of scope: A, B
   ```
 
-- Outputs: Brief plan; acceptance criteria (Given/When/Then); Non-goals; context notes; design notes; ADR stub (if needed); updated `active.context.md` next steps.
-- Done_when: Scope and approach are agreed and testable.
-- Gates: Scope clear; Given/When/Then present, specific, and testable; Non-goals captured; no critical gaps; risks noted.
+- Outputs: Brief plan; acceptance criteria (Given/When/Then); Non-goals; context notes; file list; invariants list; design notes; ADR stub (if needed); updated `active.context.md` next steps.
+- Done_when: Scope and criteria are clear; context coverage is credible; approach addresses constraints.
+- Gates: Given/When/Then present, specific, and testable; Non-goals captured; invariants confirmed; risks mitigated; migration path identified.
 - Next: build
 
 Phase: build
 
-- Goal: Apply minimal, focused changes per plan.
-- Inputs: Plan/design; file list.
+- Goal: Apply minimal, focused changes and self-review for clarity.
+- Inputs: Plan outputs; design notes; file list.
 - Checklist:
-  - Implement code and docs surgically; keep unrelated changes out.
-  - Update `agents/memory-bank` canonical files if required.
-  - Run `npm run lint:fix` and `npm run format:markdown`.
-  - Branching/commits: follow `AGENTS.md` conventions; if interactive approvals are enabled, request commit confirmation; otherwise proceed with clear Conventional Commits.
-- Outputs: Code changes; updated docs; migrations/scripts as needed.
+  - Implement code and docs surgically; keep unrelated changes out; follow repo style.
+  - Update `agents/memory-bank` canonical files if required by the change.
+  - Self-review diff for clarity and minimalism; verify naming, comments, and docs; re-check invariants and contracts.
+  - With confirmation, create `codex/<slug>` branch. If interactive approvals are enabled, request commit confirmation; otherwise proceed with clear, conventional commit messages; push when ready.
+- Outputs: Code changes; updated docs; migrations/scripts as needed; review notes and fixups.
 - Done_when: Changes compile and meet plan scope.
 - Gates: Lint/build pass locally.
 - Next: verify
 
 Phase: verify
 
-- Goal: Review, test, document, and finalize memory.
-- Inputs: Diff; design notes; plan/criteria; test harness; `agents/memory-bank/*`.
+- Goal: Validate behavior against criteria and finalize Memory Bank updates.
+- Inputs: Plan; acceptance criteria; test harness; diff.
 - Checklist:
-  - Self-review diffs for clarity and minimalism; verify naming and docs; re-check invariants/contracts.
+  - Run targeted tests; add missing ones nearby if an adjacent pattern exists.
   - Trace each Given/When/Then to a verification step; confirm Non-goals remain out of scope.
-  - Run targeted tests; validate error paths/edge cases.
-  - Update canonical files under `agents/memory-bank/` as needed; add/update ADRs for accepted decisions.
-  - Append Reflexion and progress log entries.
-  - Run memory validation and drift checks: `npm run memory:validate` and `npm run memory:drift`.
-  - Ensure `npm run lint:fix` and `npm run format:markdown` have been run.
-- Outputs: Review notes; test results; Memory Bank updates.
+  - Validate error paths and edge cases; re-run build/lint.
+  - Update Memory Bank: canonical files under `agents/memory-bank/`; add/update ADRs for accepted decisions; append Reflexion and progress log entries.
+  - Workflow Synthesis: If `agents/memory-bank/system.patterns.md` contains new high-importance procedural patterns, then update an existing workflow or create a new one from `agents/workflows/templates/pattern.workflow.template.md`; for workflow changes that alter behavior, open an ADR stub.
+  - Run `npm run lint:fix` and ensure Markdown is formatted via `npm run format:markdown`.
+  - Validate Memory Bank and drift:
+    - `npm run memory:validate`
+    - `npm run memory:drift`
+- Outputs: Test results; fixes; updated Memory Bank; optional workflow updates.
 - Done_when: Criteria met; no regressions visible; memory validated and drift-free.
-- Gates:
-  - `npm run memory:validate`
-  - `npm run memory:drift`
+- Gates: CI passes (if applicable); memory validation/drift checks pass.
 - Next: done
 
 End
 
 - Close with summary and next steps.
-- Always run `npm run lint:fix` and ensure Markdown is formatted (`npm run format:markdown`).
