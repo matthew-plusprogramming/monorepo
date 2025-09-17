@@ -1,0 +1,25 @@
+{
+  "name": "@configs/jest-config",
+  "version": "0.0.1",
+  "license": "UNLICENSED",
+  "type": "module",
+  "exports": {
+    ".": "./index.ts"
+  },
+  "scripts": {
+    "// -- 🚀 Development": "--",
+    "// -- 🛠️ Build & Clean": "--",
+    "clean": "rm -rf node_modules && rm -rf .turbo",
+    "// -- 🧪 Testing": "--",
+    "// -- 🧹 Linting & Formatting": "--",
+    "// -- ✅ Verification & CI": "--",
+    "// -- 🔧 Miscellaneous": "--"
+  },
+  "peerDependencies": {
+    "jest": "^30.1.3",
+    "ts-jest": "^29.4.1"
+  },
+  "devDependencies": {
+    "@types/jest": "^30.0.0"
+  }
+}
