@@ -97,3 +97,12 @@ Reflexion
 - What happened (2025-09-18, verify-workflow-note): Ran markdown formatting, lint:fix, and memory scripts to confirm workflow edits pass gates.
 - What worked: Existing automation caught no extra formatting needs; drift stayed clear since SHA already stamped.
 - Next time: Add a unit test or lint rule to ensure workflow checklists keep referencing canonical guidance.
+- What happened (2025-09-18, plan-node-server-testing): Scoped node-server test gap analysis using repo guidelines and mapped target files.
+- What worked: Testing guidelines highlighted boundary handling and fake requirements before deeper audit.
+- Next time: Pre-tag prospective fakes/builders in plan outputs to speed build phase documentation.
+- What happened (2025-09-18, build-node-server-testing): Documented node-server testing plan outlining suites, fakes, and sequencing.
+- What worked: Structuring by module type clarified boundary coverage and highlighted shared utility needs.
+- Next time: Include risk flags for dependencies requiring additional refactors before tests can land.
+- What happened (2025-09-18, verify-node-server-testing): Ran markdown formatter and memory scripts to validate the testing plan updates.
+- What worked: Formatter confirmed canonical files stay aligned; memory scripts guard against stale path references.
+- Next time: Pair verify gate with lint or targeted Vitest run once tests exist.
