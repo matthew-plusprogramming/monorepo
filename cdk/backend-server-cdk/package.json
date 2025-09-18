@@ -40,10 +40,10 @@
     "decrypt-envs": "dotenvx decrypt -f .env.dev .env.production&& echo 'WARNING: DO NOT COMMIT decrypted .env files to the repository!'"
   },
   "devDependencies": {
-    "@cdktf/provider-aws": "^21.10.0",
+    "@cdktf/provider-aws": "^21.10.1",
     "@configs/eslint-config": "*",
     "@configs/ts-config": "*",
-    "@dotenvx/dotenvx": "^1.49.0",
+    "@dotenvx/dotenvx": "^1.49.1",
     "@packages/schemas": "*",
     "@utils/type-utils": "*",
     "cdktf": "^0.21.0",
@@ -52,6 +52,6 @@
     "eslint": "^9.35.0",
     "tsx": "^4.20.5",
     "typescript": "^5.9.2",
-    "zod": "^4.1.8"
+    "zod": "^4.1.9"
   }
 }
