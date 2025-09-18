@@ -24,3 +24,9 @@ last_reviewed: 2025-09-03
 - 2025-09-18: Implemented Vitest tooling and added zodParser helper spec in node-server.
 - 2025-09-18: Verified Vitest setup via package test script, lint:fix, and memory validation/drift checks.
 - 2025-09-18: Extracted Vitest config into @configs/vitest-config with node/browser helpers and updated node-server to consume shared preset.
+- 2025-09-18: Planned testing-guidelines refresh to incorporate boundary policies, DI requirements, testing scopes, and supporting utilities.
+- 2025-09-18: Authored testing guidelines covering boundary defaults, reusable builders/fakes, unit-type expectations, and review checklist.
+- 2025-09-18: Verified testing-guidelines update via markdown formatting, lint:fix, and memory validation/drift (updated stamped repo SHA).
+- 2025-09-18: Planned default workflow update to reference the testing guidelines within phase checklists.
+- 2025-09-18: Updated default workflow plan/verify checklists to point at the testing guidelines.
+- 2025-09-18: Verified workflow update via format:markdown, lint:fix, memory validation, and drift checks.

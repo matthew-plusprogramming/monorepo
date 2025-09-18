@@ -79,3 +79,21 @@ Reflexion
 - What happened (2025-09-18, verify): Ran package build, node-server Vitest suite, lint:fix, and prepared memory updates.
 - What worked: Workspace install re-linked the new config package so tests consumed shared settings without manual alias tweaks.
 - Next time: Automate config package builds inside Turbo pipelines to avoid manual tsc calls before usage.
+- What happened (2025-09-18, plan-testing-guidelines): Scoped testing guidelines refresh covering boundaries, DI, utilities, and testing scope; drafted Given/When/Then and candidate files.
+- What worked: Workflow retrieval surfaced Memory Bank obligations and validation scripts before editing.
+- Next time: Template a testing-guidelines outline to accelerate future updates.
+- What happened (2025-09-18, build-testing-guidelines): Authored testing guidelines Memory Bank entry with boundary defaults, reusable utilities, and review checklist.
+- What worked: Sectioned bullets kept instructions scannable while mirroring the requested numbered list.
+- Next time: Cross-link guideline sections from relevant workflows once patterns solidify.
+- What happened (2025-09-18, verify-testing-guidelines): Ran markdown formatting, lint:fix via Turbo, and memory validation/drift after updating stamped SHA.
+- What worked: Drift script confirmed front matter alignment once repo SHA updated post-edits.
+- Next time: Bundle format+lint+memory scripts into a single npm task for documentation-only changes.
+- What happened (2025-09-18, plan-workflow-note): Determined default workflow needs a pointer to the new testing guidelines and scoped update to the plan/verify checklists.
+- What worked: Acceptance criteria clarified we just need a concise reference without restructuring other workflows.
+- Next time: Consider centralizing cross-references via front-matter links to reduce manual updates.
+- What happened (2025-09-18, build-workflow-note): Added testing-guidelines references to the plan and verify checklists in the default workflow.
+- What worked: Keeping the reminder scoped to existing bullets avoided disrupting the checklist structure.
+- Next time: Evaluate whether build phase also needs a quick reminder once additional tooling exists.
+- What happened (2025-09-18, verify-workflow-note): Ran markdown formatting, lint:fix, and memory scripts to confirm workflow edits pass gates.
+- What worked: Existing automation caught no extra formatting needs; drift stayed clear since SHA already stamped.
+- Next time: Add a unit test or lint rule to ensure workflow checklists keep referencing canonical guidance.

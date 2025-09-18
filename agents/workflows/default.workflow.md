@@ -23,6 +23,7 @@ Phase: plan
   - Identify constraints, risks, and assumptions.
   - Map impacted components and critical paths.
   - Identify interfaces, contracts, and invariants; list candidate files and tests to touch.
+  - Review `agents/memory-bank/testing.guidelines.md` to align planned tests with boundary strategies and utilities.
   - Sketch design/options; choose and justify approach; note performance, security, and migration implications.
   - If system-impacting, open ADR stub.
 - Example format:
@@ -63,6 +64,7 @@ Phase: verify
 - Checklist:
   - Run targeted tests; add missing ones nearby if an adjacent pattern exists.
   - Trace each Given/When/Then to a verification step; confirm Non-goals remain out of scope.
+  - Confirm implemented tests follow `agents/memory-bank/testing.guidelines.md` (boundaries, DI, fakes/mocks, flake-proofing).
   - Validate error paths and edge cases; re-run build/lint.
   - Update Memory Bank: canonical files under `agents/memory-bank/`; add/update ADRs for accepted decisions; append Reflexion and progress log entries.
   - Workflow Synthesis: If `agents/memory-bank/system.patterns.md` contains new high-importance procedural patterns, then update an existing workflow or create a new one from `agents/workflows/templates/pattern.workflow.template.md`; for workflow changes that alter behavior, open an ADR stub.
