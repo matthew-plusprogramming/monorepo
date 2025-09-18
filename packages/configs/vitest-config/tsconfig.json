@@ -1,0 +1,7 @@
+{
+  "extends": "@configs/ts-config/tsconfig.transpiled.json",
+  "include": ["index.ts"],
+  "compilerOptions": {
+    "outDir": "dist"
+  }
+}

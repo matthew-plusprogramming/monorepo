@@ -23,3 +23,4 @@ last_reviewed: 2025-09-03
 - 2025-09-18: Planned Vitest bootstrap for node-server tests with scoped acceptance criteria and file targets.
 - 2025-09-18: Implemented Vitest tooling and added zodParser helper spec in node-server.
 - 2025-09-18: Verified Vitest setup via package test script, lint:fix, and memory validation/drift checks.
+- 2025-09-18: Extracted Vitest config into @configs/vitest-config with node/browser helpers and updated node-server to consume shared preset.

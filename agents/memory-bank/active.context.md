@@ -70,3 +70,12 @@ Reflexion
 - What happened (2025-09-18, verify): Ran node-server Vitest, lint:fix, and memory validation/drift checks.
 - What worked: Turbo cache limited lint work; memory scripts confirmed stamped SHA alignment.
 - Next time: Suppress ES2024 warnings from esbuild for cleaner Vitest output.
+- What happened (2025-09-18, plan): Scoped shared Vitest preset extraction into @configs/vitest-config with node/browser exports and alias defaults.
+- What worked: Acceptance criteria highlighted alias invariants and targeted files before editing.
+- Next time: Evaluate whether other workspaces need additional Vitest defaults (e.g., globals) before codifying.
+- What happened (2025-09-18, build): Authored @configs/vitest-config helpers, updated node-server config and workspace dependencies, and compiled the package.
+- What worked: Central helper kept alias logic consistent; TypeScript compilation surfaced UserConfig typing gap early.
+- Next time: Consider surfacing optional overrides for include patterns instead of requiring consumers to rewrap.
+- What happened (2025-09-18, verify): Ran package build, node-server Vitest suite, lint:fix, and prepared memory updates.
+- What worked: Workspace install re-linked the new config package so tests consumed shared settings without manual alias tweaks.
+- Next time: Automate config package builds inside Turbo pipelines to avoid manual tsc calls before usage.

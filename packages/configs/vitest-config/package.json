@@ -1,23 +1,25 @@
 {
-  "name": "@configs/jest-config",
-  "version": "0.0.2",
-  "deprecated": true,
-  "description": "Replaced by @configs/vitest-config",
+  "name": "@configs/vitest-config",
+  "version": "0.0.1",
   "license": "UNLICENSED",
   "type": "module",
   "exports": {
-    ".": "./index.ts"
+    ".": "./dist/index.js"
   },
   "scripts": {
     "// -- 🚀 Development": "--",
     "// -- 🛠️ Build & Clean": "--",
-    "clean": "rm -rf node_modules && rm -rf .turbo",
+    "build": "tsc",
+    "clean": "rm -rf dist && rm -rf node_modules && rm -rf .turbo",
     "// -- 🧪 Testing": "--",
     "// -- 🧹 Linting & Formatting": "--",
     "// -- ✅ Verification & CI": "--",
     "// -- 🔧 Miscellaneous": "--"
   },
+  "devDependencies": {
+    "@configs/ts-config": "*"
+  },
   "peerDependencies": {
-    "@configs/vitest-config": "*"
+    "vitest": "^3.2.4"
   }
 }
