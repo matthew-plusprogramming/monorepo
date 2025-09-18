@@ -56,6 +56,7 @@ export default defineConfig(({ mode, command }) => {
           /^@configs\//,
           /^@types\//,
           /^eslint.*/,
+          /^@aws-sdk.*/,
           '@node-rs/argon2',
           'concurrently',
           'cross-env',
