@@ -20,3 +20,6 @@ last_reviewed: 2025-09-03
 - 2025-09-16: Planned alignment of agents Markdown with updated template while preserving repo-specific instructions.
 - 2025-09-16: Updated agents Markdown to latest template format while retaining repo-specific policies.
 - 2025-09-16: Ran formatting, lint, and memory validation scripts to confirm agents template refresh.
+- 2025-09-18: Planned Vitest bootstrap for node-server tests with scoped acceptance criteria and file targets.
+- 2025-09-18: Implemented Vitest tooling and added zodParser helper spec in node-server.
+- 2025-09-18: Verified Vitest setup via package test script, lint:fix, and memory validation/drift checks.

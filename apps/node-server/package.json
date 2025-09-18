@@ -17,7 +17,7 @@
     "copy-env-prod": "cross-env ENV=production tsx scripts/copy-env.ts",
     "clean": "rm -rf dist && rm -rf node_modules && rm -rf .turbo",
     "// -- 🧪 Testing": "--",
-    "test": "echo \"TODO: Implement vitest\" && exit 0",
+    "test": "vitest run",
     "// -- 🧹 Linting & Formatting": "--",
     "lint": "eslint src --cache",
     "lint:fix": "eslint src --fix --cache",
@@ -51,7 +51,8 @@
     "jsonwebtoken": "^9.0.2",
     "serverless-http": "^4.0.0",
     "typescript": "^5.9.2",
-    "vite": "^7.1.5",
+    "vite": "^7.1.6",
+    "vitest": "^2.1.9",
     "zod": "^4.1.8"
   }
 }

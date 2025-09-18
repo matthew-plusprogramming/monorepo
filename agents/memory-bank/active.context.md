@@ -61,3 +61,12 @@ Reflexion
 - What happened (2025-09-16, verify): Ran formatting, lint, and memory validation to confirm template alignment.
 - What worked: Required scripts and drift checks passed cleanly, validating front matter updates.
 - Next time: Bundle template diff/validation steps into a helper checklist to speed verification.
+- What happened (2025-09-18, plan): Scoped Vitest bootstrap for node-server, capturing Given/When/Then and candidate files.
+- What worked: Memory Bank retrieval highlighted alias constraints and prior test gaps to watch.
+- Next time: Pre-check existing Jest configuration overlap before adopting new tooling.
+- What happened (2025-09-18, build): Wired Vitest config, dependency, and helper spec for node-server.
+- What worked: Vite-style resolve alias kept `@` imports seamless in tests; Effect utilities made assertions straightforward.
+- Next time: Consider a shared Vitest preset once more packages adopt the stack.
+- What happened (2025-09-18, verify): Ran node-server Vitest, lint:fix, and memory validation/drift checks.
+- What worked: Turbo cache limited lint work; memory scripts confirmed stamped SHA alignment.
+- Next time: Suppress ES2024 warnings from esbuild for cleaner Vitest output.
