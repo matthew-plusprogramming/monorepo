@@ -11,3 +11,5 @@ last_reviewed: 2025-09-20
 - 2025-09-16: Planned and executed agents Markdown template sync while preserving repo-specific policies, plus format/lint/memory validations.
 - 2025-09-18: Planned, built, and verified node-server Vitest setup, shared config preset, testing guidelines, testing plan, and helper fakes with full lint/format/memory passes.
 - 2025-09-20: Iterated on node-server coverage—typed UUID helper fix, environment/middleware/location specs, spec relocations, service test expansion, Dynamo/logger/zod coverage, and Option.none validation—running plan/build/verify loops with lint, build, test, and memory checks after each milestone; also condensed Memory Bank reflexions/log for quicker retrieval.
+- 2025-09-20: Planned upcoming middleware test coverage for auth and rate limiting, aligning acceptance criteria with testing guidelines and preparing fakes/utilities for implementation.
+- 2025-09-20: Delivered auth and rate limit middleware suites using shared fakes, injected logger/dynamo layers via Vitest mocks, corrected missing Effect yields in both middlewares, and closed out lint/test passes with memory updates.

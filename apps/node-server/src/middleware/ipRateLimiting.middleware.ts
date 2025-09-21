@@ -66,10 +66,14 @@ const ipRateLimitingMiddlewareHandler = (
         ReturnValues: 'ALL_NEW',
       })
       .pipe(
-        Effect.catchAll((e) => {
-          loggerService.logError(e);
-          return Effect.fail(new InternalServerError({ message: e.message }));
-        }),
+        Effect.catchAll((e) =>
+          Effect.gen(function* () {
+            yield* loggerService.logError(e);
+            return yield* Effect.fail(
+              new InternalServerError({ message: e.message }),
+            );
+          }),
+        ),
       );
 
     // Parse the updated call count

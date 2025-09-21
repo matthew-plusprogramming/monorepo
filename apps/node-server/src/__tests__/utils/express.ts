@@ -10,6 +10,7 @@ type RequestContextInit = {
   query?: Record<string, unknown>;
   method?: string;
   url?: string;
+  ip?: string;
 };
 
 type CapturedResponse = {
@@ -45,9 +46,10 @@ const createRequest = (
     query = {},
     method = 'GET',
     url = '/',
+    ip,
   } = init;
 
-  return {
+  const request = {
     headers,
     body,
     params,
@@ -55,6 +57,12 @@ const createRequest = (
     method,
     url,
   } as unknown as Request & { user?: unknown };
+
+  if (ip) {
+    Reflect.set(request, 'ip', ip);
+  }
+
+  return request;
 };
 
 type ResponseMock = ReturnType<typeof vi.fn>;

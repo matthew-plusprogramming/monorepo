@@ -27,3 +27,6 @@ Reflexion
 - 2025-09-16 — Reconciled agents Markdown with upstream templates while flagging intentional deviations; next: annotate repo-specific policies inline for faster refresh cycles.
 - 2025-09-18 — Added Vitest tooling, shared config, testing guidelines, and node-server testing plan plus helpers; next: capture boundary-specific utilities as they stabilize.
 - 2025-09-20 — Iterated on node-server service coverage (plan/build/verify loops), tightened TypeScript typings, extended Dynamo/logger specs, closed Option.none gaps, and condensed Memory Bank reflexions/logs for faster retrieval; next: automate post-lint build checks and add focused suite scripts.
+- 2025-09-20 — Planned middleware test coverage focusing on auth and rate limiting per testing guidelines; next: implement suites using fakes and deterministic helpers.
+- 2025-09-20 — Implemented auth/rate-limit middleware specs with logger/dynamo fakes plus Effect-aware assertions, fixing missing log yields in both middlewares; next: validate lint/test runs and finalize memory updates.
+- 2025-09-20 — Wrapped verify by running node-server lint/tests and memory validators; middleware suites green and Memory Bank stamped with current HEAD.

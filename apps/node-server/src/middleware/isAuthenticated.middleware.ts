@@ -52,7 +52,7 @@ const isAuthenticatedMiddlewareHandler = (
         });
 
         req.user = userToken;
-        logger.log(
+        yield* logger.log(
           `User: ${userToken.sub}, Role: ${userToken.role} Authenticated`,
         );
       }
