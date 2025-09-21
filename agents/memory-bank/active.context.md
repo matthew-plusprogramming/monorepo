@@ -124,3 +124,66 @@ Reflexion
 - What happened (2025-09-20, verify): Ran node-server build, Vitest suite, lint:fix, and memory validation/drift to close out UUID helper fix.
 - What worked: Memory scripts confirmed front matter SHA update after edits, keeping workflow gates green.
 - Next time: Add targeted test covering mock queue exhaustion to ensure verify phase exercises error path.
+- What happened (2025-09-20, plan-node-server-pure-tests): Scoped pure/validation test implementation for environment schema, JSON error middleware, and location helpers.
+- What worked: Plan focused on table-driven validation and minimal Express doubles without expanding into service/middleware layers.
+- Next time: Reuse response/request mocks from shared test utils if coverage expands to middleware suites.
+- What happened (2025-09-20, build-node-server-pure-tests): Added Vitest suites covering environment schema, JSON error middleware, and location helpers; reused existing Express harness.
+- What worked: Table-driven assertions and shared request context avoided bespoke mocks; tests only touched pure modules as scoped.
+- Next time: Extract shared error message expectations if more env schemas surface to keep specs DRY.
+- What happened (2025-09-20, verify-node-server-pure-tests): Ran node-server Vitest, repository lint:fix, markdown formatter, and memory validation/drift to confirm test additions.
+- What worked: Memory scripts stayed clean after stamping repo SHA; Vitest run confirmed new suites pass alongside existing helper spec.
+- Next time: Automate SHA stamping to avoid manual drift reruns after documentation edits.
+- What happened (2025-09-20, plan-node-server-test-relocation): Scoped relocation of existing Vitest specs into `src/__tests__`, with acceptance criteria (`Given` tests moved, `When` Vitest runs, `Then` suites pass) and non-goals limited to file moves.
+- What worked: Mapping desired directory structure (helpers/middleware/types/location) up front simplified import updates and avoided alias confusion.
+- Next time: Capture baseline module path expectations before moving filesystem-bound specs.
+- What happened (2025-09-20, build-node-server-test-relocation): Moved helper, middleware, types, and location specs under `src/__tests__`, updated imports to use `@/` aliases, and fixed location helper expectations to reference the actual module path.
+- What worked: Shared Express harness continued to function without change; alias updates prevented brittle relative paths.
+- Next time: Consider index re-exports for `__tests__` modules if suite volume grows.
+- What happened (2025-09-20, verify-node-server-test-relocation): Ran node-server Vitest and repo lint:fix post-move, with memory validation/drift confirming no SHA mismatches.
+- What worked: Adjusted location test to resolve the production module path, keeping assertions stable after relocation.
+- Next time: Automate smoke runs when tests are moved to catch path mis-resolutions immediately.
+- What happened (2025-09-20, plan-node-server-service-tests): Scoped service-layer test coverage using existing fakes and adapter mocks per testing plan.
+- What worked: Acceptance criteria lock error translation and Dynamo interaction assertions without runtime wiring changes.
+- Next time: Pre-stage reusable AWS client mocks if multiple suites need the same setup.
+- What happened (2025-09-20, build-node-server-service-tests): Added Vitest suites for userRepo, DynamoDbService, and logger service with deterministic fakes and hoisted AWS client stubs.
+- What worked: Coordinated Layer.provide usage with typed fake queues ensured Effect-based repos and adapters executed predictably under test.
+- Next time: Consolidate valid UUID defaults in builders to avoid schema parse churn when new suites marshal data.
+- What happened (2025-09-20, verify-node-server-service-tests): Ran node-server Vitest, repo lint:fix, and memory validation/drift to close out the service test additions.
+- What worked: Typed hoisted mocks kept ESLint satisfied and made log assertions straightforward while tests stayed green.
+- Next time: Automate post-lint memory script invocation to shorten verify loops.
+- What happened (2025-09-20, plan-node-server-service-build-fix): Assessed TypeScript build failures from new service specs and mapped required env/mocking adjustments.
+- What worked: Error list from `tsc` highlighted missing mocks and env teardown gaps for fast triage.
+- Next time: Capture expected Dynamo mock inputs in the testing plan to anticipate schema constraints.
+- What happened (2025-09-20, build-node-server-service-build-fix): Updated service specs with stricter Layer typings, safer env cleanup, and deterministic AWS command assertions.
+- What worked: Scoped changes to test helpers avoided touching production code while satisfying strict compiler settings.
+- Next time: Prefer helper utilities for repeated command casts to keep specs concise.
+- What happened (2025-09-20, verify-node-server-service-build-fix): Re-ran node-server build, Vitest, and lint:fix to confirm TypeScript passes alongside updated assertions.
+- What worked: Sequential build/test runs ensured tsc and Vitest stay aligned after expectation tweaks.
+- Next time: Automate a post-lint build check in the workflow when new test suites land.
+- What happened (2025-09-20, plan-node-server-service-coverage-fill): Identified missing assertions for zodParser error handling and Dynamo/Logger adapter edge cases per testing guidelines.
+- What worked: Coverage report made it clear which branches to target without revisiting production files.
+- Next time: Consider automating coverage diffs so gaps surface during verify rather than manual review.
+- What happened (2025-09-20, build-node-server-service-coverage-fill): Added Vitest specs for zodParser error translation, DynamoDb putItem paths, and bundled console logger fallback.
+- What worked: Layer re-imports let us exercise the **BUNDLED** branch without touching production wiring.
+- Next time: Extract helpers for AWS command expectations to cut down duplicate assertion boilerplate.
+- What happened (2025-09-20, verify-node-server-service-coverage-fill): Re-ran node-server test/build pipelines and repo lint:fix to ensure new specs stay type-safe and clean.
+- What worked: Sequential tsc → vitest → build caught no regressions and keeps coverage metrics trustworthy.
+- Next time: Capture coverage snapshots in artifacts to document improvements over time.
+- What happened (2025-09-20, plan-node-server-userrepo-coverage-check): Scoped Option.none coverage question for userRepo unmarshallUser and outlined acceptance criteria plus impacted files.
+- What worked: Memory retrieval guided focus to the service and test suite without extra file hunts.
+- Next time: Capture Option branch expectations in testing guidelines for quicker future assessments.
+- What happened (2025-09-20, build-node-server-userrepo-coverage-check): Inspected userRepo implementation alongside service tests to evaluate Option.none coverage paths.
+- What worked: Dynamo fakes and builders clarified which scenarios existing tests exercise.
+- Next time: Encourage inline test comments when edge cases are intentionally omitted.
+- What happened (2025-09-20, verify-node-server-userrepo-coverage-check): Confirmed invalid-item Option.none scenario lacks direct test coverage and prepared findings plus Memory Bank stamps.
+- What worked: Cross-referencing production code with test expectations kept the conclusion grounded.
+- Next time: Promote adding a targeted spec when coverage gaps like this are identified.
+- What happened (2025-09-20, plan-node-server-userrepo-option-test): Scoped new spec to assert Option.none when Dynamo returns a non-user item.
+- What worked: Acceptance criteria mirrored existing UserRepo test structure and limited scope to test-only edits.
+- Next time: Capture reusable invalid-item fixtures to accelerate future Option branch checks.
+- What happened (2025-09-20, build-node-server-userrepo-option-test): Added email-path spec queuing a malformed Dynamo item and asserted Option.none plus query invocation.
+- What worked: Reused existing fakes/builders so the new case matched suite conventions with minimal setup.
+- Next time: Factor a helper to generate AttributeValue maps without marshall for fine-grained shape control.
+- What happened (2025-09-20, verify-node-server-userrepo-option-test): Ran node-server tests, lint:fix, and memory checks to validate the new Option.none spec.
+- What worked: Full Vitest run confirmed suite stability while memory scripts kept canonical data aligned.
+- Next time: Add a focused npm script for service specs to shorten verify loops when only one suite changes.

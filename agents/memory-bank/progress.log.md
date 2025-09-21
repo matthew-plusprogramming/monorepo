@@ -37,3 +37,18 @@ last_reviewed: 2025-09-03
 - 2025-09-20: Planned uuid test helper typing fix to resolve node-server build errors.
 - 2025-09-20: Updated uuid test helper typing and reran node-server build/test scripts to confirm errors cleared.
 - 2025-09-20: Completed verification with lint:fix plus memory validation/drift to finalize uuid helper fix.
+- 2025-09-20: Planned pure/validation test implementation for Environment schema, JSON error middleware, and location helpers in node-server.
+- 2025-09-20: Implemented Vitest coverage for Environment schema validation, JSON error middleware, and location helper paths.
+- 2025-09-20: Verified new node-server tests with Vitest, repo lint:fix, markdown formatting, and memory validation/drift after stamping current SHA.
+- 2025-09-20: Planned relocation of node-server Vitest specs into `src/__tests__`, defining acceptance criteria around green test runs post-move.
+- 2025-09-20: Moved helper/middleware/types/location specs under `src/__tests__`, updated imports to use aliases, and fixed location path assertions.
+- 2025-09-20: Re-ran node-server Vitest and repo lint:fix after relocations; memory validation/drift remained clean.
+- 2025-09-20: Planned node-server service test additions covering userRepo, dynamodb, and logger modules using fakes plus AWS client mocks.
+- 2025-09-20: Implemented node-server service Vitest coverage for userRepo, DynamoDbService, and logger adapters using hoisted AWS client mocks and existing fakes.
+- 2025-09-20: Verified service test additions via node-server Vitest, repo lint:fix, and memory validation/drift scripts to keep canonical data aligned.
+- 2025-09-20: Hardened node-server service specs to satisfy TypeScript by tightening Layer typings, using Reflect-based env cleanup, and adjusting Dynamo command expectations; verified via build, test, and lint runs.
+- 2025-09-20: Expanded node-server coverage by testing zodParser error wrapping, DynamoDb putItem success/failure, and bundled console logger fallback; verified with test/build/lint runs.
+- 2025-09-20: Assessed userRepo unmarshallUser Option.none coverage, noted absence of invalid-item test case, and refreshed Memory Bank metadata.
+- 2025-09-20: Planned Option.none coverage test for userRepo by targeting an invalid Dynamo item scenario.
+- 2025-09-20: Added userRepo service spec covering invalid email query items marshalling to Option.none.
+- 2025-09-20: Verified Option.none spec via node-server Vitest, repo lint:fix, and memory validation/drift checks.

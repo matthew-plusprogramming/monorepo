@@ -1,28 +1,21 @@
 ---
-last_reviewed: 2025-09-18
+last_reviewed: 2025-09-20
 ---
 
 # Node-Server Testing Plan
 
 ## Current Coverage Snapshot
 
-- Vitest is configured via `apps/node-server/vitest.config.ts` but only `src/helpers/zodParser.test.ts` exists.
-- No fakes/builders are present for DynamoDB, CloudWatch Logs, JWT, Argon2, or Effect layers; middleware and handlers have zero coverage.
-- Guideline gaps: boundaries (AWS SDK, crypto, JWT), DI helpers, and integration slices are all untested.
+- Vitest is configured via `apps/node-server/vitest.config.ts`; pure specs now live under `src/__tests__` covering `helpers/zodParser`, `types/environment`, `middleware/jsonError.middleware`, and `location` helpers.
+- Shared testing utilities under `src/__tests__` provide Express context, DynamoDB/logger fakes, builders, and time/UUID helpers.
+- Gaps remain across Effect services, middleware with boundary integrations, handlers, and integration slices (no coverage yet for AWS SDK adapters, JWT, or Argon2 paths).
 
 ## Recommended Test Additions
 
-### Pure/Validation Modules
+### Pure/Validation Modules (Completed 2025-09-20)
 
-- `src/types/environment.ts` (`EnvironmentSchema`)
-  - **Test type**: pure validation.
-  - **Scenarios**: successful parse; failure for each required env var; coercion of `PORT`.
-- `src/middleware/jsonError.middleware.ts`
-  - **Test type**: pure Express error handler (unit).
-  - **Scenarios**: SyntaxError with body yields 400 JSON payload; non-syntax errors delegate to `next`.
-- `src/location.ts`
-  - **Test type**: pure helper.
-  - **Scenarios**: `srcDir`, `packageRootDir`, `monorepoRootDir` resolve relative paths predictably (use inline snapshot-less assertions).
+- Coverage landed for `EnvironmentSchema`, `jsonErrorMiddleware`, and location helpers; specs assert happy-path parsing/coercion plus error delegation.
+- Next gap: ensure any future env schemas or pure helpers follow the same table-driven pattern and reuse shared Express context utilities where applicable.
 
 ### Services & Layers (Effect Use Cases)
 
@@ -79,12 +72,12 @@ last_reviewed: 2025-09-18
 
 ## Supporting Test Utilities
 
-- `tests/fakes/dynamodb.ts`: factory returning effect-friendly fake with programmable responses.
-- `tests/fakes/logger.ts`: accumulates logs for assertions.
-- `tests/builders/user.ts`: builder producing `UserPublic`, `UserCreate`, and token payloads with sensible defaults.
-- `tests/utils/time.ts`: helpers for freezing/unfreezing time and overriding `Date.now`.
-- `tests/utils/uuid.ts`: deterministic UUID sequence generator.
-- Express test harness: `makeRequestContext(options)` returning mock `req`, `res`, `next`; ensure `res.status` chainable and records payloads.
+- `src/__tests__/fakes/dynamodb.ts`: factory returning effect-friendly fake with programmable responses.
+- `src/__tests__/fakes/logger.ts`: accumulates logs for assertions.
+- `src/__tests__/builders/user.ts`: builder producing `UserPublic`, `UserCreate`, and token payloads with sensible defaults.
+- `src/__tests__/utils/time.ts`: helpers for freezing/unfreezing time and overriding `Date.now`.
+- `src/__tests__/utils/uuid.ts`: deterministic UUID sequence generator.
+- Express test harness: `src/__tests__/utils/express.ts` exports `makeRequestContext(options)` returning mock `req`, `res`, `next`; ensure `res.status` chainable and records payloads.
 
 ## Prioritization & Sequencing
 
