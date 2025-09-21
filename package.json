@@ -14,6 +14,7 @@
     "cdk/**"
   ],
   "scripts": {
+    "// -- 🚀 Turborepo": "--",
     "build": "turbo run build",
     "clean": "turbo run clean && rm -rf node_modules && rm -rf .turbo",
     "prelint": "npm run format:markdown",
@@ -21,6 +22,8 @@
     "prelint:fix": "npm run format:markdown",
     "lint:fix": "turbo run lint:fix",
     "test": "turbo run test",
+    "test:coverage": "turbo run test:coverage",
+    "// -- 🤖 Agent Scripts": "--",
     "format:markdown": "prettier --write \"agents/**/*.md\"",
     "memory:validate": "node agents/scripts/validate-memory-bank.mjs",
     "memory:drift": "node agents/scripts/check-memory-drift.mjs"

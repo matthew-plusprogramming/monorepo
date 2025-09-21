@@ -1,5 +1,5 @@
 ---
-last_reviewed: 2025-09-20
+last_reviewed: 2025-09-21
 ---
 
 # Node-Server Testing Plan
@@ -102,6 +102,15 @@ last_reviewed: 2025-09-20
 3. Add `UserRepo` and middleware service tests to lock critical boundaries before refactors.
 4. Expand to handler service tests; ensures domain behavior before integration.
 5. Finish with integration slice once fakes stabilize.
+
+## Coverage Gaps (2025-09-21 Audit)
+
+- Missing Express integration slice despite the integration requirement (`agents/memory-bank/testing.guidelines.md`, "What to Test by Unit Type") and the testing plan's pending `supertest` suite ("Integration Slice (Express)" section), leaving route wiring unverified end-to-end.
+- `ipRateLimiting` middleware does not cover the `req.ip`-missing branch in `apps/node-server/src/middleware/ipRateLimiting.middleware.ts` (line 32); the existing suite only asserts below-threshold, throttled, and Dynamo failures (`apps/node-server/src/__tests__/middleware/ipRateLimiting.middleware.test.ts`).
+- `UserRepo` ID lookup branch in `apps/node-server/src/services/userRepo.service.ts` (line 74) lacks assertions for the `Option.some` success and `InternalServerError` mapping paths, contrary to the service coverage guidance (`agents/memory-bank/testing.guidelines.md`, "What to Test by Unit Type"); the current suite stops at `Option.none` in `apps/node-server/src/__tests__/services/userRepo.service.test.ts`.
+- `register` handler does not verify repository call arguments or JWT claim structure in `apps/node-server/src/handlers/register.handler.ts` (around line 60), which the service/use-case guidance recommends (`agents/memory-bank/testing.guidelines.md`, "What to Test by Unit Type"); see current assertions in `apps/node-server/src/__tests__/handlers/register.handler.test.ts`.
+- Local entrypoint `index.ts` relies on `EnvironmentSchema.parse` and `process.exit(1)` in `apps/node-server/src/index.ts` (lines 12-18) without coverage, leaving startup validation and route registration untested against integration guidance (`agents/memory-bank/testing.guidelines.md`, "What to Test by Unit Type").
+- Core Zod schemas remain untested even though pure validation modules should carry focused specs (`agents/memory-bank/testing.guidelines.md`, "Pure/Validation Modules"), including `packages/core/schemas/schemas/user/commands/register.ts` (line 8) and related user schemas.
 
 ## Open Questions
 

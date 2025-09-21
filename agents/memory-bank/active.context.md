@@ -1,5 +1,5 @@
 ---
-last_reviewed: 2025-09-20
+last_reviewed: 2025-09-21
 ---
 
 # Active Context
@@ -32,3 +32,12 @@ Reflexion
 - 2025-09-20 — Wrapped verify by running node-server lint/tests and memory validators; middleware suites green and Memory Bank stamped with current HEAD.
 - 2025-09-20 — Added specs for CDK outputs, AppLayer, and lambda wiring to lock non-handler boundaries, updated the testing plan, and reran lint/tests; next: extend coverage into handler flows and integration slices.
 - 2025-09-21 — Implemented handler tests for getUser and register using Effect-aware Express harness, mocked AppLayer with a UserRepo fake, and stubbed argon2/JWT/time; aligned assertions to current error-obfuscation behavior and noted gaps for future hardening.
+- 2025-09-21 — Plan: audited testing guidelines and node-server suites to frame the coverage review scope.
+  Captured Given/When/Then criteria focused on surfacing actionable gaps tied to guideline mandates.
+  Flagged integration coverage, middleware edge paths, and schema validation as top-risk areas.
+- 2025-09-21 — Build: traced source modules against their specs to catalog missing branches and contracts.
+  Logged missing Express slice, `req.ip` rate-limit guard, `UserRepo` ID success/error, `register` payload/JWT assertions, boot wiring, and schema coverage.
+  Linked each finding to code locations and guideline references for quick follow-up.
+- 2025-09-21 — Verify: consolidated the prioritized gap list and embedded it into the testing plan and logs.
+  Refreshed Memory Bank metadata and prepared formatting/validation commands for completion.
+  Next steps target implementing the supertest suite and backfilling the highlighted branches.
