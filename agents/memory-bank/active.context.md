@@ -106,3 +106,21 @@ Reflexion
 - What happened (2025-09-18, verify-node-server-testing): Ran markdown formatter and memory scripts to validate the testing plan updates.
 - What worked: Formatter confirmed canonical files stay aligned; memory scripts guard against stale path references.
 - Next time: Pair verify gate with lint or targeted Vitest run once tests exist.
+- What happened (2025-09-18, plan-node-server-testing-helpers): Scoped required DynamoDB/logger fakes, user builders, and time/UUID utilities for upcoming tests.
+- What worked: Testing plan plus guidelines clarified helper contracts and boundary expectations quickly.
+- Next time: Predefine module namespaces before editing to minimize later refactors when suites land.
+- What happened (2025-09-18, build-node-server-testing-helpers): Implemented DynamoDB and logger fakes plus user, time, and UUID helpers with Express context harness under tests/.
+- What worked: Layer-based fakes kept Effect wiring straightforward and ensured middleware tests can reuse shared runners.
+- Next time: Add typed fixtures for additional services once new suites target other boundaries.
+- What happened (2025-09-18, verify-node-server-testing-helpers): Ran node-server Vitest, repo lint:fix, markdown formatting, and memory validation/drift checks; stamped current repo SHA.
+- What worked: Reusing root scripts ensured markdown and lint gates stayed in sync with workflow expectations.
+- Next time: Consider adding lightweight type-check script for tests folder to flag helper regressions early.
+- What happened (2025-09-20, plan): Scoped uuid test helper fix to align Vitest spy typing with crypto.randomUUID.
+- What worked: Workflow planning clarified acceptance criteria and kept effort limited to the helper file.
+- Next time: Catalog reusable patterns for mocking Node core utilities in tests to speed future tasks.
+- What happened (2025-09-20, build): Tightened uuid helper queue typing and mocked crypto.randomUUID with typed MockInstance; verified node-server build and tests locally.
+- What worked: Leveraging ReturnType<typeof crypto.randomUUID> avoided template literal assignment errors without changing helper ergonomics.
+- Next time: Add convenience assertions to spot exhausted UUID queues during test reviews.
+- What happened (2025-09-20, verify): Ran node-server build, Vitest suite, lint:fix, and memory validation/drift to close out UUID helper fix.
+- What worked: Memory scripts confirmed front matter SHA update after edits, keeping workflow gates green.
+- Next time: Add targeted test covering mock queue exhaustion to ensure verify phase exercises error path.
