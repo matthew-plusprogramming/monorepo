@@ -66,18 +66,18 @@ last_reviewed: 2025-09-20
   - **Scenarios**: new IP under limit passes and calls `next`; threshold exceed triggers 429 and error log; Dynamo failure surfaces obfuscated 500 path.
   - **Notes**: Freeze time to control TTL; ensure partition key string matches expected pattern.
 
-### Handlers (Domain Logic)
+### Handlers (Domain Logic — Completed 2025-09-21)
 
 - `src/handlers/getUser.handler.ts`
   - **Test type**: service/use-case test using Effect layers.
-  - **Dependencies**: Fake `UserRepo` with controllable responses; no real AWS calls.
-  - **Scenarios**: happy path returns `UserPublic`; Option.none maps to `NotFoundError`; Zod validation failure propagates.
-  - **Notes**: Provide `AppLayer` override with `Layer.merge` of fakes; assert resulting Either.
+  - **Dependencies**: Queue-driven fake `UserRepo`; AppLayer overridden via module mock to inject the fake.
+  - **Scenarios**: happy path resolves to `UserPublic`; Option.none yields `NotFoundError`; invalid identifier surfaces a `ZodError` without touching the repo.
+  - **Notes**: Capture the `generateRequestHandler` closure to invoke the Effect handler directly with fake Express requests.
 - `src/handlers/register.handler.ts`
   - **Test type**: service test with deterministic boundaries.
-  - **Dependencies**: Fake `UserRepo`, stubbed `argon2.hash`, `randomUUID`, `Date.now`, `jsonwebtoken.sign`.
-  - **Scenarios**: user exists → `ConflictError`; successful creation returns token; hashing/signing failures map to `InternalServerError`.
-  - **Utilities**: Create `withFixedTime` helper and `mockRandomUUIDSequence` to maintain deterministic values.
+  - **Dependencies**: Fake `UserRepo`, stubbed `argon2.hash`, `randomUUID`, `Date.now`, and `jsonwebtoken.sign` for predictable flows.
+  - **Scenarios**: user exists → `ConflictError`; valid registration returns a signed token and persists hashed credentials; invalid payload throws `ZodError`; hashing failure surfaces `InternalServerError`.
+  - **Utilities**: Deterministic UUID/time helpers via mocks; inspect repo fake call history for persisted payload verification.
 
 ### Integration Slice (Express)
 
@@ -90,6 +90,7 @@ last_reviewed: 2025-09-20
 
 - `src/__tests__/fakes/dynamodb.ts`: factory returning effect-friendly fake with programmable responses.
 - `src/__tests__/fakes/logger.ts`: accumulates logs for assertions.
+- `src/__tests__/fakes/userRepo.ts`: queue-based fake exposing Layer provisioning plus call tracking for handlers/services.
 - `src/__tests__/builders/user.ts`: builder producing `UserPublic`, `UserCreate`, and token payloads with sensible defaults.
 - `src/__tests__/utils/time.ts`: helpers for freezing/unfreezing time and overriding `Date.now`.
 - `src/__tests__/utils/uuid.ts`: deterministic UUID sequence generator.

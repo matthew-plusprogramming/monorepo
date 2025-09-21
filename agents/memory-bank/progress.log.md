@@ -14,3 +14,8 @@ last_reviewed: 2025-09-20
 - 2025-09-20: Planned upcoming middleware test coverage for auth and rate limiting, aligning acceptance criteria with testing guidelines and preparing fakes/utilities for implementation.
 - 2025-09-20: Delivered auth and rate limit middleware suites using shared fakes, injected logger/dynamo layers via Vitest mocks, corrected missing Effect yields in both middlewares, and closed out lint/test passes with memory updates.
 - 2025-09-20: Added node-server specs for CDK outputs, AppLayer, and the lambda entrypoint—verifying base-path toggles, layer provisioning, and serverless wiring—then refreshed the testing plan and reran lint/tests.
+- 2025-09-21: Planned node-server handler test coverage, defining Given/When/Then criteria, identifying a user repo fake strategy, and scheduling lint/test/memory validation for follow-up phases.
+- 2025-09-21: Implemented queue-driven user repo fake plus handler Vitest suites (getUser/register), wiring deterministic UUID/time/hash/sign mocks and updating the testing plan before verification.
+- 2025-09-21: Planned Either alignment for handler tests, noting the `Effect.either` polarity fix required in getUser/register specs and scheduling lint/test/memory reruns post-update.
+- 2025-09-21: Adjusted getUser/register handler specs to treat `Effect.either` successes as `Either.Right`, keeping deterministic fakes and prepping for lint/test/memory verification.
+- 2025-09-21: Verified handler Either alignment by running node-server lint/tests plus memory validation/drift, capturing the `catchAllDefect` helper tweak that normalizes defects into `Either` failures for assertions.
