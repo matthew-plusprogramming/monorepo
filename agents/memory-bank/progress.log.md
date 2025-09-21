@@ -14,3 +14,4 @@ last_reviewed: 2025-09-20
 - 2025-09-20: Planned upcoming middleware test coverage for auth and rate limiting, aligning acceptance criteria with testing guidelines and preparing fakes/utilities for implementation.
 - 2025-09-20: Delivered auth and rate limit middleware suites using shared fakes, injected logger/dynamo layers via Vitest mocks, corrected missing Effect yields in both middlewares, and closed out lint/test passes with memory updates.
 - 2025-09-20: Added node-server specs for CDK outputs, AppLayer, and the lambda entrypoint—verifying base-path toggles, layer provisioning, and serverless wiring—then refreshed the testing plan and reran lint/tests.
+- 2025-09-21: Added handler tests for getUser and register per testing guidelines and the node-server testing plan; mocked AppLayer to inject a UserRepo fake, stubbed argon2/JWT/time for determinism, verified behavior against current obfuscation rules, and updated Memory Bank stamps.

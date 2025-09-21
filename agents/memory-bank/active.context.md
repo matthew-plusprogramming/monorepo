@@ -31,3 +31,4 @@ Reflexion
 - 2025-09-20 — Implemented auth/rate-limit middleware specs with logger/dynamo fakes plus Effect-aware assertions, fixing missing log yields in both middlewares; next: validate lint/test runs and finalize memory updates.
 - 2025-09-20 — Wrapped verify by running node-server lint/tests and memory validators; middleware suites green and Memory Bank stamped with current HEAD.
 - 2025-09-20 — Added specs for CDK outputs, AppLayer, and lambda wiring to lock non-handler boundaries, updated the testing plan, and reran lint/tests; next: extend coverage into handler flows and integration slices.
+- 2025-09-21 — Implemented handler tests for getUser and register using Effect-aware Express harness, mocked AppLayer with a UserRepo fake, and stubbed argon2/JWT/time; aligned assertions to current error-obfuscation behavior and noted gaps for future hardening.
