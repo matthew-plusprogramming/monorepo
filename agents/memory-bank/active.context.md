@@ -41,3 +41,12 @@ Reflexion
 - 2025-09-21 — Verify: consolidated the prioritized gap list and embedded it into the testing plan and logs.
   Refreshed Memory Bank metadata and prepared formatting/validation commands for completion.
   Next steps target implementing the supertest suite and backfilling the highlighted branches.
+- 2025-09-21 — Plan: mapped each testing-plan gap to concrete suites (integration slice, ip fallback, repo id, register assertions, index env, schema specs).
+  Documented Given/When/Then criteria tied to updating node-server vitest coverage with supertest and core schema checks.
+  Flagged dependency additions (supertest) and module mocking strategy to avoid real AWS/process exit side effects.
+- 2025-09-21 — Build: added express supertest slice, index entry spec, ip fallback coverage, register claim assertions, and UserRepo ID branches with supporting deps.
+  Extended schema suite under @packages/schemas to lock register/getUser/token shapes and updated testing plan snapshots.
+  Installed supertest/vitest, refreshed node-server/package.json, and prepped for lint/test runs.
+- 2025-09-21 — Verify: node-server vitest (unit+integration) and core schema suites now green alongside eslint --fix.
+  Confirmed Memory Bank validate/drift scripts clean after stamping HEAD and updating the testing plan narrative.
+  Ready for final review with new coverage artifacts scoped to middleware, handlers, entry wiring, and schemas.

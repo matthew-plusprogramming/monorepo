@@ -164,4 +164,18 @@ describe('ipRateLimitingMiddlewareRequestHandler', () => {
     expect(next).not.toHaveBeenCalled();
     expect(getLoggerFake().entries.errors[0]?.message).toBe('ddb down');
   });
+
+  it('returns 429 when the request has no resolved ip', async () => {
+    const { req, res, next, captured } = makeRequestContext();
+
+    const dynamoFake = getDynamoFake();
+
+    await expect(
+      ipRateLimitingMiddlewareRequestHandler(req, res, next),
+    ).rejects.toBeDefined();
+
+    expect(captured.statusCode).toBe(HTTP_RESPONSE.THROTTLED);
+    expect(dynamoFake.calls.updateItem).toHaveLength(0);
+    expect(next).not.toHaveBeenCalled();
+  });
 });

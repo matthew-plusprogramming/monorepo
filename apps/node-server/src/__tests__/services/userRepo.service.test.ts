@@ -108,6 +108,26 @@ describe('UserRepo', () => {
     });
   });
 
+  it('returns Option.some when id lookup succeeds', async () => {
+    const user = buildUserPublic({
+      id: '22222222-2222-4222-8222-222222222222',
+    });
+
+    dynamoFake.queueSuccess('getItem', {
+      $metadata: { httpStatusCode: 200 },
+      Item: marshall(user) as Record<string, AttributeValue>,
+    });
+
+    const result = await withRepo((repo) => repo.findByIdentifier(user.id));
+
+    expect(result).toEqual(Option.some(user));
+    expect(dynamoFake.calls.getItem).toHaveLength(1);
+    expect(dynamoFake.calls.getItem[0]).toMatchObject({
+      TableName: 'test-users-table',
+      Key: { id: { S: user.id } },
+    });
+  });
+
   it('logs and maps DynamoDB failures to InternalServerError', async () => {
     const error = new Error('Dynamo offline');
 
@@ -115,6 +135,20 @@ describe('UserRepo', () => {
 
     await expect(
       withRepo((repo) => repo.findByIdentifier('someone@example.com')),
+    ).rejects.toHaveProperty('message', error.message);
+
+    expect(loggerFake.entries.errors).toContain(error);
+  });
+
+  it('logs getItem failures and maps to InternalServerError', async () => {
+    const error = new Error('ddb get failed');
+
+    dynamoFake.queueFailure('getItem', error);
+
+    await expect(
+      withRepo((repo) =>
+        repo.findByIdentifier('33333333-3333-4333-8333-333333333333'),
+      ),
     ).rejects.toHaveProperty('message', error.message);
 
     expect(loggerFake.entries.errors).toContain(error);

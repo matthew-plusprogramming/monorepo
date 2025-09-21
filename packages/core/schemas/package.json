@@ -19,6 +19,7 @@
     "build": "tsc -p tsconfig.json",
     "clean": "rm -rf node_modules && rm -rf .turbo && rm -rf dist",
     "// -- 🧪 Testing": "--",
+    "test": "vitest run",
     "// -- 🧹 Linting & Formatting": "--",
     "// -- ✅ Verification & CI": "--",
     "// -- 🔧 Miscellaneous": "--"
@@ -31,7 +32,8 @@
     "typescript": "^5.9.2"
   },
   "devDependencies": {
-    "@configs/ts-config": "*"
+    "@configs/ts-config": "*",
+    "vitest": "^3.2.4"
   },
   "peerDependencies": {
   }

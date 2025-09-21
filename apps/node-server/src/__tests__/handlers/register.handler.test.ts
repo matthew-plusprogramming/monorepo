@@ -1,4 +1,9 @@
 import { HTTP_RESPONSE, InternalServerError } from '@packages/backend-core';
+import {
+  JWT_AUDIENCE,
+  JWT_ISSUER,
+  USER_ROLE,
+} from '@packages/backend-core/auth';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { UserRepoFake } from '@/__tests__/fakes/userRepo';
@@ -83,6 +88,31 @@ describe('registerRequestHandler', () => {
 
     const [, secret] = getSignMock().mock.calls[0] as [unknown, string];
     expect(secret).toBe('shh-its-a-secret');
+
+    const [payload] = getSignMock().mock.calls[0] as [
+      Record<string, unknown>,
+      string,
+    ];
+    expect(payload).toMatchObject({
+      iss: JWT_ISSUER,
+      aud: JWT_AUDIENCE,
+      exp: Date.parse('2024-01-01T01:00:00.000Z'),
+      iat: Date.parse('2024-01-01T00:00:00.000Z'),
+      role: USER_ROLE,
+    });
+    expect(typeof payload.sub).toBe('string');
+    expect(typeof payload.jti).toBe('string');
+    expect((payload.jti as string).length).toBeGreaterThan(0);
+
+    const createCall = getUserRepoFake().calls.create[0];
+    expect(createCall).toBeDefined();
+    const ensuredCreateCall = createCall!;
+    expect(ensuredCreateCall).toMatchObject({
+      username: body.username,
+      email: body.email,
+      passwordHash: 'hashed-password',
+    });
+    expect(ensuredCreateCall.id).toBe(payload.sub as string);
   });
 
   it('obfuscates conflict as 502 when user already exists', async () => {
