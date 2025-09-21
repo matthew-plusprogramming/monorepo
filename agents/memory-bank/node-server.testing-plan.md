@@ -8,7 +8,8 @@ last_reviewed: 2025-09-20
 
 - Vitest is configured via `apps/node-server/vitest.config.ts`; pure specs now live under `src/__tests__` covering `helpers/zodParser`, `types/environment`, `middleware/jsonError.middleware`, and `location` helpers.
 - Shared testing utilities under `src/__tests__` provide Express context, DynamoDB/logger fakes, builders, and time/UUID helpers.
-- Gaps remain across Effect services, middleware with boundary integrations, handlers, and integration slices (no coverage yet for AWS SDK adapters, JWT, or Argon2 paths).
+- Client and wiring coverage now includes `clients/cdkOutputs` (base-path toggles), `layers/app.layer` (service composition via fakes), and `lambda.ts` (serverless wrapper + Express wiring).
+- Gaps remain across handler logic, Argon2/JWT boundaries, and full Express integration slices (no happy-path or error-path endpoint coverage yet).
 
 ## Recommended Test Additions
 
@@ -17,7 +18,7 @@ last_reviewed: 2025-09-20
 - Coverage landed for `EnvironmentSchema`, `jsonErrorMiddleware`, and location helpers; specs assert happy-path parsing/coercion plus error delegation.
 - Next gap: ensure any future env schemas or pure helpers follow the same table-driven pattern and reuse shared Express context utilities where applicable.
 
-### Services & Layers (Effect Use Cases)
+### Services & Layers (Effect Use Cases — Completed 2025-09-20)
 
 - `src/services/userRepo.service.ts`
   - **Test type**: service tests with in-memory fakes.
@@ -36,6 +37,21 @@ last_reviewed: 2025-09-20
   - **Test type**: adapter with boundary mocks.
   - **Scenarios**: `ApplicationLoggerService` uses console fallback when `PutLogEventsCommand` throws; `logError` emits two entries.
   - **Notes**: Stub `CloudWatchLogsClient.send` and control `Date.now`; assert message shapes.
+- `src/layers/app.layer.ts`
+  - **Test type**: layering spec using fake modules.
+  - **Scenarios**: providing the layer yields DynamoDB, Logger, and UserRepo fakes when the Effect runs.
+  - **Notes**: Replace live modules with fakes to avoid AWS client construction.
+
+### Clients & Entry (Completed 2025-09-20)
+
+- `src/clients/cdkOutputs.ts`
+  - **Test type**: pure module test with hoisted stub.
+  - **Scenarios**: Asserts `loadCDKOutput` receives `undefined` base path locally and `'.'` when `__BUNDLED__` is true; constants expose expected values.
+  - **Notes**: Use `vi.resetModules()` between cases to pick up toggled globals.
+- `src/lambda.ts`
+  - **Test type**: entrypoint wiring test with mocked dependencies.
+  - **Scenarios**: Verifies environment parsing, middleware registration order, route binding, and serverless wrapper all point at the mocked Express app.
+  - **Notes**: Mock Express factory, handlers, and middlewares to prevent side effects while asserting the wiring contract.
 
 ### Middleware
 
