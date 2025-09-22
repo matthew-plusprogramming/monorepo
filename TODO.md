@@ -32,10 +32,10 @@ Node Server (Lambda)
   - [x] Dynamo
   - [ ] Mongo
     - [ ] Maybe later?
-- [ ] Integration test suite to ensure configuration setup correctly
-  - [ ] Test behavior, not implementation. Mock only true boundaries (network, DB, clock, randomness, filesystem, process env).
-  - [ ] Prefer small, deterministic units + a few integration tests that exercise real wiring.
-  - [ ] Standardize patterns: dependency injection, test data builders, and strict AAA (Arrange-Act-Assert).
+- [x] Integration test suite to ensure configuration setup correctly
+  - [x] Test behavior, not implementation. Mock only true boundaries (network, DB, clock, randomness, filesystem, process env).
+  - [x] Prefer small, deterministic units + a few integration tests that exercise real wiring.
+  - [x] Standardize patterns: dependency injection, test data builders, and strict AAA (Arrange-Act-Assert).
 - [ ] Integrate graphql (gql.tada)
   - [ ] Maybe later?
 - [ ] Redis
