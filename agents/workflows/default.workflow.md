@@ -68,7 +68,6 @@ Phase: verify
   - Validate error paths and edge cases; re-run build/lint.
   - Update Memory Bank: canonical files under `agents/memory-bank/`; add/update ADRs for accepted decisions; append Reflexion and progress log entries.
   - Workflow Synthesis: If `agents/memory-bank/system.patterns.md` contains new high-importance procedural patterns, then update an existing workflow or create a new one from `agents/workflows/templates/pattern.workflow.template.md`; for workflow changes that alter behavior, open an ADR stub.
-  - Run `npm run lint:fix` and ensure Markdown is formatted via `npm run format:markdown`.
   - Validate Memory Bank and drift:
     - `npm run memory:validate`
     - `npm run memory:drift`
