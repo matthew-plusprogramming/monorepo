@@ -50,3 +50,12 @@ Reflexion
 - 2025-09-21 — Verify: node-server vitest (unit+integration) and core schema suites now green alongside eslint --fix.
   Confirmed Memory Bank validate/drift scripts clean after stamping HEAD and updating the testing plan narrative.
   Ready for final review with new coverage artifacts scoped to middleware, handlers, entry wiring, and schemas.
+- 2025-10-08 — Plan: scoped the heartbeat health-check to a simple GET route, locked Given/When/Then on returning HTTP 200 with a minimal payload, and noted middleware interactions as acceptable.
+  Clarified non-goals around auth/business logic and identified index wiring plus integration tests as touchpoints.
+  Prepared to lean on existing supertest slice for verification.
+- 2025-10-08 — Build: added an Express heartbeat handler returning "OK", registered the `/heartbeat` route, and extended the integration harness to include the new handler.
+  Ensured middleware ordering stayed intact and avoided new dependencies or schema updates.
+  Staged verification via the existing Vitest supertest suite.
+- 2025-10-08 — Verify: ran the node-server Vitest suite to confirm the heartbeat endpoint returns 200 alongside existing coverage.
+  Preparing to run memory validation/drift checks and stamp metadata for completion.
+  No regressions observed; rate limiting and handler flows remain green.

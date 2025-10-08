@@ -95,6 +95,26 @@ describe('node-server express integration slice', () => {
     Reflect.deleteProperty(process.env, 'PORT');
   });
 
+  it('returns 200 for GET /heartbeat', async () => {
+    const app = await buildApp();
+    const dynamoFake = getDynamoFake();
+    const userRepoFake = getUserRepoFake();
+
+    dynamoFake.reset();
+    userRepoFake.reset();
+
+    dynamoFake.queueSuccess('updateItem', {
+      $metadata: { httpStatusCode: 200 },
+      Attributes: { calls: { N: '1' } },
+    });
+
+    const response = await request(app).get('/heartbeat');
+
+    expect(response.status).toBe(HTTP_RESPONSE.SUCCESS);
+    expect(response.text).toEqual('OK');
+    expect(userRepoFake.calls.findByIdentifier).toEqual([]);
+  });
+
   it('returns 201 and a signed token for POST /register', async () => {
     await withFixedTime('2024-01-01T00:00:00.000Z', async () => {
       const app = await buildApp();
@@ -228,6 +248,9 @@ async function buildApp(): Promise<Express> {
     '@/handlers/register.handler'
   );
   const { getUserRequestHandler } = await import('@/handlers/getUser.handler');
+  const { heartbeatRequestHandler } = await import(
+    '@/handlers/heartbeat.handler'
+  );
 
   const app = express();
   app.use((req, res, next) => {
@@ -248,6 +271,7 @@ async function buildApp(): Promise<Express> {
   app.use(ipRateLimitingMiddlewareRequestHandler);
   app.use(express.json());
   app.use(jsonErrorMiddleware);
+  app.get('/heartbeat', heartbeatRequestHandler);
   app.post('/register', registerRequestHandler);
   app.get('/user/:identifier', getUserRequestHandler);
 

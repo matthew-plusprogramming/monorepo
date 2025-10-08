@@ -4,6 +4,7 @@ import express from 'express';
 import { prettifyError, ZodError } from 'zod';
 
 import { getUserRequestHandler } from '@/handlers/getUser.handler';
+import { heartbeatRequestHandler } from '@/handlers/heartbeat.handler';
 import { registerRequestHandler } from '@/handlers/register.handler';
 import { ipRateLimitingMiddlewareRequestHandler } from '@/middleware/ipRateLimiting.middleware';
 import { jsonErrorMiddleware } from '@/middleware/jsonError.middleware';
@@ -26,6 +27,7 @@ app.use(ipRateLimitingMiddlewareRequestHandler);
 app.use(express.json());
 app.use(jsonErrorMiddleware);
 
+app.get('/heartbeat', heartbeatRequestHandler);
 app.post('/register', registerRequestHandler);
 app.get('/user/:identifier', getUserRequestHandler);
 
