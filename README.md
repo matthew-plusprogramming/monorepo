@@ -1,6 +1,6 @@
 # @matthewlin/monorepo
 
-Opinionated TypeScript monorepo. Express 5 server (optionally packaged for AWS Lambda) and CDK for Terraform (CDKTF) infra. WIP, not production-ready.
+Opinionated TypeScript monorepo with an Express 5 backend (optionally packaged for AWS Lambda), a React 19 client website, and CDK for Terraform (CDKTF) infrastructure. WIP, not production-ready.
 
 ## Quick Start
 
@@ -9,6 +9,7 @@ Opinionated TypeScript monorepo. Express 5 server (optionally packaged for AWS L
   - `npm -w @cdk/backend-server-cdk run cdk:output:dev api-stack`
   - `npm -w @cdk/backend-server-cdk run cdk:output:dev api-security-stack`
 - Run the server in dev: `npm -w node-server run dev`
+- (Optional) Run the client website: `npm -w client-website run dev`
 
 The dev server uses Vite SSR to build to `dist/index.cjs` (see [apps/node-server/vite.config.ts](apps/node-server/vite.config.ts)) and runs `node --watch`. Env files are managed with dotenvx (encrypted [apps/node-server/.env.dev](apps/node-server/.env.dev)/[apps/node-server/.env.production](apps/node-server/.env.production)).
 
@@ -22,6 +23,7 @@ Encrypted envs (dotenvx):
 ## Workspaces
 
 - Apps
+  - `client-website` — React 19 + Vite single-page app with typed Sass modules. See [apps/client-website/README.md](apps/client-website/README.md).
   - `node-server` — Express server with optional Lambda entry. See [apps/node-server/README.md](apps/node-server/README.md).
 - CDK/Infra
   - `@cdk/backend-server-cdk` — CDKTF stacks (DynamoDB, CloudWatch, Lambda packaging). See [cdk/backend-server-cdk/README.md](cdk/backend-server-cdk/README.md).
@@ -47,8 +49,8 @@ Encrypted envs (dotenvx):
 
 ## Memory Bank (for contributors/agents)
 
-- Read: [agents/memory-bank.core.md](agents/memory-bank.core.md) (then [agents/memory-bank.deep.md](agents/memory-bank.deep.md))
-- After changes, update front matter in [agents/memory-bank.core.md](agents/memory-bank.core.md):
+- Read: [agents/memory-bank.md](agents/memory-bank.md) for policy and storage tiers, then dive into files under [agents/memory-bank/](agents/memory-bank/) as needed.
+- After changes, update front matter in [agents/memory-bank.md](agents/memory-bank.md):
   - `generated_at`: YYYY-MM-DD
   - `repo_git_sha`: `git rev-parse HEAD`
 - Validate links/paths: `npm run memory:validate`

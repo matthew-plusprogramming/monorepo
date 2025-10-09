@@ -4,32 +4,13 @@ last_reviewed: 2025-09-21
 
 # Progress Log
 
-- 2025-09-03: Bootstrapped Memory Bank canonical files and default workflow, added ADR-0001, and consolidated legacy docs under the canonical structure.
-- 2025-09-10: Moved logger and DynamoDB service tags into backend-core, preserved node-server layers, and opened ADR-0002.
-- 2025-09-11: Expanded user repo/schema flows, enforced AppLayer provisioning while removing unsafe casts, codified `npm run lint:fix` usage, introduced Markdown formatting, consolidated workflows (ADR-0003/0004), and verified builds/tests despite missing test scripts in some workspaces.
-- 2025-09-13: Tightened planning requirements with Given/When/Then acceptance criteria and explicit Non-goals, logged ADR-0005, and refreshed Memory Bank metadata.
-- 2025-09-16: Planned and executed agents Markdown template sync while preserving repo-specific policies, plus format/lint/memory validations.
-- 2025-09-18: Planned, built, and verified node-server Vitest setup, shared config preset, testing guidelines, testing plan, and helper fakes with full lint/format/memory passes.
-- 2025-09-20: Iterated on node-server coverage—typed UUID helper fix, environment/middleware/location specs, spec relocations, service test expansion, Dynamo/logger/zod coverage, and Option.none validation—running plan/build/verify loops with lint, build, test, and memory checks after each milestone; also condensed Memory Bank reflexions/log for quicker retrieval.
-- 2025-09-20: Planned upcoming middleware test coverage for auth and rate limiting, aligning acceptance criteria with testing guidelines and preparing fakes/utilities for implementation.
-- 2025-09-20: Delivered auth and rate limit middleware suites using shared fakes, injected logger/dynamo layers via Vitest mocks, corrected missing Effect yields in both middlewares, and closed out lint/test passes with memory updates.
-- 2025-09-20: Added node-server specs for CDK outputs, AppLayer, and the lambda entrypoint—verifying base-path toggles, layer provisioning, and serverless wiring—then refreshed the testing plan and reran lint/tests.
-- 2025-09-21: Added handler tests for getUser and register per testing guidelines and the node-server testing plan; mocked AppLayer to inject a UserRepo fake, stubbed argon2/JWT/time for determinism, verified behavior against current obfuscation rules, and updated Memory Bank stamps.
-- 2025-09-21: Audited node-server suites against testing guidelines, prioritizing gaps across the missing Express integration slice, `ipRateLimiting` `req.ip` branch, `UserRepo` ID success/error flows, `register` payload/JWT assertions, boot-level `index.ts` coverage, and untested core schemas; refreshed Memory Bank metadata for the review task.
-- 2025-09-21: Planned node-server coverage remediation per testing plan—documented acceptance criteria, dependency updates (supertest), and target suites covering ip fallback, repo id success/error, register token assertions, index boot path, integration slice, and core schema specs.
-- 2025-09-21: Implemented node-server coverage updates—added supertest integration slice, index entry wiring spec, ip missing-branch test, UserRepo ID success/error assertions, register JWT/create verifications, and core schema vitest suite; installed supertest/vitest and updated the testing plan.
-- 2025-09-21: Verified updated coverage by running node-server vitest (unit/integration), schemas vitest, eslint --fix, and memory validators; testing plan now reflects closed gaps for integration, ip fallback, register assertions, index wiring, and schema specs.
-- 2025-10-08: Added a `/heartbeat` Express handler returning `{ status: 'ok' }`, wired the new route ahead of auth endpoints, extended the supertest slice, ran node-server Vitest, and refreshed Memory Bank entries in preparation for validation.
-- 2025-10-08: Required `/heartbeat` to flow through `isAuthenticated`, updated index/lambda wiring plus supertest coverage for authorized/unauthorized cases, mocked JWT verification, reran node-server Vitest, and logged the workflow phases.
-- 2025-10-08: Planned the DAU/MAU infrastructure component addition—documented acceptance criteria, scoped resource/IAM/observability coverage, and captured the approach in a workflow run plan.
-- 2025-10-08: Reworked `dau_mau_metrics.design.md` with a new infrastructure component plus refreshed formatting, detailing IaC layout, resource topology, IAM, observability, deployment, and resilience guidance.
-- 2025-10-08: Verified the design doc updates—ran markdown formatting, executed memory validation/drift scripts after stamping `agents/memory-bank.md`, and confirmed the infrastructure section meets the documented criteria.
-- 2025-10-08: Planned the DAU/MAU analytics IaC build—defined stack scope (EventBridge, DLQ, DynamoDB tables, log groups), outputs, synth/lint checks, and constraints within a workflow run artifact.
-- 2025-10-08: Implemented the analytics CDKTF stack, provisioning the EventBridge bus with DLQ, dedupe/aggregate tables, and log groups, plus wiring outputs/schema/stack registry and cleaning up lint issues.
-- 2025-10-08: Verified the analytics stack via eslint, `npm run cdk:synth:dev`, and memory validation/drift scripts to ensure outputs/resources and metadata stay aligned.
-- 2025-10-08: Planned the node-server heartbeat analytics implementation—defined EventBridge emission scope, outputs usage, Effect layering, and test expectations in a workflow plan.
-- 2025-10-08: Implemented the heartbeat analytics flow—added EventBridge service + CDK outputs, refactored the handler, refreshed integration/unit tests, and updated logger defaults for test mode.
-- 2025-10-08: Verified eslint, vitest (node-server), and memory scripts after installing EventBridge SDK dependencies and stamping the Memory Bank SHA.
-- 2025-10-09: Planned heartbeat analytics fixes by documenting new acceptance criteria for EventBridge partial failures and scoped IAM policy updates in a workflow run artifact.
-- 2025-10-09: Implemented heartbeat analytics fixes—shared the analytics bus constant, scoped the Lambda IAM policy to that ARN, taught the handler to detect `FailedEntryCount`, and expanded tests plus register token assertions.
-- 2025-10-09: Verified heartbeat analytics fixes via node-server vitest, markdown formatting, and memory validation/drift after stamping the Memory Bank metadata.
+- 2025-09-03: Bootstrapped the Memory Bank, default workflow, and ADR-0001 to codify retrieval tiers.
+- 2025-09-10: Moved logger/DynamoDB tags into backend-core under ADR-0002 while preserving node-server layering.
+- 2025-09-11: Hardened user repo/schema flows, enforced AppLayer provisioning, and standardized lint/Markdown workflows (ADR-0003/0004).
+- 2025-09-13: Required Given/When/Then planning with explicit Non-goals via ADR-0005 and refreshed Memory Bank metadata.
+- 2025-09-16: Synced agents Markdown with upstream templates and validated format/lint/memory scripts.
+- 2025-09-18: Shipped node-server Vitest setup, shared config presets, testing guidelines, and the initial testing plan.
+- 2025-09-20: Extended node-server coverage across services, middleware, and infra wiring while iterating plan/build/verify loops and condensing Memory Bank artifacts.
+- 2025-09-21: Adopted supertest integration slices plus repo/register/schema specs to close high-risk testing gaps and update tooling.
+- 2025-10-08: Added `/heartbeat`, refreshed DAU/MAU design docs, provisioned the analytics stack, and wired EventBridge analytics with supporting tests.
+- 2025-10-09: Hardened heartbeat analytics (partial failures, IAM scope), refreshed app READMEs, and queued the log-condensation pass.
