@@ -69,12 +69,12 @@ export const isAuthenticatedMiddlewareRequestHandler: RequestHandler = async (
     .pipe(isAuthenticatedMiddlewareHandler)
     .pipe(
       Effect.catchTag('UserNotAuthenticatedError', () =>
-        Effect.fail(res.status(HTTP_RESPONSE.UNAUTHORIZED).send()),
+        Effect.succeed(res.status(HTTP_RESPONSE.UNAUTHORIZED).send()),
       ),
     )
     .pipe(
       Effect.catchTag('UserTokenInvalidError', () =>
-        Effect.fail(res.status(HTTP_RESPONSE.BAD_REQUEST).send()),
+        Effect.succeed(res.status(HTTP_RESPONSE.BAD_REQUEST).send()),
       ),
     )
     .pipe(Effect.tap(() => next()))
