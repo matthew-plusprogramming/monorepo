@@ -67,14 +67,15 @@ export const isAuthenticatedMiddlewareRequestHandler: RequestHandler = async (
 ) => {
   await Effect.succeed(req)
     .pipe(isAuthenticatedMiddlewareHandler)
+    // TODO: Figure out how not to log errors on these failures
     .pipe(
       Effect.catchTag('UserNotAuthenticatedError', () =>
-        Effect.succeed(res.status(HTTP_RESPONSE.UNAUTHORIZED).send()),
+        Effect.fail(res.status(HTTP_RESPONSE.UNAUTHORIZED).send()),
       ),
     )
     .pipe(
       Effect.catchTag('UserTokenInvalidError', () =>
-        Effect.succeed(res.status(HTTP_RESPONSE.BAD_REQUEST).send()),
+        Effect.fail(res.status(HTTP_RESPONSE.BAD_REQUEST).send()),
       ),
     )
     .pipe(Effect.tap(() => next()))
