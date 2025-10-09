@@ -7,6 +7,7 @@ import { getUserRequestHandler } from '@/handlers/getUser.handler';
 import { heartbeatRequestHandler } from '@/handlers/heartbeat.handler';
 import { registerRequestHandler } from '@/handlers/register.handler';
 import { ipRateLimitingMiddlewareRequestHandler } from '@/middleware/ipRateLimiting.middleware';
+import { isAuthenticatedMiddlewareRequestHandler } from '@/middleware/isAuthenticated.middleware';
 import { jsonErrorMiddleware } from '@/middleware/jsonError.middleware';
 import { EnvironmentSchema } from '@/types/environment';
 
@@ -27,7 +28,11 @@ app.use(ipRateLimitingMiddlewareRequestHandler);
 app.use(express.json());
 app.use(jsonErrorMiddleware);
 
-app.get('/heartbeat', heartbeatRequestHandler);
+app.get(
+  '/heartbeat',
+  isAuthenticatedMiddlewareRequestHandler,
+  heartbeatRequestHandler,
+);
 app.post('/register', registerRequestHandler);
 app.get('/user/:identifier', getUserRequestHandler);
 

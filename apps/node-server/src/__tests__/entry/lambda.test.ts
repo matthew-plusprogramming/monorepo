@@ -49,6 +49,9 @@ const ipRateLimitModule = vi.hoisted<SingleMockState>(() => ({
 const jsonErrorModule = vi.hoisted<SingleMockState>(() => ({
   handler: undefined,
 }));
+const heartbeatModule = vi.hoisted<SingleMockState>(() => ({
+  handler: undefined,
+}));
 const registerModule = vi.hoisted<SingleMockState>(() => ({
   handler: undefined,
 }));
@@ -60,6 +63,9 @@ const environmentModule = vi.hoisted<EnvironmentModuleState>(() => ({
 }));
 const serverlessModule = vi.hoisted<ServerlessModuleState>(() => ({
   factory: undefined,
+}));
+const isAuthenticatedModule = vi.hoisted<SingleMockState>(() => ({
+  handler: undefined,
 }));
 
 const handlerStub = { type: 'lambda-handler' } as const;
@@ -113,6 +119,12 @@ vi.mock('@/handlers/register.handler', () => {
   return { registerRequestHandler: handler };
 });
 
+vi.mock('@/handlers/heartbeat.handler', () => {
+  const handler = vi.fn();
+  heartbeatModule.handler = handler;
+  return { heartbeatRequestHandler: handler };
+});
+
 vi.mock('@/handlers/getUser.handler', () => {
   const handler = vi.fn();
   getUserModule.handler = handler;
@@ -125,9 +137,17 @@ vi.mock('@/types/environment', () => {
   return { EnvironmentSchema: { parse } };
 });
 
+vi.mock('@/middleware/isAuthenticated.middleware', () => {
+  const handler = vi.fn();
+  isAuthenticatedModule.handler = handler;
+  return { isAuthenticatedMiddlewareRequestHandler: handler };
+});
+
 describe('lambda entrypoint', () => {
   beforeEach(() => {
     vi.resetModules();
+    (globalThis as typeof globalThis & { __BUNDLED__?: boolean }).__BUNDLED__ =
+      false;
   });
 
   it('wraps the Express app with serverless-http and exports the handler', async () => {
@@ -151,6 +171,12 @@ describe('lambda entrypoint', () => {
       requireJsonErrorMiddleware(),
     );
 
+    expect(expressApp.get).toHaveBeenNthCalledWith(
+      1,
+      '/heartbeat',
+      requireIsAuthenticatedMiddleware(),
+      requireHeartbeatHandler(),
+    );
     expect(expressApp.post).toHaveBeenCalledWith(
       '/register',
       requireRegisterHandler(),
@@ -191,12 +217,23 @@ function requireRegisterHandler(): MockFn {
   return ensureDefined(registerModule.handler, 'register handler');
 }
 
+function requireHeartbeatHandler(): MockFn {
+  return ensureDefined(heartbeatModule.handler, 'heartbeat handler');
+}
+
 function requireGetUserHandler(): MockFn {
   return ensureDefined(getUserModule.handler, 'getUser handler');
 }
 
 function requireJsonMiddleware(): MockFn {
   return ensureDefined(expressModule.jsonMiddleware, 'express.json middleware');
+}
+
+function requireIsAuthenticatedMiddleware(): MockFn {
+  return ensureDefined(
+    isAuthenticatedModule.handler,
+    'isAuthenticated middleware',
+  );
 }
 
 function ensureDefined<T>(value: T | undefined, name: string): T {

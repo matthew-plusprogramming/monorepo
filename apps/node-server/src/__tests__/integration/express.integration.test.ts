@@ -18,7 +18,10 @@ import type * as LoggerServiceModule from '@/services/logger.service';
 const dynamoModule = vi.hoisted(() => ({ fake: undefined as unknown }));
 const userRepoModule = vi.hoisted(() => ({ fake: undefined as unknown }));
 const argonModule = vi.hoisted(() => ({ hash: undefined as unknown }));
-const jwtModule = vi.hoisted(() => ({ sign: undefined as unknown }));
+const jwtModule = vi.hoisted(() => ({
+  sign: undefined as unknown,
+  verify: undefined as unknown,
+}));
 
 vi.hoisted(() => {
   (globalThis as typeof globalThis & { __BUNDLED__?: boolean }).__BUNDLED__ =
@@ -74,8 +77,10 @@ vi.mock('@node-rs/argon2', () => {
 
 vi.mock('jsonwebtoken', () => {
   const sign = vi.fn();
+  const verify = vi.fn();
   jwtModule.sign = sign;
-  return { sign };
+  jwtModule.verify = verify;
+  return { sign, verify };
 });
 
 describe('node-server express integration slice', () => {
@@ -99,9 +104,45 @@ describe('node-server express integration slice', () => {
     const app = await buildApp();
     const dynamoFake = getDynamoFake();
     const userRepoFake = getUserRepoFake();
+    const verifyMock = getVerifyMock();
 
     dynamoFake.reset();
     userRepoFake.reset();
+    verifyMock.mockReset();
+    const token =
+      'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMTExMTExMS0xMTExLTQxMTEtODExMS0xMTExMTExMTExMTEifQ.signature';
+    verifyMock.mockReturnValue({
+      iss: JWT_ISSUER,
+      sub: '11111111-1111-4111-8111-111111111111',
+      aud: '22222222-2222-4222-8222-222222222222',
+      exp: Date.now() + 60 * 1000,
+      iat: Date.now(),
+      jti: '33333333-3333-4333-8333-333333333333',
+      role: USER_ROLE,
+    });
+
+    dynamoFake.queueSuccess('updateItem', {
+      $metadata: { httpStatusCode: 200 },
+      Attributes: { calls: { N: '1' } },
+    });
+
+    const response = await request(app)
+      .get('/heartbeat')
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(response.status).toBe(HTTP_RESPONSE.SUCCESS);
+    expect(response.text).toEqual('OK');
+    expect(verifyMock).toHaveBeenCalledWith(token, 'integration-secret');
+    expect(userRepoFake.calls.findByIdentifier).toEqual([]);
+  });
+
+  it('returns 401 for GET /heartbeat without authorization header', async () => {
+    const app = await buildApp();
+    const dynamoFake = getDynamoFake();
+    const verifyMock = getVerifyMock();
+
+    dynamoFake.reset();
+    verifyMock.mockReset();
 
     dynamoFake.queueSuccess('updateItem', {
       $metadata: { httpStatusCode: 200 },
@@ -110,9 +151,31 @@ describe('node-server express integration slice', () => {
 
     const response = await request(app).get('/heartbeat');
 
-    expect(response.status).toBe(HTTP_RESPONSE.SUCCESS);
-    expect(response.text).toEqual('OK');
-    expect(userRepoFake.calls.findByIdentifier).toEqual([]);
+    expect(response.status).toBe(HTTP_RESPONSE.UNAUTHORIZED);
+    expect(response.text).toBe('');
+    expect(verifyMock).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 for GET /heartbeat with malformed token', async () => {
+    const app = await buildApp();
+    const dynamoFake = getDynamoFake();
+    const verifyMock = getVerifyMock();
+
+    dynamoFake.reset();
+    verifyMock.mockReset();
+
+    dynamoFake.queueSuccess('updateItem', {
+      $metadata: { httpStatusCode: 200 },
+      Attributes: { calls: { N: '1' } },
+    });
+
+    const response = await request(app)
+      .get('/heartbeat')
+      .set('Authorization', 'Bearer invalid-token');
+
+    expect(response.status).toBe(HTTP_RESPONSE.BAD_REQUEST);
+    expect(response.text).toBe('');
+    expect(verifyMock).not.toHaveBeenCalled();
   });
 
   it('returns 201 and a signed token for POST /register', async () => {
@@ -251,6 +314,9 @@ async function buildApp(): Promise<Express> {
   const { heartbeatRequestHandler } = await import(
     '@/handlers/heartbeat.handler'
   );
+  const { isAuthenticatedMiddlewareRequestHandler } = await import(
+    '@/middleware/isAuthenticated.middleware'
+  );
 
   const app = express();
   app.use((req, res, next) => {
@@ -271,7 +337,11 @@ async function buildApp(): Promise<Express> {
   app.use(ipRateLimitingMiddlewareRequestHandler);
   app.use(express.json());
   app.use(jsonErrorMiddleware);
-  app.get('/heartbeat', heartbeatRequestHandler);
+  app.get(
+    '/heartbeat',
+    isAuthenticatedMiddlewareRequestHandler,
+    heartbeatRequestHandler,
+  );
   app.post('/register', registerRequestHandler);
   app.get('/user/:identifier', getUserRequestHandler);
 
@@ -292,4 +362,8 @@ function getHashMock(): ReturnType<typeof vi.fn> {
 
 function getSignMock(): ReturnType<typeof vi.fn> {
   return jwtModule.sign as ReturnType<typeof vi.fn>;
+}
+
+function getVerifyMock(): ReturnType<typeof vi.fn> {
+  return jwtModule.verify as ReturnType<typeof vi.fn>;
 }

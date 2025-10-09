@@ -59,3 +59,12 @@ Reflexion
 - 2025-10-08 — Verify: ran the node-server Vitest suite to confirm the heartbeat endpoint returns 200 alongside existing coverage.
   Preparing to run memory validation/drift checks and stamp metadata for completion.
   No regressions observed; rate limiting and handler flows remain green.
+- 2025-10-08 — Plan: captured the requirement to protect `/heartbeat` with `isAuthenticated`, set Given/When/Then on 200 for authorized users plus 401/400 for missing or malformed tokens, and scoped impacts to route wiring and integration tests.
+  Noted middleware ordering constraints and the need to extend lambda expectations.
+  Deferred any auth schema changes as out of scope.
+- 2025-10-08 — Build: wired the heartbeat route through `isAuthenticated`, updated lambda mocks to include the middleware/handler pairing, and expanded the supertest slice with authorized, unauthorized, and malformed token cases.
+  Mocked `jsonwebtoken.verify` to emit a valid decoded token while keeping rate-limiting fakes intact.
+  Verified middleware ordering stayed stable across entrypoints.
+- 2025-10-08 — Verify: reran node-server Vitest to confirm the new auth checks plus existing suites stay green.
+  Ready to finalize memory validation and drift checks with updated logs.
+  No regressions surfaced in register/getUser flows.
