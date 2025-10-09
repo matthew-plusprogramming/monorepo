@@ -45,6 +45,7 @@
     "@packages/schemas": "*",
     "@types/express": "^5.0.3",
     "@types/jsonwebtoken": "^9.0.10",
+    "@types/supertest": "^6.0.3",
     "@utils/ts-utils": "*",
     "@vitest/coverage-v8": "^3.2.4",
     "concurrently": "^9.2.1",
