@@ -65,15 +65,15 @@ const registerHandler = (
     };
     yield* userRepo.create(userToCreate);
 
-    const now = Date.now();
-    const inOneHour = now + 60 * 60 * 1000;
+    const nowSeconds = Date.now() / 1000;
+    const inOneHourSeconds = nowSeconds + 60 * 60;
 
     const userToken = {
       iss: JWT_ISSUER,
       sub: userId,
       aud: JWT_AUDIENCE,
-      exp: inOneHour,
-      iat: now,
+      exp: inOneHourSeconds,
+      iat: nowSeconds,
       jti: randomUUID(),
       role: USER_ROLE,
     } satisfies UserToken;
