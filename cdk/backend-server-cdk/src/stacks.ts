@@ -1,9 +1,11 @@
 import z from 'zod';
 
 import {
+  AnalyticsStackOutputSchema,
   ApiSecurityStackOutputSchema,
   ApiStackOutputSchema,
 } from './consumer/output';
+import { AnalyticsStack } from './stacks/analytics-stack';
 import { ApiLambdaStack } from './stacks/api-lambda-stack';
 import { ApiSecurityStack } from './stacks/api-security-stack';
 import { ApiStack, type ApiStackProps } from './stacks/api-stack';
@@ -40,5 +42,12 @@ export const stacks = [
     Stack: ApiSecurityStack,
     props: {},
     outputSchema: ApiSecurityStackOutputSchema,
+  },
+  {
+    name: 'analytics-stack',
+    description: 'Analytics pipeline for DAU/MAU tracking',
+    Stack: AnalyticsStack,
+    props: {},
+    outputSchema: AnalyticsStackOutputSchema,
   },
 ] as const satisfies Stack<UniversalStackProps>[];

@@ -21,3 +21,15 @@ last_reviewed: 2025-09-21
 - 2025-09-21: Verified updated coverage by running node-server vitest (unit/integration), schemas vitest, eslint --fix, and memory validators; testing plan now reflects closed gaps for integration, ip fallback, register assertions, index wiring, and schema specs.
 - 2025-10-08: Added a `/heartbeat` Express handler returning `{ status: 'ok' }`, wired the new route ahead of auth endpoints, extended the supertest slice, ran node-server Vitest, and refreshed Memory Bank entries in preparation for validation.
 - 2025-10-08: Required `/heartbeat` to flow through `isAuthenticated`, updated index/lambda wiring plus supertest coverage for authorized/unauthorized cases, mocked JWT verification, reran node-server Vitest, and logged the workflow phases.
+- 2025-10-08: Planned the DAU/MAU infrastructure component addition—documented acceptance criteria, scoped resource/IAM/observability coverage, and captured the approach in a workflow run plan.
+- 2025-10-08: Reworked `dau_mau_metrics.design.md` with a new infrastructure component plus refreshed formatting, detailing IaC layout, resource topology, IAM, observability, deployment, and resilience guidance.
+- 2025-10-08: Verified the design doc updates—ran markdown formatting, executed memory validation/drift scripts after stamping `agents/memory-bank.md`, and confirmed the infrastructure section meets the documented criteria.
+- 2025-10-08: Planned the DAU/MAU analytics IaC build—defined stack scope (EventBridge, DLQ, DynamoDB tables, log groups), outputs, synth/lint checks, and constraints within a workflow run artifact.
+- 2025-10-08: Implemented the analytics CDKTF stack, provisioning the EventBridge bus with DLQ, dedupe/aggregate tables, and log groups, plus wiring outputs/schema/stack registry and cleaning up lint issues.
+- 2025-10-08: Verified the analytics stack via eslint, `npm run cdk:synth:dev`, and memory validation/drift scripts to ensure outputs/resources and metadata stay aligned.
+- 2025-10-08: Planned the node-server heartbeat analytics implementation—defined EventBridge emission scope, outputs usage, Effect layering, and test expectations in a workflow plan.
+- 2025-10-08: Implemented the heartbeat analytics flow—added EventBridge service + CDK outputs, refactored the handler, refreshed integration/unit tests, and updated logger defaults for test mode.
+- 2025-10-08: Verified eslint, vitest (node-server), and memory scripts after installing EventBridge SDK dependencies and stamping the Memory Bank SHA.
+- 2025-10-09: Planned heartbeat analytics fixes by documenting new acceptance criteria for EventBridge partial failures and scoped IAM policy updates in a workflow run artifact.
+- 2025-10-09: Implemented heartbeat analytics fixes—shared the analytics bus constant, scoped the Lambda IAM policy to that ARN, taught the handler to detect `FailedEntryCount`, and expanded tests plus register token assertions.
+- 2025-10-09: Verified heartbeat analytics fixes via node-server vitest, markdown formatting, and memory validation/drift after stamping the Memory Bank metadata.

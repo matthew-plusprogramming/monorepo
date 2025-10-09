@@ -32,3 +32,18 @@ export const denyListTableName = loadCDKOutput<'api-security-stack'>(
   'api-security-stack',
   baseCdkOutputsPath,
 ).denyListTableName;
+
+const analyticsOutput = loadCDKOutput<'analytics-stack'>(
+  'analytics-stack',
+  baseCdkOutputsPath,
+);
+
+export const analyticsEventBusArn = analyticsOutput.eventBusArn;
+export const analyticsEventBusName = analyticsOutput.eventBusName;
+export const analyticsDeadLetterQueueArn = analyticsOutput.deadLetterQueueArn;
+export const analyticsDeadLetterQueueUrl = analyticsOutput.deadLetterQueueUrl;
+export const analyticsDedupeTableName = analyticsOutput.dedupeTableName;
+export const analyticsAggregateTableName = analyticsOutput.aggregateTableName;
+export const analyticsEventLogGroupName = analyticsOutput.eventLogGroupName;
+export const analyticsProcessorLogGroupName =
+  analyticsOutput.processorLogGroupName;

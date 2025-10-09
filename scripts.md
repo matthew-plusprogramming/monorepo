@@ -26,6 +26,7 @@ npm i
 npm run build
 npm -w @cdk/backend-server-cdk run cdk:output:dev api-stack
 npm -w @cdk/backend-server-cdk run cdk:output:dev api-security-stack
+npm -w @cdk/backend-server-cdk run cdk:output:dev analytics-stack
 npm -w node-server run decrypt-envs
 npm -w node-server run build
 npm -w @cdk/backend-server-cdk run copy-assets-for-cdk

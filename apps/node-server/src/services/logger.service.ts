@@ -97,16 +97,20 @@ const ConsoleLoggerService = {
     }),
 };
 
-export const ApplicationLoggerService = __BUNDLED__
+const shouldUseConsoleLogger = __BUNDLED__ || process.env.NODE_ENV === 'test';
+
+export const ApplicationLoggerService = shouldUseConsoleLogger
   ? Layer.succeed(LoggerService, ConsoleLoggerService)
   : Layer.effect(
       LoggerService,
       makeLoggerService(applicationLogGroupName, serverLogStreamName),
     );
 
-export const SecurityLoggerService = Layer.effect(
-  LoggerService,
-  makeLoggerService(securityLogGroupName, securityLogStreamName),
-);
+export const SecurityLoggerService = shouldUseConsoleLogger
+  ? Layer.succeed(LoggerService, ConsoleLoggerService)
+  : Layer.effect(
+      LoggerService,
+      makeLoggerService(securityLogGroupName, securityLogStreamName),
+    );
 
 export { LoggerService } from '@packages/backend-core';

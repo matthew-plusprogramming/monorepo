@@ -102,6 +102,24 @@ vi.mock('@/handlers/getUser.handler', () => {
   return { getUserRequestHandler: handler };
 });
 
+vi.mock('@/clients/cdkOutputs', () => ({
+  usersTableName: 'users-table',
+  applicationLogGroupName: 'application-log-group',
+  serverLogStreamName: 'server-log-stream',
+  securityLogGroupName: 'security-log-group',
+  securityLogStreamName: 'security-log-stream',
+  rateLimitTableName: 'rate-limit-table',
+  denyListTableName: 'deny-list-table',
+  analyticsEventBusArn: 'analytics-bus-arn',
+  analyticsEventBusName: 'analytics-bus',
+  analyticsDeadLetterQueueArn: 'analytics-dlq-arn',
+  analyticsDeadLetterQueueUrl: 'https://example.com/dlq',
+  analyticsDedupeTableName: 'analytics-dedupe-table',
+  analyticsAggregateTableName: 'analytics-aggregate-table',
+  analyticsEventLogGroupName: 'analytics-event-log-group',
+  analyticsProcessorLogGroupName: 'analytics-processor-log-group',
+}));
+
 vi.mock('@/types/environment', () => {
   const parse = vi.fn((env: NodeJS.ProcessEnv) =>
     environmentParseImpl.impl(env),
