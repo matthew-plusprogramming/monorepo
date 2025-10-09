@@ -22,29 +22,29 @@
     "// -- 🔧 Miscellaneous": "--"
   },
   "dependencies": {
-    "react": "^19.1.1",
-    "react-dom": "^19.1.1"
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0"
   },
   "devDependencies": {
     "@configs/eslint-config": "*",
     "@configs/ts-config": "*",
     "@configs/vite-config": "*",
-    "@types/react": "^19.1.13",
-    "@types/react-dom": "^19.1.9",
+    "@types/react": "^19.2.2",
+    "@types/react-dom": "^19.2.1",
     "@vitejs/plugin-react-swc": "^4.1.0",
     "autoprefixer": "^10.4.21",
     "classnames": "^2.5.1",
-    "eslint": "^9.35.0",
-    "eslint-plugin-react-dom": "^1.53.1",
-    "eslint-plugin-react-hooks": "^5.2.0",
-    "eslint-plugin-react-refresh": "^0.4.20",
-    "eslint-plugin-react-x": "^1.53.1",
+    "eslint": "^9.37.0",
+    "eslint-plugin-react-dom": "^2.0.6",
+    "eslint-plugin-react-hooks": "^7.0.0",
+    "eslint-plugin-react-refresh": "^0.4.23",
+    "eslint-plugin-react-x": "^2.0.6",
     "globals": "^16.4.0",
-    "jiti": "^2.5.1",
+    "jiti": "^2.6.1",
     "postcss": "^8.5.6",
-    "sass": "^1.92.1",
+    "sass": "^1.93.2",
     "typed-scss-modules": "^8.1.1",
-    "typescript": "^5.9.2",
-    "vite": "^7.1.6"
+    "typescript": "^5.9.3",
+    "vite": "^7.1.9"
   }
 }

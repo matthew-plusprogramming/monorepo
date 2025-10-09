@@ -33,19 +33,19 @@
     "dist"
   ],
   "dependencies": {
-    "@aws-sdk/client-cloudwatch-logs": "^3.891.0",
-    "@aws-sdk/client-dynamodb": "^3.891.0",
+    "@aws-sdk/client-cloudwatch-logs": "^3.906.0",
+    "@aws-sdk/client-dynamodb": "^3.906.0",
     "@aws-sdk/client-eventbridge": "^3.906.0",
-    "effect": "^3.17.13",
+    "effect": "^3.18.4",
     "express": "^5.1.0",
-    "typescript": "^5.9.2",
-    "zod": "^4.1.9"
+    "typescript": "^5.9.3",
+    "zod": "^4.1.12"
   },
   "devDependencies": {
     "@configs/eslint-config": "*",
     "@configs/ts-config": "*",
     "@types/express": "^5.0.3",
-    "eslint": "^9.35.0",
+    "eslint": "^9.37.0",
     "tsc-alias": "^1.8.16"
   }
 }
