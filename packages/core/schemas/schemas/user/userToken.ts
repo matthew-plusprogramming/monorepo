@@ -5,7 +5,7 @@ export const UserTokenSchema = z.object({
   // Standard claims
   iss: z.string(),
   sub: UserIdSchema,
-  aud: z.uuid(),
+  aud: z.string(),
   exp: z.number(),
   iat: z.number(),
   jti: z.uuid(),
