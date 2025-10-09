@@ -32,6 +32,7 @@
   "devDependencies": {
     "@aws-sdk/client-cloudwatch-logs": "^3.891.0",
     "@aws-sdk/client-dynamodb": "^3.891.0",
+    "@aws-sdk/client-eventbridge": "^3.906.0",
     "@aws-sdk/util-dynamodb": "^3.891.0",
     "@cdk/backend-server-cdk": "*",
     "@configs/eslint-config": "*",

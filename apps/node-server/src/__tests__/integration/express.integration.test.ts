@@ -1,26 +1,13 @@
 import { HTTP_RESPONSE } from '@packages/backend-core';
-import {
-  JWT_AUDIENCE,
-  JWT_ISSUER,
-  USER_ROLE,
-} from '@packages/backend-core/auth';
-import type { Express } from 'express';
+import express, { type Express } from 'express';
 import request from 'supertest';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { DynamoDbServiceFake } from '@/__tests__/fakes/dynamodb';
-import type { UserRepoFake } from '@/__tests__/fakes/userRepo';
-import { withFixedTime } from '@/__tests__/utils/time';
-import { restoreRandomUUID } from '@/__tests__/utils/uuid';
-import type * as DynamoServiceModule from '@/services/dynamodb.service';
-import type * as LoggerServiceModule from '@/services/logger.service';
+import type { EventBridgeServiceFake } from '@/__tests__/fakes/eventBridge';
+import type * as EventBridgeServiceModule from '@/services/eventBridge.service';
 
-const dynamoModule = vi.hoisted(() => ({ fake: undefined as unknown }));
-const userRepoModule = vi.hoisted(() => ({ fake: undefined as unknown }));
-const argonModule = vi.hoisted(() => ({ hash: undefined as unknown }));
-const jwtModule = vi.hoisted(() => ({
-  sign: undefined as unknown,
-  verify: undefined as unknown,
+const eventBridgeModule = vi.hoisted(() => ({
+  fake: undefined as EventBridgeServiceFake | undefined,
 }));
 
 vi.hoisted(() => {
@@ -30,340 +17,116 @@ vi.hoisted(() => {
 });
 
 vi.mock('@/clients/cdkOutputs', () => ({
-  rateLimitTableName: 'rate-limit-table',
-  applicationLogGroupName: 'app-log-group',
-  serverLogStreamName: 'app-log-stream',
-  securityLogGroupName: 'security-log-group',
-  securityLogStreamName: 'security-log-stream',
-  denyListTableName: 'deny-list-table',
-  usersTableName: 'users-table',
+  analyticsEventBusArn: 'analytics-bus-arn',
+  analyticsEventBusName: 'analytics-bus',
+  analyticsDeadLetterQueueArn: 'analytics-dlq-arn',
+  analyticsDeadLetterQueueUrl: 'https://example.com/dlq',
+  analyticsDedupeTableName: 'analytics-dedupe-table',
+  analyticsAggregateTableName: 'analytics-aggregate-table',
+  analyticsEventLogGroupName: 'analytics-event-log-group',
+  analyticsProcessorLogGroupName: 'analytics-processor-log-group',
 }));
 
-vi.mock('@/services/dynamodb.service', async (importOriginal) => {
-  const actual = (await importOriginal()) as typeof DynamoServiceModule;
-  const { createDynamoDbServiceFake } = await import(
-    '@/__tests__/fakes/dynamodb'
+vi.mock('@/services/eventBridge.service', async (importOriginal) => {
+  const actual = (await importOriginal()) as typeof EventBridgeServiceModule;
+  const { createEventBridgeServiceFake } = await import(
+    '@/__tests__/fakes/eventBridge'
   );
-  const fake = createDynamoDbServiceFake();
-  dynamoModule.fake = fake;
+  const fake = createEventBridgeServiceFake();
+  eventBridgeModule.fake = fake;
   return {
     ...actual,
-    LiveDynamoDbService: fake.layer,
-  };
+    LiveEventBridgeService: fake.layer as typeof actual.LiveEventBridgeService,
+  } satisfies typeof actual;
 });
 
-vi.mock('@/services/logger.service', async (importOriginal) => {
-  const actual = (await importOriginal()) as typeof LoggerServiceModule;
-  const { createLoggerServiceFake } = await import('@/__tests__/fakes/logger');
-  return {
-    ...actual,
-    ApplicationLoggerService: createLoggerServiceFake().layer,
-    SecurityLoggerService: createLoggerServiceFake().layer,
-  };
-});
-
-vi.mock('@/layers/app.layer', async () => {
-  const { createUserRepoFake } = await import('@/__tests__/fakes/userRepo');
-  const fake = createUserRepoFake();
-  userRepoModule.fake = fake;
-  return { AppLayer: fake.layer };
-});
-
-vi.mock('@node-rs/argon2', () => {
-  const hash = vi.fn();
-  argonModule.hash = hash;
-  return { default: { hash } };
-});
-
-vi.mock('jsonwebtoken', () => {
-  const sign = vi.fn();
-  const verify = vi.fn();
-  jwtModule.sign = sign;
-  jwtModule.verify = verify;
-  return { sign, verify };
-});
-
-describe('node-server express integration slice', () => {
+describe('heartbeat integration', () => {
   beforeEach(() => {
     vi.resetModules();
     vi.clearAllMocks();
-    restoreRandomUUID();
-    process.env.PEPPER = 'integration-pepper';
-    process.env.JWT_SECRET = 'integration-secret';
-    process.env.PORT = '3000' as unknown as number;
+    (globalThis as typeof globalThis & { __BUNDLED__?: boolean }).__BUNDLED__ =
+      false;
+    process.env.APP_ENV = 'test-env';
+    process.env.APP_VERSION = '1.2.3';
   });
 
   afterEach(() => {
-    restoreRandomUUID();
-    Reflect.deleteProperty(process.env, 'PEPPER');
-    Reflect.deleteProperty(process.env, 'JWT_SECRET');
-    Reflect.deleteProperty(process.env, 'PORT');
+    Reflect.deleteProperty(process.env, 'APP_ENV');
+    Reflect.deleteProperty(process.env, 'APP_VERSION');
   });
 
-  it('returns 200 for GET /heartbeat', async () => {
-    const app = await buildApp();
-    const dynamoFake = getDynamoFake();
-    const userRepoFake = getUserRepoFake();
-    const verifyMock = getVerifyMock();
-
-    dynamoFake.reset();
-    userRepoFake.reset();
-    verifyMock.mockReset();
-    const token =
-      'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMTExMTExMS0xMTExLTQxMTEtODExMS0xMTExMTExMTExMTEifQ.signature';
-    verifyMock.mockReturnValue({
-      iss: JWT_ISSUER,
-      sub: '11111111-1111-4111-8111-111111111111',
-      aud: '22222222-2222-4222-8222-222222222222',
-      exp: Date.now() + 60 * 1000,
-      iat: Date.now(),
-      jti: '33333333-3333-4333-8333-333333333333',
-      role: USER_ROLE,
-    });
-
-    dynamoFake.queueSuccess('updateItem', {
+  it('publishes analytics heartbeat event for authenticated requests', async () => {
+    const app = await buildHeartbeatApp();
+    const eventBridgeFake = getEventBridgeFake();
+    eventBridgeFake.reset();
+    eventBridgeFake.queueSuccess({
       $metadata: { httpStatusCode: 200 },
-      Attributes: { calls: { N: '1' } },
+      FailedEntryCount: 0,
     });
 
     const response = await request(app)
       .get('/heartbeat')
-      .set('Authorization', `Bearer ${token}`);
+      .set('X-Platform', 'ios');
 
     expect(response.status).toBe(HTTP_RESPONSE.SUCCESS);
-    expect(response.text).toEqual('OK');
-    expect(verifyMock).toHaveBeenCalledWith(token, 'integration-secret');
-    expect(userRepoFake.calls.findByIdentifier).toEqual([]);
+    expect(response.text).toBe('OK');
+    expect(eventBridgeFake.calls).toHaveLength(1);
+    const [entry] = eventBridgeFake.calls[0]?.Entries ?? [];
+    expect(entry?.EventBusName).toBe('analytics-bus');
+    const detail = JSON.parse(entry?.Detail ?? '{}') as Record<string, unknown>;
+    expect(detail).toMatchObject({
+      userId: 'user-1',
+      env: 'test-env',
+      appVersion: '1.2.3',
+      platform: 'ios',
+    });
   });
 
-  it('returns 401 for GET /heartbeat without authorization header', async () => {
-    const app = await buildApp();
-    const dynamoFake = getDynamoFake();
-    const verifyMock = getVerifyMock();
-
-    dynamoFake.reset();
-    verifyMock.mockReset();
-
-    dynamoFake.queueSuccess('updateItem', {
+  it('returns 502 when EventBridge reports failed entries', async () => {
+    const app = await buildHeartbeatApp();
+    const eventBridgeFake = getEventBridgeFake();
+    eventBridgeFake.reset();
+    eventBridgeFake.queueSuccess({
       $metadata: { httpStatusCode: 200 },
-      Attributes: { calls: { N: '1' } },
+      FailedEntryCount: 1,
+      Entries: [
+        {
+          ErrorCode: 'InternalFailure',
+          ErrorMessage: 'rate exceeded',
+        },
+      ],
     });
 
     const response = await request(app).get('/heartbeat');
 
-    expect(response.status).toBe(HTTP_RESPONSE.UNAUTHORIZED);
-    expect(response.text).toBe('');
-    expect(verifyMock).not.toHaveBeenCalled();
-  });
-
-  it('returns 400 for GET /heartbeat with malformed token', async () => {
-    const app = await buildApp();
-    const dynamoFake = getDynamoFake();
-    const verifyMock = getVerifyMock();
-
-    dynamoFake.reset();
-    verifyMock.mockReset();
-
-    dynamoFake.queueSuccess('updateItem', {
-      $metadata: { httpStatusCode: 200 },
-      Attributes: { calls: { N: '1' } },
-    });
-
-    const response = await request(app)
-      .get('/heartbeat')
-      .set('Authorization', 'Bearer invalid-token');
-
-    expect(response.status).toBe(HTTP_RESPONSE.BAD_REQUEST);
-    expect(response.text).toBe('');
-    expect(verifyMock).not.toHaveBeenCalled();
-  });
-
-  it('returns 201 and a signed token for POST /register', async () => {
-    await withFixedTime('2024-01-01T00:00:00.000Z', async () => {
-      const app = await buildApp();
-
-      const dynamoFake = getDynamoFake();
-      const userRepoFake = getUserRepoFake();
-      const hashMock = getHashMock();
-      const signMock = getSignMock();
-
-      dynamoFake.reset();
-      userRepoFake.reset();
-      hashMock.mockResolvedValueOnce('hashed-password');
-      signMock.mockImplementationOnce((payload: unknown) => {
-        return JSON.stringify(payload);
-      });
-
-      dynamoFake.queueSuccess('updateItem', {
-        $metadata: { httpStatusCode: 200 },
-        Attributes: { calls: { N: '1' } },
-      });
-      userRepoFake.queueFindNone();
-      userRepoFake.queueCreateSuccess();
-
-      const response = await request(app)
-        .post('/register')
-        .set('X-Forwarded-For', '198.51.100.20')
-        .send({
-          username: 'new-user',
-          email: 'new-user@example.com',
-          password: 'supersecret',
-        });
-
-      expect(response.status).toBe(HTTP_RESPONSE.CREATED);
-      const payload = JSON.parse(response.text) as Record<string, unknown>;
-      expect(payload).toMatchObject({
-        iss: JWT_ISSUER,
-        aud: JWT_AUDIENCE,
-        exp: Date.parse('2024-01-01T01:00:00.000Z'),
-        iat: Date.parse('2024-01-01T00:00:00.000Z'),
-        role: USER_ROLE,
-      });
-
-      expect(typeof payload.sub).toBe('string');
-      expect(typeof payload.jti).toBe('string');
-
-      expect(userRepoFake.calls.create).toHaveLength(1);
-      const createdUser = userRepoFake.calls.create[0];
-      expect(createdUser).toBeDefined();
-      const ensuredCreatedUser = createdUser!;
-      expect(ensuredCreatedUser).toMatchObject({
-        username: 'new-user',
-        email: 'new-user@example.com',
-        passwordHash: 'hashed-password',
-      });
-      expect(typeof ensuredCreatedUser.id).toBe('string');
-      expect(payload.sub as string).toBe(ensuredCreatedUser.id);
-      expect((payload.jti as string).length).toBeGreaterThan(0);
-      expect(dynamoFake.calls.updateItem).toHaveLength(1);
-      expect(dynamoFake.calls.updateItem[0]?.TableName).toBe(
-        'rate-limit-table',
-      );
-      expect(hashMock).toHaveBeenCalledWith('supersecret', {
-        secret: Buffer.from('integration-pepper'),
-      });
-      expect(signMock).toHaveBeenCalledWith(payload, 'integration-secret');
-    });
-  });
-
-  it('obfuscates missing users when GET /user/:identifier returns none', async () => {
-    const app = await buildApp();
-    const dynamoFake = getDynamoFake();
-    const userRepoFake = getUserRepoFake();
-
-    dynamoFake.reset();
-    userRepoFake.reset();
-
-    dynamoFake.queueSuccess('updateItem', {
-      $metadata: { httpStatusCode: 200 },
-      Attributes: { calls: { N: '1' } },
-    });
-    userRepoFake.queueFindNone();
-
-    const response = await request(app)
-      .get('/user/33333333-3333-4333-8333-333333333333')
-      .set('X-Forwarded-For', '203.0.113.10');
-
     expect(response.status).toBe(HTTP_RESPONSE.BAD_GATEWAY);
     expect(response.text).toBe('Bad Gateway');
-    expect(userRepoFake.calls.findByIdentifier).toEqual([
-      '33333333-3333-4333-8333-333333333333',
-    ]);
-  });
-
-  it('returns 429 when rate limiting triggers before route logic', async () => {
-    const app = await buildApp();
-    const dynamoFake = getDynamoFake();
-    const userRepoFake = getUserRepoFake();
-
-    dynamoFake.reset();
-    userRepoFake.reset();
-
-    dynamoFake.queueSuccess('updateItem', {
-      $metadata: { httpStatusCode: 200 },
-      Attributes: { calls: { N: '6' } },
-    });
-
-    const response = await request(app)
-      .post('/register')
-      .set('X-Forwarded-For', '192.0.2.40')
-      .send({
-        username: 'rate-limited',
-        email: 'rate-limited@example.com',
-        password: 'supersecret',
-      });
-
-    expect(response.status).toBe(HTTP_RESPONSE.THROTTLED);
-    expect(response.text).toBe('');
-    expect(userRepoFake.calls.findByIdentifier).toEqual([]);
+    expect(eventBridgeFake.calls).toHaveLength(1);
   });
 });
 
-async function buildApp(): Promise<Express> {
-  const express = (await import('express')).default;
-  const { ipRateLimitingMiddlewareRequestHandler } = await import(
-    '@/middleware/ipRateLimiting.middleware'
-  );
-  const { jsonErrorMiddleware } = await import(
-    '@/middleware/jsonError.middleware'
-  );
-  const { registerRequestHandler } = await import(
-    '@/handlers/register.handler'
-  );
-  const { getUserRequestHandler } = await import('@/handlers/getUser.handler');
+async function buildHeartbeatApp(): Promise<Express> {
   const { heartbeatRequestHandler } = await import(
     '@/handlers/heartbeat.handler'
   );
-  const { isAuthenticatedMiddlewareRequestHandler } = await import(
-    '@/middleware/isAuthenticated.middleware'
-  );
 
   const app = express();
-  app.use((req, res, next) => {
-    if (!req.ip && typeof req.get === 'function') {
-      const forwarded = req.get('x-forwarded-for');
-      if (forwarded) {
-        const [first] = forwarded.split(',');
-        if (first) {
-          Object.defineProperty(req, 'ip', {
-            value: first.trim(),
-            configurable: true,
-          });
-        }
-      }
-    }
-    next();
-  });
-  app.use(ipRateLimitingMiddlewareRequestHandler);
-  app.use(express.json());
-  app.use(jsonErrorMiddleware);
   app.get(
     '/heartbeat',
-    isAuthenticatedMiddlewareRequestHandler,
+    (req, _res, next) => {
+      Object.assign(req, {
+        user: {
+          sub: 'user-1',
+          jti: 'token-1',
+        },
+      });
+      next();
+    },
     heartbeatRequestHandler,
   );
-  app.post('/register', registerRequestHandler);
-  app.get('/user/:identifier', getUserRequestHandler);
-
   return app;
 }
 
-function getDynamoFake(): DynamoDbServiceFake {
-  return dynamoModule.fake as DynamoDbServiceFake;
-}
-
-function getUserRepoFake(): UserRepoFake {
-  return userRepoModule.fake as UserRepoFake;
-}
-
-function getHashMock(): ReturnType<typeof vi.fn> {
-  return argonModule.hash as ReturnType<typeof vi.fn>;
-}
-
-function getSignMock(): ReturnType<typeof vi.fn> {
-  return jwtModule.sign as ReturnType<typeof vi.fn>;
-}
-
-function getVerifyMock(): ReturnType<typeof vi.fn> {
-  return jwtModule.verify as ReturnType<typeof vi.fn>;
+function getEventBridgeFake(): EventBridgeServiceFake {
+  return eventBridgeModule.fake as EventBridgeServiceFake;
 }

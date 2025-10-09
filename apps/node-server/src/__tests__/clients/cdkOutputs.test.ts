@@ -12,6 +12,16 @@ const outputsByStack = {
     rateLimitTableName: 'rate-limit-table',
     denyListTableName: 'deny-list-table',
   },
+  'analytics-stack': {
+    eventBusArn: 'analytics-bus-arn',
+    eventBusName: 'analytics-bus',
+    deadLetterQueueArn: 'analytics-dlq-arn',
+    deadLetterQueueUrl: 'https://example.com/dlq',
+    dedupeTableName: 'analytics-dedupe-table',
+    aggregateTableName: 'analytics-aggregate-table',
+    eventLogGroupName: 'analytics-event-log-group',
+    processorLogGroupName: 'analytics-processor-log-group',
+  },
 } as const;
 
 type StackName = keyof typeof outputsByStack;
@@ -60,6 +70,7 @@ describe('clients/cdkOutputs', () => {
       'api-security-stack',
       'api-security-stack',
       'api-security-stack',
+      'analytics-stack',
     ]);
     expect(loadCalls.every((call) => call.basePath === undefined)).toBe(true);
 
@@ -70,6 +81,18 @@ describe('clients/cdkOutputs', () => {
     expect(module.securityLogStreamName).toBe('security-log-stream');
     expect(module.rateLimitTableName).toBe('rate-limit-table');
     expect(module.denyListTableName).toBe('deny-list-table');
+    expect(module.analyticsEventBusArn).toBe('analytics-bus-arn');
+    expect(module.analyticsEventBusName).toBe('analytics-bus');
+    expect(module.analyticsDeadLetterQueueArn).toBe('analytics-dlq-arn');
+    expect(module.analyticsDeadLetterQueueUrl).toBe('https://example.com/dlq');
+    expect(module.analyticsDedupeTableName).toBe('analytics-dedupe-table');
+    expect(module.analyticsAggregateTableName).toBe(
+      'analytics-aggregate-table',
+    );
+    expect(module.analyticsEventLogGroupName).toBe('analytics-event-log-group');
+    expect(module.analyticsProcessorLogGroupName).toBe(
+      'analytics-processor-log-group',
+    );
   });
 
   it('uses bundled base path when __BUNDLED__ is true', async () => {
@@ -79,7 +102,7 @@ describe('clients/cdkOutputs', () => {
 
     const module = await import('@/clients/cdkOutputs');
 
-    expect(loadCalls).toHaveLength(7);
+    expect(loadCalls).toHaveLength(8);
     expect(loadCalls.every((call) => call.basePath === '.')).toBe(true);
 
     expect(module.usersTableName).toBe('users-table');
@@ -89,5 +112,17 @@ describe('clients/cdkOutputs', () => {
     expect(module.securityLogStreamName).toBe('security-log-stream');
     expect(module.rateLimitTableName).toBe('rate-limit-table');
     expect(module.denyListTableName).toBe('deny-list-table');
+    expect(module.analyticsEventBusArn).toBe('analytics-bus-arn');
+    expect(module.analyticsEventBusName).toBe('analytics-bus');
+    expect(module.analyticsDeadLetterQueueArn).toBe('analytics-dlq-arn');
+    expect(module.analyticsDeadLetterQueueUrl).toBe('https://example.com/dlq');
+    expect(module.analyticsDedupeTableName).toBe('analytics-dedupe-table');
+    expect(module.analyticsAggregateTableName).toBe(
+      'analytics-aggregate-table',
+    );
+    expect(module.analyticsEventLogGroupName).toBe('analytics-event-log-group');
+    expect(module.analyticsProcessorLogGroupName).toBe(
+      'analytics-processor-log-group',
+    );
   });
 });

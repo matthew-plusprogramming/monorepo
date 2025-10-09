@@ -93,11 +93,16 @@ describe('registerRequestHandler', () => {
       Record<string, unknown>,
       string,
     ];
+    const expectedIssuedAtSeconds =
+      Date.parse('2024-01-01T00:00:00.000Z') / 1000;
+    const expectedExpiresAtSeconds =
+      Date.parse('2024-01-01T01:00:00.000Z') / 1000;
+
     expect(payload).toMatchObject({
       iss: JWT_ISSUER,
       aud: JWT_AUDIENCE,
-      exp: Date.parse('2024-01-01T01:00:00.000Z'),
-      iat: Date.parse('2024-01-01T00:00:00.000Z'),
+      exp: expectedExpiresAtSeconds,
+      iat: expectedIssuedAtSeconds,
       role: USER_ROLE,
     });
     expect(typeof payload.sub).toBe('string');

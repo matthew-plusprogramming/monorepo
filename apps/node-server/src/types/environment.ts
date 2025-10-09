@@ -9,6 +9,8 @@ export const EnvironmentSchema = z.object({
   PEPPER: z.string({ error: 'PEPPER is required' }),
   PORT: z.coerce.number().positive({ error: 'PORT must be a positive number' }),
   JWT_SECRET: z.string({ error: 'JWT_SECRET is required' }),
+  APP_ENV: z.string().default('development'),
+  APP_VERSION: z.string().default('0.0.0'),
 });
 
 export type Environment = z.infer<typeof EnvironmentSchema>;

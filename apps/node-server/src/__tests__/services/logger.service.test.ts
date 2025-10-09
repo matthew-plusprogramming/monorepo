@@ -3,6 +3,7 @@ import { LoggerService } from '@packages/backend-core';
 import type { Layer } from 'effect';
 import { Effect } from 'effect';
 import {
+  afterAll,
   afterEach,
   beforeAll,
   beforeEach,
@@ -76,11 +77,21 @@ vi.mock('@/clients/cdkOutputs', () => ({
 
 let ApplicationLoggerService: LoggerLayer;
 let SecurityLoggerService: LoggerLayer;
+const originalNodeEnv = process.env.NODE_ENV;
 
 beforeAll(async () => {
+  process.env.NODE_ENV = 'development';
   ({ ApplicationLoggerService, SecurityLoggerService } = await import(
     '@/services/logger.service'
   ));
+});
+
+afterAll(() => {
+  if (originalNodeEnv) {
+    process.env.NODE_ENV = originalNodeEnv;
+  } else {
+    Reflect.deleteProperty(process.env, 'NODE_ENV');
+  }
 });
 
 describe('LoggerService CloudWatch adapter', () => {
