@@ -5,7 +5,7 @@ import { S3Backend } from 'cdktf';
 import {
   BACKING_BUCKET_NAME,
   BACKING_LOCK_TABLE_NAME,
-} from '../constants/backend';
+} from '../stacks/bootstrap/constants';
 
 export class StandardBackend {
   public constructor(stack: TerraformStack, stackId: string, region: string) {

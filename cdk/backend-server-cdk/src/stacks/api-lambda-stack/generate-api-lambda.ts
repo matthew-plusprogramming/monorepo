@@ -12,6 +12,8 @@ import type { Construct } from 'constructs';
 import { packageRootDir } from '../../location';
 import { ANALYTICS_EVENT_BUS_NAME } from '../analytics-stack/constants';
 
+import { API_LAMBDA_FUNCTION_NAME } from './constants';
+
 export const generateApiLambda = (scope: Construct, region: string): void => {
   const assumeRole = new DataAwsIamPolicyDocument(scope, 'assume-role', {
     statement: [
@@ -77,7 +79,7 @@ export const generateApiLambda = (scope: Construct, region: string): void => {
   // TODO: Move these constants (memory size, reserved concurrency, etc) to config
   // TODO: Set log group to application log group
   new LambdaFunction(scope, 'my-lambda-function', {
-    functionName: 'my-lambda-function',
+    functionName: API_LAMBDA_FUNCTION_NAME,
     filename: asset.path,
     handler: 'lambda.handler',
     runtime: 'nodejs22.x',

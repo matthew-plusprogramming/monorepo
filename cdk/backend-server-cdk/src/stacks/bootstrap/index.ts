@@ -5,12 +5,10 @@ import { S3BucketVersioningA } from '@cdktf/provider-aws/lib/s3-bucket-versionin
 import { TerraformStack } from 'cdktf';
 import type { Construct } from 'constructs';
 
-import {
-  BACKING_BUCKET_NAME,
-  BACKING_LOCK_TABLE_NAME,
-} from '../../constants/backend';
 import type { UniversalStackProps } from '../../types/stack';
 import { StandardBackend } from '../../utils/standard-backend';
+
+import { BACKING_BUCKET_NAME, BACKING_LOCK_TABLE_NAME } from './constants';
 
 export interface BootstrapStackProps extends UniversalStackProps {
   migrateStateToBootstrappedBackend?: boolean;
