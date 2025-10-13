@@ -4,7 +4,11 @@ import { DynamodbTable } from '@cdktf/provider-aws/lib/dynamodb-table';
 import { SqsQueue } from '@cdktf/provider-aws/lib/sqs-queue';
 import type { Construct } from 'constructs';
 
-import { ANALYTICS_EVENT_BUS_NAME } from './constants';
+import {
+  ANALYTICS_AGGREGATE_TABLE_NAME,
+  ANALYTICS_DEDUPE_TABLE_NAME,
+  ANALYTICS_EVENT_BUS_NAME,
+} from './constants';
 
 export interface AnalyticsResources {
   eventBus: CloudwatchEventBus;
@@ -20,7 +24,6 @@ export const generateAnalyticsResources = (
   region: string,
 ): AnalyticsResources => {
   const deadLetterQueue = new SqsQueue(scope, 'analytics-metrics-dlq', {
-    name: 'analytics-metrics-dlq',
     messageRetentionSeconds: 1_209_600, // 14 days
     sqsManagedSseEnabled: true,
     region,
@@ -36,7 +39,7 @@ export const generateAnalyticsResources = (
   });
 
   const dedupeTable = new DynamodbTable(scope, 'analytics-dedupe-table', {
-    name: 'analytics-dedupe-table',
+    name: ANALYTICS_DEDUPE_TABLE_NAME,
     billingMode: 'PAY_PER_REQUEST',
     hashKey: 'pk',
     attribute: [
@@ -53,7 +56,7 @@ export const generateAnalyticsResources = (
   });
 
   const aggregateTable = new DynamodbTable(scope, 'analytics-aggregate-table', {
-    name: 'analytics-aggregate-table',
+    name: ANALYTICS_AGGREGATE_TABLE_NAME,
     billingMode: 'PAY_PER_REQUEST',
     hashKey: 'pk',
     attribute: [
@@ -66,7 +69,6 @@ export const generateAnalyticsResources = (
   });
 
   const eventLogGroup = new CloudwatchLogGroup(scope, 'analytics-event-logs', {
-    name: 'analytics-event-logs',
     retentionInDays: 30,
   });
 
@@ -74,7 +76,6 @@ export const generateAnalyticsResources = (
     scope,
     'analytics-processor-logs',
     {
-      name: 'analytics-processor-logs',
       retentionInDays: 30,
     },
   );

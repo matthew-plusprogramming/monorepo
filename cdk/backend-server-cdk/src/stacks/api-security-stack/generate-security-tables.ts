@@ -6,12 +6,14 @@ import {
 import { TerraformOutput } from 'cdktf';
 import type { Construct } from 'constructs';
 
+import { DENY_LIST_TABLE_NAME, RATE_LIMIT_TABLE_NAME } from './constants';
+
 export const generateSecurityTables = (
   scope: Construct,
   region: string,
 ): void => {
   const rateLimitTable = new DynamodbTable(scope, 'rate-limit-table', {
-    name: 'rate-limit-table',
+    name: RATE_LIMIT_TABLE_NAME,
     billingMode: 'PAY_PER_REQUEST',
     hashKey: RATE_LIMITING_SCHEMA_CONSTANTS.key.base,
     attribute: [
@@ -28,7 +30,7 @@ export const generateSecurityTables = (
   });
 
   const denyListTable = new DynamodbTable(scope, 'deny-list-table', {
-    name: 'deny-list-table',
+    name: DENY_LIST_TABLE_NAME,
     billingMode: 'PAY_PER_REQUEST',
     hashKey: DENY_LIST_SCHEMA_CONSTANTS.key.base,
     attribute: [

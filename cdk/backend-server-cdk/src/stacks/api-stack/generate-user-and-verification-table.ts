@@ -6,12 +6,14 @@ import {
 import { TerraformOutput } from 'cdktf';
 import type { Construct } from 'constructs';
 
+import { USER_TABLE_NAME, USER_VERIFICATION_TABLE_NAME } from './constants';
+
 export const generateUserAndVerificationTable = (
   scope: Construct,
   region: string,
 ): void => {
   const userTable = new DynamodbTable(scope, 'user-table', {
-    name: 'user-table',
+    name: USER_TABLE_NAME,
     billingMode: 'PAY_PER_REQUEST',
     hashKey: USER_SCHEMA_CONSTANTS.key.id,
     attribute: [
@@ -38,7 +40,7 @@ export const generateUserAndVerificationTable = (
     scope,
     'user-verification-table',
     {
-      name: `user-verification-table`,
+      name: USER_VERIFICATION_TABLE_NAME,
       billingMode: 'PAY_PER_REQUEST',
       hashKey: VERIFICATION_SCHEMA_CONSTANTS.key.id,
       attribute: [
