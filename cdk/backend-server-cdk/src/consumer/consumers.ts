@@ -7,10 +7,11 @@ import { packageRootDir } from '../location';
 import { stacks } from '../stacks';
 
 type StackConfig = (typeof stacks)[number];
-type StackConfigWithoutBootstrap = Exclude<StackConfig, { name: 'bootstrap' }>;
 
 type OutputByName = {
-  [S in StackConfigWithoutBootstrap as S['name']]: output<S['outputSchema']>;
+  [S in StackConfig as S['name'] extends `${string}-bootstrap-stack`
+    ? never
+    : S['name']]: output<S['outputSchema']>;
 };
 
 export type ConsumableStack = keyof OutputByName;
@@ -43,8 +44,7 @@ const loadOutput = <T extends ConsumableStack>(
   const stackOutput = JSON.parse(stackOutputData);
 
   const stackConfig = stacks.find(
-    (s): s is Extract<StackConfigWithoutBootstrap, { name: T }> =>
-      s.name === stack,
+    (s): s is Extract<StackConfig, { name: T }> => s.name === stack,
   );
   if (!stackConfig) {
     throw new Error(`Unknown stack: ${stack}`);

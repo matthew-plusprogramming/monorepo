@@ -3,10 +3,11 @@
 Infrastructure for the monorepo using CDK for Terraform (CDKTF). Targets AWS (DynamoDB, CloudWatch Logs, Lambda packaging) and supports OpenTofu/Terraform.
 
 Stacks ([src/stacks.ts](src/stacks.ts)):
-- `bootstrap`: CDKTF backend/resources bootstrap (WIP migration helper)
-- `api-stack`: App tables + app log group/stream
-- `api-security-stack`: Security tables (rate limiting, deny list) + security logs
-- `api-lambda-stack`: Lambda infra consuming `dist/lambda.zip` artifact
+- `bootstrap`: CDKTF backend/state resources (WIP migration helper)
+- `api-stack`: Application DynamoDB tables (users + verification)
+- `api-security-stack`: Rate limiting and deny list DynamoDB tables
+- `api-lambda-stack`: Lambda packaging, IAM role, and analytics permissions
+- `analytics-stack`: EventBridge bus, DLQ, DynamoDB tables, and log groups for analytics
 
 ## Prerequisites
 
@@ -23,7 +24,7 @@ Encrypted env files provide AWS settings:
 - [`.env.dev`](.env.dev): keys/region for dev
 - [`.env.production`](.env.production): keys/region for prod
 
-Scripts set `ENV=dev|production` and load `.env.$ENV` with `dotenvx`. You can prefix any command with `STACK=<name>` to operate on a single stack.
+Scripts set `ENV=dev|production` and load `.env.$ENV` with `dotenvx`. You can prefix any command with `STACK=<prefixed stack name from src/stacks.ts>` to operate on a single stack.
 
 Encrypted envs (dotenvx):
 - The checked-in encrypted files are examples. If you don't have the private key, decryption will fail. In that case, delete the existing [`.env.dev`](.env.dev) and [`.env.production`](.env.production) and create your own with the required variables.
@@ -36,11 +37,12 @@ Encrypted envs (dotenvx):
 
 - Synthesize: `npm -w @cdk/backend-server-cdk run cdk:synth:dev`
 - Deploy all (interactive): `npm -w @cdk/backend-server-cdk run cdk:deploy:dev`
-- Deploy one stack: `STACK=api-stack npm -w @cdk/backend-server-cdk run cdk:deploy:dev`
+- Deploy one stack: `STACK=myapp-api-stack npm -w @cdk/backend-server-cdk run cdk:deploy:dev`
 - Destroy: `npm -w @cdk/backend-server-cdk run cdk:destroy:dev`
 - Output JSON for app consumption:
-  - `npm -w @cdk/backend-server-cdk run cdk:output:dev api-stack`
-  - `npm -w @cdk/backend-server-cdk run cdk:output:dev api-security-stack`
+  - `npm -w @cdk/backend-server-cdk run cdk:output:dev myapp-api-stack`
+  - `npm -w @cdk/backend-server-cdk run cdk:output:dev myapp-api-security-stack`
+  - `npm -w @cdk/backend-server-cdk run cdk:output:dev myapp-analytics-stack`
 
 Outputs are written under [`cdktf-outputs/stacks`](cdktf-outputs/stacks) and validated by schemas in [src/consumer/output](src/consumer/output). The app reads these via `@cdk/backend-server-cdk`’s `loadCDKOutput` ([src/consumer/consumers.ts](src/consumer/consumers.ts)).
 

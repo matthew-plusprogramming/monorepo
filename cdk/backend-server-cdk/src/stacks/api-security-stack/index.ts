@@ -21,6 +21,5 @@ export class ApiSecurityStack extends TerraformStack {
     new StandardBackend(this, id, region);
 
     generateSecurityTables(this, region);
-
   }
 }

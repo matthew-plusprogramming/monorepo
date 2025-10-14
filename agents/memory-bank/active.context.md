@@ -51,3 +51,6 @@ Reflexion
 - 2025-10-13 — Verify phase: Ran targeted Vitest for logger service after rebuilding backend-core outputs.
   Stamped memory metadata, validated Memory Bank paths, and confirmed drift alignment.
   Ready for downstream integration with console-forwarding logger behavior.
+- 2025-10-14 — Plan phase: Catalogued documentation and stack inconsistencies around backend-server-cdk outputs.
+  Build phase: Updated README commands/descriptions and adjusted consumer typing to exclude bootstrap outputs.
+  Verify phase: Ran `npm -w @cdk/backend-server-cdk run lint` to confirm clean lint status post changes.
