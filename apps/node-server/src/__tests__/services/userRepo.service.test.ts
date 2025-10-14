@@ -137,7 +137,7 @@ describe('UserRepo', () => {
       withRepo((repo) => repo.findByIdentifier('someone@example.com')),
     ).rejects.toHaveProperty('message', error.message);
 
-    expect(loggerFake.entries.errors).toContain(error);
+    expect(loggerFake.entries.errors).toContainEqual([error]);
   });
 
   it('logs getItem failures and maps to InternalServerError', async () => {
@@ -151,7 +151,7 @@ describe('UserRepo', () => {
       ),
     ).rejects.toHaveProperty('message', error.message);
 
-    expect(loggerFake.entries.errors).toContain(error);
+    expect(loggerFake.entries.errors).toContainEqual([error]);
   });
 
   it('writes new users with marshalling and returns true', async () => {
@@ -188,6 +188,6 @@ describe('UserRepo', () => {
       error.message,
     );
 
-    expect(loggerFake.entries.errors).toContain(error);
+    expect(loggerFake.entries.errors).toContainEqual([error]);
   });
 });

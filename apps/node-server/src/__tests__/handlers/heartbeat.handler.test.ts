@@ -125,9 +125,9 @@ describe('heartbeatRequestHandler', () => {
       appVersion: '2.0.0',
       platform: 'android',
     });
-    expect(getLoggerFake().entries.logs).toContain(
+    expect(getLoggerFake().entries.logs).toContainEqual([
       'Heartbeat event recorded for user user-1',
-    );
+    ]);
     expect(getLoggerFake().entries.errors).toHaveLength(0);
   });
 
@@ -172,9 +172,12 @@ describe('heartbeatRequestHandler', () => {
     expect(response.text).toBe('Bad Gateway');
     expect(eventBridgeFake.calls).toHaveLength(1);
     expect(getLoggerFake().entries.logs).toHaveLength(0);
-    expect(getLoggerFake().entries.errors[0]?.message).toContain(
-      'InternalFailure',
-    );
+    const errorArgs = getLoggerFake().entries.errors[0] ?? [];
+    const firstError = errorArgs[0];
+    expect(firstError).toBeInstanceOf(Error);
+    if (firstError instanceof Error) {
+      expect(firstError.message).toContain('InternalFailure');
+    }
   });
 
   it('obfuscates failures when publishing heartbeat event errors', async () => {

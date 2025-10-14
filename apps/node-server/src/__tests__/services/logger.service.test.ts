@@ -35,32 +35,30 @@ const runWithLayer = <R>(
   );
 
 describe('ConsoleLoggerService', () => {
-  it('logs messages via console.info and returns success metadata', async () => {
+  it('logs messages via console.info and resolves with undefined', async () => {
     const consoleInfo = vi
       .spyOn(console, 'info')
       .mockImplementation(() => undefined);
 
     const result = await runWithLayer(ApplicationLoggerService, (service) =>
-      service.log('hello world'),
+      service.log('hello world', 123, { extra: true }),
     );
 
-    expect(consoleInfo).toHaveBeenCalledWith('hello world');
-    expect(result).toEqual({ $metadata: { httpStatusCode: 200 } });
+    expect(consoleInfo).toHaveBeenCalledWith('hello world', 123, { extra: true });
+    expect(result).toBeUndefined();
   });
 
-  it('logs errors via console.error and returns success metadata', async () => {
+  it('logs errors via console.error and resolves with undefined', async () => {
     const consoleError = vi
       .spyOn(console, 'error')
       .mockImplementation(() => undefined);
     const error = new Error('boom');
-    error.stack = 'STACK';
 
     const result = await runWithLayer(SecurityLoggerService, (service) =>
-      service.logError(error),
+      service.logError(error, 'during heartbeat'),
     );
 
-    expect(consoleError).toHaveBeenCalledWith('[ERROR]', 'boom');
-    expect(consoleError).toHaveBeenCalledWith('STACK');
-    expect(result).toEqual({ $metadata: { httpStatusCode: 200 } });
+    expect(consoleError).toHaveBeenCalledWith(error, 'during heartbeat');
+    expect(result).toBeUndefined();
   });
 });

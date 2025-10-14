@@ -125,8 +125,8 @@ describe('isAuthenticatedMiddlewareRequestHandler', () => {
     expect(verify).toHaveBeenCalledWith(token, 'test-secret');
     expect(next).toHaveBeenCalledTimes(1);
     expect(captured.statusCode).toBeUndefined();
-    expect(getLoggerFake().entries.logs).toContain(
+    expect(getLoggerFake().entries.logs).toContainEqual([
       `User: ${decodedToken.sub}, Role: ${decodedToken.role} Authenticated`,
-    );
+    ]);
   });
 });

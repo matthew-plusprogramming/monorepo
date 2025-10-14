@@ -1,19 +1,12 @@
-import type { PutLogEventsCommandOutput } from '@aws-sdk/client-cloudwatch-logs';
 import {
   LoggerService,
   type LoggerServiceSchema,
 } from '@packages/backend-core';
 import { Effect, Layer } from 'effect';
 
-const LOG_SUCCESS_METADATA = {
-  $metadata: {
-    httpStatusCode: 200,
-  },
-} as PutLogEventsCommandOutput;
-
 export type CapturedLoggerEntries = {
-  readonly logs: Array<string | undefined>;
-  readonly errors: Array<Error>;
+  readonly logs: Array<ReadonlyArray<unknown>>;
+  readonly errors: Array<ReadonlyArray<unknown>>;
 };
 
 export type LoggerServiceFake = {
@@ -30,15 +23,13 @@ export const createLoggerServiceFake = (): LoggerServiceFake => {
   };
 
   const service: LoggerServiceSchema = {
-    log: (input) =>
+    log: (...input) =>
       Effect.sync(() => {
         entries.logs.push(input);
-        return LOG_SUCCESS_METADATA;
       }),
-    logError: (input) =>
+    logError: (...input) =>
       Effect.sync(() => {
         entries.errors.push(input);
-        return LOG_SUCCESS_METADATA;
       }),
   };
 

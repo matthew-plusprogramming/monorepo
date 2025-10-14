@@ -136,9 +136,9 @@ describe('ipRateLimitingMiddlewareRequestHandler', () => {
     ).rejects.toBeDefined();
     expect(captured.statusCode).toBe(HTTP_RESPONSE.THROTTLED);
     expect(next).not.toHaveBeenCalled();
-    expect(getLoggerFake().entries.logs).toContain(
+    expect(getLoggerFake().entries.logs).toContainEqual([
       `[RATE_LIMIT_EXCEEDED] ${req.ip as string} - 6 calls`,
-    );
+    ]);
   });
 
   it('propagates an internal error when DynamoDB update fails', async () => {
@@ -158,7 +158,12 @@ describe('ipRateLimitingMiddlewareRequestHandler', () => {
     ).rejects.toBeDefined();
     expect(captured.statusCode).toBeUndefined();
     expect(next).not.toHaveBeenCalled();
-    expect(getLoggerFake().entries.errors[0]?.message).toBe('ddb down');
+    const errorArgs = getLoggerFake().entries.errors[0] ?? [];
+    const firstError = errorArgs[0];
+    expect(firstError).toBeInstanceOf(Error);
+    if (firstError instanceof Error) {
+      expect(firstError.message).toBe('ddb down');
+    }
   });
 
   it('returns 429 when the request has no resolved ip', async () => {
