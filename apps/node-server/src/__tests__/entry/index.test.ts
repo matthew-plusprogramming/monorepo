@@ -104,10 +104,6 @@ vi.mock('@/handlers/getUser.handler', () => {
 
 vi.mock('@/clients/cdkOutputs', () => ({
   usersTableName: 'users-table',
-  applicationLogGroupName: 'application-log-group',
-  serverLogStreamName: 'server-log-stream',
-  securityLogGroupName: 'security-log-group',
-  securityLogStreamName: 'security-log-stream',
   rateLimitTableName: 'rate-limit-table',
   denyListTableName: 'deny-list-table',
   analyticsEventBusArn: 'analytics-bus-arn',

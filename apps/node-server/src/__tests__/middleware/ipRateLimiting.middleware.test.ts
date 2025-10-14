@@ -23,10 +23,6 @@ const loggerModule = vi.hoisted(() => ({ fake: undefined as unknown }));
 
 vi.mock('@/clients/cdkOutputs', () => ({
   rateLimitTableName: 'rate-limit-table',
-  applicationLogGroupName: 'app-log-group',
-  serverLogStreamName: 'app-log-stream',
-  securityLogGroupName: 'sec-log-group',
-  securityLogStreamName: 'sec-log-stream',
   denyListTableName: 'deny-list-table',
   usersTableName: 'users-table',
 }));

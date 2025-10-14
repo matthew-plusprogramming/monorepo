@@ -1,40 +1,25 @@
 import { loadCDKOutput } from '@cdk/backend-server-cdk';
 
 const baseCdkOutputsPath = __BUNDLED__ ? '.' : undefined;
+const API_STACK = 'myapp-api-stack' as const;
+const API_SECURITY_STACK = 'myapp-api-security-stack' as const;
+const ANALYTICS_STACK = 'myapp-analytics-stack' as const;
 
-export const usersTableName = loadCDKOutput<'api-stack'>(
-  'api-stack',
+const apiOutput = loadCDKOutput<typeof API_STACK>(
+  API_STACK,
   baseCdkOutputsPath,
-).userTableName;
+);
+export const usersTableName = apiOutput.userTableName;
 
-export const applicationLogGroupName = loadCDKOutput<'api-stack'>(
-  'api-stack',
+const securityOutput = loadCDKOutput<typeof API_SECURITY_STACK>(
+  API_SECURITY_STACK,
   baseCdkOutputsPath,
-).applicationLogGroupName;
-export const serverLogStreamName = loadCDKOutput<'api-stack'>(
-  'api-stack',
-  baseCdkOutputsPath,
-).serverLogStreamName;
+);
+export const rateLimitTableName = securityOutput.rateLimitTableName;
+export const denyListTableName = securityOutput.denyListTableName;
 
-export const securityLogGroupName = loadCDKOutput<'api-security-stack'>(
-  'api-security-stack',
-  baseCdkOutputsPath,
-).securityLogGroupName;
-export const securityLogStreamName = loadCDKOutput<'api-security-stack'>(
-  'api-security-stack',
-  baseCdkOutputsPath,
-).securityLogStreamName;
-export const rateLimitTableName = loadCDKOutput<'api-security-stack'>(
-  'api-security-stack',
-  baseCdkOutputsPath,
-).rateLimitTableName;
-export const denyListTableName = loadCDKOutput<'api-security-stack'>(
-  'api-security-stack',
-  baseCdkOutputsPath,
-).denyListTableName;
-
-const analyticsOutput = loadCDKOutput<'analytics-stack'>(
-  'analytics-stack',
+const analyticsOutput = loadCDKOutput<typeof ANALYTICS_STACK>(
+  ANALYTICS_STACK,
   baseCdkOutputsPath,
 );
 

@@ -14,3 +14,8 @@ last_reviewed: 2025-09-21
 - 2025-09-21: Adopted supertest integration slices plus repo/register/schema specs to close high-risk testing gaps and update tooling.
 - 2025-10-08: Added `/heartbeat`, refreshed DAU/MAU design docs, provisioned the analytics stack, and wired EventBridge analytics with supporting tests.
 - 2025-10-09: Hardened heartbeat analytics (partial failures, IAM scope), refreshed app READMEs, and queued the log-condensation pass.
+- 2025-10-13: Completed plan phase for console-only logger refactor and queued build/test steps.
+- 2025-10-13: Executed build phase to remove CloudWatch adapters and export console-backed logger layers.
+- 2025-10-13: Ran targeted logger service tests and memory validation/drift checks to close verify phase.
+- 2025-10-13: Realigned CDK output consumers/tests with `myapp-*` stack keys, restoring full workspace test runs.
+- 2025-10-13: Removed application/security log group outputs and CloudWatch resources after migrating to console logging.

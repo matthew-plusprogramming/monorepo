@@ -28,3 +28,17 @@ Reflexion
 - 2025-09-21 — Adopted supertest integration slices plus repo/register/schema specs to close priority testing gaps and stabilize coverage tooling.
 - 2025-10-08 — Added authenticated `/heartbeat`, documented DAU/MAU infra, shipped the analytics stack, and wired EventBridge analytics with supporting tests.
 - 2025-10-09 — Hardened heartbeat analytics for partial failures/IAM, refreshed READMEs for client website + backend docs, and initiated the log-condensation effort.
+- 2025-10-13 — Plan phase: Scoped the logger refactor toward console-only layers.
+  Logged key invariants around Effect layering and metadata outputs.
+  Tagged upcoming test adjustments for console spying.
+- 2025-10-13 — Build phase: Simplified application/security logger layers to console-only output.
+  Preserved Effect Layer wiring while trimming AWS client dependencies.
+  Coordinated test rewrites to remove CloudWatch-specific mocks.
+- 2025-10-13 — Verify phase: Exercised logger Vitest suite directly to confirm console behavior.
+  Documented `npm run test` pretest blocker tied to existing CDK output typings.
+  Completed memory validation and drift checks after stamping front matter.
+- 2025-10-13 — Follow-up: Matched client/CDK schemas to prefixed stack names so `npm run test` succeeds end-to-end.
+  Confirmed Vitest sweep passes; noted integration stderr is expected retry noise.
+- 2025-10-13 — Cleanup: Removed legacy application/security log group outputs post console logger migration.
+  Trimmed CloudWatch resources from the security stack and updated CDK consumers.
+  Synced mocks/tests with leaner outputs and reran Vitest.

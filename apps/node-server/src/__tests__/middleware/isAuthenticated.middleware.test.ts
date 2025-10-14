@@ -22,10 +22,6 @@ vi.mock('jsonwebtoken', () => ({
 }));
 
 vi.mock('@/clients/cdkOutputs', () => ({
-  applicationLogGroupName: 'app-log-group',
-  serverLogStreamName: 'app-log-stream',
-  securityLogGroupName: 'sec-log-group',
-  securityLogStreamName: 'sec-log-stream',
   rateLimitTableName: 'rate-limit-table',
   denyListTableName: 'deny-list-table',
   usersTableName: 'users-table',

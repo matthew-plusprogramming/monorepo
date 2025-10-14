@@ -1,6 +1,4 @@
-import { CloudwatchLogGroup } from '@cdktf/provider-aws/lib/cloudwatch-log-group';
-import { CloudwatchLogStream } from '@cdktf/provider-aws/lib/cloudwatch-log-stream';
-import { TerraformOutput, TerraformStack } from 'cdktf';
+import { TerraformStack } from 'cdktf';
 import type { Construct } from 'constructs';
 
 import type { UniversalStackProps } from '../../types/stack';
@@ -24,27 +22,5 @@ export class ApiSecurityStack extends TerraformStack {
 
     generateSecurityTables(this, region);
 
-    const securityLogGroup = new CloudwatchLogGroup(this, 'security-logs', {
-      name: 'security-logs',
-      retentionInDays: 14,
-    });
-
-    const securityLogStream = new CloudwatchLogStream(
-      this,
-      'security-lambda-logs',
-      {
-        name: 'security-lambda-logs',
-        logGroupName: securityLogGroup.name,
-      },
-    );
-
-    new TerraformOutput(this, 'securityLogGroupName', {
-      value: securityLogGroup.name,
-      description: 'The name of the security log group',
-    });
-    new TerraformOutput(this, 'securityLogStreamName', {
-      value: securityLogStream.name,
-      description: 'The name of the security log stream',
-    });
   }
 }

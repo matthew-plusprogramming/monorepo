@@ -1,7 +1,9 @@
 import { z } from 'zod';
 
+const ANALYTICS_STACK_NAME = 'myapp-analytics-stack' as const;
+
 export const AnalyticsStackOutputSchema = z.object({
-  'analytics-stack': z.object({
+  [ANALYTICS_STACK_NAME]: z.object({
     eventBusArn: z.string(),
     eventBusName: z.string(),
     deadLetterQueueArn: z.string(),

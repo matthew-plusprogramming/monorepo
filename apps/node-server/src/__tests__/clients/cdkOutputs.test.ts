@@ -1,18 +1,19 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+const API_STACK = 'myapp-api-stack' as const;
+const API_SECURITY_STACK = 'myapp-api-security-stack' as const;
+const ANALYTICS_STACK = 'myapp-analytics-stack' as const;
+
 const outputsByStack = {
-  'api-stack': {
+  [API_STACK]: {
     userTableName: 'users-table',
-    applicationLogGroupName: 'application-log-group',
-    serverLogStreamName: 'server-log-stream',
+    verificationTableName: 'verification-table',
   },
-  'api-security-stack': {
-    securityLogGroupName: 'security-log-group',
-    securityLogStreamName: 'security-log-stream',
+  [API_SECURITY_STACK]: {
     rateLimitTableName: 'rate-limit-table',
     denyListTableName: 'deny-list-table',
   },
-  'analytics-stack': {
+  [ANALYTICS_STACK]: {
     eventBusArn: 'analytics-bus-arn',
     eventBusName: 'analytics-bus',
     deadLetterQueueArn: 'analytics-dlq-arn',
@@ -62,23 +63,12 @@ describe('clients/cdkOutputs', () => {
 
     const module = await import('@/clients/cdkOutputs');
 
-    expect(loadCalls.map((call) => call.stack)).toEqual([
-      'api-stack',
-      'api-stack',
-      'api-stack',
-      'api-security-stack',
-      'api-security-stack',
-      'api-security-stack',
-      'api-security-stack',
-      'analytics-stack',
+    expect(loadCalls).toEqual([
+      { stack: API_STACK, basePath: undefined },
+      { stack: API_SECURITY_STACK, basePath: undefined },
+      { stack: ANALYTICS_STACK, basePath: undefined },
     ]);
-    expect(loadCalls.every((call) => call.basePath === undefined)).toBe(true);
-
     expect(module.usersTableName).toBe('users-table');
-    expect(module.applicationLogGroupName).toBe('application-log-group');
-    expect(module.serverLogStreamName).toBe('server-log-stream');
-    expect(module.securityLogGroupName).toBe('security-log-group');
-    expect(module.securityLogStreamName).toBe('security-log-stream');
     expect(module.rateLimitTableName).toBe('rate-limit-table');
     expect(module.denyListTableName).toBe('deny-list-table');
     expect(module.analyticsEventBusArn).toBe('analytics-bus-arn');
@@ -102,14 +92,12 @@ describe('clients/cdkOutputs', () => {
 
     const module = await import('@/clients/cdkOutputs');
 
-    expect(loadCalls).toHaveLength(8);
-    expect(loadCalls.every((call) => call.basePath === '.')).toBe(true);
-
+    expect(loadCalls).toEqual([
+      { stack: API_STACK, basePath: '.' },
+      { stack: API_SECURITY_STACK, basePath: '.' },
+      { stack: ANALYTICS_STACK, basePath: '.' },
+    ]);
     expect(module.usersTableName).toBe('users-table');
-    expect(module.applicationLogGroupName).toBe('application-log-group');
-    expect(module.serverLogStreamName).toBe('server-log-stream');
-    expect(module.securityLogGroupName).toBe('security-log-group');
-    expect(module.securityLogStreamName).toBe('security-log-stream');
     expect(module.rateLimitTableName).toBe('rate-limit-table');
     expect(module.denyListTableName).toBe('deny-list-table');
     expect(module.analyticsEventBusArn).toBe('analytics-bus-arn');
