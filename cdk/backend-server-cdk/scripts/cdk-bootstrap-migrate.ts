@@ -1,6 +1,7 @@
 import { execSync } from 'node:child_process';
 import { resolve } from 'node:path';
 
+import { STACK_PREFIX } from '../src/constants';
 import { packageRootDir } from '../src/location';
 
 const ENV = process.env.ENV;
@@ -9,7 +10,10 @@ if (!ENV) {
   process.exit(1);
 }
 
-const workDir = resolve(packageRootDir, 'cdktf.out/stacks/bootstrap');
+const workDir = resolve(
+  packageRootDir,
+  `cdktf.out/stacks/${STACK_PREFIX}-bootstrap-stack`,
+);
 const envFile = resolve(packageRootDir, `.env.${ENV}`);
 
 try {

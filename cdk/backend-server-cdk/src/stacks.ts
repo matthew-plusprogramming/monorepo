@@ -11,10 +11,8 @@ import { ApiSecurityStack } from './stacks/api-security-stack';
 import { ApiStack, type ApiStackProps } from './stacks/api-stack';
 import { BootstrapStack, type BootstrapStackProps } from './stacks/bootstrap';
 import type { Stack, UniversalStackProps } from './types/stack';
+import { STACK_PREFIX } from './constants';
 
-export const COMPANY_NAME = 'mycompany';
-export const PROJECT_NAME = 'myproject';
-export const STACK_PREFIX = 'myapp';
 export const stacks = [
   {
     name: `${STACK_PREFIX}-bootstrap-stack`,
