@@ -44,21 +44,19 @@ const loadOutput = <T extends ConsumableStack>(
   const stackOutput = JSON.parse(stackOutputData);
 
   const stackConfig = stacks.find(
-    (s): s is Extract<StackConfig, { name: T }> => s.name === stack,
+    (s): s is StackConfig & { name: T } => s.name === stack,
   );
   if (!stackConfig) {
     throw new Error(`Unknown stack: ${stack}`);
   }
 
-  const parsed = stackConfig?.outputSchema.parse(
-    stackOutput,
-  ) as OutputByName[T];
+  const parsed = stackConfig.outputSchema.safeParse(stackOutput);
 
-  if (!parsed) {
+  if (!parsed.success) {
     throw new Error(`Failed to parse output for stack: ${stack}`);
   }
 
-  return (parsed as Record<T, OutputValueByName[T]>)[stack];
+  return (parsed.data as Record<T, OutputValueByName[T]>)[stack];
 };
 
 const loadedOutputs: { [K in ConsumableStack]?: OutputValueByName[K] } = {};
