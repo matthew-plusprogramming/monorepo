@@ -8,6 +8,7 @@ import type { Construct } from 'constructs';
 
 import { DENY_LIST_TABLE_NAME, RATE_LIMIT_TABLE_NAME } from './constants';
 
+// TODO: fold into the api stack (this shouldn't be separate)
 export const generateSecurityTables = (
   scope: Construct,
   region: string,
