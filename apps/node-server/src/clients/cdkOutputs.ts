@@ -1,25 +1,27 @@
-import { loadCDKOutput } from '@cdk/backend-server-cdk';
+import {
+  ANALYTICS_STACK_NAME,
+  API_SECURITY_STACK_NAME,
+  API_STACK_NAME,
+  loadCDKOutput,
+} from '@cdk/backend-server-cdk';
 
 const baseCdkOutputsPath = __BUNDLED__ ? '.' : undefined;
-const API_STACK = 'myapp-api-stack' as const;
-const API_SECURITY_STACK = 'myapp-api-security-stack' as const;
-const ANALYTICS_STACK = 'myapp-analytics-stack' as const;
 
-const apiOutput = loadCDKOutput<typeof API_STACK>(
-  API_STACK,
+const apiOutput = loadCDKOutput<typeof API_STACK_NAME>(
+  API_STACK_NAME,
   baseCdkOutputsPath,
 );
 export const usersTableName = apiOutput.userTableName;
 
-const securityOutput = loadCDKOutput<typeof API_SECURITY_STACK>(
-  API_SECURITY_STACK,
+const securityOutput = loadCDKOutput<typeof API_SECURITY_STACK_NAME>(
+  API_SECURITY_STACK_NAME,
   baseCdkOutputsPath,
 );
 export const rateLimitTableName = securityOutput.rateLimitTableName;
 export const denyListTableName = securityOutput.denyListTableName;
 
-const analyticsOutput = loadCDKOutput<typeof ANALYTICS_STACK>(
-  ANALYTICS_STACK,
+const analyticsOutput = loadCDKOutput<typeof ANALYTICS_STACK_NAME>(
+  ANALYTICS_STACK_NAME,
   baseCdkOutputsPath,
 );
 

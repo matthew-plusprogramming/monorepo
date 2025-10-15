@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-const ANALYTICS_STACK_NAME = 'myapp-analytics-stack' as const;
+import { ANALYTICS_STACK_NAME } from '../../stacks/names';
 
 export const AnalyticsStackOutputSchema = z.object({
   [ANALYTICS_STACK_NAME]: z.object({

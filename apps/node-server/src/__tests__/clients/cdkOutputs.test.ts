@@ -1,19 +1,20 @@
+import {
+  ANALYTICS_STACK_NAME,
+  API_SECURITY_STACK_NAME,
+  API_STACK_NAME,
+} from '@cdk/backend-server-cdk';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const API_STACK = 'myapp-api-stack' as const;
-const API_SECURITY_STACK = 'myapp-api-security-stack' as const;
-const ANALYTICS_STACK = 'myapp-analytics-stack' as const;
-
 const outputsByStack = {
-  [API_STACK]: {
+  [API_STACK_NAME]: {
     userTableName: 'users-table',
     verificationTableName: 'verification-table',
   },
-  [API_SECURITY_STACK]: {
+  [API_SECURITY_STACK_NAME]: {
     rateLimitTableName: 'rate-limit-table',
     denyListTableName: 'deny-list-table',
   },
-  [ANALYTICS_STACK]: {
+  [ANALYTICS_STACK_NAME]: {
     eventBusArn: 'analytics-bus-arn',
     eventBusName: 'analytics-bus',
     deadLetterQueueArn: 'analytics-dlq-arn',
@@ -34,19 +35,30 @@ type LoadCall = {
 
 const loadCalls: Array<LoadCall> = [];
 
-const loadCDKOutputMock = vi.fn((stack: StackName, basePath?: string) => {
-  loadCalls.push({ stack, basePath });
-  return outputsByStack[stack];
-});
+// eslint-disable-next-line no-var
+var loadCDKOutputMock: ReturnType<typeof vi.fn> | undefined;
 
-vi.mock('@cdk/backend-server-cdk', () => ({
-  loadCDKOutput: loadCDKOutputMock,
-}));
+vi.mock('@cdk/backend-server-cdk', async () => {
+  const actual = (await vi.importActual('@cdk/backend-server-cdk')) as Record<
+    string,
+    unknown
+  >;
+
+  loadCDKOutputMock = vi.fn((stack: StackName, basePath?: string) => {
+    loadCalls.push({ stack, basePath });
+    return outputsByStack[stack];
+  });
+
+  return {
+    ...actual,
+    loadCDKOutput: loadCDKOutputMock!,
+  };
+});
 
 describe('clients/cdkOutputs', () => {
   beforeEach(() => {
     loadCalls.length = 0;
-    loadCDKOutputMock.mockClear();
+    loadCDKOutputMock?.mockClear();
   });
 
   afterEach(() => {
@@ -64,9 +76,9 @@ describe('clients/cdkOutputs', () => {
     const module = await import('@/clients/cdkOutputs');
 
     expect(loadCalls).toEqual([
-      { stack: API_STACK, basePath: undefined },
-      { stack: API_SECURITY_STACK, basePath: undefined },
-      { stack: ANALYTICS_STACK, basePath: undefined },
+      { stack: API_STACK_NAME, basePath: undefined },
+      { stack: API_SECURITY_STACK_NAME, basePath: undefined },
+      { stack: ANALYTICS_STACK_NAME, basePath: undefined },
     ]);
     expect(module.usersTableName).toBe('users-table');
     expect(module.rateLimitTableName).toBe('rate-limit-table');
@@ -93,9 +105,9 @@ describe('clients/cdkOutputs', () => {
     const module = await import('@/clients/cdkOutputs');
 
     expect(loadCalls).toEqual([
-      { stack: API_STACK, basePath: '.' },
-      { stack: API_SECURITY_STACK, basePath: '.' },
-      { stack: ANALYTICS_STACK, basePath: '.' },
+      { stack: API_STACK_NAME, basePath: '.' },
+      { stack: API_SECURITY_STACK_NAME, basePath: '.' },
+      { stack: ANALYTICS_STACK_NAME, basePath: '.' },
     ]);
     expect(module.usersTableName).toBe('users-table');
     expect(module.rateLimitTableName).toBe('rate-limit-table');

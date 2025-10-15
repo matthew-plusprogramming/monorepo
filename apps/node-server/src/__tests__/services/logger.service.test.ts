@@ -2,7 +2,15 @@ import type { LoggerServiceSchema } from '@packages/backend-core';
 import { LoggerService } from '@packages/backend-core';
 import type { Layer } from 'effect';
 import { Effect } from 'effect';
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  describe,
+  expect,
+  it,
+  vi,
+} from 'vitest';
 
 type LoggerLayer = Layer.Layer<LoggerService, never, never>;
 
@@ -44,7 +52,9 @@ describe('ConsoleLoggerService', () => {
       service.log('hello world', 123, { extra: true }),
     );
 
-    expect(consoleInfo).toHaveBeenCalledWith('hello world', 123, { extra: true });
+    expect(consoleInfo).toHaveBeenCalledWith('hello world', 123, {
+      extra: true,
+    });
     expect(result).toBeUndefined();
   });
 

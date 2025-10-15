@@ -1,6 +1,6 @@
 import z from 'zod';
 
-const API_SECURITY_STACK_NAME = 'myapp-api-security-stack' as const;
+import { API_SECURITY_STACK_NAME } from '../../stacks/names';
 
 export const ApiSecurityStackOutputSchema = z.object({
   [API_SECURITY_STACK_NAME]: z.object({

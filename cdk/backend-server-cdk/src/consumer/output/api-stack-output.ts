@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-const API_STACK_NAME = 'myapp-api-stack' as const;
+import { API_STACK_NAME } from '../../stacks/names';
 
 export const ApiStackOutputSchema = z.object({
   [API_STACK_NAME]: z.object({

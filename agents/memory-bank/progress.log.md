@@ -23,3 +23,5 @@ last_reviewed: 2025-09-21
 - 2025-10-13: Executed build by refactoring logger schema/service/tests to variadic unknown args with void effects, eliminating CloudWatch metadata.
 - 2025-10-13: Verified console-forwarding logger via Vitest, updated Memory Bank metadata, and validated drift/paths.
 - 2025-10-14: Synced backend-server-cdk docs with stack names and outputs, and hardened consumer typing against bootstrap artifacts.
+- 2025-10-15: Planned stack-name single source across CDK consumers and node-client, flagging re-export and cycle risks.
+- 2025-10-15: Built shared stack-name exports, updated schemas/stacks/client/tests, and verified via targeted Vitest run.

@@ -54,3 +54,12 @@ Reflexion
 - 2025-10-14 — Plan phase: Catalogued documentation and stack inconsistencies around backend-server-cdk outputs.
   Build phase: Updated README commands/descriptions and adjusted consumer typing to exclude bootstrap outputs.
   Verify phase: Ran `npm -w @cdk/backend-server-cdk run lint` to confirm clean lint status post changes.
+- 2025-10-15 — Plan phase: Scoped shared stack name exports to eliminate duplicated literals across consumers and app clients.
+  Flagged circular import risk when re-exporting through the consumer entrypoint and mapped affected schemas/tests.
+  Picked a dedicated `stacks/names` module feeding both CDK stacks and downstream consumers.
+- 2025-10-15 — Build phase: Added the derived stack name constants module and re-exported it via `@cdk/backend-server-cdk`.
+  Refactored output schemas, stack registry, client loader, and Vitest consumers to pull from the shared names.
+  Preserved mock behavior by layering partial-module mocks so literals stay sourced from the actual exports.
+- 2025-10-15 — Verify phase: Exercised the CDK outputs client suite to ensure shared stack names resolve while bundling toggles.
+  Formatted Memory Bank markdown and ran validation/drift scripts to lock in the new constants metadata.
+  Double-checked consumer exports to avoid stack re-entry loops during runtime resolution.

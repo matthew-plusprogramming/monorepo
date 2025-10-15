@@ -10,12 +10,18 @@ import { ApiLambdaStack } from './stacks/api-lambda-stack';
 import { ApiSecurityStack } from './stacks/api-security-stack';
 import { ApiStack, type ApiStackProps } from './stacks/api-stack';
 import { BootstrapStack, type BootstrapStackProps } from './stacks/bootstrap';
+import {
+  ANALYTICS_STACK_NAME,
+  API_LAMBDA_STACK_NAME,
+  API_SECURITY_STACK_NAME,
+  API_STACK_NAME,
+  BOOTSTRAP_STACK_NAME,
+} from './stacks/names';
 import type { Stack, UniversalStackProps } from './types/stack';
-import { STACK_PREFIX } from './constants';
 
 export const stacks = [
   {
-    name: `${STACK_PREFIX}-bootstrap-stack`,
+    name: BOOTSTRAP_STACK_NAME,
     description: 'Bootstrap stack for CdkTF projects',
     Stack: BootstrapStack,
     props: {
@@ -24,28 +30,28 @@ export const stacks = [
     outputSchema: z.object(),
   } as const satisfies Stack<BootstrapStackProps>,
   {
-    name: `${STACK_PREFIX}-api-stack`,
+    name: API_STACK_NAME,
     description: 'API stack for the application',
     Stack: ApiStack,
     props: {},
     outputSchema: ApiStackOutputSchema,
   } as const satisfies Stack<ApiStackProps>,
   {
-    name: `${STACK_PREFIX}-api-lambda-stack`,
+    name: API_LAMBDA_STACK_NAME,
     description: 'Lambdas for API stack',
     Stack: ApiLambdaStack,
     props: {},
     outputSchema: z.object(),
   },
   {
-    name: `${STACK_PREFIX}-api-security-stack`,
+    name: API_SECURITY_STACK_NAME,
     description: 'Security stack for API',
     Stack: ApiSecurityStack,
     props: {},
     outputSchema: ApiSecurityStackOutputSchema,
   },
   {
-    name: `${STACK_PREFIX}-analytics-stack`,
+    name: ANALYTICS_STACK_NAME,
     description: 'Analytics pipeline for DAU/MAU tracking',
     Stack: AnalyticsStack,
     props: {},
