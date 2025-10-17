@@ -30,21 +30,21 @@
     "@configs/ts-config": "*",
     "@configs/vite-config": "*",
     "@types/react": "^19.2.2",
-    "@types/react-dom": "^19.2.1",
+    "@types/react-dom": "^19.2.2",
     "@vitejs/plugin-react-swc": "^4.1.0",
     "autoprefixer": "^10.4.21",
     "classnames": "^2.5.1",
     "eslint": "^9.37.0",
-    "eslint-plugin-react-dom": "^2.0.6",
+    "eslint-plugin-react-dom": "^2.2.2",
     "eslint-plugin-react-hooks": "^7.0.0",
-    "eslint-plugin-react-refresh": "^0.4.23",
-    "eslint-plugin-react-x": "^2.0.6",
+    "eslint-plugin-react-refresh": "^0.4.24",
+    "eslint-plugin-react-x": "^2.2.2",
     "globals": "^16.4.0",
     "jiti": "^2.6.1",
     "postcss": "^8.5.6",
     "sass": "^1.93.2",
     "typed-scss-modules": "^8.1.1",
     "typescript": "^5.9.3",
-    "vite": "^7.1.9"
+    "vite": "^7.1.10"
   }
 }

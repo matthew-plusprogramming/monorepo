@@ -30,10 +30,10 @@
     "decrypt-envs": "dotenvx decrypt -f .env.dev .env.production&& echo 'WARNING: DO NOT COMMIT decrypted .env files to the repository!'"
   },
   "devDependencies": {
-    "@aws-sdk/client-cloudwatch-logs": "^3.906.0",
-    "@aws-sdk/client-dynamodb": "^3.906.0",
-    "@aws-sdk/client-eventbridge": "^3.906.0",
-    "@aws-sdk/util-dynamodb": "^3.906.0",
+    "@aws-sdk/client-cloudwatch-logs": "^3.911.0",
+    "@aws-sdk/client-dynamodb": "^3.911.0",
+    "@aws-sdk/client-eventbridge": "^3.911.0",
+    "@aws-sdk/util-dynamodb": "^3.911.0",
     "@cdk/backend-server-cdk": "*",
     "@configs/eslint-config": "*",
     "@configs/ts-config": "*",
@@ -58,7 +58,7 @@
     "serverless-http": "^4.0.0",
     "supertest": "^7.1.4",
     "typescript": "^5.9.3",
-    "vite": "^7.1.9",
+    "vite": "^7.1.10",
     "vitest": "^3.2.4",
     "zod": "^4.1.12"
   }
