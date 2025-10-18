@@ -7,7 +7,8 @@ import { IamPolicy } from '@cdktf/provider-aws/lib/iam-policy';
 import { IamRole } from '@cdktf/provider-aws/lib/iam-role';
 import { IamRolePolicyAttachment } from '@cdktf/provider-aws/lib/iam-role-policy-attachment';
 import { LambdaFunction } from '@cdktf/provider-aws/lib/lambda-function';
-import { AssetType, TerraformAsset, Token } from 'cdktf';
+import { LambdaFunctionUrl } from '@cdktf/provider-aws/lib/lambda-function-url';
+import { AssetType, TerraformAsset, TerraformOutput, Token } from 'cdktf';
 import type { Construct } from 'constructs';
 
 import { packageRootDir } from '../../location';
@@ -85,7 +86,6 @@ export const generateApiLambda = (scope: Construct, region: string): void => {
     },
   );
 
-  // TODO: Implement public URL
   const asset = new TerraformAsset(scope, `${API_LAMBDA_FUNCTION_NAME}-asset`, {
     path: resolve(packageRootDir, 'dist/lambda.zip'),
     type: AssetType.FILE,
@@ -102,7 +102,7 @@ export const generateApiLambda = (scope: Construct, region: string): void => {
 
   // TODO: Move these constants (memory size, reserved concurrency, etc) to config
   // TODO: Set log group to application log group
-  new LambdaFunction(scope, 'my-lambda-function', {
+  const lambdaFunction = new LambdaFunction(scope, API_LAMBDA_FUNCTION_NAME, {
     functionName: API_LAMBDA_FUNCTION_NAME,
     filename: asset.path,
     handler: 'lambda.handler',
@@ -116,5 +116,19 @@ export const generateApiLambda = (scope: Construct, region: string): void => {
       logFormat: 'Text',
       logGroup: lambdaLogGroup.name,
     },
+  });
+
+  const lambdaUrl = new LambdaFunctionUrl(
+    scope,
+    `${API_LAMBDA_FUNCTION_NAME}-url`,
+    {
+      functionName: lambdaFunction.functionName,
+      authorizationType: 'NONE',
+    },
+  );
+
+  new TerraformOutput(scope, 'apiLambdaFunctionUrl', {
+    value: lambdaUrl.functionUrl,
+    description: 'The URL of the API Lambda function',
   });
 };
