@@ -16,6 +16,7 @@ Auth Package (Integrated into node server)
 - [x] Set low concurrency (10)
 - [x] Coarse rate limiting
   - [ ] Global config
+- [ ] Implement repo services for specific data access
 - [ ] Authenticates user
 - [ ] Deny-list check
 - [ ] Integrate authzed (spiceDB)
