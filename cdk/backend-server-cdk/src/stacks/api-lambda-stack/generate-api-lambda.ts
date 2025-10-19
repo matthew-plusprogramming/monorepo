@@ -64,12 +64,14 @@ export const generateApiLambda = (scope: Construct, region: string): void => {
     scope,
     `${API_LAMBDA_FUNCTION_NAME}-put-events-policy`,
     {
+      name: `${API_LAMBDA_FUNCTION_NAME}-put-events-policy`,
       policy: eventBridgePolicyDocument.json,
     },
   );
 
   // TODO: Implement aws_iam_role_policy_attachment
   const iamRole = new IamRole(scope, `${API_LAMBDA_FUNCTION_NAME}-role`, {
+    name: `${API_LAMBDA_FUNCTION_NAME}-role`,
     assumeRolePolicy: Token.asString(assumeRole.json),
     managedPolicyArns: [
       'arn:aws:iam::aws:policy/AmazonDynamoDBFullAccess_v2',
