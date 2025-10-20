@@ -12,6 +12,9 @@ import { globalIgnores } from 'eslint/config';
 import { includeIgnoreFile } from '@eslint/compat';
 import { fileURLToPath } from 'node:url';
 import { ESLint } from 'eslint';
+import reactPlugin from 'eslint-plugin-react';
+import reactHooksPlugin from 'eslint-plugin-react-hooks';
+import jsxA11yPlugin from 'eslint-plugin-jsx-a11y';
 
 const eslintIgnorePatterns = [
   '**/.git',
@@ -121,6 +124,40 @@ export const baseConfig = (
       '@stylistic/js/new-parens': 'error',
       '@stylistic/ts/no-extra-semi': 'error',
       '@stylistic/ts/space-before-blocks': 'error',
+
+      // Strictest rules
+      '@typescript-eslint/no-misused-promises': [
+        'error',
+        { checksVoidReturn: false },
+      ],
+      '@typescript-eslint/require-await': 'error',
+      '@typescript-eslint/restrict-template-expressions': [
+        'error',
+        { allowNumber: true, allowBoolean: false, allowNullish: false },
+      ],
+      '@typescript-eslint/no-unsafe-assignment': 'warn',
+      '@typescript-eslint/no-unsafe-member-access': 'warn',
+      '@typescript-eslint/no-unsafe-call': 'warn',
+      '@typescript-eslint/no-unsafe-return': 'warn',
+      '@typescript-eslint/prefer-readonly': 'warn',
+      '@typescript-eslint/no-confusing-void-expression': 'error',
+
+      // Strict code structure
+      complexity: ['warn', { max: 10 }],
+      'max-lines': ['warn', 400],
+      'max-lines-per-function': ['warn', 80],
+      'max-depth': ['warn', 4],
+      'max-nested-callbacks': ['warn', 3],
+
+      // Strict clarity and whitespace
+      '@stylistic/js/quotes': ['error', 'single', { avoidEscape: true }],
+      '@stylistic/js/semi': ['error', 'always'],
+      '@stylistic/js/comma-dangle': ['error', 'always-multiline'],
+      '@stylistic/js/indent': ['error', 2, { SwitchCase: 1 }],
+      '@stylistic/js/space-infix-ops': 'error',
+
+      // Deprecated rules
+      '@typescript-eslint/no-deprecated': 'error',
     },
     settings: {
       'import/resolver': {
@@ -134,4 +171,25 @@ export const baseConfig = (
   prettier,
   includeIgnoreFile(gitignorePath),
   globalIgnores(eslintIgnorePatterns),
+];
+
+export const reactConfig = (
+  tsconfigDirectory: string,
+  projectOverride?: string[],
+): Array<ConfigWithExtends> => [
+  ...baseConfig(tsconfigDirectory, projectOverride),
+  {
+    plugins: {
+      react: reactPlugin,
+      'react-hooks': reactHooksPlugin,
+      'jsx-a11y': jsxA11yPlugin,
+    },
+    rules: {
+      'react/jsx-boolean-value': ['error', 'never'],
+      'react/jsx-no-useless-fragment': 'error',
+      'react-hooks/rules-of-hooks': 'error',
+      'react-hooks/exhaustive-deps': 'warn',
+      'jsx-a11y/no-autofocus': 'warn',
+    },
+  },
 ];

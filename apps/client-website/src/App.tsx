@@ -31,7 +31,12 @@ export const App = (): JSX.Element => {
       </div>
       <h1>Vite + React</h1>
       <div className={classnames(styles.card)}>
-        <button onClick={() => setCount((count) => count + 1)} type="button">
+        <button
+          onClick={() => {
+            setCount((count) => count + 1);
+          }}
+          type="button"
+        >
           count is {count}
         </button>
         <p>
