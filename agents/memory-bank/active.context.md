@@ -63,3 +63,12 @@ Reflexion
 - 2025-10-15 — Verify phase: Exercised the CDK outputs client suite to ensure shared stack names resolve while bundling toggles.
   Formatted Memory Bank markdown and ran validation/drift scripts to lock in the new constants metadata.
   Double-checked consumer exports to avoid stack re-entry loops during runtime resolution.
+- 2025-10-20 — Plan phase: Ran lint, catalogued current errors, and mapped helper extraction to hit lint gates.
+  Logged acceptance criteria for a warning-free lint run and captured impacted files plus invariants.
+  Ready to extract helpers, tighten types, and rerun lint during build.
+- 2025-10-20 — Build phase: Refactored heartbeat handler and CDK generator into helper functions and tightened JSON parse typing.
+  Added justified `max-lines-per-function` disables for integration-heavy tests and rewrote logger tests to assert promise resolution.
+  Finished with a clean `npm run lint` after running `npm run lint:fix` for formatting.
+- 2025-10-20 — Verify phase: Re-ran `npm run lint` to confirm acceptance criteria and zero warnings remain satisfied.
+  Stamped Memory Bank metadata with current date/SHA and reran `memory:validate` plus `memory:drift` successfully.
+  Ready to summarize work, highlight disable rationales, and propose next steps.

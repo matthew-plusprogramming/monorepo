@@ -16,8 +16,8 @@ import { ANALYTICS_EVENT_BUS_NAME } from '../analytics-stack/constants';
 
 import { API_LAMBDA_FUNCTION_NAME } from './constants';
 
-export const generateApiLambda = (scope: Construct, region: string): void => {
-  const assumeRole = new DataAwsIamPolicyDocument(
+const createAssumeRoleDocument = (scope: Construct): DataAwsIamPolicyDocument =>
+  new DataAwsIamPolicyDocument(
     scope,
     `${API_LAMBDA_FUNCTION_NAME}-assume-role`,
     {
@@ -36,10 +36,11 @@ export const generateApiLambda = (scope: Construct, region: string): void => {
     },
   );
 
-  const callerIdentity = new DataAwsCallerIdentity(
-    scope,
-    `${API_LAMBDA_FUNCTION_NAME}-caller`,
-  );
+const createAnalyticsPolicy = (
+  scope: Construct,
+  region: string,
+  callerIdentity: DataAwsCallerIdentity,
+): IamPolicy => {
   const analyticsEventBusArn = `arn:aws:events:${region}:${Token.asString(
     callerIdentity.accountId,
   )}:event-bus/${ANALYTICS_EVENT_BUS_NAME}`;
@@ -60,16 +61,17 @@ export const generateApiLambda = (scope: Construct, region: string): void => {
     },
   );
 
-  const putEventsPolicy = new IamPolicy(
-    scope,
-    `${API_LAMBDA_FUNCTION_NAME}-put-events-policy`,
-    {
-      name: `${API_LAMBDA_FUNCTION_NAME}-put-events-policy`,
-      policy: eventBridgePolicyDocument.json,
-    },
-  );
+  return new IamPolicy(scope, `${API_LAMBDA_FUNCTION_NAME}-put-events-policy`, {
+    name: `${API_LAMBDA_FUNCTION_NAME}-put-events-policy`,
+    policy: eventBridgePolicyDocument.json,
+  });
+};
 
-  // TODO: Implement aws_iam_role_policy_attachment
+const createExecutionRole = (
+  scope: Construct,
+  assumeRole: DataAwsIamPolicyDocument,
+  putEventsPolicy: IamPolicy,
+): IamRole => {
   const iamRole = new IamRole(scope, `${API_LAMBDA_FUNCTION_NAME}-role`, {
     name: `${API_LAMBDA_FUNCTION_NAME}-role`,
     assumeRolePolicy: Token.asString(assumeRole.json),
@@ -88,6 +90,14 @@ export const generateApiLambda = (scope: Construct, region: string): void => {
     },
   );
 
+  return iamRole;
+};
+
+const createLambdaResources = (
+  scope: Construct,
+  region: string,
+  iamRole: IamRole,
+): { lambdaFunction: LambdaFunction; lambdaUrl: LambdaFunctionUrl } => {
   const asset = new TerraformAsset(scope, `${API_LAMBDA_FUNCTION_NAME}-asset`, {
     path: resolve(packageRootDir, 'dist/lambda.zip'),
     type: AssetType.FILE,
@@ -102,8 +112,6 @@ export const generateApiLambda = (scope: Construct, region: string): void => {
     },
   );
 
-  // TODO: Move these constants (memory size, reserved concurrency, etc) to config
-  // TODO: Set log group to application log group
   const lambdaFunction = new LambdaFunction(scope, API_LAMBDA_FUNCTION_NAME, {
     functionName: API_LAMBDA_FUNCTION_NAME,
     filename: asset.path,
@@ -128,6 +136,19 @@ export const generateApiLambda = (scope: Construct, region: string): void => {
       authorizationType: 'NONE',
     },
   );
+
+  return { lambdaFunction, lambdaUrl };
+};
+
+export const generateApiLambda = (scope: Construct, region: string): void => {
+  const assumeRole = createAssumeRoleDocument(scope);
+  const callerIdentity = new DataAwsCallerIdentity(
+    scope,
+    `${API_LAMBDA_FUNCTION_NAME}-caller`,
+  );
+  const putEventsPolicy = createAnalyticsPolicy(scope, region, callerIdentity);
+  const executionRole = createExecutionRole(scope, assumeRole, putEventsPolicy);
+  const { lambdaUrl } = createLambdaResources(scope, region, executionRole);
 
   new TerraformOutput(scope, 'apiLambdaFunctionUrl', {
     value: lambdaUrl.functionUrl,

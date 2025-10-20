@@ -41,7 +41,7 @@ const loadOutput = <T extends ConsumableStack>(
     throw new Error(`Stack output file not found: ${stackOutputPath}`);
   }
   const stackOutputData = readFileSync(stackOutputPath, 'utf-8');
-  const stackOutput = JSON.parse(stackOutputData);
+  const stackOutput: unknown = JSON.parse(stackOutputData);
 
   const stackConfig = stacks.find(
     (s): s is StackConfig & { name: T } => s.name === stack,

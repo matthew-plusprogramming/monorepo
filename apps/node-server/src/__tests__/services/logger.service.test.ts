@@ -48,14 +48,14 @@ describe('ConsoleLoggerService', () => {
       .spyOn(console, 'info')
       .mockImplementation(() => undefined);
 
-    const result = await runWithLayer(ApplicationLoggerService, (service) =>
-      service.log('hello world', 123, { extra: true }),
-    );
-
+    await expect(
+      runWithLayer(ApplicationLoggerService, (service) =>
+        service.log('hello world', 123, { extra: true }),
+      ),
+    ).resolves.toBeUndefined();
     expect(consoleInfo).toHaveBeenCalledWith('hello world', 123, {
       extra: true,
     });
-    expect(result).toBeUndefined();
   });
 
   it('logs errors via console.error and resolves with undefined', async () => {
@@ -64,11 +64,11 @@ describe('ConsoleLoggerService', () => {
       .mockImplementation(() => undefined);
     const error = new Error('boom');
 
-    const result = await runWithLayer(SecurityLoggerService, (service) =>
-      service.logError(error, 'during heartbeat'),
-    );
-
+    await expect(
+      runWithLayer(SecurityLoggerService, (service) =>
+        service.logError(error, 'during heartbeat'),
+      ),
+    ).resolves.toBeUndefined();
     expect(consoleError).toHaveBeenCalledWith(error, 'during heartbeat');
-    expect(result).toBeUndefined();
   });
 });

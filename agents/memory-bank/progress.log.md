@@ -25,3 +25,6 @@ last_reviewed: 2025-09-21
 - 2025-10-14: Synced backend-server-cdk docs with stack names and outputs, and hardened consumer typing against bootstrap artifacts.
 - 2025-10-15: Planned stack-name single source across CDK consumers and node-client, flagging re-export and cycle risks.
 - 2025-10-15: Built shared stack-name exports, updated schemas/stacks/client/tests, and verified via targeted Vitest run.
+- 2025-10-20: Planned lint remediation across node-server tests, heartbeat handler, and CDK consumers; documented acceptance criteria and invariants before refactors.
+- 2025-10-20: Executed lint fixes by adding scoped `max-lines-per-function` disables, restructuring heartbeat handler/CDK lambda helpers, tightening JSON parsing, and confirming lint passes.
+- 2025-10-20: Verified lint remains clean post-fixes and completed memory validation plus drift checks after stamping metadata.
