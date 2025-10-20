@@ -92,19 +92,21 @@ export const createDynamoDbServiceFake = (): DynamoDbServiceFake => {
 
   const service: DynamoDbServiceSchema = {
     getItem: (input) =>
-      Effect.sync(() => recordCall('getItem', input)).pipe(
-        Effect.flatMap(() => dequeue(responseQueues.getItem, 'getItem')),
-      ),
+      Effect.sync(() => {
+        recordCall('getItem', input);
+      }).pipe(Effect.flatMap(() => dequeue(responseQueues.getItem, 'getItem'))),
     putItem: (input) =>
-      Effect.sync(() => recordCall('putItem', input)).pipe(
-        Effect.flatMap(() => dequeue(responseQueues.putItem, 'putItem')),
-      ),
+      Effect.sync(() => {
+        recordCall('putItem', input);
+      }).pipe(Effect.flatMap(() => dequeue(responseQueues.putItem, 'putItem'))),
     query: (input) =>
-      Effect.sync(() => recordCall('query', input)).pipe(
-        Effect.flatMap(() => dequeue(responseQueues.query, 'query')),
-      ),
+      Effect.sync(() => {
+        recordCall('query', input);
+      }).pipe(Effect.flatMap(() => dequeue(responseQueues.query, 'query'))),
     updateItem: (input) =>
-      Effect.sync(() => recordCall('updateItem', input)).pipe(
+      Effect.sync(() => {
+        recordCall('updateItem', input);
+      }).pipe(
         Effect.flatMap(() => dequeue(responseQueues.updateItem, 'updateItem')),
       ),
   };

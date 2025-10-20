@@ -109,6 +109,10 @@ export const ipRateLimitingMiddlewareRequestHandler: RequestHandler = async (
         Effect.fail(res.status(HTTP_RESPONSE.THROTTLED).send()),
       ),
     )
-    .pipe(Effect.tap(() => next()))
+    .pipe(
+      Effect.tap(() => {
+        next();
+      }),
+    )
     .pipe(Effect.runPromise);
 };

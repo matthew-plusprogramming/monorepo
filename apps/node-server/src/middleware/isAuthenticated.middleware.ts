@@ -78,6 +78,10 @@ export const isAuthenticatedMiddlewareRequestHandler: RequestHandler = async (
         Effect.fail(res.status(HTTP_RESPONSE.BAD_REQUEST).send()),
       ),
     )
-    .pipe(Effect.tap(() => next()))
+    .pipe(
+      Effect.tap(() => {
+        next();
+      }),
+    )
     .pipe(Effect.runPromise);
 };
