@@ -28,3 +28,6 @@ last_reviewed: 2025-09-21
 - 2025-10-20: Planned lint remediation across node-server tests, heartbeat handler, and CDK consumers; documented acceptance criteria and invariants before refactors.
 - 2025-10-20: Executed lint fixes by adding scoped `max-lines-per-function` disables, restructuring heartbeat handler/CDK lambda helpers, tightening JSON parsing, and confirming lint passes.
 - 2025-10-20: Verified lint remains clean post-fixes and completed memory validation plus drift checks after stamping metadata.
+- 2025-10-20: Planned a lint rerun with refactor-first fixes, logging acceptance criteria and risks before entering build.
+- 2025-10-20: Refactored node-server test suites to comply with `max-lines-per-function`, ran Prettier, and restored a clean `npm run lint` result.
+- 2025-10-20: Verified lint remains clean, stamped Memory Bank metadata with HEAD, and ran `memory:validate` plus `memory:drift` to close the workflow.

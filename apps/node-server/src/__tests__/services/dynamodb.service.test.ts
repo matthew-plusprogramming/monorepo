@@ -59,110 +59,122 @@ vi.mock('@smithy/node-http-handler', () => ({
 }));
 
 describe('DynamoDbService adapter', () => {
-  const useService = <R>(
-    run: (service: DynamoDbServiceSchema) => Effect.Effect<R, Error>,
-  ): Promise<R> =>
-    Effect.runPromise(
-      Effect.gen(function* () {
-        const service = yield* DynamoDbService;
-        return yield* run(service);
-      }).pipe(Effect.provide(LiveDynamoDbService)),
-    );
+  beforeEach(initializeDynamoContext);
+  afterEach(cleanupDynamoContext);
 
-  beforeEach(() => {
-    sendMock.mockReset();
-    mocks.lastClientConfig = undefined;
-    process.env.AWS_REGION = 'us-east-1';
-  });
+  it(
+    'sends GetItemCommand via AWS client and returns the response',
+    sendsGetItemCommand,
+  );
+  it('wraps AWS rejections into Error instances', wrapsRejectionsAsErrors);
+  it('allows updating items through the adapter', allowsUpdateItem);
+  it('writes items with putItem', writesItemsWithPutItem);
+  it('propagates putItem failures as Errors', propagatesPutItemFailures);
+});
 
-  afterEach(() => {
-    Reflect.deleteProperty(process.env, 'AWS_REGION');
-  });
+const useService = <R>(
+  run: (service: DynamoDbServiceSchema) => Effect.Effect<R, Error>,
+): Promise<R> =>
+  Effect.runPromise(
+    Effect.gen(function* () {
+      const service = yield* DynamoDbService;
+      return yield* run(service);
+    }).pipe(Effect.provide(LiveDynamoDbService)),
+  );
 
-  it('sends GetItemCommand via AWS client and returns the response', async () => {
-    const output = { $metadata: { httpStatusCode: 200 } };
-    sendMock.mockResolvedValueOnce(output);
+function initializeDynamoContext(): void {
+  sendMock.mockReset();
+  mocks.lastClientConfig = undefined;
+  process.env.AWS_REGION = 'us-east-1';
+}
 
-    const result = await useService((service) =>
-      service.getItem({
-        TableName: 'users',
-        Key: { id: { S: 'id-123' } },
-      }),
-    );
+function cleanupDynamoContext(): void {
+  Reflect.deleteProperty(process.env, 'AWS_REGION');
+}
 
-    expect(result).toBe(output);
-    expect(sendMock).toHaveBeenCalledTimes(1);
-    const command = sendMock.mock.calls[0]?.[0] as CommandWithInput;
-    expect(command?.input).toEqual({
+async function sendsGetItemCommand(): Promise<void> {
+  const output = { $metadata: { httpStatusCode: 200 } };
+  sendMock.mockResolvedValueOnce(output);
+
+  const result = await useService((service) =>
+    service.getItem({
       TableName: 'users',
       Key: { id: { S: 'id-123' } },
-    });
+    }),
+  );
 
-    expect(mocks.lastClientConfig).toMatchObject({
-      region: 'us-east-1',
-      maxAttempts: 2,
-    });
-    expect(mocks.httpHandlerConfig).toMatchObject({
-      connectionTimeout: 300,
-      socketTimeout: 1000,
-      requestTimeout: 1500,
-    });
+  expect(result).toBe(output);
+  expect(sendMock).toHaveBeenCalledTimes(1);
+  const command = sendMock.mock.calls[0]?.[0] as CommandWithInput;
+  expect(command?.input).toEqual({
+    TableName: 'users',
+    Key: { id: { S: 'id-123' } },
   });
 
-  it('wraps AWS rejections into Error instances', async () => {
-    sendMock.mockRejectedValueOnce('network unavailable');
-
-    await expect(
-      useService((service) => service.query({ TableName: 'users' })),
-    ).rejects.toMatchObject({ message: 'network unavailable' });
+  expect(mocks.lastClientConfig).toMatchObject({
+    region: 'us-east-1',
+    maxAttempts: 2,
   });
+  expect(mocks.httpHandlerConfig).toMatchObject({
+    connectionTimeout: 300,
+    socketTimeout: 1000,
+    requestTimeout: 1500,
+  });
+}
 
-  it('allows updating items through the adapter', async () => {
-    const output = { $metadata: { httpStatusCode: 200 }, Attributes: {} };
-    sendMock.mockResolvedValueOnce(output);
+async function wrapsRejectionsAsErrors(): Promise<void> {
+  sendMock.mockRejectedValueOnce('network unavailable');
 
-    const result = await useService((service) =>
-      service.updateItem({ TableName: 'users', Key: { id: { S: '123' } } }),
-    );
+  await expect(
+    useService((service) => service.query({ TableName: 'users' })),
+  ).rejects.toMatchObject({ message: 'network unavailable' });
+}
 
-    expect(result).toBe(output);
-    const command = sendMock.mock.calls[0]?.[0] as CommandWithInput;
-    expect(command?.input).toMatchObject({
+async function allowsUpdateItem(): Promise<void> {
+  const output = { $metadata: { httpStatusCode: 200 }, Attributes: {} };
+  sendMock.mockResolvedValueOnce(output);
+
+  const result = await useService((service) =>
+    service.updateItem({ TableName: 'users', Key: { id: { S: '123' } } }),
+  );
+
+  expect(result).toBe(output);
+  const command = sendMock.mock.calls[0]?.[0] as CommandWithInput;
+  expect(command?.input).toMatchObject({
+    TableName: 'users',
+    Key: { id: { S: '123' } },
+  });
+}
+
+async function writesItemsWithPutItem(): Promise<void> {
+  const output = { $metadata: { httpStatusCode: 200 } };
+  sendMock.mockResolvedValueOnce(output);
+
+  const result = await useService((service) =>
+    service.putItem({
       TableName: 'users',
-      Key: { id: { S: '123' } },
-    });
+      Item: { id: { S: 'new-user' } },
+    }),
+  );
+
+  expect(result).toBe(output);
+  expect(sendMock).toHaveBeenCalledTimes(1);
+  const command = sendMock.mock.calls[0]?.[0] as CommandWithInput;
+  expect(command?.input).toEqual({
+    TableName: 'users',
+    Item: { id: { S: 'new-user' } },
   });
+}
 
-  it('writes items with putItem', async () => {
-    const output = { $metadata: { httpStatusCode: 200 } };
-    sendMock.mockResolvedValueOnce(output);
+async function propagatesPutItemFailures(): Promise<void> {
+  sendMock.mockRejectedValueOnce('write failed');
 
-    const result = await useService((service) =>
+  await expect(
+    useService((service) =>
       service.putItem({
         TableName: 'users',
         Item: { id: { S: 'new-user' } },
       }),
-    );
-
-    expect(result).toBe(output);
-    expect(sendMock).toHaveBeenCalledTimes(1);
-    const command = sendMock.mock.calls[0]?.[0] as CommandWithInput;
-    expect(command?.input).toEqual({
-      TableName: 'users',
-      Item: { id: { S: 'new-user' } },
-    });
-  });
-
-  it('propagates putItem failures as Errors', async () => {
-    sendMock.mockRejectedValueOnce('write failed');
-
-    await expect(
-      useService((service) =>
-        service.putItem({
-          TableName: 'users',
-          Item: { id: { S: 'new-user' } },
-        }),
-      ),
-    ).rejects.toMatchObject({ message: 'write failed' });
-  });
-});
+    ),
+  ).rejects.toMatchObject({ message: 'write failed' });
+}

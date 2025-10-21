@@ -69,114 +69,132 @@ const expectPartitionKey = (
 };
 
 describe('ipRateLimitingMiddlewareRequestHandler', () => {
-  beforeEach(() => {
-    getLoggerFake().reset();
-    getDynamoFake().reset();
-  });
-
+  beforeEach(resetFakes);
   afterEach(() => {
     vi.useRealTimers();
   });
 
-  it('passes through when the IP is under the allowed threshold', async () => {
-    vi.useFakeTimers();
-    const now = new Date('2024-01-01T00:00:05Z');
-    vi.setSystemTime(now);
+  it(
+    'passes through when the IP is under the allowed threshold',
+    passesThroughWhenUnderThreshold,
+  );
 
-    const { req, res, next, captured } = makeRequestContext({
-      ip: '198.51.100.20',
-    });
+  it(
+    'returns 429 and logs when the rate limit is exceeded',
+    returns429WhenExceeded,
+  );
 
-    const dynamoFake = getDynamoFake();
-    const updateResult: UpdateItemCommandOutput = {
-      $metadata: {},
-      Attributes: {
-        calls: { N: '3' },
-      },
-    };
-    dynamoFake.queueSuccess('updateItem', updateResult);
+  it(
+    'propagates an internal error when DynamoDB update fails',
+    propagatesWhenUpdateFails,
+  );
 
-    await expect(
-      ipRateLimitingMiddlewareRequestHandler(req, res, next),
-    ).resolves.toBeUndefined();
-
-    expect(next).toHaveBeenCalledTimes(1);
-    expect(captured.statusCode).toBeUndefined();
-
-    const [updateCall] = dynamoFake.calls.updateItem;
-    expect(updateCall?.TableName).toBe('rate-limit-table');
-    expect(req.ip).toBeDefined();
-    expectPartitionKey(
-      updateCall as UpdateItemCommandInput,
-      req.ip as string,
-      now,
-    );
-  });
-
-  it('returns 429 and logs when the rate limit is exceeded', async () => {
-    vi.useFakeTimers();
-    const now = new Date('2024-01-01T00:00:30Z');
-    vi.setSystemTime(now);
-
-    const { req, res, next, captured } = makeRequestContext({
-      ip: '203.0.113.42',
-    });
-
-    const dynamoFake = getDynamoFake();
-    const updateResult: UpdateItemCommandOutput = {
-      $metadata: {},
-      Attributes: {
-        calls: { N: '6' },
-      },
-    };
-    dynamoFake.queueSuccess('updateItem', updateResult);
-
-    await expect(
-      ipRateLimitingMiddlewareRequestHandler(req, res, next),
-    ).rejects.toBeDefined();
-    expect(captured.statusCode).toBe(HTTP_RESPONSE.THROTTLED);
-    expect(next).not.toHaveBeenCalled();
-    expect(getLoggerFake().entries.logs).toContainEqual([
-      `[RATE_LIMIT_EXCEEDED] ${req.ip as string} - 6 calls`,
-    ]);
-  });
-
-  it('propagates an internal error when DynamoDB update fails', async () => {
-    vi.useFakeTimers();
-    const now = new Date('2024-01-01T00:00:45Z');
-    vi.setSystemTime(now);
-
-    const { req, res, next, captured } = makeRequestContext({
-      ip: '192.0.2.10',
-    });
-
-    const dynamoFake = getDynamoFake();
-    dynamoFake.queueFailure('updateItem', new Error('ddb down'));
-
-    await expect(
-      ipRateLimitingMiddlewareRequestHandler(req, res, next),
-    ).rejects.toBeDefined();
-    expect(captured.statusCode).toBeUndefined();
-    expect(next).not.toHaveBeenCalled();
-    const errorArgs = getLoggerFake().entries.errors[0] ?? [];
-    const firstError = errorArgs[0];
-    expect(firstError).toBeInstanceOf(Error);
-    if (firstError instanceof Error) {
-      expect(firstError.message).toBe('ddb down');
-    }
-  });
-
-  it('returns 429 when the request has no resolved ip', async () => {
-    const { req, res, next, captured } = makeRequestContext();
-
-    const dynamoFake = getDynamoFake();
-
-    await expect(
-      ipRateLimitingMiddlewareRequestHandler(req, res, next),
-    ).rejects.toBeDefined();
-
-    expect(captured.statusCode).toBe(HTTP_RESPONSE.THROTTLED);
-    expect(dynamoFake.calls.updateItem).toHaveLength(0);
-    expect(next).not.toHaveBeenCalled();
-  });
+  it('returns 429 when the request has no resolved ip', rejectsWhenIpMissing);
 });
+
+function resetFakes(): void {
+  getLoggerFake().reset();
+  getDynamoFake().reset();
+}
+
+async function passesThroughWhenUnderThreshold(): Promise<void> {
+  vi.useFakeTimers();
+  const now = new Date('2024-01-01T00:00:05Z');
+  vi.setSystemTime(now);
+
+  const { req, res, next, captured } = makeRequestContext({
+    ip: '198.51.100.20',
+  });
+
+  const dynamoFake = getDynamoFake();
+  const updateResult: UpdateItemCommandOutput = {
+    $metadata: {},
+    Attributes: {
+      calls: { N: '3' },
+    },
+  };
+  dynamoFake.queueSuccess('updateItem', updateResult);
+
+  await expect(
+    ipRateLimitingMiddlewareRequestHandler(req, res, next),
+  ).resolves.toBeUndefined();
+
+  expect(next).toHaveBeenCalledTimes(1);
+  expect(captured.statusCode).toBeUndefined();
+
+  const [updateCall] = dynamoFake.calls.updateItem;
+  expect(updateCall?.TableName).toBe('rate-limit-table');
+  expect(req.ip).toBeDefined();
+  expectPartitionKey(
+    updateCall as UpdateItemCommandInput,
+    req.ip as string,
+    now,
+  );
+}
+
+async function returns429WhenExceeded(): Promise<void> {
+  vi.useFakeTimers();
+  const now = new Date('2024-01-01T00:00:30Z');
+  vi.setSystemTime(now);
+
+  const { req, res, next, captured } = makeRequestContext({
+    ip: '203.0.113.42',
+  });
+
+  const dynamoFake = getDynamoFake();
+  const updateResult: UpdateItemCommandOutput = {
+    $metadata: {},
+    Attributes: {
+      calls: { N: '6' },
+    },
+  };
+  dynamoFake.queueSuccess('updateItem', updateResult);
+
+  await expect(
+    ipRateLimitingMiddlewareRequestHandler(req, res, next),
+  ).rejects.toBeDefined();
+  expect(captured.statusCode).toBe(HTTP_RESPONSE.THROTTLED);
+  expect(next).not.toHaveBeenCalled();
+  expect(getLoggerFake().entries.logs).toContainEqual([
+    `[RATE_LIMIT_EXCEEDED] ${req.ip as string} - 6 calls`,
+  ]);
+}
+
+async function propagatesWhenUpdateFails(): Promise<void> {
+  vi.useFakeTimers();
+  const now = new Date('2024-01-01T00:00:45Z');
+  vi.setSystemTime(now);
+
+  const { req, res, next, captured } = makeRequestContext({
+    ip: '192.0.2.10',
+  });
+
+  const dynamoFake = getDynamoFake();
+  dynamoFake.queueFailure('updateItem', new Error('ddb down'));
+
+  await expect(
+    ipRateLimitingMiddlewareRequestHandler(req, res, next),
+  ).rejects.toBeDefined();
+  expect(captured.statusCode).toBeUndefined();
+  expect(next).not.toHaveBeenCalled();
+  const errorArgs = getLoggerFake().entries.errors[0] ?? [];
+  const firstError = errorArgs[0];
+  expect(firstError).toBeInstanceOf(Error);
+  if (firstError instanceof Error) {
+    expect(firstError.message).toBe('ddb down');
+  }
+}
+
+async function rejectsWhenIpMissing(): Promise<void> {
+  const { req, res, next, captured } = makeRequestContext();
+
+  const dynamoFake = getDynamoFake();
+
+  await expect(
+    ipRateLimitingMiddlewareRequestHandler(req, res, next),
+  ).rejects.toBeDefined();
+
+  expect(captured.statusCode).toBe(HTTP_RESPONSE.THROTTLED);
+  expect(dynamoFake.calls.updateItem).toHaveLength(0);
+  expect(next).not.toHaveBeenCalled();
+}

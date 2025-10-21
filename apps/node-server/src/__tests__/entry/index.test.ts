@@ -157,33 +157,7 @@ describe('node-server index entrypoint', () => {
   it('bootstraps express app when environment validation succeeds', async () => {
     const module = await import('@/index');
 
-    const expressApp = requireExpressApp();
-    const parse = requireEnvironmentParse();
-    const jsonMiddleware = requireExpressJsonMiddleware();
-
-    expect(expressModule.factory).toHaveBeenCalledTimes(1);
-    expect(parse).toHaveBeenCalledWith(process.env);
-    expect(expressApp.use).toHaveBeenNthCalledWith(
-      1,
-      requireIpRateLimitMiddleware(),
-    );
-    expect(expressModule.json).toHaveBeenCalledTimes(1);
-    expect(expressApp.use).toHaveBeenNthCalledWith(2, jsonMiddleware);
-    expect(expressApp.use).toHaveBeenNthCalledWith(
-      3,
-      requireJsonErrorMiddleware(),
-    );
-    expect(expressApp.post).toHaveBeenCalledWith(
-      '/register',
-      requireRegisterHandler(),
-    );
-    expect(expressApp.get).toHaveBeenCalledWith(
-      '/user/:identifier',
-      requireGetUserHandler(),
-    );
-    expect(expressApp.listen).toHaveBeenCalledWith('3000');
-    expect(module.app).toBe(expressApp);
-    expect(exitSpy).not.toHaveBeenCalled();
+    assertBootstrapSuccess({ module, exitSpy });
   });
 
   it('logs and exits when environment validation fails', async () => {
@@ -198,12 +172,8 @@ describe('node-server index entrypoint', () => {
     };
 
     await expect(import('@/index')).rejects.toBe(exitError);
-    expect(consoleErrorSpy).toHaveBeenNthCalledWith(
-      1,
-      'Environment variables validation failed',
-    );
-    expect(consoleErrorSpy).toHaveBeenCalledTimes(2);
-    expect(exitSpy).toHaveBeenCalledWith(1);
+
+    assertBootstrapFailure({ consoleErrorSpy, exitSpy });
   });
 });
 
@@ -240,4 +210,55 @@ function ensureDefined<T>(value: T | undefined, name: string): T {
     throw new Error(`${name} was not initialized`);
   }
   return value;
+}
+
+function assertBootstrapSuccess({
+  module,
+  exitSpy,
+}: {
+  module: { app?: ExpressAppStub | undefined };
+  exitSpy: ReturnType<typeof vi.spyOn>;
+}): void {
+  const expressApp = requireExpressApp();
+  const parse = requireEnvironmentParse();
+  const jsonMiddleware = requireExpressJsonMiddleware();
+
+  expect(expressModule.factory).toHaveBeenCalledTimes(1);
+  expect(parse).toHaveBeenCalledWith(process.env);
+  expect(expressApp.use).toHaveBeenNthCalledWith(
+    1,
+    requireIpRateLimitMiddleware(),
+  );
+  expect(expressModule.json).toHaveBeenCalledTimes(1);
+  expect(expressApp.use).toHaveBeenNthCalledWith(2, jsonMiddleware);
+  expect(expressApp.use).toHaveBeenNthCalledWith(
+    3,
+    requireJsonErrorMiddleware(),
+  );
+  expect(expressApp.post).toHaveBeenCalledWith(
+    '/register',
+    requireRegisterHandler(),
+  );
+  expect(expressApp.get).toHaveBeenCalledWith(
+    '/user/:identifier',
+    requireGetUserHandler(),
+  );
+  expect(expressApp.listen).toHaveBeenCalledWith('3000');
+  expect(module.app).toBe(expressApp);
+  expect(exitSpy).not.toHaveBeenCalled();
+}
+
+function assertBootstrapFailure({
+  consoleErrorSpy,
+  exitSpy,
+}: {
+  consoleErrorSpy: ReturnType<typeof vi.spyOn>;
+  exitSpy: ReturnType<typeof vi.spyOn>;
+}): void {
+  expect(consoleErrorSpy).toHaveBeenNthCalledWith(
+    1,
+    'Environment variables validation failed',
+  );
+  expect(consoleErrorSpy).toHaveBeenCalledTimes(2);
+  expect(exitSpy).toHaveBeenCalledWith(1);
 }
