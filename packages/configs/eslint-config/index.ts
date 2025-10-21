@@ -148,8 +148,8 @@ export const baseConfig = (
 
       // Strict code structure
       complexity: ['warn', { max: 10 }],
-      'max-lines': ['warn', 400],
-      'max-lines-per-function': ['warn', 80],
+      'max-lines': ['warn', 300],
+      'max-lines-per-function': ['warn', 75],
       'max-depth': ['warn', 4],
       'max-nested-callbacks': ['warn', 3],
 
