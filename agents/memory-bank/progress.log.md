@@ -31,3 +31,6 @@ last_reviewed: 2025-09-21
 - 2025-10-20: Planned a lint rerun with refactor-first fixes, logging acceptance criteria and risks before entering build.
 - 2025-10-20: Refactored node-server test suites to comply with `max-lines-per-function`, ran Prettier, and restored a clean `npm run lint` result.
 - 2025-10-20: Verified lint remains clean, stamped Memory Bank metadata with HEAD, and ran `memory:validate` plus `memory:drift` to close the workflow.
+- 2025-10-20: Planned the repository service workflow, capturing schema/infra/service steps, acceptance criteria, and testing strategy ahead of codifying the process.
+- 2025-10-20: Drafted `agents/workflows/repository-service.workflow.md` to operationalize the repository service checklist across schemas, infra, services, and tests.
+- 2025-10-20: Verified the repository service plan/workflow, formatted Markdown, updated Memory Bank metadata, and ran validation/drift scripts to confirm alignment with HEAD.
