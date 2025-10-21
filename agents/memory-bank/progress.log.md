@@ -69,3 +69,12 @@ last_reviewed: 2025-09-21
 - 2025-10-21: Plan phase for AAA comment rollout — inventoried all Vitest suites, scoped documentation updates, and queued validation scripts for verify.
 - 2025-10-21: Build phase for AAA comment rollout — added explicit Arrange/Act/Assert comments across every test file and documented the requirement in testing guidelines.
 - 2025-10-21: Verify phase for AAA comment rollout — executed agent:finalize (lint, validation, drift, quality scripts) to confirm the comment policy landed cleanly.
+- 2025-10-21: Plan phase for AAA enforcement script — scoped an agent to scan `.test.ts` files for Arrange/Act/Assert parity and outlined TypeScript AST traversal approach.
+  Logged integration with the aggregated quality runner plus failure messaging constraints before entering build.
+  Preparing implementation to enforce the comment convention automatically.
+- 2025-10-21: Build phase for AAA enforcement script — implemented the TypeScript AST scanner, integrated it into `check-code-quality.mjs`, and ran `npm run phase:check` to validate the workflow.
+  Confirmed the new script exits cleanly when tests comply and surfaces descriptive errors when they do not.
+  Ready to run verification scripts and stamp Memory Bank metadata.
+- 2025-10-21: Verify phase for AAA enforcement script — executed `npm run agent:finalize` (memory validation, drift check, phase:check) after updating the Memory Bank SHA.
+  Confirmed the aggregated quality runner passes with the new check and existing heuristics intact.
+  Ready to report enforcement coverage and surface any follow-up opportunities.
