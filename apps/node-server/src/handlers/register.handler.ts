@@ -86,7 +86,40 @@ const registerHandler = (
       role: USER_ROLE,
     } satisfies UserToken;
 
-    return sign(userToken, process.env.JWT_SECRET);
+    const signResult = yield* Effect.tryPromise({
+      try: () =>
+        new Promise<string>((resolve, reject) => {
+          sign(
+            userToken,
+            process.env.JWT_SECRET,
+            {
+              algorithm: 'HS256',
+            },
+            (err, token) => {
+              if (err || !token) {
+                reject(
+                  new Error(
+                    err
+                      ? `JWT sign error: ${err.message}`
+                      : 'No token returned',
+                  ),
+                );
+              } else {
+                resolve(token);
+              }
+            },
+          );
+        }),
+      catch: (error) =>
+        new InternalServerError({
+          message:
+            error instanceof Error
+              ? `Failed to sign JWT: ${error.message}`
+              : 'Failed to sign JWT',
+        }),
+    });
+
+    return signResult;
   });
 };
 

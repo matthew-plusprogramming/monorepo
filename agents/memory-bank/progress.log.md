@@ -65,3 +65,4 @@ last_reviewed: 2025-09-21
 - 2025-10-21: Plan phase for Api stack/security consolidation — outlined acceptance criteria, constraints, and target files/tests for folding the API security resources into the ApiStack before implementation.
 - 2025-10-21: Build phase for Api stack/security consolidation — merged security tables into ApiStack, removed the standalone stack, updated output schemas/clients/tests, and refreshed docs to reference the unified stack.
 - 2025-10-21: Verify phase for Api stack/security consolidation — reran lint, targeted the cdkOutputs Vitest suite, stamped Memory Bank metadata with HEAD, and executed memory validation/drift to confirm doc alignment.
+- 2025-10-21: Plan phase for register handler JWT tryPromise follow-up — captured acceptance criteria, risks, and target files to realign the handler tests with callback-based signing before making code changes.

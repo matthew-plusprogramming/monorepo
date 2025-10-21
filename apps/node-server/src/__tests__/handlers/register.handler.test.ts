@@ -5,6 +5,7 @@ import {
   USER_ROLE,
 } from '@packages/backend-core/auth';
 import type { RequestHandler } from 'express';
+import type { Mock } from 'vitest';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 /* eslint-disable max-lines */
@@ -17,7 +18,7 @@ import { restoreRandomUUID } from '@/__tests__/utils/uuid';
 // Hoisted state to capture the fake exposed by the AppLayer mock
 const userRepoModule = vi.hoisted((): { fake?: UserRepoFake } => ({}));
 const argonModule = vi.hoisted((): { hash?: ReturnType<typeof vi.fn> } => ({}));
-const jwtModule = vi.hoisted((): { sign?: ReturnType<typeof vi.fn> } => ({}));
+const jwtModule = vi.hoisted((): { sign?: Mock<JwtSignMock> } => ({}));
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null;
@@ -32,6 +33,14 @@ type JwtPayload = {
   jti: string;
   [key: string]: unknown;
 };
+
+type JwtSignCallback = (error: Error | null, token?: string) => void;
+type JwtSignMock = (
+  payload: Record<string, unknown>,
+  secret: string,
+  options: Record<string, unknown> | undefined,
+  callback: JwtSignCallback,
+) => void;
 
 const isJwtPayload = (candidate: unknown): candidate is JwtPayload => {
   if (!isRecord(candidate)) {
@@ -53,11 +62,19 @@ const isJwtPayload = (candidate: unknown): candidate is JwtPayload => {
 
 const isJwtSignCall = (
   candidate: unknown,
-): candidate is [Record<string, unknown>, string] =>
+): candidate is [
+  Record<string, unknown>,
+  string,
+  Record<string, unknown> | undefined,
+  JwtSignCallback,
+] =>
   Array.isArray(candidate) &&
-  candidate.length === 2 &&
+  candidate.length === 4 &&
   isRecord(candidate[0]) &&
-  typeof candidate[1] === 'string';
+  typeof candidate[1] === 'string' &&
+  (candidate[2] === undefined ||
+    (typeof candidate[2] === 'object' && candidate[2] !== null)) &&
+  typeof candidate[3] === 'function';
 
 vi.hoisted(() => {
   Reflect.set(globalThis, '__BUNDLED__', false);
@@ -82,8 +99,7 @@ vi.mock('@node-rs/argon2', () => {
 });
 
 vi.mock('jsonwebtoken', () => {
-  const sign =
-    vi.fn<(payload: Record<string, unknown>, secret: string) => string>();
+  const sign = vi.fn<JwtSignMock>();
   jwtModule.sign = sign;
   return { sign };
 });
@@ -102,7 +118,7 @@ const getHashMock = (): ReturnType<typeof vi.fn> => {
   return argonModule.hash;
 };
 
-const getSignMock = (): ReturnType<typeof vi.fn> => {
+const getSignMock = (): Mock<JwtSignMock> => {
   if (!jwtModule.sign) {
     throw new Error('jwt sign mock was not initialized');
   }
@@ -122,6 +138,8 @@ function initializeRegisterContext(): void {
   restoreRandomUUID();
   process.env.PEPPER = 'test-pepper';
   process.env.JWT_SECRET = 'shh-its-a-secret';
+  argonModule.hash?.mockReset();
+  jwtModule.sign?.mockReset();
 }
 
 async function returns201ForNewUser(): Promise<void> {
@@ -194,10 +212,10 @@ async function propagatesRepoCreateFailure(): Promise<void> {
   expect(captured.sendBody).toBe('ddb put failed');
 }
 
-async function rejectsWhenHashingFails(): Promise<void> {
+async function propagatesHashingFailure(): Promise<void> {
   getHashMock().mockRejectedValueOnce(new Error('argon2 failed'));
 
-  const { req, res } = makeRequestContext({
+  const { req, res, captured } = makeRequestContext({
     method: 'POST',
     url: '/register',
     body: createRegisterBody({ username: 'user', email: 'user@example.com' }),
@@ -207,17 +225,21 @@ async function rejectsWhenHashingFails(): Promise<void> {
   const repoFake = resetUserRepoFake();
   repoFake.queueFindNone();
 
-  await expect(handler(req, res, vi.fn())).rejects.toBeDefined();
+  await handler(req, res, vi.fn());
+  expect(captured.statusCode).toBe(HTTP_RESPONSE.BAD_GATEWAY);
+  expect(captured.sendBody).toBe('Bad Gateway');
 }
 
-async function rejectsWhenJwtFails(): Promise<void> {
+async function propagatesJwtFailure(): Promise<void> {
   const handler = await importRegisterHandler();
   getHashMock().mockResolvedValueOnce('hashed-password');
-  getSignMock().mockImplementationOnce(() => {
-    throw new Error('jwt sign failed');
-  });
+  getSignMock().mockImplementationOnce(
+    (_payload, _secret, _options, callback) => {
+      callback(new Error('jwt sign failed'));
+    },
+  );
 
-  const { req, res } = makeRequestContext({
+  const { req, res, captured } = makeRequestContext({
     method: 'POST',
     url: '/register',
     body: createRegisterBody({ username: 'user', email: 'user@example.com' }),
@@ -227,7 +249,9 @@ async function rejectsWhenJwtFails(): Promise<void> {
     const repoFake = resetUserRepoFake();
     repoFake.queueFindNone();
     repoFake.queueCreateSuccess();
-    await expect(handler(req, res, vi.fn())).rejects.toBeDefined();
+    await handler(req, res, vi.fn());
+    expect(captured.statusCode).toBe(HTTP_RESPONSE.BAD_GATEWAY);
+    expect(captured.sendBody).toBe('Bad Gateway');
   });
 }
 
@@ -254,7 +278,11 @@ function prepareSuccessfulRegistration(
   tokenResult: string,
 ): void {
   getHashMock().mockResolvedValueOnce(hashResult);
-  getSignMock().mockReturnValueOnce(tokenResult);
+  getSignMock().mockImplementationOnce(
+    (_payload, _secret, _options, callback) => {
+      callback(null, tokenResult);
+    },
+  );
   const repoFake = resetUserRepoFake();
   repoFake.queueFindNone();
   repoFake.queueCreateSuccess();
@@ -279,8 +307,9 @@ function assertSuccessfulRegistration({
   if (!isJwtSignCall(signCall)) {
     throw new Error('JWT sign call missing');
   }
-  const [payload, secret] = signCall;
+  const [payload, secret, options] = signCall;
   expect(secret).toBe('shh-its-a-secret');
+  expect(options).toMatchObject({ algorithm: 'HS256' });
   if (!isJwtPayload(payload)) {
     throw new Error('JWT payload missing fields');
   }
@@ -325,8 +354,14 @@ describe('registerRequestHandler', () => {
     'propagates repo create failure via InternalServerError (obfuscated 502)',
     propagatesRepoCreateFailure,
   );
-  it('rejects when hashing throws an unknown error', rejectsWhenHashingFails);
-  it('rejects when JWT signing throws an unknown error', rejectsWhenJwtFails);
+  it(
+    'propagates hashing failure via InternalServerError (obfuscated 502)',
+    propagatesHashingFailure,
+  );
+  it(
+    'propagates JWT signing failure via InternalServerError (obfuscated 502)',
+    propagatesJwtFailure,
+  );
 });
 
 /* eslint-enable max-lines */
