@@ -23,7 +23,9 @@ if (!fmMatch) {
 const fm = fmMatch[0];
 const shaMatch = fm.match(/repo_git_sha:\s*([a-f0-9]{7,40})/);
 if (!shaMatch) {
-  console.warn('⚠️ repo_git_sha not found in agents/memory-bank.md front matter. Skipping drift check.');
+  console.warn(
+    '⚠️ repo_git_sha not found in agents/memory-bank.md front matter. Skipping drift check.',
+  );
   process.exit(0);
 }
 
@@ -39,7 +41,9 @@ if (stampedSha === headSha) {
 let changed = '';
 try {
   const tracked = DRIFT_TRACKED_DIRS.join(' ');
-  changed = execSync(`git diff --name-only ${stampedSha} ${headSha} -- ${tracked}`)
+  changed = execSync(
+    `git diff --name-only ${stampedSha} ${headSha} -- ${tracked}`,
+  )
     .toString()
     .trim();
 } catch (e) {
@@ -49,7 +53,9 @@ try {
 }
 
 if (changed) {
-  console.error('❌ Memory bank drift detected in tracked areas since stamped SHA:');
+  console.error(
+    '❌ Memory bank drift detected in tracked areas since stamped SHA:',
+  );
   console.error(changed);
   console.error(
     `\nUpdate ${MEMORY_OVERVIEW} front matter (repo_git_sha/generated_at) and review canonical files under ${DRIFT_TRACKED_DIRS.join(', ')}.`,
@@ -57,4 +63,6 @@ if (changed) {
   process.exit(1);
 }
 
-console.info(`✅ No impactful changes under ${DRIFT_TRACKED_DIRS.join('/ ')} since stamped SHA.`);
+console.info(
+  `✅ No impactful changes under ${DRIFT_TRACKED_DIRS.join('/ ')} since stamped SHA.`,
+);

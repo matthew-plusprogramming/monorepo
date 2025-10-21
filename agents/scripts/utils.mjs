@@ -12,7 +12,9 @@ export const listGitTrackedFiles = () => {
       .map((line) => line.trim())
       .filter((line) => line.length > 0);
   } catch (error) {
-    console.error('❌ Failed to run "git ls-files". Ensure the script runs inside the repository.');
+    console.error(
+      '❌ Failed to run "git ls-files". Ensure the script runs inside the repository.',
+    );
     console.error(error.message);
     process.exit(1);
   }

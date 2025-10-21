@@ -1,5 +1,3 @@
-import { resolve } from 'node:path';
-
 import {
   formatFinding,
   isTestFile,
@@ -9,9 +7,9 @@ import {
   splitLines,
 } from './utils.mjs';
 
-const root = process.cwd();
 
 const ALLOWLIST = new Set([
+  // Approved runtime entry points
   'packages/core/backend-core/src/request.handler.ts',
   'apps/node-server/src/middleware/ipRateLimiting.middleware.ts',
   'apps/node-server/src/middleware/isAuthenticated.middleware.ts',

@@ -34,7 +34,11 @@ for (const arg of args) {
     process.exit(0);
   }
   if (arg.startsWith('--unsafe-types=')) {
-    const list = arg.slice('--unsafe-types='.length).split(',').map((t) => t.trim().toLowerCase()).filter(Boolean);
+    const list = arg
+      .slice('--unsafe-types='.length)
+      .split(',')
+      .map((t) => t.trim().toLowerCase())
+      .filter(Boolean);
     if (list.length) {
       options.unsafeTypes = new Set(list);
     } else {
@@ -67,7 +71,8 @@ const normalizeType = (text) => {
   return trimmed;
 };
 
-const normalizeForCompare = (text) => normalizeType(text).replace(/\s+/g, ' ').toLowerCase();
+const normalizeForCompare = (text) =>
+  normalizeType(text).replace(/\s+/g, ' ').toLowerCase();
 
 const determineScriptKind = (file) => {
   if (file.endsWith('.tsx')) return ts.ScriptKind.TSX;
@@ -90,7 +95,9 @@ const collectTrackedFiles = () => {
       .map((line) => line.trim())
       .filter((line) => line.length > 0);
   } catch (error) {
-    console.error('❌ Failed to run "git ls-files". Ensure the script runs inside the repository.');
+    console.error(
+      '❌ Failed to run "git ls-files". Ensure the script runs inside the repository.',
+    );
     console.error(error.message);
     process.exit(1);
   }
@@ -185,7 +192,13 @@ for (const relativePath of trackedFiles) {
   }
 
   const lines = sourceText.split(/\r?\n/);
-  const sourceFile = ts.createSourceFile(relativePath, sourceText, ts.ScriptTarget.Latest, true, determineScriptKind(relativePath));
+  const sourceFile = ts.createSourceFile(
+    relativePath,
+    sourceText,
+    ts.ScriptTarget.Latest,
+    true,
+    determineScriptKind(relativePath),
+  );
 
   const skip = new Set();
 
@@ -208,7 +221,8 @@ for (const relativePath of trackedFiles) {
           const innerTypeRaw = innerCandidate.type.getText(sourceFile);
           const innerCompare = normalizeForCompare(innerTypeRaw);
           const innerDisplay = normalizeType(innerTypeRaw).replace(/\s+/g, ' ');
-          const innerIsUnsafe = innerCompare === 'unknown' || options.unsafeTypes.has(innerCompare);
+          const innerIsUnsafe =
+            innerCompare === 'unknown' || options.unsafeTypes.has(innerCompare);
           if (innerIsUnsafe) {
             reason = `double assertion via "${innerDisplay}" → "${typeDisplay.replace(/\s+/g, ' ')}"`;
             innerTypeDisplay = innerDisplay;
@@ -221,7 +235,9 @@ for (const relativePath of trackedFiles) {
         if (!reason) {
           reason = `cast to "${typeDisplay.replace(/\s+/g, ' ')}"`;
         }
-        const { line } = sourceFile.getLineAndCharacterOfPosition(node.type.getStart(sourceFile));
+        const { line } = sourceFile.getLineAndCharacterOfPosition(
+          node.type.getStart(sourceFile),
+        );
         const commentBlock = collectLeadingComments(lines, line);
         const codeLine = lines[line] ?? '';
         results.push({

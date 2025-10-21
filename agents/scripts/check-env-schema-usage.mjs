@@ -119,11 +119,15 @@ for (const file of trackedFiles) {
 }
 
 if (findings.length > 0) {
-  console.error('❌ Found environment variable usages missing from EnvironmentSchema:');
+  console.error(
+    '❌ Found environment variable usages missing from EnvironmentSchema:',
+  );
   for (const finding of findings) {
     console.error(`  ${finding}`);
   }
   process.exit(1);
 }
 
-console.log('✅ All process.env usages map to EnvironmentSchema or approved extras.');
+console.log(
+  '✅ All process.env usages map to EnvironmentSchema or approved extras.',
+);

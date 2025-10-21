@@ -53,9 +53,10 @@ const filesToScan = collectDocsFiles();
 // ROOT_BASENAMES and PATH_PREFIXES are sourced from ./constants.js
 
 // Remove fenced code blocks to avoid false positives when scanning plain text/links
-const stripFencedCodeBlocks = (md) => md
-  .replace(FENCED_BACKTICK_BLOCK_REGEX, '')
-  .replace(FENCED_TILDE_BLOCK_REGEX, '');
+const stripFencedCodeBlocks = (md) =>
+  md
+    .replace(FENCED_BACKTICK_BLOCK_REGEX, '')
+    .replace(FENCED_TILDE_BLOCK_REGEX, '');
 
 // Inline code spans (keep existing behavior)
 const extractCodeSpanCandidates = (md) => {
@@ -94,7 +95,8 @@ const extractMarkdownLinks = (md) => {
     if (href.startsWith('#')) continue;
     if (href.startsWith('//')) continue; // protocol-relative
     const hasScheme = SCHEME_PREFIX_REGEX.test(href);
-    if (hasScheme && LINK_IGNORE_SCHEMES.includes(href.split(':', 1)[0] + ':')) continue;
+    if (hasScheme && LINK_IGNORE_SCHEMES.includes(href.split(':', 1)[0] + ':'))
+      continue;
     set.add(href);
   }
   return [...set];
@@ -115,7 +117,8 @@ const extractReferenceLinks = (md) => {
     if (!href || href.startsWith('#')) continue;
     if (href.startsWith('//')) continue;
     const hasScheme = SCHEME_PREFIX_REGEX.test(href);
-    if (hasScheme && LINK_IGNORE_SCHEMES.includes(href.split(':', 1)[0] + ':')) continue;
+    if (hasScheme && LINK_IGNORE_SCHEMES.includes(href.split(':', 1)[0] + ':'))
+      continue;
     set.add(href);
   }
   return [...set];
@@ -151,7 +154,10 @@ const normalizeCandidate = (raw, baseDir) => {
   if (!raw) return null;
   let p = String(raw).trim();
   // Strip surrounding quotes/angle brackets
-  if ((p.startsWith('"') && p.endsWith('"')) || (p.startsWith("'") && p.endsWith("'"))) {
+  if (
+    (p.startsWith('"') && p.endsWith('"')) ||
+    (p.startsWith("'") && p.endsWith("'"))
+  ) {
     p = p.slice(1, -1);
   }
   if (p.startsWith('<') && p.endsWith('>')) p = p.slice(1, -1);
@@ -220,7 +226,8 @@ const missingMap = new Map(); // key: display path, value: { file, line }
 for (const abs of filesToScan) {
   if (!existsSync(abs)) {
     const rel = relative(root, abs);
-    if (!missingMap.has(rel)) missingMap.set(rel, { file: '(collector)', line: 0 });
+    if (!missingMap.has(rel))
+      missingMap.set(rel, { file: '(collector)', line: 0 });
     continue;
   }
   const md = readFileSync(abs, 'utf-8');
@@ -257,12 +264,14 @@ for (const abs of filesToScan) {
   while ((lm = linkRe.exec(strippedForLinks))) {
     let inside = (lm[1] || '').trim();
     if (!inside) continue;
-    if (inside.startsWith('<') && inside.includes('>')) inside = inside.slice(1, inside.indexOf('>'));
+    if (inside.startsWith('<') && inside.includes('>'))
+      inside = inside.slice(1, inside.indexOf('>'));
     else inside = inside.split(/\s+/)[0];
     const href = inside.trim();
     if (!href || href.startsWith('#') || href.startsWith('//')) continue;
     const hasScheme = SCHEME_PREFIX_REGEX.test(href);
-    if (hasScheme && LINK_IGNORE_SCHEMES.includes(href.split(':', 1)[0] + ':')) continue;
+    if (hasScheme && LINK_IGNORE_SCHEMES.includes(href.split(':', 1)[0] + ':'))
+      continue;
     const norm = normalizeCandidate(href, dir);
     if (!norm) continue;
     // Note: line numbers here would be approximate due to stripping; omit index for clarity
@@ -279,7 +288,8 @@ for (const abs of filesToScan) {
     href = href.trim();
     if (!href || href.startsWith('#') || href.startsWith('//')) continue;
     const hasScheme = SCHEME_PREFIX_REGEX.test(href);
-    if (hasScheme && LINK_IGNORE_SCHEMES.includes(href.split(':', 1)[0] + ':')) continue;
+    if (hasScheme && LINK_IGNORE_SCHEMES.includes(href.split(':', 1)[0] + ':'))
+      continue;
     const norm = normalizeCandidate(href, dir);
     if (!norm) continue;
     if (!checkPath(norm)) recordMiss(norm, md.indexOf(lines[i]));

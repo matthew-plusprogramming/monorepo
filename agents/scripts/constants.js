@@ -38,7 +38,8 @@ export const FENCED_TILDE_BLOCK_REGEX = /~~~[\s\S]*?~~~/g;
 // Inline markdown links and images: optional leading ! for images
 // Robust inline markdown link/image regex source and factory
 export const INLINE_LINK_OR_IMAGE_RE_SOURCE = String.raw`!?\[[^\]]*]\(\s*(<[^>]*>|[^()\s]+(?:\([^)]*\)[^()\s]*)*)(?:\s+["'(][^"')]*["')])?\s*\)`;
-export const makeInlineLinkOrImageRe = () => new RegExp(INLINE_LINK_OR_IMAGE_RE_SOURCE, 'g');
+export const makeInlineLinkOrImageRe = () =>
+  new RegExp(INLINE_LINK_OR_IMAGE_RE_SOURCE, 'g');
 // Reference-style link definition at start of line
 export const REF_DEFINITION_REGEX = /^\s*\[[^\]]+\]:\s*(\S+)/;
 // Plain-text agents/ path references
