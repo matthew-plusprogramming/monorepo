@@ -180,3 +180,6 @@ Reflexion
 - 2025-10-20 — Verify phase: Executed the unsafe assertion scanner, confirmed reported matches include adjacent comments, and stamped Memory Bank metadata.
   Reran memory validation and drift checks after updating the overview front matter to the latest HEAD.
   Ready to summarize the agent utility, verification steps, and suggested follow-up actions.
+- 2025-10-20 — Build phase: Expanded `find-unsafe-as-casts.mjs` with an `--include-all` flag so audits can surface every assertion alongside the focused unsafe subset.
+  Verified the default mode still highlights `as never` and double assertions, while the optional flag mirrors the full repository inventory for cross-checking.
+  Next rerun the script with the new flag, validate outputs against manual notes, and refresh memory scripts before closeout.

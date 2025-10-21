@@ -12,6 +12,7 @@ const args = process.argv.slice(2);
 const options = {
   unsafeTypes: new Set(DEFAULT_UNSAFE_TYPES),
   includeDouble: true,
+  includeAll: false,
   failOnMatch: false,
 };
 
@@ -21,6 +22,7 @@ const printHelp = () => {
 Options
   --unsafe-types=types   Comma-separated list of lower-case type names treated as unsafe (default: any,never)
   --no-double            Disable detection of chained assertions (e.g., "as unknown as Target")
+  --include-all          Report every "as" assertion (not just unsafe/double heuristics)
   --fail-on-match        Exit with code 1 if any unsafe assertions are found
   -h, --help             Show this message
 `);
@@ -42,6 +44,10 @@ for (const arg of args) {
   }
   if (arg === '--no-double') {
     options.includeDouble = false;
+    continue;
+  }
+  if (arg === '--include-all') {
+    options.includeAll = true;
     continue;
   }
   if (arg === '--fail-on-match') {
@@ -211,7 +217,10 @@ for (const relativePath of trackedFiles) {
         }
       }
 
-      if (reason) {
+      if (reason || options.includeAll) {
+        if (!reason) {
+          reason = `cast to "${typeDisplay.replace(/\s+/g, ' ')}"`;
+        }
         const { line } = sourceFile.getLineAndCharacterOfPosition(node.type.getStart(sourceFile));
         const commentBlock = collectLeadingComments(lines, line);
         const codeLine = lines[line] ?? '';
