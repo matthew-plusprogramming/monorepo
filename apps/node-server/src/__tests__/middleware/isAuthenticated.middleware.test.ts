@@ -74,12 +74,14 @@ function cleanupAuthContext(): void {
 }
 
 async function rejectsWhenHeaderMissing(): Promise<void> {
+  // Arrange
   const { req, res, next, captured } = makeRequestContext();
 
-  await expect(
-    isAuthenticatedMiddlewareRequestHandler(req, res, next),
-  ).rejects.toBeDefined();
+  // Act
+  const action = isAuthenticatedMiddlewareRequestHandler(req, res, next);
 
+  // Assert
+  await expect(action).rejects.toBeDefined();
   expect(captured.statusCode).toBe(HTTP_RESPONSE.UNAUTHORIZED);
   expect(next).not.toHaveBeenCalled();
   expect(getVerifyMock()).not.toHaveBeenCalled();
@@ -87,20 +89,23 @@ async function rejectsWhenHeaderMissing(): Promise<void> {
 }
 
 async function rejectsWhenTokenMalformed(): Promise<void> {
+  // Arrange
   const { req, res, next, captured } = makeRequestContext({
     headers: { authorization: 'Bearer not-a-jwt' },
   });
 
-  await expect(
-    isAuthenticatedMiddlewareRequestHandler(req, res, next),
-  ).rejects.toBeDefined();
+  // Act
+  const action = isAuthenticatedMiddlewareRequestHandler(req, res, next);
 
+  // Assert
+  await expect(action).rejects.toBeDefined();
   expect(captured.statusCode).toBe(HTTP_RESPONSE.BAD_REQUEST);
   expect(next).not.toHaveBeenCalled();
   expect(getVerifyMock()).not.toHaveBeenCalled();
 }
 
 async function rejectsWhenVerificationFails(): Promise<void> {
+  // Arrange
   const token = 'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.signature';
   const { req, res, next, captured } = makeRequestContext({
     headers: { authorization: `Bearer ${token}` },
@@ -110,16 +115,18 @@ async function rejectsWhenVerificationFails(): Promise<void> {
     throw new Error('invalid signature');
   });
 
-  await expect(
-    isAuthenticatedMiddlewareRequestHandler(req, res, next),
-  ).rejects.toBeDefined();
+  // Act
+  const action = isAuthenticatedMiddlewareRequestHandler(req, res, next);
 
+  // Assert
+  await expect(action).rejects.toBeDefined();
   expect(verify).toHaveBeenCalledWith(token, 'test-secret');
   expect(captured.statusCode).toBe(HTTP_RESPONSE.UNAUTHORIZED);
   expect(next).not.toHaveBeenCalled();
 }
 
 async function attachesUserAndLogs(): Promise<void> {
+  // Arrange
   const token = 'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.signature';
   const { req, res, next, captured } = makeRequestContext({
     headers: { authorization: `Bearer ${token}` },
@@ -136,10 +143,11 @@ async function attachesUserAndLogs(): Promise<void> {
   } as const;
   verify.mockReturnValue(decodedToken);
 
-  await expect(
-    isAuthenticatedMiddlewareRequestHandler(req, res, next),
-  ).resolves.toBeUndefined();
+  // Act
+  const action = isAuthenticatedMiddlewareRequestHandler(req, res, next);
 
+  // Assert
+  await expect(action).resolves.toBeUndefined();
   expect(req.user).toStrictEqual(decodedToken);
   expect(verify).toHaveBeenCalledWith(token, 'test-secret');
   expect(next).toHaveBeenCalledTimes(1);

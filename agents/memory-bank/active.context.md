@@ -170,3 +170,12 @@ Reflexion
 - 2025-10-21 — Plan phase: Documented register handler test updates needed after adopting Effect.tryPromise for JWT signing.
   Captured acceptance criteria, risks, and candidate files with focus on callback-capable mocks and unchanged error mapping.
   Ready to adjust the suite and verify the handler continues to return tokens and obfuscated failures as expected.
+- 2025-10-21 — Plan phase: Catalogued every Vitest suite to apply explicit Arrange/Act/Assert markers and flagged testing guideline updates to enforce the pattern.
+  Logged Memory Bank touchpoints plus validation scripts required during verify.
+  Noted that only comments and documentation should change, leaving runtime behavior intact.
+- 2025-10-21 — Build phase: Inserted `// Arrange`, `// Act`, and `// Assert` comments across all test files and refactored expectations to keep assertions out of the Act step.
+  Updated the testing guidelines with a formal AAA comment convention while keeping existing structure intact.
+  Prepared to run formatting, quality checks, and Memory Bank validation before closing verify.
+- 2025-10-21 — Verify phase: Executed `npm run agent:finalize` to rerun lint, Memory Bank validation, drift checks, and quality scripts after the AAA rollout.
+  Confirmed all tests with new comments pass lint without new errors and that documentation remains formatted.
+  Ready to hand off the comment policy with metadata stamped and validation clean.

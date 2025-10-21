@@ -66,3 +66,6 @@ last_reviewed: 2025-09-21
 - 2025-10-21: Build phase for Api stack/security consolidation — merged security tables into ApiStack, removed the standalone stack, updated output schemas/clients/tests, and refreshed docs to reference the unified stack.
 - 2025-10-21: Verify phase for Api stack/security consolidation — reran lint, targeted the cdkOutputs Vitest suite, stamped Memory Bank metadata with HEAD, and executed memory validation/drift to confirm doc alignment.
 - 2025-10-21: Plan phase for register handler JWT tryPromise follow-up — captured acceptance criteria, risks, and target files to realign the handler tests with callback-based signing before making code changes.
+- 2025-10-21: Plan phase for AAA comment rollout — inventoried all Vitest suites, scoped documentation updates, and queued validation scripts for verify.
+- 2025-10-21: Build phase for AAA comment rollout — added explicit Arrange/Act/Assert comments across every test file and documented the requirement in testing guidelines.
+- 2025-10-21: Verify phase for AAA comment rollout — executed agent:finalize (lint, validation, drift, quality scripts) to confirm the comment policy landed cleanly.

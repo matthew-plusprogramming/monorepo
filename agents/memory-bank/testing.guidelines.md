@@ -1,5 +1,5 @@
 ---
-last_reviewed: 2025-09-18
+last_reviewed: 2025-10-21
 ---
 
 # Testing Guidelines
@@ -43,6 +43,12 @@ last_reviewed: 2025-09-18
 - Reset globals, environment variables, and timers inside `afterEach` hooks.
 - Skip default snapshots; use snapshots only for stable, structured artifacts (e.g., schemas, emails).
 
+## AAA Comment Convention
+
+- Every test case must annotate the Arrange, Act, and Assert phases with explicit `// Arrange`, `// Act`, and `// Assert` comments.
+- Keep setup logic confined to the Arrange section; defer calls to the unit under test until the Act phase.
+- When chaining helpers that immediately return promises (e.g., `Effect.runPromise`), capture the promise in the Act phase and perform assertions afterward to preserve structure.
+
 ## Bootstrap Testing Plan
 
 - Start by covering 3–5 pure functions with focused assertions.
@@ -52,6 +58,6 @@ last_reviewed: 2025-09-18
 ## Review Checklist
 
 - Asserts observable behavior, not internals or private helpers.
-- Each test focuses on a single concept with minimal mocking and clear Arrange/Act/Assert structure.
+- Each test focuses on a single concept with minimal mocking and explicitly labeled Arrange/Act/Assert comments.
 - No hidden global state; timers and environment variables restored after each test; data deterministic.
 - Test data flows through builders/helpers rather than large inline literals.

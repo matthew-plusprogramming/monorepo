@@ -38,6 +38,7 @@ describe('getUserRequestHandler', () => {
   });
 
   it('returns 200 and the user for a valid identifier', async () => {
+    // Arrange
     const { req, res, captured } = makeRequestContext({
       params: { identifier: buildUserPublic().email },
     });
@@ -49,8 +50,10 @@ describe('getUserRequestHandler', () => {
     getUserRepoFake().reset();
     getUserRepoFake().queueFindSome(user);
 
+    // Act
     await getUserRequestHandler(req, res, vi.fn());
 
+    // Assert
     // Verify the fake was invoked with the parsed identifier
     expect(getUserRepoFake().calls.findByIdentifier[0]).toBe(user.email);
     expect(captured.statusCode).toBe(HTTP_RESPONSE.SUCCESS);
@@ -58,6 +61,7 @@ describe('getUserRequestHandler', () => {
   });
 
   it('obfuscates NotFoundError as 502 when user is missing', async () => {
+    // Arrange
     const { req, res, captured } = makeRequestContext({
       params: { identifier: '11111111-1111-1111-1111-111111111111' },
     });
@@ -68,13 +72,16 @@ describe('getUserRequestHandler', () => {
     getUserRepoFake().reset();
     getUserRepoFake().queueFindNone();
 
+    // Act
     await getUserRequestHandler(req, res, vi.fn());
 
+    // Assert
     expect(captured.statusCode).toBe(HTTP_RESPONSE.BAD_GATEWAY);
     expect(captured.sendBody).toBe('Bad Gateway');
   });
 
   it('obfuscates Zod validation failures as 502', async () => {
+    // Arrange
     // No repo call expected since input parsing fails first
     const { req, res, captured } = makeRequestContext({
       params: { identifier: 'not-a-uuid-or-email' },
@@ -84,8 +91,10 @@ describe('getUserRequestHandler', () => {
       '@/handlers/getUser.handler'
     );
 
+    // Act
     await getUserRequestHandler(req, res, vi.fn());
 
+    // Assert
     expect(captured.statusCode).toBe(HTTP_RESPONSE.BAD_GATEWAY);
     expect(captured.sendBody).toBe('Bad Gateway');
   });

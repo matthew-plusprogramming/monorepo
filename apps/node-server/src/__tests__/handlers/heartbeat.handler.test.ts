@@ -123,7 +123,8 @@ function cleanupHeartbeatContext(): void {
 }
 
 async function publishesHeartbeatEvent(): Promise<void> {
-  const { response, eventBridgeFake, loggerFake } = await runHeartbeatScenario({
+  // Arrange
+  const scenario: HeartbeatScenarioOptions = {
     user: { sub: 'user-1', jti: 'token-1' },
     platform: 'android',
     configureEventBridge: (fake) => {
@@ -132,8 +133,13 @@ async function publishesHeartbeatEvent(): Promise<void> {
         FailedEntryCount: 0,
       });
     },
-  });
+  };
 
+  // Act
+  const { response, eventBridgeFake, loggerFake } =
+    await runHeartbeatScenario(scenario);
+
+  // Assert
   expect(response.status).toBe(HTTP_RESPONSE.SUCCESS);
   expect(response.text).toBe('OK');
   expect(eventBridgeFake.calls).toHaveLength(1);
@@ -157,7 +163,8 @@ async function publishesHeartbeatEvent(): Promise<void> {
 }
 
 async function obfuscatesFailedEntries(): Promise<void> {
-  const { response, eventBridgeFake, loggerFake } = await runHeartbeatScenario({
+  // Arrange
+  const scenario: HeartbeatScenarioOptions = {
     user: { sub: 'user-3', jti: 'token-3' },
     configureEventBridge: (fake) => {
       fake.queueSuccess({
@@ -171,8 +178,13 @@ async function obfuscatesFailedEntries(): Promise<void> {
         ],
       });
     },
-  });
+  };
 
+  // Act
+  const { response, eventBridgeFake, loggerFake } =
+    await runHeartbeatScenario(scenario);
+
+  // Assert
   expect(response.status).toBe(HTTP_RESPONSE.BAD_GATEWAY);
   expect(response.text).toBe('Bad Gateway');
   expect(eventBridgeFake.calls).toHaveLength(1);
@@ -186,13 +198,18 @@ async function obfuscatesFailedEntries(): Promise<void> {
 }
 
 async function obfuscatesPublishErrors(): Promise<void> {
-  const { response, loggerFake } = await runHeartbeatScenario({
+  // Arrange
+  const scenario: HeartbeatScenarioOptions = {
     user: { sub: 'user-2', jti: 'token-2' },
     configureEventBridge: (fake) => {
       fake.queueFailure(new Error('boom'));
     },
-  });
+  };
 
+  // Act
+  const { response, loggerFake } = await runHeartbeatScenario(scenario);
+
+  // Assert
   expect(response.status).toBe(HTTP_RESPONSE.BAD_GATEWAY);
   expect(response.text).toBe('Bad Gateway');
   expect(loggerFake.entries.errors).toHaveLength(1);

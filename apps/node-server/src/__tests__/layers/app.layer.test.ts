@@ -98,9 +98,11 @@ describe('AppLayer', () => {
   });
 
   it('provides DynamoDb, Logger, EventBridge, and UserRepo services', async () => {
+    // Arrange
     const { AppLayer } = await import('@/layers/app.layer');
     const { UserRepo } = await import('@/services/userRepo.service');
 
+    // Act
     const result = await Effect.runPromise(
       Effect.gen(function* () {
         const dynamo = yield* DynamoDbService;
@@ -111,6 +113,7 @@ describe('AppLayer', () => {
       }).pipe(Effect.provide(AppLayer)),
     );
 
+    // Assert
     expect(result.dynamo).toBe(getDynamoFake().service);
     expect(result.logger).toBe(getLoggerFake().service);
     expect(result.eventBridge).toBe(getEventBridgeFake().service);

@@ -143,6 +143,7 @@ function initializeRegisterContext(): void {
 }
 
 async function returns201ForNewUser(): Promise<void> {
+  // Arrange
   const body = createRegisterBody({
     username: 'new-user',
     email: 'new-user@example.com',
@@ -153,12 +154,14 @@ async function returns201ForNewUser(): Promise<void> {
     body,
   });
 
+  // Act
   await withFixedTime('2024-01-01T00:00:00.000Z', async () => {
     const handler = await importRegisterHandler();
     prepareSuccessfulRegistration('hashed-password', 'signed.token.value');
     await handler(req, res, vi.fn());
   });
 
+  // Assert
   assertSuccessfulRegistration({
     body,
     captured,
@@ -168,6 +171,7 @@ async function returns201ForNewUser(): Promise<void> {
 }
 
 async function obfuscatesConflictAs502(): Promise<void> {
+  // Arrange
   const body = createRegisterBody({
     username: 'dup',
     email: 'dup@example.com',
@@ -185,13 +189,17 @@ async function obfuscatesConflictAs502(): Promise<void> {
     username: 'dup',
     email: 'dup@example.com',
   });
+
+  // Act
   await handler(req, res, vi.fn());
 
+  // Assert
   expect(captured.statusCode).toBe(HTTP_RESPONSE.BAD_GATEWAY);
   expect(captured.sendBody).toBe('Bad Gateway');
 }
 
 async function propagatesRepoCreateFailure(): Promise<void> {
+  // Arrange
   const handler = await importRegisterHandler();
   getHashMock().mockResolvedValueOnce('hashed-password');
 
@@ -206,13 +214,17 @@ async function propagatesRepoCreateFailure(): Promise<void> {
   repoFake.queueCreateFailure(
     new InternalServerError({ message: 'ddb put failed' }),
   );
+
+  // Act
   await handler(req, res, vi.fn());
 
+  // Assert
   expect(captured.statusCode).toBe(HTTP_RESPONSE.INTERNAL_SERVER_ERROR);
   expect(captured.sendBody).toBe('ddb put failed');
 }
 
 async function propagatesHashingFailure(): Promise<void> {
+  // Arrange
   getHashMock().mockRejectedValueOnce(new Error('argon2 failed'));
 
   const { req, res, captured } = makeRequestContext({
@@ -225,12 +237,16 @@ async function propagatesHashingFailure(): Promise<void> {
   const repoFake = resetUserRepoFake();
   repoFake.queueFindNone();
 
+  // Act
   await handler(req, res, vi.fn());
+
+  // Assert
   expect(captured.statusCode).toBe(HTTP_RESPONSE.BAD_GATEWAY);
   expect(captured.sendBody).toBe('Bad Gateway');
 }
 
 async function propagatesJwtFailure(): Promise<void> {
+  // Arrange
   const handler = await importRegisterHandler();
   getHashMock().mockResolvedValueOnce('hashed-password');
   getSignMock().mockImplementationOnce(
@@ -245,14 +261,17 @@ async function propagatesJwtFailure(): Promise<void> {
     body: createRegisterBody({ username: 'user', email: 'user@example.com' }),
   });
 
+  // Act
   await withFixedTime('2024-01-01T00:00:00.000Z', async () => {
     const repoFake = resetUserRepoFake();
     repoFake.queueFindNone();
     repoFake.queueCreateSuccess();
     await handler(req, res, vi.fn());
-    expect(captured.statusCode).toBe(HTTP_RESPONSE.BAD_GATEWAY);
-    expect(captured.sendBody).toBe('Bad Gateway');
   });
+
+  // Assert
+  expect(captured.statusCode).toBe(HTTP_RESPONSE.BAD_GATEWAY);
+  expect(captured.sendBody).toBe('Bad Gateway');
 }
 
 function createRegisterBody({

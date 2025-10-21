@@ -57,6 +57,7 @@ describe('heartbeat integration', () => {
   });
 
   it('publishes analytics heartbeat event for authenticated requests', async () => {
+    // Arrange
     const app = await buildHeartbeatApp();
     const eventBridgeFake = getEventBridgeFake();
     eventBridgeFake.reset();
@@ -65,10 +66,12 @@ describe('heartbeat integration', () => {
       FailedEntryCount: 0,
     });
 
+    // Act
     const response = await request(app)
       .get('/heartbeat')
       .set('X-Platform', 'ios');
 
+    // Assert
     expect(response.status).toBe(HTTP_RESPONSE.SUCCESS);
     expect(response.text).toBe('OK');
     expect(eventBridgeFake.calls).toHaveLength(1);
@@ -88,6 +91,7 @@ describe('heartbeat integration', () => {
   });
 
   it('returns 502 when EventBridge reports failed entries', async () => {
+    // Arrange
     const app = await buildHeartbeatApp();
     const eventBridgeFake = getEventBridgeFake();
     eventBridgeFake.reset();
@@ -102,8 +106,10 @@ describe('heartbeat integration', () => {
       ],
     });
 
+    // Act
     const response = await request(app).get('/heartbeat');
 
+    // Assert
     expect(response.status).toBe(HTTP_RESPONSE.BAD_GATEWAY);
     expect(response.text).toBe('Bad Gateway');
     expect(eventBridgeFake.calls).toHaveLength(1);

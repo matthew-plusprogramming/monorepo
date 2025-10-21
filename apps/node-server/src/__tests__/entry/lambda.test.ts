@@ -150,8 +150,13 @@ describe('lambda entrypoint', () => {
   });
 
   it('wraps the Express app with serverless-http and exports the handler', async () => {
+    // Arrange
+    // Default mocks wired in module scope establish expectations
+
+    // Act
     const module = await import('@/lambda');
 
+    // Assert
     const expressApp = requireExpressApp();
     const serverless = requireServerless();
     const envParse = requireEnvironmentParse();

@@ -13,14 +13,35 @@ describe('location helpers', () => {
   const expectedMonorepoRoot = resolve(expectedPackageRoot, '../..');
 
   it('exports srcDir pointing to the module directory', () => {
-    expect(srcDir).toBe(moduleDir);
+    // Arrange
+    // moduleDir defined in outer scope
+
+    // Act
+    const result = srcDir;
+
+    // Assert
+    expect(result).toBe(moduleDir);
   });
 
   it('exports packageRootDir one level above srcDir', () => {
-    expect(packageRootDir).toBe(expectedPackageRoot);
+    // Arrange
+    // expectedPackageRoot defined in outer scope
+
+    // Act
+    const result = packageRootDir;
+
+    // Assert
+    expect(result).toBe(expectedPackageRoot);
   });
 
   it('exports monorepoRootDir two levels above packageRootDir', () => {
-    expect(monorepoRootDir).toBe(expectedMonorepoRoot);
+    // Arrange
+    // expectedMonorepoRoot defined in outer scope
+
+    // Act
+    const result = monorepoRootDir;
+
+    // Assert
+    expect(result).toBe(expectedMonorepoRoot);
   });
 });

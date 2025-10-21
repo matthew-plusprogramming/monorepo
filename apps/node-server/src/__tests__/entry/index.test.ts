@@ -166,12 +166,18 @@ describe('node-server index entrypoint', () => {
   });
 
   it('bootstraps express app when environment validation succeeds', async () => {
+    // Arrange
+    // Defaults from beforeEach ensure successful environment parsing
+
+    // Act
     const module = await import('@/index');
 
+    // Assert
     assertBootstrapSuccess({ module, exitSpy });
   });
 
   it('logs and exits when environment validation fails', async () => {
+    // Arrange
     const exitError = new Error('process exit invoked');
     exitSpy.mockImplementationOnce((): never => {
       throw exitError;
@@ -182,7 +188,11 @@ describe('node-server index entrypoint', () => {
       throw new ZodError([]);
     };
 
-    await expect(import('@/index')).rejects.toBe(exitError);
+    // Act
+    const importPromise = import('@/index');
+
+    // Assert
+    await expect(importPromise).rejects.toBe(exitError);
 
     assertBootstrapFailure({ consoleErrorSpy, exitSpy });
   });

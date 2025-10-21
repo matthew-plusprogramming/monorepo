@@ -78,6 +78,7 @@ function resetRepoFakes(): void {
 }
 
 async function returnsSomeWhenEmailMatches(): Promise<void> {
+  // Arrange
   const user = buildUserPublic({
     id: '11111111-1111-4111-8111-111111111111',
   });
@@ -88,7 +89,10 @@ async function returnsSomeWhenEmailMatches(): Promise<void> {
     Items: [marshall(user)],
   });
 
+  // Act
   const result = await withRepo((repo) => repo.findByIdentifier(user.email));
+
+  // Assert
   expect(Option.isSome(result)).toBe(true);
   expect(result).toEqual(Option.some(user));
 
@@ -105,6 +109,7 @@ async function returnsSomeWhenEmailMatches(): Promise<void> {
 }
 
 async function returnsNoneWhenEmailParseFails(): Promise<void> {
+  // Arrange
   const invalidItem = marshall({ notAUser: true });
 
   dynamoFake.queueSuccess('query', {
@@ -113,10 +118,12 @@ async function returnsNoneWhenEmailParseFails(): Promise<void> {
     Items: [invalidItem],
   });
 
+  // Act
   const result = await withRepo((repo) =>
     repo.findByIdentifier('invalid-user@example.com'),
   );
 
+  // Assert
   expect(Option.isNone(result)).toBe(true);
   expect(dynamoFake.calls.query).toHaveLength(1);
   expect(dynamoFake.calls.query[0]).toMatchObject({
@@ -129,6 +136,7 @@ async function returnsNoneWhenEmailParseFails(): Promise<void> {
 }
 
 async function returnsNoneWhenIdMisses(): Promise<void> {
+  // Arrange
   const user = buildUserPublic({
     id: '11111111-1111-4111-8111-111111111111',
   });
@@ -137,8 +145,10 @@ async function returnsNoneWhenIdMisses(): Promise<void> {
     $metadata: { httpStatusCode: 200 },
   });
 
+  // Act
   const result = await withRepo((repo) => repo.findByIdentifier(user.id));
 
+  // Assert
   expect(Option.isNone(result)).toBe(true);
   expect(dynamoFake.calls.getItem).toHaveLength(1);
   expect(dynamoFake.calls.getItem[0]).toMatchObject({
@@ -149,6 +159,7 @@ async function returnsNoneWhenIdMisses(): Promise<void> {
 }
 
 async function returnsSomeWhenIdHits(): Promise<void> {
+  // Arrange
   const user = buildUserPublic({
     id: '22222222-2222-4222-8222-222222222222',
   });
@@ -158,8 +169,10 @@ async function returnsSomeWhenIdHits(): Promise<void> {
     Item: marshall(user),
   });
 
+  // Act
   const result = await withRepo((repo) => repo.findByIdentifier(user.id));
 
+  // Assert
   expect(result).toEqual(Option.some(user));
   expect(dynamoFake.calls.getItem).toHaveLength(1);
   expect(dynamoFake.calls.getItem[0]).toMatchObject({
@@ -169,42 +182,56 @@ async function returnsSomeWhenIdHits(): Promise<void> {
 }
 
 async function returnsNoneWhenIdentifierInvalid(): Promise<void> {
+  // Arrange
+  // No additional setup required
+
+  // Act
   const result = await withRepo((repo) =>
     repo.findByIdentifier('not-a-valid-email-or-uuid'),
   );
 
+  // Assert
   expect(Option.isNone(result)).toBe(true);
   expect(dynamoFake.calls.query).toHaveLength(0);
   expect(dynamoFake.calls.getItem).toHaveLength(0);
 }
 
 async function logsQueryFailures(): Promise<void> {
+  // Arrange
   const error = new Error('Dynamo offline');
 
   dynamoFake.queueFailure('query', error);
 
-  await expect(
-    withRepo((repo) => repo.findByIdentifier('someone@example.com')),
-  ).rejects.toHaveProperty('message', error.message);
+  // Act
+  const action = withRepo((repo) =>
+    repo.findByIdentifier('someone@example.com'),
+  );
+
+  // Assert
+  await expect(action).rejects.toHaveProperty('message', error.message);
 
   expect(loggerFake.entries.errors).toContainEqual([error]);
 }
 
 async function logsGetItemFailures(): Promise<void> {
+  // Arrange
   const error = new Error('ddb get failed');
 
   dynamoFake.queueFailure('getItem', error);
 
-  await expect(
-    withRepo((repo) =>
-      repo.findByIdentifier('33333333-3333-4333-8333-333333333333'),
-    ),
-  ).rejects.toHaveProperty('message', error.message);
+  // Act
+  const action = withRepo((repo) =>
+    repo.findByIdentifier('33333333-3333-4333-8333-333333333333'),
+  );
+
+  // Assert
+  await expect(action).rejects.toHaveProperty('message', error.message);
 
   expect(loggerFake.entries.errors).toContainEqual([error]);
 }
 
 async function writesNewUsersSuccessfully(): Promise<void> {
+  // Arrange
   const user = buildUserCreate({
     id: '11111111-1111-4111-8111-111111111111',
   });
@@ -213,8 +240,10 @@ async function writesNewUsersSuccessfully(): Promise<void> {
     $metadata: { httpStatusCode: 200 },
   });
 
+  // Act
   const result = await withRepo((repo) => repo.create(user));
 
+  // Assert
   expect(result).toBe(true);
   expect(dynamoFake.calls.putItem).toHaveLength(1);
   expect(dynamoFake.calls.putItem[0]).toMatchObject({
@@ -226,6 +255,7 @@ async function writesNewUsersSuccessfully(): Promise<void> {
 }
 
 async function logsPutItemFailures(): Promise<void> {
+  // Arrange
   const user = buildUserCreate({
     id: '11111111-1111-4111-8111-111111111111',
   });
@@ -233,20 +263,26 @@ async function logsPutItemFailures(): Promise<void> {
 
   dynamoFake.queueFailure('putItem', error);
 
-  await expect(withRepo((repo) => repo.create(user))).rejects.toHaveProperty(
-    'message',
-    error.message,
-  );
+  // Act
+  const action = withRepo((repo) => repo.create(user));
+
+  // Assert
+  await expect(action).rejects.toHaveProperty('message', error.message);
 
   expect(loggerFake.entries.errors).toContainEqual([error]);
 }
 
 async function validatesCreatePayload(): Promise<void> {
+  // Arrange
   const user = buildUserCreate({
     id: 'not-a-uuid',
   });
 
-  await expect(withRepo((repo) => repo.create(user))).rejects.toHaveProperty(
+  // Act
+  const action = withRepo((repo) => repo.create(user));
+
+  // Assert
+  await expect(action).rejects.toHaveProperty(
     'message',
     'Invalid user payload',
   );

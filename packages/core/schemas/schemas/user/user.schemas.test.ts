@@ -16,14 +16,18 @@ const baseRegisterInput = {
 
 describe('user schemas', () => {
   it('accepts valid register input and rejects short passwords', () => {
-    expect(RegisterInputSchema.parse(baseRegisterInput)).toStrictEqual(
-      baseRegisterInput,
-    );
-
-    const invalidResult = RegisterInputSchema.safeParse({
+    // Arrange
+    const invalidInput = {
       ...baseRegisterInput,
       password: 'short',
-    });
+    };
+
+    // Act
+    const parsed = RegisterInputSchema.parse(baseRegisterInput);
+    const invalidResult = RegisterInputSchema.safeParse(invalidInput);
+
+    // Assert
+    expect(parsed).toStrictEqual(baseRegisterInput);
     expect(invalidResult.success).toBe(false);
     if (!invalidResult.success) {
       expect(invalidResult.error.issues[0]?.message).toContain(
@@ -33,13 +37,19 @@ describe('user schemas', () => {
   });
 
   it('maps both user id and email via GetUserSchema', () => {
+    // Arrange
     const id = '11111111-1111-4111-8111-111111111111';
-    expect(GetUserSchema.parse(id)).toBe(id);
-    expect(GetUserSchema.parse(baseRegisterInput.email)).toBe(
-      baseRegisterInput.email,
+
+    // Act
+    const parsedId = GetUserSchema.parse(id);
+    const parsedEmail = GetUserSchema.parse(baseRegisterInput.email);
+    const invalidIdentifier = GetUserSchema.safeParse(
+      'not-a-valid-identifier',
     );
 
-    const invalidIdentifier = GetUserSchema.safeParse('not-a-valid-identifier');
+    // Assert
+    expect(parsedId).toBe(id);
+    expect(parsedEmail).toBe(baseRegisterInput.email);
     expect(invalidIdentifier.success).toBe(false);
     if (!invalidIdentifier.success) {
       expect(invalidIdentifier.error.issues.length).toBeGreaterThan(0);
@@ -48,36 +58,40 @@ describe('user schemas', () => {
   });
 
   it('requires all fields for UserCreateSchema and UserPublicSchema', () => {
+    // Arrange
     const createInput = {
       id: '11111111-1111-4111-8111-111111111111',
       username: baseRegisterInput.username,
       email: baseRegisterInput.email,
       passwordHash: 'hashed-password',
     } as const;
-
-    expect(UserCreateSchema.parse(createInput)).toStrictEqual(createInput);
-
-    const missingId = UserCreateSchema.safeParse({
-      ...createInput,
-      id: undefined,
-    });
-    expect(missingId.success).toBe(false);
-
     const publicShape = {
       id: createInput.id,
       username: createInput.username,
       email: createInput.email,
     } as const;
-    expect(UserPublicSchema.parse(publicShape)).toStrictEqual(publicShape);
 
+    // Act
+    const parsedCreate = UserCreateSchema.parse(createInput);
+    const parsedPublic = UserPublicSchema.parse(publicShape);
+    const missingId = UserCreateSchema.safeParse({
+      ...createInput,
+      id: undefined,
+    });
     const invalidEmail = UserPublicSchema.safeParse({
       ...publicShape,
       email: 'invalid',
     });
+
+    // Assert
+    expect(parsedCreate).toStrictEqual(createInput);
+    expect(missingId.success).toBe(false);
+    expect(parsedPublic).toStrictEqual(publicShape);
     expect(invalidEmail.success).toBe(false);
   });
 
   it('validates token claims for UserTokenSchema', () => {
+    // Arrange
     const token = {
       iss: 'issuer',
       sub: '11111111-1111-4111-8111-111111111111',
@@ -88,12 +102,15 @@ describe('user schemas', () => {
       role: 'user',
     } as const;
 
-    expect(UserTokenSchema.parse(token)).toStrictEqual(token);
-
+    // Act
+    const parsedToken = UserTokenSchema.parse(token);
     const invalidToken = UserTokenSchema.safeParse({
       ...token,
       role: 7,
     });
+
+    // Assert
+    expect(parsedToken).toStrictEqual(token);
     expect(invalidToken.success).toBe(false);
   });
 });

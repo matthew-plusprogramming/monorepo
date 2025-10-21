@@ -13,8 +13,13 @@ describe('EnvironmentSchema', () => {
   } as const;
 
   it('parses valid environment variables and coerces PORT to a number', () => {
+    // Arrange
     const result = EnvironmentSchema.safeParse(baseEnv);
 
+    // Act
+    // Synchronous parse is already executed during arrangement
+
+    // Assert
     expect(result.success).toBe(true);
     if (result.success) {
       expect(result.data).toStrictEqual({
@@ -34,11 +39,14 @@ describe('EnvironmentSchema', () => {
     ['PORT', 'Invalid input: expected number, received NaN'],
     ['JWT_SECRET', 'JWT_SECRET is required'],
   ] as const)('fails when %s is missing', (missingKey, expectedMessage) => {
+    // Arrange
     const input: Record<string, unknown> = { ...baseEnv };
     delete input[missingKey];
 
+    // Act
     const result = EnvironmentSchema.safeParse(input);
 
+    // Assert
     expect(result.success).toBe(false);
     if (!result.success) {
       const issue = result.error.issues.find(
@@ -50,11 +58,16 @@ describe('EnvironmentSchema', () => {
   });
 
   it('enforces PORT to be a positive number', () => {
+    // Arrange
     const result = EnvironmentSchema.safeParse({
       ...baseEnv,
       PORT: '0',
     });
 
+    // Act
+    // Safe parse executed during arrangement
+
+    // Assert
     expect(result.success).toBe(false);
     if (!result.success) {
       expect(result.error.issues[0]).toMatchObject({

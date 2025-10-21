@@ -77,11 +77,14 @@ describe('clients/cdkOutputs', () => {
   });
 
   it('resolves outputs with default path when not bundled', async () => {
+    // Arrange
     vi.resetModules();
     Reflect.set(globalThis, '__BUNDLED__', false);
 
+    // Act
     const module = await import('@/clients/cdkOutputs');
 
+    // Assert
     expect(loadCalls).toEqual([
       { stack: API_STACK_NAME, basePath: undefined },
       { stack: ANALYTICS_STACK_NAME, basePath: undefined },
@@ -104,11 +107,14 @@ describe('clients/cdkOutputs', () => {
   });
 
   it('uses bundled base path when __BUNDLED__ is true', async () => {
+    // Arrange
     vi.resetModules();
     Reflect.set(globalThis, '__BUNDLED__', true);
 
+    // Act
     const module = await import('@/clients/cdkOutputs');
 
+    // Assert
     expect(loadCalls).toEqual([
       { stack: API_STACK_NAME, basePath: '.' },
       { stack: ANALYTICS_STACK_NAME, basePath: '.' },

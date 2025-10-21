@@ -44,31 +44,37 @@ const runWithLayer = <R>(
 
 describe('ConsoleLoggerService', () => {
   it('logs messages via console.info and resolves with undefined', async () => {
+    // Arrange
     const consoleInfo = vi
       .spyOn(console, 'info')
       .mockImplementation(() => undefined);
 
-    await expect(
-      runWithLayer(ApplicationLoggerService, (service) =>
-        service.log('hello world', 123, { extra: true }),
-      ),
-    ).resolves.toBeUndefined();
+    // Act
+    const action = runWithLayer(ApplicationLoggerService, (service) =>
+      service.log('hello world', 123, { extra: true }),
+    );
+
+    // Assert
+    await expect(action).resolves.toBeUndefined();
     expect(consoleInfo).toHaveBeenCalledWith('hello world', 123, {
       extra: true,
     });
   });
 
   it('logs errors via console.error and resolves with undefined', async () => {
+    // Arrange
     const consoleError = vi
       .spyOn(console, 'error')
       .mockImplementation(() => undefined);
     const error = new Error('boom');
 
-    await expect(
-      runWithLayer(SecurityLoggerService, (service) =>
-        service.logError(error, 'during heartbeat'),
-      ),
-    ).resolves.toBeUndefined();
+    // Act
+    const action = runWithLayer(SecurityLoggerService, (service) =>
+      service.logError(error, 'during heartbeat'),
+    );
+
+    // Assert
+    await expect(action).resolves.toBeUndefined();
     expect(consoleError).toHaveBeenCalledWith(error, 'during heartbeat');
   });
 });

@@ -106,6 +106,7 @@ function resetFakes(): void {
 }
 
 async function passesThroughWhenUnderThreshold(): Promise<void> {
+  // Arrange
   vi.useFakeTimers();
   const now = new Date('2024-01-01T00:00:05Z');
   vi.setSystemTime(now);
@@ -123,10 +124,11 @@ async function passesThroughWhenUnderThreshold(): Promise<void> {
   };
   dynamoFake.queueSuccess('updateItem', updateResult);
 
-  await expect(
-    ipRateLimitingMiddlewareRequestHandler(req, res, next),
-  ).resolves.toBeUndefined();
+  // Act
+  const action = ipRateLimitingMiddlewareRequestHandler(req, res, next);
 
+  // Assert
+  await expect(action).resolves.toBeUndefined();
   expect(next).toHaveBeenCalledTimes(1);
   expect(captured.statusCode).toBeUndefined();
 
@@ -143,6 +145,7 @@ async function passesThroughWhenUnderThreshold(): Promise<void> {
 }
 
 async function returns429WhenExceeded(): Promise<void> {
+  // Arrange
   vi.useFakeTimers();
   const now = new Date('2024-01-01T00:00:30Z');
   vi.setSystemTime(now);
@@ -160,9 +163,11 @@ async function returns429WhenExceeded(): Promise<void> {
   };
   dynamoFake.queueSuccess('updateItem', updateResult);
 
-  await expect(
-    ipRateLimitingMiddlewareRequestHandler(req, res, next),
-  ).rejects.toBeDefined();
+  // Act
+  const action = ipRateLimitingMiddlewareRequestHandler(req, res, next);
+
+  // Assert
+  await expect(action).rejects.toBeDefined();
   expect(captured.statusCode).toBe(HTTP_RESPONSE.THROTTLED);
   expect(next).not.toHaveBeenCalled();
   const ip = req.ip;
@@ -175,6 +180,7 @@ async function returns429WhenExceeded(): Promise<void> {
 }
 
 async function propagatesWhenUpdateFails(): Promise<void> {
+  // Arrange
   vi.useFakeTimers();
   const now = new Date('2024-01-01T00:00:45Z');
   vi.setSystemTime(now);
@@ -186,9 +192,11 @@ async function propagatesWhenUpdateFails(): Promise<void> {
   const dynamoFake = getDynamoFake();
   dynamoFake.queueFailure('updateItem', new Error('ddb down'));
 
-  await expect(
-    ipRateLimitingMiddlewareRequestHandler(req, res, next),
-  ).rejects.toBeDefined();
+  // Act
+  const action = ipRateLimitingMiddlewareRequestHandler(req, res, next);
+
+  // Assert
+  await expect(action).rejects.toBeDefined();
   expect(captured.statusCode).toBeUndefined();
   expect(next).not.toHaveBeenCalled();
   const errorArgs = getLoggerFake().entries.errors[0] ?? [];
@@ -200,14 +208,16 @@ async function propagatesWhenUpdateFails(): Promise<void> {
 }
 
 async function rejectsWhenIpMissing(): Promise<void> {
+  // Arrange
   const { req, res, next, captured } = makeRequestContext();
 
   const dynamoFake = getDynamoFake();
 
-  await expect(
-    ipRateLimitingMiddlewareRequestHandler(req, res, next),
-  ).rejects.toBeDefined();
+  // Act
+  const action = ipRateLimitingMiddlewareRequestHandler(req, res, next);
 
+  // Assert
+  await expect(action).rejects.toBeDefined();
   expect(captured.statusCode).toBe(HTTP_RESPONSE.THROTTLED);
   expect(dynamoFake.calls.updateItem).toHaveLength(0);
   expect(next).not.toHaveBeenCalled();

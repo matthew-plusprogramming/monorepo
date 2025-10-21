@@ -101,9 +101,11 @@ function cleanupDynamoContext(): void {
 }
 
 async function sendsGetItemCommand(): Promise<void> {
+  // Arrange
   const output = { $metadata: { httpStatusCode: 200 } };
   sendMock.mockResolvedValueOnce(output);
 
+  // Act
   const result = await useService((service) =>
     service.getItem({
       TableName: 'users',
@@ -111,6 +113,7 @@ async function sendsGetItemCommand(): Promise<void> {
     }),
   );
 
+  // Assert
   expect(result).toBe(output);
   expect(sendMock).toHaveBeenCalledTimes(1);
   const command = sendMock.mock.calls[0]?.[0];
@@ -134,21 +137,29 @@ async function sendsGetItemCommand(): Promise<void> {
 }
 
 async function wrapsRejectionsAsErrors(): Promise<void> {
+  // Arrange
   sendMock.mockRejectedValueOnce('network unavailable');
 
-  await expect(
-    useService((service) => service.query({ TableName: 'users' })),
-  ).rejects.toMatchObject({ message: 'network unavailable' });
+  // Act
+  const action = useService((service) => service.query({ TableName: 'users' }));
+
+  // Assert
+  await expect(action).rejects.toMatchObject({
+    message: 'network unavailable',
+  });
 }
 
 async function allowsUpdateItem(): Promise<void> {
+  // Arrange
   const output = { $metadata: { httpStatusCode: 200 }, Attributes: {} };
   sendMock.mockResolvedValueOnce(output);
 
+  // Act
   const result = await useService((service) =>
     service.updateItem({ TableName: 'users', Key: { id: { S: '123' } } }),
   );
 
+  // Assert
   expect(result).toBe(output);
   const command = sendMock.mock.calls[0]?.[0];
   if (!command) {
@@ -161,9 +172,11 @@ async function allowsUpdateItem(): Promise<void> {
 }
 
 async function writesItemsWithPutItem(): Promise<void> {
+  // Arrange
   const output = { $metadata: { httpStatusCode: 200 } };
   sendMock.mockResolvedValueOnce(output);
 
+  // Act
   const result = await useService((service) =>
     service.putItem({
       TableName: 'users',
@@ -171,6 +184,7 @@ async function writesItemsWithPutItem(): Promise<void> {
     }),
   );
 
+  // Assert
   expect(result).toBe(output);
   expect(sendMock).toHaveBeenCalledTimes(1);
   const command = sendMock.mock.calls[0]?.[0];
@@ -184,14 +198,17 @@ async function writesItemsWithPutItem(): Promise<void> {
 }
 
 async function propagatesPutItemFailures(): Promise<void> {
+  // Arrange
   sendMock.mockRejectedValueOnce('write failed');
 
-  await expect(
-    useService((service) =>
-      service.putItem({
-        TableName: 'users',
-        Item: { id: { S: 'new-user' } },
-      }),
-    ),
-  ).rejects.toMatchObject({ message: 'write failed' });
+  // Act
+  const action = useService((service) =>
+    service.putItem({
+      TableName: 'users',
+      Item: { id: { S: 'new-user' } },
+    }),
+  );
+
+  // Assert
+  await expect(action).rejects.toMatchObject({ message: 'write failed' });
 }
