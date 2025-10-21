@@ -56,3 +56,9 @@ last_reviewed: 2025-09-21
 - 2025-10-21: Plan phase for cdkOutputs test lint warning — captured acceptance criteria, scope, and constraints before touching the mocked module type guard.
 - 2025-10-21: Build phase for cdkOutputs test lint warning — replaced the Reflect-based guard with an `in` property check and typed extraction to avoid unsafe assignments.
 - 2025-10-21: Verify phase for cdkOutputs test lint warning — reran `npm run lint`, updated Memory Bank metadata, and executed validation/drift checks to close the task.
+- 2025-10-21: Plan phase for repository service fake reconstruction review — documented acceptance criteria, constraints, and target files to assess workflow coverage without modifying production code.
+- 2025-10-21: Build phase for repository service fake reconstruction review — compared workflow guidance against the existing user repo fake and noted missing instructions around queue helpers and Layer wiring.
+- 2025-10-21: Verify phase for repository service fake reconstruction review — confirmed the identified workflow gaps, stamped the Memory Bank metadata, and reran validation/drift scripts.
+- 2025-10-21: Plan phase for repository service workflow fake guidance — captured acceptance criteria, constraints, and target files before editing the workflow.
+- 2025-10-21: Build phase for repository service workflow fake guidance — added queue helper, Layer export, and reset expectations to the repository-service workflow.
+- 2025-10-21: Verify phase for repository service workflow fake guidance — ran markdown formatting and memory validation/drift to confirm the new instructions are stable.

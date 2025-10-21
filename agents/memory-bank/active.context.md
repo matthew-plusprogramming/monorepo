@@ -16,6 +16,85 @@ Open Decisions
 
 - Define the long-term ADR indexing cadence as the system matures.
 
+## 2025-10-21 — Repository Service Fake Reconstruction Review
+
+Acceptance Criteria (Given/When/Then)
+
+- Given the repository-service workflow, when evaluating its guidance against existing user repository artifacts, then we can decide if it enables reconstructing `apps/node-server/src/__tests__/fakes/userRepo.ts`.
+- Given the analysis finds missing guidance, when gaps exist, then we enumerate them with concrete file references or patterns to extend.
+- Given the review is advisory, when finished, then we provide recommendations without editing product code.
+
+Non-goals
+
+- Modifying repository implementations, tests, or workflows.
+- Rewriting fakes beyond assessment notes.
+
+Constraints & Assumptions
+
+- Follow the default workflow and repository-service workflow structure; keep Memory Bank updates in sync.
+- Treat existing `userRepo` implementation and tests as reference truth for fake behavior.
+
+Risks & Mitigations
+
+- Overlooking implicit invariants in tests → cross-check `userRepo.service` and fake to confirm interface coverage.
+- Misinterpreting workflow scope → map candidate files listed in the workflow against actual fake responsibilities.
+
+Candidate Files & Tests
+
+- `agents/workflows/repository-service.workflow.md`
+- `apps/node-server/src/services/userRepo.service.ts`
+- `apps/node-server/src/__tests__/fakes/userRepo.ts`
+- `apps/node-server/src/__tests__/services/userRepo.service.test.ts`
+
+Testing Strategy
+
+- Review existing fake and service tests to infer required steps; no automated runs expected.
+
+Next Steps
+
+- Compare workflow instructions with fake implementation to identify coverage gaps.
+- Summarize whether the workflow suffices and document any missing patterns.
+
+## 2025-10-21 — Repository Service Workflow Fake Guidance Update
+
+Acceptance Criteria (Given/When/Then)
+
+- Given the repository-service workflow, when we extend its build checklist, then it explicitly documents how to scaffold repository fakes (interface shape, Layer wiring, queue helpers).
+- Given the updated workflow, when contributors follow it, then they can recreate the behavior of `apps/node-server/src/__tests__/fakes/userRepo.ts` without reading existing code.
+- Given the workflow change touches canonical docs, when we run formatting and Memory Bank validation scripts, then they pass without further edits.
+
+Non-goals
+
+- Authoring new fake modules or modifying production repositories.
+- Rewriting the workflow beyond the additions necessary for fake guidance.
+
+Constraints & Assumptions
+
+- Align instructions with current fake conventions (call tracking, reset helpers, `Layer.succeed` exports).
+- Maintain workflow formatting/numbering and rely on repo-standard Markdown tooling.
+
+Risks & Mitigations
+
+- Risk of over-prescriptive detail → reference required behaviors while allowing entity-specific naming.
+- Risk of formatting drift → run `npm run format:markdown` after editing.
+- Risk of Memory Bank desync → execute validation and drift scripts post-update.
+
+Candidate Files & Tests
+
+- `agents/workflows/repository-service.workflow.md`
+- `agents/memory-bank/active.context.md`
+- `agents/memory-bank/progress.log.md`
+- `apps/node-server/src/__tests__/fakes/userRepo.ts` (reference only)
+
+Testing Strategy
+
+- Manual review of the updated workflow content.
+- Run `npm run format:markdown`, `npm run memory:validate`, and `npm run memory:drift`.
+
+Next Steps
+
+- None — workflow guidance is updated and verified; prepare final summary only.
+
 ## 2025-10-20 — Code Quality Automation Scripts
 
 Acceptance Criteria (Given/When/Then)
@@ -258,3 +337,21 @@ Reflexion
   Ready to rerun lint and capture verify reflections.
 - 2025-10-21 — Verify phase: Reran `npm run lint` with a clean result, updated Memory Bank front matter to HEAD, and executed `memory:validate` plus `memory:drift`.
   Ready to summarize the test fix and close the workflow.
+- 2025-10-21 — Plan phase: Assessed repository-service workflow coverage for rebuilding the user repo fake.
+  Logged acceptance criteria, constraints, and candidate files in active context without modifying code.
+  Preparing to compare workflow guidance against the current fake and service implementations.
+- 2025-10-21 — Build phase: Reviewed repository-service workflow steps against the user repo fake implementation.
+  Flagged missing guidance for queue-backed helpers and for exporting a ready-to-use Effect layer.
+  Lining up verify notes to confirm whether additional workflow updates are needed.
+- 2025-10-21 — Verify phase: Verified the workflow lacks explicit steps for rebuilding the user repo fake and captured required follow-ups.
+  Stamped Memory Bank metadata with current HEAD and reran validation/drift scripts successfully.
+  Ready to summarize findings and recommend workflow updates.
+- 2025-10-21 — Plan phase: Scoped the workflow extension to capture repository fake scaffolding requirements.
+  Logged acceptance criteria, constraints, and candidate files in active context for the new update.
+  Identified formatting and Memory Bank checks as upcoming tasks post-edit.
+- 2025-10-21 — Build phase: Added repository fake guidance to the workflow build checklist.
+  Captured queue helpers, Layer export wiring, and reset expectations for `<Entity>Repo` fakes.
+  Preparing to format Markdown and rerun memory scripts before closing verification.
+- 2025-10-21 — Verify phase: Ran Markdown formatter plus Memory Bank validation/drift after updating the workflow.
+  Confirmed the new fake guidance renders cleanly and keeps the repository-service process aligned.
+  Ready to report the additions and recommend adoption to the team.

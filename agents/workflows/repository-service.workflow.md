@@ -67,6 +67,7 @@ Candidate Files & Tests
 - `apps/node-server/src/services` (e.g., `apps/node-server/src/services/userRepo.service.ts`) for repository implementation.
 - `apps/node-server/src/layers/app.layer.ts` for wiring the repository layer.
 - `apps/node-server/src/handlers` (e.g., `apps/node-server/src/handlers/register.handler.ts`) and associated tests to consume the repository.
+- `apps/node-server/src/__tests__/fakes/userRepo.ts` (and sibling fakes) to mirror repository contracts with queue helpers, call tracking, and Layer exports for tests.
 - `packages/core/backend-core/src/types/errors` if additional errors are required.
 
 Testing Strategy Alignment
@@ -126,11 +127,16 @@ Phase: build
   5. **Layer Wiring & Consumption**
      - Export the repository layer from `apps/node-server/src/layers/app.layer.ts` (or relevant layer module).
      - Update handlers/use cases to inject and use the repository; adjust middleware or service composition as needed.
-  6. **Tests**
+  6. **Repository Fake**
+     - Create or update `apps/node-server/src/__tests__/fakes/<entity>Repo.ts` to implement the repository interface with queue-backed responses.
+     - Expose a `Layer` via `Layer.succeed(<Entity>Repo, service)` so tests can provide the fake without additional wiring.
+     - Track calls and expose `reset` utilities to clear queues/counters between expectations.
+     - Offer helper functions (e.g., `queueFindSome`, `queueCreateFailure`) that enqueue `Effect` results matching the real repository contract.
+  7. **Tests**
      - Add repository unit tests (mocking DynamoDB client or using local fake) covering happy path, validation failure, and AWS errors.
      - Extend handler/service integration tests to cover repository usage.
      - Ensure schema and CDK consumer tests reflect new outputs.
-  7. **Self-review**
+  8. **Self-review**
      - Verify imports use barrel exports consistently; ensure no unused exports remain.
      - Run `npm run lint`, targeted package lint/test scripts, and Vitest suites you touched.
 - Outputs: Repository service implementation, schema/infra/test updates, passing local checks.
