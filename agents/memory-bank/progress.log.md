@@ -62,3 +62,6 @@ last_reviewed: 2025-09-21
 - 2025-10-21: Plan phase for repository service workflow fake guidance — captured acceptance criteria, constraints, and target files before editing the workflow.
 - 2025-10-21: Build phase for repository service workflow fake guidance — added queue helper, Layer export, and reset expectations to the repository-service workflow.
 - 2025-10-21: Verify phase for repository service workflow fake guidance — ran markdown formatting and memory validation/drift to confirm the new instructions are stable.
+- 2025-10-21: Plan phase for Api stack/security consolidation — outlined acceptance criteria, constraints, and target files/tests for folding the API security resources into the ApiStack before implementation.
+- 2025-10-21: Build phase for Api stack/security consolidation — merged security tables into ApiStack, removed the standalone stack, updated output schemas/clients/tests, and refreshed docs to reference the unified stack.
+- 2025-10-21: Verify phase for Api stack/security consolidation — reran lint, targeted the cdkOutputs Vitest suite, stamped Memory Bank metadata with HEAD, and executed memory validation/drift to confirm doc alignment.

@@ -16,6 +16,56 @@ Open Decisions
 
 - Define the long-term ADR indexing cadence as the system matures.
 
+## 2025-10-21 — API Security Stack Consolidation
+
+Acceptance Criteria (Given/When/Then)
+
+- Given the ApiStack infrastructure definition, when the stack is synthesized, then the single stack outputs user, verification, rate limit, and deny list table names under the API stack key.
+- Given stack orchestration, when selecting stacks for deploy/output consumption, then the security tables live inside ApiStack and no separate API security stack entry remains.
+- Given application consumers of CDK outputs, when the server loads table names, then it reads all required values from the ApiStack output without regressing existing tests.
+
+Non-goals
+
+- Altering analytics, lambda packaging, or unrelated stacks/resources.
+- Reworking middleware/service logic beyond updating output sources.
+
+Constraints & Assumptions
+
+- Preserve DynamoDB table names and CDKTF resource configuration while relocating definitions.
+- Update consumer schemas, constants, and documentation together to avoid drift.
+- Capture Memory Bank metadata and doc changes per workflow requirements.
+
+Risks & Mitigations
+
+- Missed references to `api-security-stack` in code/docs → search for the identifier and update all occurrences.
+- Output schema mismatch after consolidation → extend `ApiStackOutputSchema` and adjust tests to guard shape.
+- Cached outputs in tests masking errors → reset module state in Vitest suites and rely on updated expectations.
+
+Candidate Files & Tests
+
+- `cdk/backend-server-cdk/src/stacks/api-stack/index.ts`
+- `cdk/backend-server-cdk/src/stacks/api-stack/constants.ts`
+- `cdk/backend-server-cdk/src/stacks/api-stack/generate-user-and-verification-table.ts`
+- `cdk/backend-server-cdk/src/stacks/api-security-stack/*`
+- `cdk/backend-server-cdk/src/stacks.ts`
+- `cdk/backend-server-cdk/src/stacks/names.ts`
+- `cdk/backend-server-cdk/src/consumer/output/*`
+- `apps/node-server/src/clients/cdkOutputs.ts`
+- `apps/node-server/src/__tests__/clients/cdkOutputs.test.ts`
+- Repository docs referencing stack names and Memory Bank artifacts
+
+Testing Strategy
+
+- Run `npm run lint` from the repo root to ensure Turbo-based lint targets stay green.
+- Execute `npm -w node-server run test -- src/__tests__/clients/cdkOutputs.test.ts` to confirm the client loads consolidated outputs.
+- After doc/memory updates, run `npm run memory:validate` and `npm run memory:drift`.
+
+Next Steps
+
+- Merge the security table generators and constants into the ApiStack implementation and remove the standalone stack.
+- Update output schemas, client consumption, docs, and tests to point at the unified ApiStack.
+- Prepare verification steps (lint, targeted tests, memory scripts) once changes are in place.
+
 ## 2025-10-21 — Repository Service Fake Reconstruction Review
 
 Acceptance Criteria (Given/When/Then)
@@ -355,3 +405,12 @@ Reflexion
 - 2025-10-21 — Verify phase: Ran Markdown formatter plus Memory Bank validation/drift after updating the workflow.
   Confirmed the new fake guidance renders cleanly and keeps the repository-service process aligned.
   Ready to report the additions and recommend adoption to the team.
+- 2025-10-21 — Plan phase: Scoped consolidation of the API security resources into the ApiStack and captured Given/When/Then coverage for outputs, stack list, and consumer behavior.
+  Documented constraints around preserving table names, updating schemas/docs, and running lint plus targeted Vitest to guard regressions.
+  Next refactor the CDK stack definitions, adjust consumers/tests/docs, and prepare verification scripts.
+- 2025-10-21 — Build phase: Folded rate limit and deny list tables into ApiStack, removed the standalone API security stack, and updated consumers to read from the unified output.
+  Updated docs and scripts to drop `api-security-stack` references while keeping table names stable.
+  Next rerun targeted Vitest, stamp Memory Bank metadata, and validate memory drift before closeout.
+- 2025-10-21 — Verify phase: Ran workspace lint, targeted Vitest for cdk outputs, and memory validation/drift after stamping HEAD in the Memory Bank.
+  Confirmed the app client resolves all table names from ApiStack and documentation now reflects the unified stack.
+  Ready to summarize consolidation results and highlight follow-up options if deeper integration tests are needed.

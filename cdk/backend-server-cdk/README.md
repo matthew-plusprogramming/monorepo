@@ -4,8 +4,7 @@ Infrastructure for the monorepo using CDK for Terraform (CDKTF). Targets AWS (Dy
 
 Stacks ([src/stacks.ts](src/stacks.ts)):
 - `bootstrap`: CDKTF backend/state resources (WIP migration helper)
-- `api-stack`: Application DynamoDB tables (users + verification)
-- `api-security-stack`: Rate limiting and deny list DynamoDB tables
+- `api-stack`: Application DynamoDB tables (users, verification, rate limit, deny list)
 - `api-lambda-stack`: Lambda packaging, IAM role, and analytics permissions
 - `analytics-stack`: EventBridge bus, DLQ, DynamoDB tables, and log groups for analytics
 
@@ -41,7 +40,6 @@ Encrypted envs (dotenvx):
 - Destroy: `npm -w @cdk/backend-server-cdk run cdk:destroy:dev`
 - Output JSON for app consumption:
   - `npm -w @cdk/backend-server-cdk run cdk:output:dev myapp-api-stack`
-  - `npm -w @cdk/backend-server-cdk run cdk:output:dev myapp-api-security-stack`
   - `npm -w @cdk/backend-server-cdk run cdk:output:dev myapp-analytics-stack`
 
 Outputs are written under [`cdktf-outputs/stacks`](cdktf-outputs/stacks) and validated by schemas in [src/consumer/output](src/consumer/output). The app reads these via `@cdk/backend-server-cdk`’s `loadCDKOutput` ([src/consumer/consumers.ts](src/consumer/consumers.ts)).

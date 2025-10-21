@@ -8,7 +8,6 @@ Express 5 + Effect server written in TypeScript. Builds with Vite SSR to CommonJ
 - Ensure AWS credentials are available for DynamoDB/EventBridge access (environment variables or a configured profile)
 - Pull CDK outputs for dev (required for table/log names):
   - `npm -w @cdk/backend-server-cdk run cdk:output:dev api-stack`
-  - `npm -w @cdk/backend-server-cdk run cdk:output:dev api-security-stack`
 - (Optional) Pull analytics outputs if you plan to emit heartbeat events locally:
   - `npm -w @cdk/backend-server-cdk run cdk:output:dev analytics-stack`
 - Start the dev server: `npm -w node-server run dev`
@@ -104,7 +103,7 @@ Routes are defined in [src/index.ts](src/index.ts); handlers live under [src/han
 
 ## Troubleshooting
 
-- Missing CDK outputs: run `cdk:output:dev` for `api-stack`, `api-security-stack`, and `analytics-stack`.
+- Missing CDK outputs: run `cdk:output:dev` for `api-stack` and `analytics-stack`.
 - Vite errors referencing `PORT`, `LAMBDA`, or other env vars: confirm `.env` (or the stage-specific encrypted files) include the required values and rerun `copy-env-dev`.
 - EventBridge access denied: ensure credentials allow `events:PutEvents` on the analytics bus and that outputs resolve the bus ARN.
 - DynamoDB credential issues: verify AWS region/keys or use an attached IAM role; confirm local network access when talking to AWS directly.

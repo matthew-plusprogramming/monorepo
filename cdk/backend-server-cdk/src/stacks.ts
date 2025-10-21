@@ -2,18 +2,15 @@ import z from 'zod';
 
 import {
   AnalyticsStackOutputSchema,
-  ApiSecurityStackOutputSchema,
   ApiStackOutputSchema,
 } from './consumer/output';
 import { AnalyticsStack } from './stacks/analytics-stack';
 import { ApiLambdaStack } from './stacks/api-lambda-stack';
-import { ApiSecurityStack } from './stacks/api-security-stack';
 import { ApiStack, type ApiStackProps } from './stacks/api-stack';
 import { BootstrapStack, type BootstrapStackProps } from './stacks/bootstrap';
 import {
   ANALYTICS_STACK_NAME,
   API_LAMBDA_STACK_NAME,
-  API_SECURITY_STACK_NAME,
   API_STACK_NAME,
   BOOTSTRAP_STACK_NAME,
 } from './stacks/names';
@@ -42,13 +39,6 @@ export const stacks = [
     Stack: ApiLambdaStack,
     props: {},
     outputSchema: z.object(),
-  },
-  {
-    name: API_SECURITY_STACK_NAME,
-    description: 'Security stack for API',
-    Stack: ApiSecurityStack,
-    props: {},
-    outputSchema: ApiSecurityStackOutputSchema,
   },
   {
     name: ANALYTICS_STACK_NAME,

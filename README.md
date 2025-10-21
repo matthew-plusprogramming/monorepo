@@ -7,7 +7,6 @@ Opinionated TypeScript monorepo with an Express 5 backend (optionally packaged f
 - Install deps: `npm install`
 - Generate CDK outputs for dev (so the app can find table/log names):
   - `npm -w @cdk/backend-server-cdk run cdk:output:dev api-stack`
-  - `npm -w @cdk/backend-server-cdk run cdk:output:dev api-security-stack`
 - Run the server in dev: `npm -w node-server run dev`
 - (Optional) Run the client website: `npm -w client-website run dev`
 
