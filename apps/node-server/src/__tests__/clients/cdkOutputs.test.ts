@@ -38,10 +38,25 @@ const loadCalls: Array<LoadCall> = [];
 // eslint-disable-next-line no-var
 var loadCDKOutputMock: ReturnType<typeof vi.fn> | undefined;
 
+type BackendServerCdkModule = Record<string, unknown> & {
+  loadCDKOutput: (stack: string, basePath?: string) => unknown;
+};
+
+function isBackendServerCdkModule(
+  value: unknown,
+): value is BackendServerCdkModule {
+  if (typeof value !== 'object' || value === null) {
+    return false;
+  }
+  const loadCDKOutput = Reflect.get(value, 'loadCDKOutput');
+  return typeof loadCDKOutput === 'function';
+}
+
 vi.mock('@cdk/backend-server-cdk', async () => {
-  const actual = await vi.importActual<
-    typeof import('@cdk/backend-server-cdk')
-  >('@cdk/backend-server-cdk');
+  const actual = await vi.importActual('@cdk/backend-server-cdk');
+  if (!isBackendServerCdkModule(actual)) {
+    throw new Error('Failed to load backend-server-cdk module');
+  }
 
   loadCDKOutputMock = vi.fn((stack: StackName, basePath?: string) => {
     loadCalls.push({ stack, basePath });
@@ -61,10 +76,7 @@ describe('clients/cdkOutputs', () => {
   });
 
   afterEach(() => {
-    Reflect.deleteProperty(
-      globalThis as typeof globalThis & { __BUNDLED__?: boolean },
-      '__BUNDLED__',
-    );
+    Reflect.deleteProperty(globalThis, '__BUNDLED__');
   });
 
   it('resolves outputs with default path when not bundled', async () => {

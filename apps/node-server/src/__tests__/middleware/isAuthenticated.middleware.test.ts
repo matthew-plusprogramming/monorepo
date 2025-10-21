@@ -1,4 +1,4 @@
-import { HTTP_RESPONSE } from '@packages/backend-core';
+import { HTTP_RESPONSE, LoggerService } from '@packages/backend-core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { LoggerServiceFake } from '@/__tests__/fakes/logger';
@@ -13,7 +13,7 @@ vi.hoisted(() => {
 const verifyMock = vi.hoisted(() => ({
   fn: vi.fn<(token: string, secret: string | undefined) => unknown>(),
 }));
-const loggerModule = vi.hoisted(() => ({ fake: undefined as unknown }));
+const loggerModule = vi.hoisted((): { fake?: LoggerServiceFake } => ({}));
 
 vi.mock('jsonwebtoken', () => ({
   verify: verifyMock.fn,
@@ -25,20 +25,23 @@ vi.mock('@/clients/cdkOutputs', () => ({
   usersTableName: 'users-table',
 }));
 
-vi.mock('@/services/logger.service', async (importOriginal) => {
-  const actual = await importOriginal();
+vi.mock('@/services/logger.service', async () => {
   const { createLoggerServiceFake } = await import('@/__tests__/fakes/logger');
   const fake = createLoggerServiceFake();
   loggerModule.fake = fake;
   return {
-    ...actual,
+    LoggerService,
     ApplicationLoggerService: fake.layer,
     SecurityLoggerService: fake.layer,
   };
 });
 
-const getLoggerFake = (): LoggerServiceFake =>
-  loggerModule.fake as LoggerServiceFake;
+const getLoggerFake = (): LoggerServiceFake => {
+  if (!loggerModule.fake) {
+    throw new Error('Logger fake was not initialized');
+  }
+  return loggerModule.fake;
+};
 const getVerifyMock = (): typeof verifyMock.fn => verifyMock.fn;
 
 describe('isAuthenticatedMiddlewareRequestHandler', () => {

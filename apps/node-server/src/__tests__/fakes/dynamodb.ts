@@ -37,7 +37,7 @@ type CallHistory = {
 
 export type DynamoDbServiceFake = {
   readonly service: DynamoDbServiceSchema;
-  readonly layer: Layer.Layer<never, never, DynamoDbService>;
+  readonly layer: Layer.Layer<DynamoDbService, never, never>;
   readonly queueSuccess: {
     (operation: 'getItem', output: GetItemCommandOutput): void;
     (operation: 'putItem', output: PutItemCommandOutput): void;
@@ -83,29 +83,22 @@ export const createDynamoDbServiceFake = (): DynamoDbServiceFake => {
     updateItem: [],
   };
 
-  const recordCall = <T extends OperationName>(
-    operation: T,
-    input: CallHistory[T][number],
-  ): void => {
-    callHistory[operation].push(input);
-  };
-
   const service: DynamoDbServiceSchema = {
-    getItem: (input) =>
+    getItem: (input: GetItemCommandInput) =>
       Effect.sync(() => {
-        recordCall('getItem', input);
+        callHistory.getItem.push(input);
       }).pipe(Effect.flatMap(() => dequeue(responseQueues.getItem, 'getItem'))),
-    putItem: (input) =>
+    putItem: (input: PutItemCommandInput) =>
       Effect.sync(() => {
-        recordCall('putItem', input);
+        callHistory.putItem.push(input);
       }).pipe(Effect.flatMap(() => dequeue(responseQueues.putItem, 'putItem'))),
-    query: (input) =>
+    query: (input: QueryCommandInput) =>
       Effect.sync(() => {
-        recordCall('query', input);
+        callHistory.query.push(input);
       }).pipe(Effect.flatMap(() => dequeue(responseQueues.query, 'query'))),
-    updateItem: (input) =>
+    updateItem: (input: UpdateItemCommandInput) =>
       Effect.sync(() => {
-        recordCall('updateItem', input);
+        callHistory.updateItem.push(input);
       }).pipe(
         Effect.flatMap(() => dequeue(responseQueues.updateItem, 'updateItem')),
       ),

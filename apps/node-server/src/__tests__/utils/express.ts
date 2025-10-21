@@ -1,13 +1,14 @@
 import type { handlerInput } from '@packages/backend-core';
 import { Effect } from 'effect';
 import type { NextFunction, Request, Response } from 'express';
+import type { ParsedQs } from 'qs';
 import { vi } from 'vitest';
 
 type RequestContextInit = {
-  headers?: Record<string, string | undefined>;
+  headers?: Record<string, string | string[] | undefined>;
   body?: unknown;
   params?: Record<string, string>;
-  query?: Record<string, unknown>;
+  query?: ParsedQs;
   method?: string;
   url?: string;
   ip?: string;
@@ -49,20 +50,20 @@ const createRequest = (
     ip,
   } = init;
 
-  const request: Request & { user?: unknown } = {
+  const request = {
     headers,
     body,
     params,
     query,
     method,
     url,
-  } as Request & { user?: unknown };
+  };
 
   if (ip) {
     Reflect.set(request, 'ip', ip);
   }
 
-  return request;
+  return request as Request & { user?: unknown };
 };
 
 type ResponseMock = ReturnType<typeof vi.fn>;
@@ -75,7 +76,8 @@ const createResponse = (
   jsonMock: ResponseMock;
   sendMock: ResponseMock;
 } => {
-  const response: Response = {} as Response;
+  // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
+  const response = {} as Response;
 
   const statusMock: ResponseMock = vi.fn((statusCode: number) => {
     captured.statusCode = statusCode;

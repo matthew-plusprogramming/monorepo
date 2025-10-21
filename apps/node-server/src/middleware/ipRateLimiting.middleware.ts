@@ -18,6 +18,9 @@ import {
   SecurityLoggerService,
 } from '@/services/logger.service';
 
+const WINDOW_SECONDS = 60;
+const RATE_LIMIT_CALLS = 5;
+
 // TODO: refactor out to backend-core with deps
 const ipRateLimitingMiddlewareHandler = (
   input: handlerInput,
@@ -38,7 +41,6 @@ const ipRateLimitingMiddlewareHandler = (
     }
 
     // Single-UpdateItem approach using a fixed 60s window bucket in the key
-    const WINDOW_SECONDS = 60;
     const nowSec = Math.floor(Date.now() / 1000);
     const windowStart = Math.floor(nowSec / WINDOW_SECONDS) * WINDOW_SECONDS;
     const windowEndTtl = windowStart + WINDOW_SECONDS;
@@ -81,7 +83,6 @@ const ipRateLimitingMiddlewareHandler = (
     const newNumCalls = parseInt(callsN);
 
     // TODO: refactor out to constants
-    const RATE_LIMIT_CALLS = 5;
     if (newNumCalls > RATE_LIMIT_CALLS) {
       yield* loggerService.log(
         `[RATE_LIMIT_EXCEEDED] ${ip} - ${newNumCalls} calls`,

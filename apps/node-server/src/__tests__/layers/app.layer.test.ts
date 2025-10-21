@@ -15,9 +15,8 @@ import type * as LoggerServiceModule from '@/services/logger.service';
 import type * as UserRepoModule from '@/services/userRepo.service';
 import type { UserRepoSchema } from '@/services/userRepo.service';
 
-vi.hoisted(() => {
-  (globalThis as typeof globalThis & { __BUNDLED__: boolean }).__BUNDLED__ =
-    false;
+vi.hoisted((): undefined => {
+  Reflect.set(globalThis, '__BUNDLED__', false);
   return undefined;
 });
 

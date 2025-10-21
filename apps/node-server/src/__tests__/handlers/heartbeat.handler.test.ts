@@ -12,18 +12,15 @@ import type { EventBridgeServiceFake } from '@/__tests__/fakes/eventBridge';
 import type { LoggerServiceFake } from '@/__tests__/fakes/logger';
 import type { UserRepoFake } from '@/__tests__/fakes/userRepo';
 
-const dynamoModule = vi.hoisted(() => ({
-  fake: undefined as DynamoDbServiceFake | undefined,
-}));
-const eventBridgeModule = vi.hoisted(() => ({
-  fake: undefined as EventBridgeServiceFake | undefined,
-}));
-const loggerModule = vi.hoisted(() => ({
-  fake: undefined as LoggerServiceFake | undefined,
-}));
-const userRepoModule = vi.hoisted(() => ({
-  fake: undefined as UserRepoFake | undefined,
-}));
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null;
+
+const dynamoModule = vi.hoisted((): { fake?: DynamoDbServiceFake } => ({}));
+const eventBridgeModule = vi.hoisted(
+  (): { fake?: EventBridgeServiceFake } => ({}),
+);
+const loggerModule = vi.hoisted((): { fake?: LoggerServiceFake } => ({}));
+const userRepoModule = vi.hoisted((): { fake?: UserRepoFake } => ({}));
 
 vi.mock('@/clients/cdkOutputs', () => ({
   analyticsEventBusArn: 'analytics-bus-arn',
@@ -86,27 +83,38 @@ describe('heartbeatRequestHandler', () => {
 });
 
 function getDynamoFake(): DynamoDbServiceFake {
-  return dynamoModule.fake as DynamoDbServiceFake;
+  if (!dynamoModule.fake) {
+    throw new Error('Dynamo fake was not initialized');
+  }
+  return dynamoModule.fake;
 }
 
 function getEventBridgeFake(): EventBridgeServiceFake {
-  return eventBridgeModule.fake as EventBridgeServiceFake;
+  if (!eventBridgeModule.fake) {
+    throw new Error('EventBridge fake was not initialized');
+  }
+  return eventBridgeModule.fake;
 }
 
 function getLoggerFake(): LoggerServiceFake {
-  return loggerModule.fake as LoggerServiceFake;
+  if (!loggerModule.fake) {
+    throw new Error('Logger fake was not initialized');
+  }
+  return loggerModule.fake;
 }
 
 function getUserRepoFake(): UserRepoFake {
-  return userRepoModule.fake as UserRepoFake;
+  if (!userRepoModule.fake) {
+    throw new Error('User repo fake was not initialized');
+  }
+  return userRepoModule.fake;
 }
 
 function initializeHeartbeatContext(): void {
   vi.resetModules();
   process.env.APP_ENV = 'test-env';
   process.env.APP_VERSION = '2.0.0';
-  (globalThis as typeof globalThis & { __BUNDLED__?: boolean }).__BUNDLED__ =
-    false;
+  Reflect.set(globalThis, '__BUNDLED__', false);
 }
 
 function cleanupHeartbeatContext(): void {
@@ -131,7 +139,11 @@ async function publishesHeartbeatEvent(): Promise<void> {
   expect(eventBridgeFake.calls).toHaveLength(1);
   const [entry] = eventBridgeFake.calls[0]?.Entries ?? [];
   expect(entry?.EventBusName).toBe('analytics-bus');
-  const detail = JSON.parse(entry?.Detail ?? '{}') as Record<string, unknown>;
+  const parsedDetail: unknown = JSON.parse(entry?.Detail ?? '{}');
+  if (!isRecord(parsedDetail)) {
+    throw new Error('Heartbeat detail payload missing');
+  }
+  const detail = parsedDetail;
   expect(detail).toMatchObject({
     userId: 'user-1',
     env: 'test-env',
@@ -242,7 +254,6 @@ function attachUser(user: { sub: string; jti: string }) {
   };
 }
 vi.hoisted(() => {
-  (globalThis as typeof globalThis & { __BUNDLED__?: boolean }).__BUNDLED__ =
-    false;
+  Reflect.set(globalThis, '__BUNDLED__', false);
   return undefined;
 });

@@ -2,7 +2,11 @@ import type {
   UpdateItemCommandInput,
   UpdateItemCommandOutput,
 } from '@aws-sdk/client-dynamodb';
-import { HTTP_RESPONSE } from '@packages/backend-core';
+import {
+  DynamoDbService,
+  HTTP_RESPONSE,
+  LoggerService,
+} from '@packages/backend-core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { DynamoDbServiceFake } from '@/__tests__/fakes/dynamodb';
@@ -15,8 +19,8 @@ vi.hoisted(() => {
   return undefined;
 });
 
-const dynamoModule = vi.hoisted(() => ({ fake: undefined as unknown }));
-const loggerModule = vi.hoisted(() => ({ fake: undefined as unknown }));
+const dynamoModule = vi.hoisted((): { fake?: DynamoDbServiceFake } => ({}));
+const loggerModule = vi.hoisted((): { fake?: LoggerServiceFake } => ({}));
 
 vi.mock('@/clients/cdkOutputs', () => ({
   rateLimitTableName: 'rate-limit-table',
@@ -24,35 +28,42 @@ vi.mock('@/clients/cdkOutputs', () => ({
   usersTableName: 'users-table',
 }));
 
-vi.mock('@/services/logger.service', async (importOriginal) => {
-  const actual = await importOriginal();
+vi.mock('@/services/logger.service', async () => {
   const { createLoggerServiceFake } = await import('@/__tests__/fakes/logger');
   const fake = createLoggerServiceFake();
   loggerModule.fake = fake;
   return {
-    ...actual,
+    LoggerService,
     ApplicationLoggerService: fake.layer,
     SecurityLoggerService: fake.layer,
   };
 });
 
-vi.mock('@/services/dynamodb.service', async (importOriginal) => {
-  const actual = await importOriginal();
+vi.mock('@/services/dynamodb.service', async () => {
   const { createDynamoDbServiceFake } = await import(
     '@/__tests__/fakes/dynamodb'
   );
   const fake = createDynamoDbServiceFake();
   dynamoModule.fake = fake;
   return {
-    ...actual,
+    DynamoDbService,
     LiveDynamoDbService: fake.layer,
   };
 });
 
-const getLoggerFake = (): LoggerServiceFake =>
-  loggerModule.fake as LoggerServiceFake;
-const getDynamoFake = (): DynamoDbServiceFake =>
-  dynamoModule.fake as DynamoDbServiceFake;
+const getLoggerFake = (): LoggerServiceFake => {
+  if (!loggerModule.fake) {
+    throw new Error('Logger fake was not initialized');
+  }
+  return loggerModule.fake;
+};
+
+const getDynamoFake = (): DynamoDbServiceFake => {
+  if (!dynamoModule.fake) {
+    throw new Error('Dynamo fake was not initialized');
+  }
+  return dynamoModule.fake;
+};
 
 const expectPartitionKey = (
   input: UpdateItemCommandInput,
@@ -120,13 +131,15 @@ async function passesThroughWhenUnderThreshold(): Promise<void> {
   expect(captured.statusCode).toBeUndefined();
 
   const [updateCall] = dynamoFake.calls.updateItem;
-  expect(updateCall?.TableName).toBe('rate-limit-table');
-  expect(req.ip).toBeDefined();
-  expectPartitionKey(
-    updateCall as UpdateItemCommandInput,
-    req.ip as string,
-    now,
-  );
+  if (!updateCall) {
+    throw new Error('Missing Dynamo update call');
+  }
+  expect(updateCall.TableName).toBe('rate-limit-table');
+  const ip = req.ip;
+  if (typeof ip !== 'string') {
+    throw new Error('Expected request ip to be defined');
+  }
+  expectPartitionKey(updateCall, ip, now);
 }
 
 async function returns429WhenExceeded(): Promise<void> {
@@ -152,8 +165,12 @@ async function returns429WhenExceeded(): Promise<void> {
   ).rejects.toBeDefined();
   expect(captured.statusCode).toBe(HTTP_RESPONSE.THROTTLED);
   expect(next).not.toHaveBeenCalled();
+  const ip = req.ip;
+  if (typeof ip !== 'string') {
+    throw new Error('Expected request ip to be defined');
+  }
   expect(getLoggerFake().entries.logs).toContainEqual([
-    `[RATE_LIMIT_EXCEEDED] ${req.ip as string} - 6 calls`,
+    `[RATE_LIMIT_EXCEEDED] ${ip} - 6 calls`,
   ]);
 }
 

@@ -4,8 +4,10 @@ import {
   JWT_ISSUER,
   USER_ROLE,
 } from '@packages/backend-core/auth';
+import type { RequestHandler } from 'express';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+/* eslint-disable max-lines */
 import type { UserRepoFake } from '@/__tests__/fakes/userRepo';
 // no need for value imports; use simple tuple typing instead
 import { makeRequestContext } from '@/__tests__/utils/express';
@@ -16,6 +18,46 @@ import { restoreRandomUUID } from '@/__tests__/utils/uuid';
 const userRepoModule = vi.hoisted((): { fake?: UserRepoFake } => ({}));
 const argonModule = vi.hoisted((): { hash?: ReturnType<typeof vi.fn> } => ({}));
 const jwtModule = vi.hoisted((): { sign?: ReturnType<typeof vi.fn> } => ({}));
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null;
+
+type JwtPayload = {
+  iss: string;
+  aud: string;
+  exp: number;
+  iat: number;
+  role: string;
+  sub: string;
+  jti: string;
+  [key: string]: unknown;
+};
+
+const isJwtPayload = (candidate: unknown): candidate is JwtPayload => {
+  if (!isRecord(candidate)) {
+    return false;
+  }
+
+  const { iss, aud, role, sub, jti, exp, iat } = candidate;
+
+  return (
+    typeof iss === 'string' &&
+    typeof aud === 'string' &&
+    typeof role === 'string' &&
+    typeof sub === 'string' &&
+    typeof jti === 'string' &&
+    typeof exp === 'number' &&
+    typeof iat === 'number'
+  );
+};
+
+const isJwtSignCall = (
+  candidate: unknown,
+): candidate is [Record<string, unknown>, string] =>
+  Array.isArray(candidate) &&
+  candidate.length === 2 &&
+  isRecord(candidate[0]) &&
+  typeof candidate[1] === 'string';
 
 vi.hoisted(() => {
   Reflect.set(globalThis, '__BUNDLED__', false);
@@ -34,13 +76,14 @@ vi.mock('@/layers/app.layer', async () => {
 });
 
 vi.mock('@node-rs/argon2', () => {
-  const hash = vi.fn();
+  const hash = vi.fn<(password: string, salt?: string) => Promise<string>>();
   argonModule.hash = hash;
   return { default: { hash } };
 });
 
 vi.mock('jsonwebtoken', () => {
-  const sign = vi.fn();
+  const sign =
+    vi.fn<(payload: Record<string, unknown>, secret: string) => string>();
   jwtModule.sign = sign;
   return { sign };
 });
@@ -67,11 +110,7 @@ const getSignMock = (): ReturnType<typeof vi.fn> => {
 };
 
 type RegisterTestContext = ReturnType<typeof makeRequestContext>;
-type RegisterHandler = (
-  req: RegisterTestContext['req'],
-  res: RegisterTestContext['res'],
-  next: RegisterTestContext['next'],
-) => Promise<void> | void;
+type RegisterHandler = RequestHandler;
 
 async function importRegisterHandler(): Promise<RegisterHandler> {
   const module = await import('@/handlers/register.handler');
@@ -235,15 +274,16 @@ function assertSuccessfulRegistration({
   expect(captured.statusCode).toBe(HTTP_RESPONSE.CREATED);
   expect(captured.sendBody).toBe(expectedToken);
 
-  const signCall = getSignMock().mock.calls[0] as
-    | [Record<string, unknown>, string]
-    | undefined;
-  expect(signCall).toBeDefined();
-  if (!signCall) {
+  const signMock = getSignMock();
+  const signCall = signMock.mock.calls[0];
+  if (!isJwtSignCall(signCall)) {
     throw new Error('JWT sign call missing');
   }
   const [payload, secret] = signCall;
   expect(secret).toBe('shh-its-a-secret');
+  if (!isJwtPayload(payload)) {
+    throw new Error('JWT payload missing fields');
+  }
 
   const issuedAtMillis = Date.parse(issuedAtIso);
   const expectedIssuedAtSeconds = issuedAtMillis / 1000;
@@ -256,19 +296,22 @@ function assertSuccessfulRegistration({
     iat: expectedIssuedAtSeconds,
     role: USER_ROLE,
   });
-  expect(typeof payload.sub).toBe('string');
-  expect(typeof payload.jti).toBe('string');
-  expect((payload.jti as string).length).toBeGreaterThan(0);
+  const { sub, jti } = payload;
+  if (typeof jti !== 'string' || typeof sub !== 'string') {
+    throw new Error('JWT payload missing identifiers');
+  }
+  expect(jti.length).toBeGreaterThan(0);
 
   const createCall = getUserRepoFake().calls.create[0];
-  expect(createCall).toBeDefined();
-  const ensuredCreateCall = createCall!;
-  expect(ensuredCreateCall).toMatchObject({
+  if (!createCall) {
+    throw new Error('UserRepo create call missing');
+  }
+  expect(createCall).toMatchObject({
     username: body.username,
     email: body.email,
     passwordHash: 'hashed-password',
   });
-  expect(ensuredCreateCall.id).toBe(payload.sub as string);
+  expect(createCall.id).toBe(sub);
 }
 describe('registerRequestHandler', () => {
   beforeEach(initializeRegisterContext);
@@ -285,3 +328,5 @@ describe('registerRequestHandler', () => {
   it('rejects when hashing throws an unknown error', rejectsWhenHashingFails);
   it('rejects when JWT signing throws an unknown error', rejectsWhenJwtFails);
 });
+
+/* eslint-enable max-lines */

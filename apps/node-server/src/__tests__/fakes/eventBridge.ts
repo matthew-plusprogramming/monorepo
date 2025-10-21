@@ -14,7 +14,7 @@ type ResponseEntry =
 
 export type EventBridgeServiceFake = {
   readonly service: EventBridgeServiceSchema;
-  readonly layer: Layer.Layer<never, never, EventBridgeService>;
+  readonly layer: Layer.Layer<EventBridgeService, never, never>;
   readonly queueSuccess: (output: PutEventsCommandOutput) => void;
   readonly queueFailure: (error: Error) => void;
   readonly calls: Array<PutEventsCommandInput>;

@@ -6,6 +6,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { EventBridgeServiceFake } from '@/__tests__/fakes/eventBridge';
 import type * as EventBridgeServiceModule from '@/services/eventBridge.service';
 
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null;
+
 const eventBridgeModule = vi.hoisted(
   (): { fake?: EventBridgeServiceFake } => ({}),
 );
@@ -71,7 +74,11 @@ describe('heartbeat integration', () => {
     expect(eventBridgeFake.calls).toHaveLength(1);
     const [entry] = eventBridgeFake.calls[0]?.Entries ?? [];
     expect(entry?.EventBusName).toBe('analytics-bus');
-    const detail = JSON.parse(entry?.Detail ?? '{}') as Record<string, unknown>;
+    const parsedDetail: unknown = JSON.parse(entry?.Detail ?? '{}');
+    if (!isRecord(parsedDetail)) {
+      throw new Error('Heartbeat detail missing');
+    }
+    const detail = parsedDetail;
     expect(detail).toMatchObject({
       userId: 'user-1',
       env: 'test-env',

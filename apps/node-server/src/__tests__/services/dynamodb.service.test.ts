@@ -9,10 +9,18 @@ import {
 
 type CommandWithInput<T = Record<string, unknown>> = { readonly input: T };
 
-const mocks = vi.hoisted(() => ({
+type DynamoMocks = {
+  sendMock: ReturnType<
+    typeof vi.fn<(command: CommandWithInput) => Promise<unknown>>
+  >;
+  lastClientConfig: Record<string, unknown> | undefined;
+  httpHandlerConfig: Record<string, unknown> | undefined;
+};
+
+const mocks = vi.hoisted<DynamoMocks>(() => ({
   sendMock: vi.fn<(command: CommandWithInput) => Promise<unknown>>(),
-  lastClientConfig: undefined as Record<string, unknown> | undefined,
-  httpHandlerConfig: undefined as Record<string, unknown> | undefined,
+  lastClientConfig: undefined,
+  httpHandlerConfig: undefined,
 }));
 
 const { sendMock } = mocks;
@@ -105,8 +113,11 @@ async function sendsGetItemCommand(): Promise<void> {
 
   expect(result).toBe(output);
   expect(sendMock).toHaveBeenCalledTimes(1);
-  const command = sendMock.mock.calls[0]?.[0] as CommandWithInput;
-  expect(command?.input).toEqual({
+  const command = sendMock.mock.calls[0]?.[0];
+  if (!command) {
+    throw new Error('AWS client did not receive a command');
+  }
+  expect(command.input).toEqual({
     TableName: 'users',
     Key: { id: { S: 'id-123' } },
   });
@@ -139,8 +150,11 @@ async function allowsUpdateItem(): Promise<void> {
   );
 
   expect(result).toBe(output);
-  const command = sendMock.mock.calls[0]?.[0] as CommandWithInput;
-  expect(command?.input).toMatchObject({
+  const command = sendMock.mock.calls[0]?.[0];
+  if (!command) {
+    throw new Error('AWS client did not receive a command');
+  }
+  expect(command.input).toMatchObject({
     TableName: 'users',
     Key: { id: { S: '123' } },
   });
@@ -159,8 +173,11 @@ async function writesItemsWithPutItem(): Promise<void> {
 
   expect(result).toBe(output);
   expect(sendMock).toHaveBeenCalledTimes(1);
-  const command = sendMock.mock.calls[0]?.[0] as CommandWithInput;
-  expect(command?.input).toEqual({
+  const command = sendMock.mock.calls[0]?.[0];
+  if (!command) {
+    throw new Error('AWS client did not receive a command');
+  }
+  expect(command.input).toEqual({
     TableName: 'users',
     Item: { id: { S: 'new-user' } },
   });

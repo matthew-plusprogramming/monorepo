@@ -1,3 +1,4 @@
+import type { MockInstance } from 'vitest';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ZodError } from 'zod';
 
@@ -47,13 +48,16 @@ const getUserModule = vi.hoisted<SingleMockState>(() => ({
 const environmentModule = vi.hoisted<EnvironmentModuleState>(() => ({
   parse: undefined,
 }));
-const environmentParseImpl = vi.hoisted(() => ({
-  impl: ((env) => env) as EnvironmentParseImpl,
+type EnvironmentParseState = {
+  impl: EnvironmentParseImpl;
+};
+
+const environmentParseImpl = vi.hoisted<EnvironmentParseState>(() => ({
+  impl: (env: NodeJS.ProcessEnv): NodeJS.ProcessEnv => env,
 }));
 
-vi.hoisted(() => {
-  (globalThis as typeof globalThis & { __BUNDLED__?: boolean }).__BUNDLED__ =
-    false;
+vi.hoisted((): undefined => {
+  Reflect.set(globalThis, '__BUNDLED__', false);
   return undefined;
 });
 
@@ -125,8 +129,8 @@ vi.mock('@/types/environment', () => {
 });
 
 describe('node-server index entrypoint', () => {
-  let exitSpy: ReturnType<typeof vi.spyOn>;
-  let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
+  let exitSpy: MockInstance<typeof process.exit>;
+  let consoleErrorSpy: MockInstance<typeof console.error>;
 
   beforeEach(() => {
     vi.resetModules();
@@ -141,11 +145,12 @@ describe('node-server index entrypoint', () => {
     getUserModule.handler = undefined;
     environmentModule.parse = undefined;
     environmentParseImpl.impl = (env): NodeJS.ProcessEnv => env;
-    process.env.PORT = '3000';
+    process.env.PORT = 3000;
 
     exitSpy = vi.spyOn(process, 'exit');
-    exitSpy.mockImplementation((code?: number | null): never => {
-      const formattedCode = code ?? 'undefined';
+    exitSpy.mockImplementation((code?: string | number | null) => {
+      const formattedCode =
+        code === null || code === undefined ? 'undefined' : String(code);
       throw new Error(
         `process.exit called unexpectedly with code ${formattedCode}`,
       );
@@ -223,7 +228,7 @@ function assertBootstrapSuccess({
   exitSpy,
 }: {
   module: { app?: unknown };
-  exitSpy: ReturnType<typeof vi.spyOn>;
+  exitSpy: MockInstance<typeof process.exit>;
 }): void {
   const expressApp = requireExpressApp();
   const parse = requireEnvironmentParse();
@@ -249,8 +254,8 @@ function assertBootstrapSuccess({
     '/user/:identifier',
     requireGetUserHandler(),
   );
-  expect(expressApp.listen).toHaveBeenCalledWith('3000');
-  const moduleApp = module.app as ExpressAppStub | undefined;
+  expect(expressApp.listen).toHaveBeenCalledWith(process.env.PORT);
+  const moduleApp = module.app;
   expect(moduleApp).toBe(expressApp);
   expect(exitSpy).not.toHaveBeenCalled();
 }
@@ -259,8 +264,8 @@ function assertBootstrapFailure({
   consoleErrorSpy,
   exitSpy,
 }: {
-  consoleErrorSpy: ReturnType<typeof vi.spyOn>;
-  exitSpy: ReturnType<typeof vi.spyOn>;
+  consoleErrorSpy: MockInstance<typeof console.error>;
+  exitSpy: MockInstance<typeof process.exit>;
 }): void {
   expect(consoleErrorSpy).toHaveBeenNthCalledWith(
     1,

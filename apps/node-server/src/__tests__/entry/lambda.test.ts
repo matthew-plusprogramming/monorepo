@@ -146,8 +146,7 @@ vi.mock('@/middleware/isAuthenticated.middleware', () => {
 describe('lambda entrypoint', () => {
   beforeEach(() => {
     vi.resetModules();
-    (globalThis as typeof globalThis & { __BUNDLED__?: boolean }).__BUNDLED__ =
-      false;
+    Reflect.set(globalThis, '__BUNDLED__', false);
   });
 
   it('wraps the Express app with serverless-http and exports the handler', async () => {

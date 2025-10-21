@@ -21,22 +21,34 @@ type StackOutput<Name extends ConsumableStack> = output<
   StackOutputSchema<Name>
 >;
 
-type StackOutputValue<Name extends ConsumableStack> = StackOutput<Name>[Name];
+type StackOutputKey<Name extends ConsumableStack> = Extract<
+  Name,
+  keyof StackOutput<Name>
+>;
 
-const parseStackOutput = <TConfig extends ConsumableStackConfig>(
-  config: TConfig,
-  stackName: TConfig['name'],
+type StackOutputValue<Name extends ConsumableStack> =
+  StackOutput<Name>[StackOutputKey<Name>];
+
+const parseStackOutput = <TName extends ConsumableStack>(
+  config: Extract<ConsumableStackConfig, { name: TName }>,
+  stackName: TName,
   rawOutput: unknown,
-): StackOutput<TConfig['name']> => {
+): StackOutput<TName> => {
   const parsed = config.outputSchema.safeParse(rawOutput);
   if (!parsed.success) {
     throw new Error(`Failed to parse output for stack: ${stackName}`, {
       cause: parsed.error,
     });
   }
-  const data: StackOutput<TConfig['name']> = parsed.data;
-  return data;
+  return parsed.data as StackOutput<TName>;
 };
+
+const hasStackOutput = <Name extends ConsumableStack>(
+  record: StackOutput<Name>,
+  stackName: Name,
+): record is StackOutput<Name> & {
+  [K in StackOutputKey<Name>]-?: StackOutputValue<K>;
+} => stackName in record;
 
 const generateOutputPath = (
   stack: ConsumableStack,
@@ -59,15 +71,21 @@ const loadOutput = <T extends ConsumableStack>(
   const stackOutput: unknown = JSON.parse(stackOutputData);
 
   const stackConfig = stacks.find(
-    (s): s is ConsumableStackConfig & { name: T } => s.name === stack,
+    (s): s is ConsumableStackConfig => s.name === stack,
   );
   if (!stackConfig) {
     throw new Error(`Unknown stack: ${stack}`);
   }
+  const typedConfig = stackConfig as Extract<
+    ConsumableStackConfig,
+    { name: T }
+  >;
 
-  const data = parseStackOutput(stackConfig, stack, stackOutput);
-  const value: StackOutputValue<T> = data[stack];
-  return value;
+  const parsedOutput = parseStackOutput(typedConfig, stack, stackOutput);
+  if (!hasStackOutput(parsedOutput, stack)) {
+    throw new Error(`Missing output for stack: ${stack}`);
+  }
+  return parsedOutput[stack as StackOutputKey<T>];
 };
 
 const loadedOutputs: { [K in ConsumableStack]?: StackOutputValue<K> } = {};

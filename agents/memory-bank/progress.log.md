@@ -41,3 +41,6 @@ last_reviewed: 2025-09-21
 - 2025-10-20: Planned unsafe assertion audit script — documented AST-based detection, comment capture expectations, and the agent script target before implementation.
 - 2025-10-20: Build phase for unsafe assertion audit script — implemented the TypeScript AST scanner, comment aggregation, and CLI options, then validated the help output.
 - 2025-10-20: Verify phase for unsafe assertion audit script — ran the scanner, updated Memory Bank metadata, and completed memory validation plus drift checks.
+- 2025-10-20: Plan phase for fixing Vitest/Effect typing regressions in node-server tests — scoped mock updates, Layer typing corrections, and Express helper adjustments ahead of build.
+- 2025-10-20: Build phase for Vitest/Effect regression fix — rewired node-server mocks/helpers, refreshed fake service layers, and tightened CDK output consumer typing before rerunning tests.
+- 2025-10-20: Verify phase for Vitest/Effect regression fix — reran node-server/workspace test matrices and completed memory validation plus drift checks after updating metadata.

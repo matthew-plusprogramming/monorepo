@@ -11,7 +11,7 @@ export type CapturedLoggerEntries = {
 
 export type LoggerServiceFake = {
   readonly service: LoggerServiceSchema;
-  readonly layer: Layer.Layer<never, never, LoggerService>;
+  readonly layer: Layer.Layer<LoggerService, never, never>;
   readonly entries: CapturedLoggerEntries;
   readonly reset: () => void;
 };

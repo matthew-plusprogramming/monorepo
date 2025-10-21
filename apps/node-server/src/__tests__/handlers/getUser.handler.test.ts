@@ -7,7 +7,7 @@ import type { UserRepoFake } from '@/__tests__/fakes/userRepo';
 import { makeRequestContext } from '@/__tests__/utils/express';
 
 // Hoisted state to capture the fake exposed by the AppLayer mock
-const userRepoModule = vi.hoisted(() => ({ fake: undefined as unknown }));
+const userRepoModule = vi.hoisted((): { fake?: UserRepoFake } => ({}));
 
 vi.hoisted(() => {
   Reflect.set(globalThis, '__BUNDLED__', false);
@@ -25,7 +25,12 @@ vi.mock('@/layers/app.layer', async () => {
   return { AppLayer: fake.layer };
 });
 
-const getUserRepoFake = (): UserRepoFake => userRepoModule.fake as UserRepoFake;
+const getUserRepoFake = (): UserRepoFake => {
+  if (!userRepoModule.fake) {
+    throw new Error('UserRepo fake was not initialized');
+  }
+  return userRepoModule.fake;
+};
 
 describe('getUserRequestHandler', () => {
   beforeEach(() => {

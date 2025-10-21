@@ -16,11 +16,9 @@ vi.mock('@/clients/cdkOutputs', () => ({
 const dynamoFake = createDynamoDbServiceFake();
 const loggerFake = createLoggerServiceFake();
 const dependencies = dynamoFake.layer.pipe(Layer.merge(loggerFake.layer));
-const repoLayer = LiveUserRepo.pipe(Layer.provide(dependencies)) as Layer.Layer<
-  UserRepo,
-  never,
-  never
->;
+const repoLayer: Layer.Layer<UserRepo, never, never> = LiveUserRepo.pipe(
+  Layer.provide(dependencies),
+);
 
 const run = <R, E>(effect: Effect.Effect<R, E, UserRepo>): Promise<R> =>
   Effect.runPromise(effect.pipe(Effect.provide(repoLayer)));
