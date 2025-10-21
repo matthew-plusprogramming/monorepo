@@ -142,6 +142,7 @@ describe('node-server index entrypoint', () => {
     environmentModule.parse = undefined;
     environmentParseImpl.impl = (env): NodeJS.ProcessEnv => env;
     process.env.PORT = '3000' as unknown as number;
+
     exitSpy = vi.spyOn(process, 'exit') as ReturnType<typeof vi.spyOn>;
     exitSpy.mockImplementation(() => undefined as never);
     consoleErrorSpy = vi.spyOn(console, 'error') as ReturnType<typeof vi.spyOn>;
@@ -216,7 +217,7 @@ function assertBootstrapSuccess({
   module,
   exitSpy,
 }: {
-  module: { app?: ExpressAppStub | undefined };
+  module: { app?: unknown };
   exitSpy: ReturnType<typeof vi.spyOn>;
 }): void {
   const expressApp = requireExpressApp();
@@ -244,7 +245,8 @@ function assertBootstrapSuccess({
     requireGetUserHandler(),
   );
   expect(expressApp.listen).toHaveBeenCalledWith('3000');
-  expect(module.app).toBe(expressApp);
+  const moduleApp = module.app as ExpressAppStub | undefined;
+  expect(moduleApp).toBe(expressApp);
   expect(exitSpy).not.toHaveBeenCalled();
 }
 

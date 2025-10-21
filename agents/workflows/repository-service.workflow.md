@@ -62,7 +62,7 @@ Interfaces & Invariants
 Candidate Files & Tests
 
 - `packages/core/schemas/schemas` (add new modules) and sibling tests such as `packages/core/schemas/schemas/user/user.schemas.test.ts`.
-- `cdk/backend-server-cdk/src/stacks` for DynamoDB resources and `cdk/backend-server-cdk/src/stackRegistry.ts` for registration.
+- `cdk/backend-server-cdk/src/stacks` for DynamoDB resources and `cdk/backend-server-cdk/src/stacks.ts` for registration.
 - `cdk/backend-server-cdk/src/consumer` for outputs loaders and exports.
 - `apps/node-server/src/services` (e.g., `apps/node-server/src/services/userRepo.service.ts`) for repository implementation.
 - `apps/node-server/src/layers/app.layer.ts` for wiring the repository layer.
@@ -115,7 +115,7 @@ Phase: build
      - Export schema constants for table name/GSI usage; add schema tests.
   2. **Infrastructure**
      - Update or create DynamoDB stack modules in `cdk/backend-server-cdk/src/stacks`.
-     - Register new stacks in `stackRegistry.ts`; expose outputs via consumers and re-export table names through `@cdk/backend-server-cdk`.
+     - Register new stacks in `stacks.ts`; expose outputs via consumers and re-export table names through `@cdk/backend-server-cdk`.
      - Update CDK outputs loader tests and re-run `npm -w @cdk/backend-server-cdk run lint`.
   3. **Backend Core (if needed)**
      - Define additional domain errors or shared types in `packages/core/backend-core` (e.g., `packages/core/backend-core/src/types/errors`).

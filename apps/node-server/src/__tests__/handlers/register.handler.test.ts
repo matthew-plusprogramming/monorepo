@@ -59,7 +59,7 @@ type RegisterHandler = (
 
 async function importRegisterHandler(): Promise<RegisterHandler> {
   const module = await import('@/handlers/register.handler');
-  return module.registerRequestHandler;
+  return module.registerRequestHandler as unknown as RegisterHandler;
 }
 
 function initializeRegisterContext(): void {

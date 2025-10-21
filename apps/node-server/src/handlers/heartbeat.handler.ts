@@ -29,16 +29,13 @@ type HeartbeatDetail = {
 };
 
 const resolvePlatform = (req: Request): string => {
-  const platformHeader = req.headers[PLATFORM_HEADER];
-  const platformValue = Array.isArray(platformHeader)
-    ? platformHeader[0]
-    : platformHeader;
+  const platformValue = req.get(PLATFORM_HEADER) ?? undefined;
+  const userAgentValue = req.get('user-agent') ?? undefined;
 
   return z
     .string()
-    .optional()
     .catch('unknown')
-    .parse(platformValue ?? req.headers['user-agent']);
+    .parse(platformValue ?? userAgentValue);
 };
 
 const buildHeartbeatDetail = (

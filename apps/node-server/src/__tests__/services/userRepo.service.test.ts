@@ -48,6 +48,10 @@ describe('UserRepo', () => {
     returnsNoneWhenEmailParseFails,
   );
   it('returns Option.none when id lookup misses', returnsNoneWhenIdMisses);
+  it(
+    'returns Option.none without Dynamo lookups when identifier is invalid',
+    returnsNoneWhenIdentifierInvalid,
+  );
   it('returns Option.some when id lookup succeeds', returnsSomeWhenIdHits);
   it(
     'logs and maps DynamoDB failures to InternalServerError',
@@ -64,6 +68,10 @@ describe('UserRepo', () => {
   it(
     'logs errors when putItem fails and emits InternalServerError',
     logsPutItemFailures,
+  );
+  it(
+    'validates create payloads before writing and logs Zod errors',
+    validatesCreatePayload,
   );
 });
 
@@ -91,6 +99,9 @@ async function returnsSomeWhenEmailMatches(): Promise<void> {
   expect(dynamoFake.calls.query[0]).toMatchObject({
     TableName: 'test-users-table',
     IndexName: USER_SCHEMA_CONSTANTS.gsi.email,
+    ExpressionAttributeNames: {
+      '#email': USER_SCHEMA_CONSTANTS.key.email,
+    },
     Limit: 1,
     ProjectionExpression: USER_SCHEMA_CONSTANTS.projection.userPublic,
   });
@@ -117,6 +128,9 @@ async function returnsNoneWhenEmailParseFails(): Promise<void> {
   expect(dynamoFake.calls.query[0]).toMatchObject({
     TableName: 'test-users-table',
     IndexName: USER_SCHEMA_CONSTANTS.gsi.email,
+    ExpressionAttributeNames: {
+      '#email': USER_SCHEMA_CONSTANTS.key.email,
+    },
   });
 }
 
@@ -158,6 +172,16 @@ async function returnsSomeWhenIdHits(): Promise<void> {
     TableName: 'test-users-table',
     Key: { id: { S: user.id } },
   });
+}
+
+async function returnsNoneWhenIdentifierInvalid(): Promise<void> {
+  const result = await withRepo((repo) =>
+    repo.findByIdentifier('not-a-valid-email-or-uuid'),
+  );
+
+  expect(Option.isNone(result)).toBe(true);
+  expect(dynamoFake.calls.query).toHaveLength(0);
+  expect(dynamoFake.calls.getItem).toHaveLength(0);
 }
 
 async function logsQueryFailures(): Promise<void> {
@@ -221,4 +245,20 @@ async function logsPutItemFailures(): Promise<void> {
   );
 
   expect(loggerFake.entries.errors).toContainEqual([error]);
+}
+
+async function validatesCreatePayload(): Promise<void> {
+  const user = buildUserCreate({
+    id: 'not-a-uuid',
+  });
+
+  await expect(withRepo((repo) => repo.create(user))).rejects.toHaveProperty(
+    'message',
+    'Invalid user payload',
+  );
+
+  expect(dynamoFake.calls.putItem).toHaveLength(0);
+  expect(loggerFake.entries.errors).toHaveLength(1);
+  const [loggedError] = loggerFake.entries.errors[0] ?? [];
+  expect(loggedError).toBeInstanceOf(Error);
 }

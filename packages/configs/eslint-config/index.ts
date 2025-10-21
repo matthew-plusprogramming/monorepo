@@ -141,6 +141,11 @@ export const baseConfig = (
       '@typescript-eslint/no-unsafe-return': 'warn',
       '@typescript-eslint/prefer-readonly': 'warn',
       '@typescript-eslint/no-confusing-void-expression': 'error',
+      '@typescript-eslint/no-unnecessary-type-assertion': 'warn',
+      '@typescript-eslint/consistent-type-assertions': [
+        'error',
+        { assertionStyle: 'as', objectLiteralTypeAssertions: 'never' },
+      ],
 
       // Strict code structure
       complexity: ['warn', { max: 10 }],

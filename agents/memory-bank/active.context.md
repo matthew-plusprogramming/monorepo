@@ -16,6 +16,48 @@ Open Decisions
 
 - Define the long-term ADR indexing cadence as the system matures.
 
+## 2025-10-20 — User Repository Service Implementation
+
+Acceptance Criteria (Given/When/Then)
+
+- Given a stored user accessible by email, when `findByIdentifier` receives that email, then it returns `Option.some` with a `UserPublic` parsed via the email GSI.
+- Given an existing user id, when `findByIdentifier` receives the id, then it validates the identifier, fetches via the primary key, and returns `Option.some` with a `UserPublic`.
+- Given a valid `UserCreate` payload, when `create` runs, then it validates the payload, writes to DynamoDB using schema constants and CDK outputs, and returns `true`.
+- Given an invalid payload or DynamoDB failure, when repository methods run, then they log the underlying issue and fail with `InternalServerError`.
+
+Non-goals
+
+- Adding update/delete flows, GSIs, or backfill scripts.
+- Modifying user schema shapes beyond validation needed for repository use.
+
+Constraints & Assumptions
+
+- Table names and keys come from `@/clients/cdkOutputs` and `USER_SCHEMA_CONSTANTS`; no literals.
+- Repositories expose Effect layers via `Context.Tag` with explicit `InternalServerError` typing.
+- Inputs are validated with Zod before DynamoDB writes; outputs pass through `UserPublicSchema`.
+
+Risks & Mitigations
+
+- DynamoDB marshalling bugs → reuse schema constants and extend unit coverage for query/put payloads.
+- Validation gaps → add explicit Zod parsing and tests for invalid payloads.
+- Handler regressions → ensure repository contract shape remains unchanged for existing handlers.
+
+Candidate Files & Tests
+
+- `apps/node-server/src/services/userRepo.service.ts`
+- `apps/node-server/src/__tests__/services/userRepo.service.test.ts`
+- `apps/node-server/src/__tests__/fakes/userRepo.ts`
+- `apps/node-server/src/__tests__/builders/user.ts`
+
+Testing Strategy
+
+- Extend repository unit tests for validation, DynamoDB failure logging, and identifier filtering.
+- Re-run `npm run test`, `npm run lint`, and `npm -w @cdk/backend-server-cdk run lint`.
+
+Next Steps
+
+- Summarize repository service updates, stamp Memory Bank metadata, and prepare final handoff guidance.
+
 Reflexion
 
 - 2025-09-03 — Bootstrapped the canonical Memory Bank, default workflow, and ADR-0001 covering retrieval tiers.
@@ -87,3 +129,12 @@ Reflexion
 - 2025-10-20 — Verify phase: Stamped Memory Bank metadata with HEAD, ran Markdown formatting, and validated memory paths/drift for the new workflow assets.
   Confirmed repository-service plan/workflow paths resolve to real directories and updated progress tracking.
   Ready to hand off the workflow with verification guidance baked in.
+- 2025-10-20 — Plan phase: Reconfirmed user schemas/infra cover table keys, scoped repository validation/logging updates, and aligned contracts with handlers.
+  Logged Given/When/Then acceptance criteria plus risks in Active Context for the user repository implementation.
+  Next build phase adds Zod-backed validation, identifier guarding, and updated tests before rerunning lint/test suites.
+- 2025-10-20 — Build phase: Validated user creation payloads, guarded identifier lookups, and normalized heartbeat platform detection across services and handlers.
+  Expanded repository unit coverage for invalid identifiers/payloads, mocked logger errors, and resolved express entrypoint typing gaps.
+  Lint passes after restructuring imports and extracting helper builders to keep functions under the line limits.
+- 2025-10-20 — Verify phase: Ran `npm run lint` and `npm run test` to confirm TypeScript compilation and Vitest suites succeed without warnings.
+  Captured analytics heartbeat stderr as expected test noise, then queued Memory Bank stamping plus validation scripts.
+  Ready to summarize repository service behavior, note remaining risks, and close the workflow.
