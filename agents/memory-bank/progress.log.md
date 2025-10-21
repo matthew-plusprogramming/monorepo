@@ -44,3 +44,8 @@ last_reviewed: 2025-09-21
 - 2025-10-20: Plan phase for fixing Vitest/Effect typing regressions in node-server tests — scoped mock updates, Layer typing corrections, and Express helper adjustments ahead of build.
 - 2025-10-20: Build phase for Vitest/Effect regression fix — rewired node-server mocks/helpers, refreshed fake service layers, and tightened CDK output consumer typing before rerunning tests.
 - 2025-10-20: Verify phase for Vitest/Effect regression fix — reran node-server/workspace test matrices and completed memory validation plus drift checks after updating metadata.
+- 2025-10-20: Plan phase for code hygiene automation survey — catalogued enforceable hygiene heuristics and outlined candidate scripts for future automation.
+- 2025-10-20: Build phase for code hygiene automation survey — inspected runtime/tests for enforceable heuristics and gathered file/line evidence for env parity, resource sourcing, Effect boundaries, and console usage.
+- 2025-10-20: Verify phase for code hygiene automation survey — updated Memory Bank front matter to HEAD, ran validation/drift scripts, and assembled the automation recommendations for handoff.
+- 2025-10-20: Plan phase for code quality automation scripts — recorded acceptance criteria, constraints, and targets for stand-alone checks plus the aggregate runner.
+- 2025-10-20: Build phase for code quality automation scripts — created individual Effect/env/resource/console checks, shared git utilities, and confirmed the aggregate runner executes all scripts cleanly.

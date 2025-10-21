@@ -16,6 +16,49 @@ Open Decisions
 
 - Define the long-term ADR indexing cadence as the system matures.
 
+## 2025-10-20 — Code Quality Automation Scripts
+
+Acceptance Criteria (Given/When/Then)
+
+- Given the previously identified hygiene checks, when we complete this task, then each check ships as a standalone Node script under `agents/scripts/` with discoverable help output and a non-zero exit code on violations.
+- Given the individual scripts exist, when the aggregate “check code quality” utility runs, then it executes every check (including `agents/scripts/find-unsafe-as-casts.mjs`) and fails if any constituent script fails.
+- Given contributors run the scripts from the repo root, when scans finish, then they operate on git-tracked sources only and emit actionable file:line diagnostics without mutating files.
+
+Non-goals
+
+- Modifying ESLint/Prettier configuration or auto-fixing violations.
+- Scanning non-tracked or generated artifacts (e.g., `dist/`, build outputs).
+
+Constraints & Assumptions
+
+- Scripts target git-tracked files enumerated via `git ls-files`.
+- Prefer lightweight parsing (string/JSON schemas) unless an AST is required for accuracy.
+- Provide ignores/allowlists for sanctioned locations (e.g., tests needing console access).
+
+Risks & Mitigations
+
+- False positives in tests → scope scripts to production paths or expose `--include-tests` flag.
+- Runtime cost in CI → share helper utilities to avoid repeated work (e.g., cached env schema).
+- Aggregated failures obscuring root cause → aggregate runner surfaces per-script output and stops on first failure while printing a summary.
+
+Candidate Files & Tests
+
+- `agents/scripts/*.mjs` (new check scripts plus aggregate runner).
+- Production code under `apps/node-server/src/**`, `packages/core/**`, `cdk/backend-server-cdk/src/**`.
+- Existing tests for verifying allowlists (`apps/node-server/src/__tests__/**`) where necessary.
+
+Testing Strategy
+
+- Run each script locally on the clean tree to confirm zero findings and success messaging.
+- During development, temporarily inject known violations to exercise failure paths, then remove.
+- Execute the aggregate script to ensure it correctly chains existing and new checks.
+
+Next Steps
+
+- Inventory heuristics per script and define allowlists/outputs.
+- Implement scripts with shared helper utilities where appropriate.
+- Combine scripts into a master runner and document usage.
+
 ## 2025-10-20 — User Repository Service Implementation
 
 Acceptance Criteria (Given/When/Then)
@@ -192,3 +235,6 @@ Reflexion
 - 2025-10-20 — Build phase: Expanded `find-unsafe-as-casts.mjs` with an `--include-all` flag so audits can surface every assertion alongside the focused unsafe subset.
   Verified the default mode still highlights `as never` and double assertions, while the optional flag mirrors the full repository inventory for cross-checking.
   Next rerun the script with the new flag, validate outputs against manual notes, and refresh memory scripts before closeout.
+- 2025-10-20 — Build phase: Authored effect/runtime/env/console/resource check scripts plus the aggregate runner under `agents/scripts/**`.
+  Shared git file utilities via `utils.mjs`, codified allowlists, and confirmed each script exits cleanly on the current tree.
+  Prepared to capture verify reflections and wire the master command into handoff guidance.
