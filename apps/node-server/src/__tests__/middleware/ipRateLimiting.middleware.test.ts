@@ -9,12 +9,9 @@ import type { DynamoDbServiceFake } from '@/__tests__/fakes/dynamodb';
 import type { LoggerServiceFake } from '@/__tests__/fakes/logger';
 import { makeRequestContext } from '@/__tests__/utils/express';
 import { ipRateLimitingMiddlewareRequestHandler } from '@/middleware/ipRateLimiting.middleware';
-import type * as DynamoServiceModule from '@/services/dynamodb.service';
-import type * as LoggerServiceModule from '@/services/logger.service';
 
 vi.hoisted(() => {
-  (globalThis as typeof globalThis & { __BUNDLED__: boolean }).__BUNDLED__ =
-    false;
+  Reflect.set(globalThis, '__BUNDLED__', false);
   return undefined;
 });
 
@@ -28,7 +25,7 @@ vi.mock('@/clients/cdkOutputs', () => ({
 }));
 
 vi.mock('@/services/logger.service', async (importOriginal) => {
-  const actual = (await importOriginal()) as typeof LoggerServiceModule;
+  const actual = await importOriginal();
   const { createLoggerServiceFake } = await import('@/__tests__/fakes/logger');
   const fake = createLoggerServiceFake();
   loggerModule.fake = fake;
@@ -40,7 +37,7 @@ vi.mock('@/services/logger.service', async (importOriginal) => {
 });
 
 vi.mock('@/services/dynamodb.service', async (importOriginal) => {
-  const actual = (await importOriginal()) as typeof DynamoServiceModule;
+  const actual = await importOriginal();
   const { createDynamoDbServiceFake } = await import(
     '@/__tests__/fakes/dynamodb'
   );

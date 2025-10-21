@@ -4,11 +4,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { LoggerServiceFake } from '@/__tests__/fakes/logger';
 import { makeRequestContext } from '@/__tests__/utils/express';
 import { isAuthenticatedMiddlewareRequestHandler } from '@/middleware/isAuthenticated.middleware';
-import type * as LoggerServiceModule from '@/services/logger.service';
 
 vi.hoisted(() => {
-  (globalThis as typeof globalThis & { __BUNDLED__: boolean }).__BUNDLED__ =
-    false;
+  Reflect.set(globalThis, '__BUNDLED__', false);
   return undefined;
 });
 
@@ -28,7 +26,7 @@ vi.mock('@/clients/cdkOutputs', () => ({
 }));
 
 vi.mock('@/services/logger.service', async (importOriginal) => {
-  const actual = (await importOriginal()) as typeof LoggerServiceModule;
+  const actual = await importOriginal();
   const { createLoggerServiceFake } = await import('@/__tests__/fakes/logger');
   const fake = createLoggerServiceFake();
   loggerModule.fake = fake;

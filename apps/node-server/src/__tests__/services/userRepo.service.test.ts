@@ -1,4 +1,3 @@
-import type { AttributeValue } from '@aws-sdk/client-dynamodb';
 import { marshall } from '@aws-sdk/util-dynamodb';
 import { USER_SCHEMA_CONSTANTS } from '@packages/schemas/user';
 import { Effect, Layer, Option } from 'effect';
@@ -88,7 +87,7 @@ async function returnsSomeWhenEmailMatches(): Promise<void> {
   dynamoFake.queueSuccess('query', {
     $metadata: { httpStatusCode: 200 },
     Count: 1,
-    Items: [marshall(user) as Record<string, AttributeValue>],
+    Items: [marshall(user)],
   });
 
   const result = await withRepo((repo) => repo.findByIdentifier(user.email));
@@ -108,10 +107,7 @@ async function returnsSomeWhenEmailMatches(): Promise<void> {
 }
 
 async function returnsNoneWhenEmailParseFails(): Promise<void> {
-  const invalidItem = marshall({ notAUser: true }) as Record<
-    string,
-    AttributeValue
-  >;
+  const invalidItem = marshall({ notAUser: true });
 
   dynamoFake.queueSuccess('query', {
     $metadata: { httpStatusCode: 200 },
@@ -161,7 +157,7 @@ async function returnsSomeWhenIdHits(): Promise<void> {
 
   dynamoFake.queueSuccess('getItem', {
     $metadata: { httpStatusCode: 200 },
-    Item: marshall(user) as Record<string, AttributeValue>,
+    Item: marshall(user),
   });
 
   const result = await withRepo((repo) => repo.findByIdentifier(user.id));

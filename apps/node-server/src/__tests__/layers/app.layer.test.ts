@@ -21,18 +21,12 @@ vi.hoisted(() => {
   return undefined;
 });
 
-const dynamoModule = vi.hoisted(() => ({
-  fake: undefined as DynamoDbServiceFake | undefined,
-}));
-const loggerModule = vi.hoisted(() => ({
-  fake: undefined as LoggerServiceFake | undefined,
-}));
-const eventBridgeModule = vi.hoisted(() => ({
-  fake: undefined as EventBridgeServiceFake | undefined,
-}));
-const userRepoModule = vi.hoisted(() => ({
-  service: undefined as UserRepoSchema | undefined,
-}));
+const dynamoModule = vi.hoisted((): { fake?: DynamoDbServiceFake } => ({}));
+const loggerModule = vi.hoisted((): { fake?: LoggerServiceFake } => ({}));
+const eventBridgeModule = vi.hoisted(
+  (): { fake?: EventBridgeServiceFake } => ({}),
+);
+const userRepoModule = vi.hoisted((): { service?: UserRepoSchema } => ({}));
 
 vi.mock('@/clients/cdkOutputs', () => ({
   usersTableName: 'users-table',
@@ -49,7 +43,7 @@ vi.mock('@/clients/cdkOutputs', () => ({
 }));
 
 vi.mock('@/services/dynamodb.service', async (importOriginal) => {
-  const actual = (await importOriginal()) as typeof DynamoServiceModule;
+  const actual: typeof DynamoServiceModule = await importOriginal();
   const { createDynamoDbServiceFake } = await import(
     '@/__tests__/fakes/dynamodb'
   );
@@ -57,25 +51,24 @@ vi.mock('@/services/dynamodb.service', async (importOriginal) => {
   dynamoModule.fake = fake;
   return {
     ...actual,
-    LiveDynamoDbService: fake.layer as typeof actual.LiveDynamoDbService,
+    LiveDynamoDbService: fake.layer,
   } satisfies typeof actual;
 });
 
 vi.mock('@/services/logger.service', async (importOriginal) => {
-  const actual = (await importOriginal()) as typeof LoggerServiceModule;
+  const actual: typeof LoggerServiceModule = await importOriginal();
   const { createLoggerServiceFake } = await import('@/__tests__/fakes/logger');
   const fake = createLoggerServiceFake();
   loggerModule.fake = fake;
   return {
     ...actual,
-    ApplicationLoggerService:
-      fake.layer as typeof actual.ApplicationLoggerService,
-    SecurityLoggerService: fake.layer as typeof actual.SecurityLoggerService,
+    ApplicationLoggerService: fake.layer,
+    SecurityLoggerService: fake.layer,
   } satisfies typeof actual;
 });
 
 vi.mock('@/services/eventBridge.service', async (importOriginal) => {
-  const actual = (await importOriginal()) as typeof EventBridgeServiceModule;
+  const actual: typeof EventBridgeServiceModule = await importOriginal();
   const { createEventBridgeServiceFake } = await import(
     '@/__tests__/fakes/eventBridge'
   );
@@ -83,12 +76,12 @@ vi.mock('@/services/eventBridge.service', async (importOriginal) => {
   eventBridgeModule.fake = fake;
   return {
     ...actual,
-    LiveEventBridgeService: fake.layer as typeof actual.LiveEventBridgeService,
+    LiveEventBridgeService: fake.layer,
   } satisfies typeof actual;
 });
 
 vi.mock('@/services/userRepo.service', async (importOriginal) => {
-  const actual = (await importOriginal()) as typeof UserRepoModule;
+  const actual: typeof UserRepoModule = await importOriginal();
   const service: UserRepoSchema = {
     findByIdentifier: vi.fn(() => Effect.succeed(Option.none())),
     create: vi.fn(() => Effect.succeed(true as const)),
@@ -96,10 +89,7 @@ vi.mock('@/services/userRepo.service', async (importOriginal) => {
   userRepoModule.service = service;
   return {
     ...actual,
-    LiveUserRepo: Layer.succeed(
-      actual.UserRepo,
-      service,
-    ) as typeof actual.LiveUserRepo,
+    LiveUserRepo: Layer.succeed(actual.UserRepo, service),
   } satisfies typeof actual;
 });
 
@@ -130,17 +120,29 @@ describe('AppLayer', () => {
 });
 
 function getDynamoFake(): DynamoDbServiceFake {
-  return dynamoModule.fake as DynamoDbServiceFake;
+  if (!dynamoModule.fake) {
+    throw new Error('Dynamo fake was not initialized');
+  }
+  return dynamoModule.fake;
 }
 
 function getLoggerFake(): LoggerServiceFake {
-  return loggerModule.fake as LoggerServiceFake;
+  if (!loggerModule.fake) {
+    throw new Error('Logger fake was not initialized');
+  }
+  return loggerModule.fake;
 }
 
 function getEventBridgeFake(): EventBridgeServiceFake {
-  return eventBridgeModule.fake as EventBridgeServiceFake;
+  if (!eventBridgeModule.fake) {
+    throw new Error('EventBridge fake was not initialized');
+  }
+  return eventBridgeModule.fake;
 }
 
 function getUserRepoService(): UserRepoSchema {
-  return userRepoModule.service as UserRepoSchema;
+  if (!userRepoModule.service) {
+    throw new Error('User repo service was not initialized');
+  }
+  return userRepoModule.service;
 }

@@ -141,11 +141,16 @@ describe('node-server index entrypoint', () => {
     getUserModule.handler = undefined;
     environmentModule.parse = undefined;
     environmentParseImpl.impl = (env): NodeJS.ProcessEnv => env;
-    process.env.PORT = '3000' as unknown as number;
+    process.env.PORT = '3000';
 
-    exitSpy = vi.spyOn(process, 'exit') as ReturnType<typeof vi.spyOn>;
-    exitSpy.mockImplementation(() => undefined as never);
-    consoleErrorSpy = vi.spyOn(console, 'error') as ReturnType<typeof vi.spyOn>;
+    exitSpy = vi.spyOn(process, 'exit');
+    exitSpy.mockImplementation((code?: number | null): never => {
+      const formattedCode = code ?? 'undefined';
+      throw new Error(
+        `process.exit called unexpectedly with code ${formattedCode}`,
+      );
+    });
+    consoleErrorSpy = vi.spyOn(console, 'error');
     consoleErrorSpy.mockImplementation(() => undefined);
   });
 
@@ -163,9 +168,9 @@ describe('node-server index entrypoint', () => {
 
   it('logs and exits when environment validation fails', async () => {
     const exitError = new Error('process exit invoked');
-    exitSpy.mockImplementationOnce((() => {
+    exitSpy.mockImplementationOnce((): never => {
       throw exitError;
-    }) as never);
+    });
 
     environmentParseImpl.impl = (env): never => {
       void env;

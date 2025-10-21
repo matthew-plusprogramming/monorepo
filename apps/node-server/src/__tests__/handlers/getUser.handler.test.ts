@@ -10,8 +10,7 @@ import { makeRequestContext } from '@/__tests__/utils/express';
 const userRepoModule = vi.hoisted(() => ({ fake: undefined as unknown }));
 
 vi.hoisted(() => {
-  (globalThis as typeof globalThis & { __BUNDLED__: boolean }).__BUNDLED__ =
-    false;
+  Reflect.set(globalThis, '__BUNDLED__', false);
   return undefined;
 });
 

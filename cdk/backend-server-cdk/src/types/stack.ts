@@ -7,12 +7,15 @@ export interface UniversalStackProps {
   region: string;
 }
 
-export interface Stack<TProps extends UniversalStackProps> {
+export interface Stack<
+  TProps extends UniversalStackProps,
+  TOutputSchema extends z.ZodType = z.ZodType,
+> {
   name: string;
   description?: string;
   Stack: new (scope: Construct, id: string, props: TProps) => TerraformStack;
   props: Omit<TProps, keyof UniversalStackProps>;
-  outputSchema: z.ZodObject;
+  outputSchema: TOutputSchema;
 }
 
 export type AnyStack = Prettify<Stack<UniversalStackProps>>;

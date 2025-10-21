@@ -8,19 +8,34 @@ import { stacks } from '../stacks';
 
 type StackConfig = (typeof stacks)[number];
 
-type OutputByName = {
-  [S in StackConfig as S['name'] extends `${string}-bootstrap-stack`
-    ? never
-    : S['name']]: output<S['outputSchema']>;
-};
+type BootstrapStackName = `${string}-bootstrap-stack`;
+type ConsumableStackConfig = Exclude<StackConfig, { name: BootstrapStackName }>;
+export type ConsumableStack = ConsumableStackConfig['name'];
 
-export type ConsumableStack = keyof OutputByName;
+type StackOutputSchema<Name extends ConsumableStack> = Extract<
+  ConsumableStackConfig,
+  { name: Name }
+>['outputSchema'];
 
-// Flattened output type by stack name so union keys work without double indexing
-type OutputValueByName = {
-  [K in keyof OutputByName]: OutputByName[K] extends Record<K, infer V>
-    ? V
-    : never;
+type StackOutput<Name extends ConsumableStack> = output<
+  StackOutputSchema<Name>
+>;
+
+type StackOutputValue<Name extends ConsumableStack> = StackOutput<Name>[Name];
+
+const parseStackOutput = <TConfig extends ConsumableStackConfig>(
+  config: TConfig,
+  stackName: TConfig['name'],
+  rawOutput: unknown,
+): StackOutput<TConfig['name']> => {
+  const parsed = config.outputSchema.safeParse(rawOutput);
+  if (!parsed.success) {
+    throw new Error(`Failed to parse output for stack: ${stackName}`, {
+      cause: parsed.error,
+    });
+  }
+  const data: StackOutput<TConfig['name']> = parsed.data;
+  return data;
 };
 
 const generateOutputPath = (
@@ -36,7 +51,7 @@ const generateOutputPath = (
 const loadOutput = <T extends ConsumableStack>(
   stack: T,
   stackOutputPath: string,
-): OutputValueByName[T] => {
+): StackOutputValue<T> => {
   if (!existsSync(stackOutputPath)) {
     throw new Error(`Stack output file not found: ${stackOutputPath}`);
   }
@@ -44,32 +59,28 @@ const loadOutput = <T extends ConsumableStack>(
   const stackOutput: unknown = JSON.parse(stackOutputData);
 
   const stackConfig = stacks.find(
-    (s): s is StackConfig & { name: T } => s.name === stack,
+    (s): s is ConsumableStackConfig & { name: T } => s.name === stack,
   );
   if (!stackConfig) {
     throw new Error(`Unknown stack: ${stack}`);
   }
 
-  const parsed = stackConfig.outputSchema.safeParse(stackOutput);
-
-  if (!parsed.success) {
-    throw new Error(`Failed to parse output for stack: ${stack}`);
-  }
-
-  return (parsed.data as Record<T, OutputValueByName[T]>)[stack];
+  const data = parseStackOutput(stackConfig, stack, stackOutput);
+  const value: StackOutputValue<T> = data[stack];
+  return value;
 };
 
-const loadedOutputs: { [K in ConsumableStack]?: OutputValueByName[K] } = {};
+const loadedOutputs: { [K in ConsumableStack]?: StackOutputValue<K> } = {};
 
 export const loadCDKOutput = <T extends ConsumableStack>(
   stack: T,
   outputsPath?: string,
-): OutputValueByName[T] => {
-  if (!loadedOutputs[stack]) {
-    loadedOutputs[stack] = loadOutput<typeof stack>(
-      stack,
-      generateOutputPath(stack, outputsPath),
-    );
+): StackOutputValue<T> => {
+  const existing = loadedOutputs[stack];
+  if (existing) {
+    return existing;
   }
-  return loadedOutputs[stack]!;
+  const output = loadOutput(stack, generateOutputPath(stack, outputsPath));
+  loadedOutputs[stack] = output;
+  return output;
 };

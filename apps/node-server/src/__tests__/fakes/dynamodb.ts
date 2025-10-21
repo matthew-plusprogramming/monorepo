@@ -22,17 +22,17 @@ type ResponseEntry<T> =
   | { type: 'error'; error: Error };
 
 type ResponseQueues = {
-  readonly getItem: Array<ResponseEntry<GetItemCommandOutput>>;
-  readonly putItem: Array<ResponseEntry<PutItemCommandOutput>>;
-  readonly query: Array<ResponseEntry<QueryCommandOutput>>;
-  readonly updateItem: Array<ResponseEntry<UpdateItemCommandOutput>>;
+  getItem: Array<ResponseEntry<GetItemCommandOutput>>;
+  putItem: Array<ResponseEntry<PutItemCommandOutput>>;
+  query: Array<ResponseEntry<QueryCommandOutput>>;
+  updateItem: Array<ResponseEntry<UpdateItemCommandOutput>>;
 };
 
 type CallHistory = {
-  readonly getItem: Array<GetItemCommandInput>;
-  readonly putItem: Array<PutItemCommandInput>;
-  readonly query: Array<QueryCommandInput>;
-  readonly updateItem: Array<UpdateItemCommandInput>;
+  getItem: Array<GetItemCommandInput>;
+  putItem: Array<PutItemCommandInput>;
+  query: Array<QueryCommandInput>;
+  updateItem: Array<UpdateItemCommandInput>;
 };
 
 export type DynamoDbServiceFake = {
@@ -87,7 +87,7 @@ export const createDynamoDbServiceFake = (): DynamoDbServiceFake => {
     operation: T,
     input: CallHistory[T][number],
   ): void => {
-    callHistory[operation].push(input as never);
+    callHistory[operation].push(input);
   };
 
   const service: DynamoDbServiceSchema = {

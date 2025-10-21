@@ -39,10 +39,9 @@ const loadCalls: Array<LoadCall> = [];
 var loadCDKOutputMock: ReturnType<typeof vi.fn> | undefined;
 
 vi.mock('@cdk/backend-server-cdk', async () => {
-  const actual = (await vi.importActual('@cdk/backend-server-cdk')) as Record<
-    string,
-    unknown
-  >;
+  const actual = await vi.importActual<
+    typeof import('@cdk/backend-server-cdk')
+  >('@cdk/backend-server-cdk');
 
   loadCDKOutputMock = vi.fn((stack: StackName, basePath?: string) => {
     loadCalls.push({ stack, basePath });
@@ -51,7 +50,7 @@ vi.mock('@cdk/backend-server-cdk', async () => {
 
   return {
     ...actual,
-    loadCDKOutput: loadCDKOutputMock!,
+    loadCDKOutput: loadCDKOutputMock,
   };
 });
 
@@ -70,8 +69,7 @@ describe('clients/cdkOutputs', () => {
 
   it('resolves outputs with default path when not bundled', async () => {
     vi.resetModules();
-    (globalThis as typeof globalThis & { __BUNDLED__: boolean }).__BUNDLED__ =
-      false;
+    Reflect.set(globalThis, '__BUNDLED__', false);
 
     const module = await import('@/clients/cdkOutputs');
 
@@ -99,8 +97,7 @@ describe('clients/cdkOutputs', () => {
 
   it('uses bundled base path when __BUNDLED__ is true', async () => {
     vi.resetModules();
-    (globalThis as typeof globalThis & { __BUNDLED__: boolean }).__BUNDLED__ =
-      true;
+    Reflect.set(globalThis, '__BUNDLED__', true);
 
     const module = await import('@/clients/cdkOutputs');
 

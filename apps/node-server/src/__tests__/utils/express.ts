@@ -49,14 +49,14 @@ const createRequest = (
     ip,
   } = init;
 
-  const request = {
+  const request: Request & { user?: unknown } = {
     headers,
     body,
     params,
     query,
     method,
     url,
-  } as unknown as Request & { user?: unknown };
+  } as Request & { user?: unknown };
 
   if (ip) {
     Reflect.set(request, 'ip', ip);
@@ -75,7 +75,7 @@ const createResponse = (
   jsonMock: ResponseMock;
   sendMock: ResponseMock;
 } => {
-  const response = {} as Response;
+  const response: Response = {} as Response;
 
   const statusMock: ResponseMock = vi.fn((statusCode: number) => {
     captured.statusCode = statusCode;
@@ -102,7 +102,7 @@ const createResponse = (
 };
 
 export const makeHandlerInput = (req: Request): handlerInput =>
-  Effect.succeed(req) as handlerInput;
+  Effect.succeed(req);
 
 export const runEffect: RunEffect = async (effect) => Effect.runPromise(effect);
 

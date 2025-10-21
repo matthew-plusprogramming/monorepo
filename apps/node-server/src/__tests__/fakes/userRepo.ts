@@ -64,10 +64,7 @@ export const createUserRepoFake = (): UserRepoFake => {
   const service: UserRepoSchema = {
     findByIdentifier: (idOrEmail: string) => {
       calls.findByIdentifier.push(idOrEmail);
-      return dequeue(
-        queues.findByIdentifier,
-        'findByIdentifier',
-      ) as Effect.Effect<Option.Option<UserPublic>, InternalServerError>;
+      return dequeue(queues.findByIdentifier, 'findByIdentifier');
     },
     create: (user) => {
       calls.create.push(user);
@@ -98,7 +95,7 @@ export const createUserRepoFake = (): UserRepoFake => {
       queues.findByIdentifier.push({ type: 'error', error });
     },
     queueCreateSuccess: (): void => {
-      queues.create.push({ type: 'success', value: true as const });
+      queues.create.push({ type: 'success', value: true });
     },
     queueCreateFailure: (error: InternalServerError): void => {
       queues.create.push({ type: 'error', error });

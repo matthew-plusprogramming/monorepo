@@ -80,11 +80,7 @@ const findByEmail = (
       ProjectionExpression: USER_SCHEMA_CONSTANTS.projection.userPublic,
     })
     .pipe(
-      Effect.map((res) =>
-        unmarshallUser(
-          res.Items?.[0] as Record<string, AttributeValue> | undefined,
-        ),
-      ),
+      Effect.map((res) => unmarshallUser(res.Items?.[0])),
       Effect.tapError((error) => deps.logger.logError(error)),
       Effect.mapError(
         (error) => new InternalServerError({ message: error.message }),
@@ -136,11 +132,11 @@ const buildCreate =
             Item: marshall(validatedUser),
           })
           .pipe(
-            Effect.map(() => true as const),
             Effect.tapError((error) => deps.logger.logError(error)),
             Effect.mapError(
               (error) => new InternalServerError({ message: error.message }),
             ),
+            Effect.flatMap(() => Effect.succeed(true)),
           ),
       ),
     );

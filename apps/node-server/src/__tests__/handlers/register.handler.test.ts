@@ -13,13 +13,12 @@ import { withFixedTime } from '@/__tests__/utils/time';
 import { restoreRandomUUID } from '@/__tests__/utils/uuid';
 
 // Hoisted state to capture the fake exposed by the AppLayer mock
-const userRepoModule = vi.hoisted(() => ({ fake: undefined as unknown }));
-const argonModule = vi.hoisted(() => ({ hash: undefined as unknown }));
-const jwtModule = vi.hoisted(() => ({ sign: undefined as unknown }));
+const userRepoModule = vi.hoisted((): { fake?: UserRepoFake } => ({}));
+const argonModule = vi.hoisted((): { hash?: ReturnType<typeof vi.fn> } => ({}));
+const jwtModule = vi.hoisted((): { sign?: ReturnType<typeof vi.fn> } => ({}));
 
 vi.hoisted(() => {
-  (globalThis as typeof globalThis & { __BUNDLED__: boolean }).__BUNDLED__ =
-    false;
+  Reflect.set(globalThis, '__BUNDLED__', false);
   return undefined;
 });
 
@@ -46,9 +45,26 @@ vi.mock('jsonwebtoken', () => {
   return { sign };
 });
 
-const getUserRepoFake = (): UserRepoFake => userRepoModule.fake as UserRepoFake;
-const getHashMock = (): ReturnType<typeof vi.fn> => argonModule.hash as never;
-const getSignMock = (): ReturnType<typeof vi.fn> => jwtModule.sign as never;
+const getUserRepoFake = (): UserRepoFake => {
+  if (!userRepoModule.fake) {
+    throw new Error('UserRepo fake was not initialized');
+  }
+  return userRepoModule.fake;
+};
+
+const getHashMock = (): ReturnType<typeof vi.fn> => {
+  if (!argonModule.hash) {
+    throw new Error('argon2 hash mock was not initialized');
+  }
+  return argonModule.hash;
+};
+
+const getSignMock = (): ReturnType<typeof vi.fn> => {
+  if (!jwtModule.sign) {
+    throw new Error('jwt sign mock was not initialized');
+  }
+  return jwtModule.sign;
+};
 
 type RegisterTestContext = ReturnType<typeof makeRequestContext>;
 type RegisterHandler = (
@@ -59,7 +75,7 @@ type RegisterHandler = (
 
 async function importRegisterHandler(): Promise<RegisterHandler> {
   const module = await import('@/handlers/register.handler');
-  return module.registerRequestHandler as unknown as RegisterHandler;
+  return module.registerRequestHandler;
 }
 
 function initializeRegisterContext(): void {

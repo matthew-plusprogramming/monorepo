@@ -6,13 +6,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { EventBridgeServiceFake } from '@/__tests__/fakes/eventBridge';
 import type * as EventBridgeServiceModule from '@/services/eventBridge.service';
 
-const eventBridgeModule = vi.hoisted(() => ({
-  fake: undefined as EventBridgeServiceFake | undefined,
-}));
+const eventBridgeModule = vi.hoisted(
+  (): { fake?: EventBridgeServiceFake } => ({}),
+);
 
 vi.hoisted(() => {
-  (globalThis as typeof globalThis & { __BUNDLED__?: boolean }).__BUNDLED__ =
-    false;
+  Reflect.set(globalThis, '__BUNDLED__', false);
   return undefined;
 });
 
@@ -28,7 +27,7 @@ vi.mock('@/clients/cdkOutputs', () => ({
 }));
 
 vi.mock('@/services/eventBridge.service', async (importOriginal) => {
-  const actual = (await importOriginal()) as typeof EventBridgeServiceModule;
+  const actual: typeof EventBridgeServiceModule = await importOriginal();
   const { createEventBridgeServiceFake } = await import(
     '@/__tests__/fakes/eventBridge'
   );
@@ -36,7 +35,7 @@ vi.mock('@/services/eventBridge.service', async (importOriginal) => {
   eventBridgeModule.fake = fake;
   return {
     ...actual,
-    LiveEventBridgeService: fake.layer as typeof actual.LiveEventBridgeService,
+    LiveEventBridgeService: fake.layer,
   } satisfies typeof actual;
 });
 
@@ -44,8 +43,7 @@ describe('heartbeat integration', () => {
   beforeEach(() => {
     vi.resetModules();
     vi.clearAllMocks();
-    (globalThis as typeof globalThis & { __BUNDLED__?: boolean }).__BUNDLED__ =
-      false;
+    Reflect.set(globalThis, '__BUNDLED__', false);
     process.env.APP_ENV = 'test-env';
     process.env.APP_VERSION = '1.2.3';
   });
@@ -128,5 +126,8 @@ async function buildHeartbeatApp(): Promise<Express> {
 }
 
 function getEventBridgeFake(): EventBridgeServiceFake {
-  return eventBridgeModule.fake as EventBridgeServiceFake;
+  if (!eventBridgeModule.fake) {
+    throw new Error('EventBridge fake was not initialized');
+  }
+  return eventBridgeModule.fake;
 }

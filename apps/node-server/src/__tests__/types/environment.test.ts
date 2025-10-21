@@ -34,7 +34,7 @@ describe('EnvironmentSchema', () => {
     ['PORT', 'Invalid input: expected number, received NaN'],
     ['JWT_SECRET', 'JWT_SECRET is required'],
   ] as const)('fails when %s is missing', (missingKey, expectedMessage) => {
-    const input = { ...baseEnv } as Record<string, unknown>;
+    const input: Record<string, unknown> = { ...baseEnv };
     delete input[missingKey];
 
     const result = EnvironmentSchema.safeParse(input);

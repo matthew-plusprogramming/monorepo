@@ -26,6 +26,9 @@ const httpHandler = new NodeHttpHandler({
   httpsAgent: new Agent({ keepAlive: true }),
 });
 
+const normalizeAwsError = (error: unknown): Error =>
+  error instanceof Error ? error : new Error(String(error));
+
 const makeDynamoDbService = (): Effect.Effect<
   DynamoDbServiceSchema,
   never,
@@ -43,28 +46,28 @@ const makeDynamoDbService = (): Effect.Effect<
         return Effect.tryPromise({
           try: () => client.send(new GetItemCommand(input)),
           // TODO: Check what error types we can make
-          catch: (error) => new Error(error as string),
+          catch: normalizeAwsError,
         });
       },
       putItem: (input): Effect.Effect<PutItemCommandOutput, Error> => {
         return Effect.tryPromise({
           try: () => client.send(new PutItemCommand(input)),
           // TODO: Check what error types we can make
-          catch: (error) => new Error(error as string),
+          catch: normalizeAwsError,
         });
       },
       updateItem: (input): Effect.Effect<UpdateItemCommandOutput, Error> => {
         return Effect.tryPromise({
           try: () => client.send(new UpdateItemCommand(input)),
           // TODO: Check what error types we can make
-          catch: (error) => new Error(error as string),
+          catch: normalizeAwsError,
         });
       },
       query: (input): Effect.Effect<QueryCommandOutput, Error> => {
         return Effect.tryPromise({
           try: () => client.send(new QueryCommand(input)),
           // TODO: Check what error types we can make
-          catch: (error) => new Error(error as string),
+          catch: normalizeAwsError,
         });
       },
     } satisfies DynamoDbServiceSchema;

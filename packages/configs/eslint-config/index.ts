@@ -5,13 +5,12 @@ import prettier from 'eslint-config-prettier';
 import importPlugin from 'eslint-plugin-import';
 import prettierPlugin from 'eslint-plugin-prettier';
 import simpleImportSort from 'eslint-plugin-simple-import-sort';
-import tsdoc from 'eslint-plugin-tsdoc';
+import tsdocPlugin from 'eslint-plugin-tsdoc';
 import unusedImports from 'eslint-plugin-unused-imports';
 import tseslint, { type ConfigWithExtends } from 'typescript-eslint';
 import { globalIgnores } from 'eslint/config';
 import { includeIgnoreFile } from '@eslint/compat';
 import { fileURLToPath } from 'node:url';
-import { ESLint } from 'eslint';
 import reactPlugin from 'eslint-plugin-react';
 import reactHooksPlugin from 'eslint-plugin-react-hooks';
 import jsxA11yPlugin from 'eslint-plugin-jsx-a11y';
@@ -52,7 +51,7 @@ export const baseConfig = (
       import: importPlugin,
       'simple-import-sort': simpleImportSort,
       'unused-imports': unusedImports,
-      tsdoc: tsdoc as ESLint.Plugin,
+      tsdoc: tsdocPlugin,
       prettier: prettierPlugin,
       '@stylistic': stylistic,
     },

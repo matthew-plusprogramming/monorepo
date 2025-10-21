@@ -5,5 +5,9 @@ const message =
 
 throw new Error(message);
 
-export const nodeConfig: Config = {} as never;
-export const browserConfig: Config = {} as never;
+const createConfig = (): never => {
+  throw new Error(message);
+};
+
+export const nodeConfig: Config = createConfig();
+export const browserConfig: Config = createConfig();
