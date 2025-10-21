@@ -49,3 +49,7 @@ last_reviewed: 2025-09-21
 - 2025-10-20: Verify phase for code hygiene automation survey — updated Memory Bank front matter to HEAD, ran validation/drift scripts, and assembled the automation recommendations for handoff.
 - 2025-10-20: Plan phase for code quality automation scripts — recorded acceptance criteria, constraints, and targets for stand-alone checks plus the aggregate runner.
 - 2025-10-20: Build phase for code quality automation scripts — created individual Effect/env/resource/console checks, shared git utilities, and confirmed the aggregate runner executes all scripts cleanly.
+- 2025-10-20: Verify phase for code quality automation scripts — executed all check commands (individual + aggregate), stamped Memory Bank metadata with HEAD, and reran validation/drift successfully.
+- 2025-10-20: Plan phase for eliminating remaining Effect.promise usage — scoped register handler refactor to use Effect.tryPromise per new automation rules.
+- 2025-10-20: Build phase for eliminating remaining Effect.promise usage — updated the register handler to wrap argon2 hashing in Effect.tryPromise with InternalServerError mapping.
+- 2025-10-20: Verify phase for eliminating remaining Effect.promise usage — ran effect/code-quality scripts to confirm zero violations after the refactor.

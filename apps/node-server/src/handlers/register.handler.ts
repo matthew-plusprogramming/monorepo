@@ -51,11 +51,19 @@ const registerHandler = (
       });
     }
 
-    const hashedPassword = yield* Effect.promise(() =>
-      argon2.hash(parsedInput.password, {
-        secret: Buffer.from(process.env.PEPPER),
-      }),
-    );
+    const hashedPassword = yield* Effect.tryPromise({
+      try: () =>
+        argon2.hash(parsedInput.password, {
+          secret: Buffer.from(process.env.PEPPER),
+        }),
+      catch: (error) =>
+        new InternalServerError({
+          message:
+            error instanceof Error
+              ? `Failed to hash password: ${error.message}`
+              : 'Failed to hash password',
+        }),
+    });
 
     const userToCreate: UserCreate = {
       id: userId,

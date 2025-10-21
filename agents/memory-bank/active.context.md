@@ -238,3 +238,15 @@ Reflexion
 - 2025-10-20 — Build phase: Authored effect/runtime/env/console/resource check scripts plus the aggregate runner under `agents/scripts/**`.
   Shared git file utilities via `utils.mjs`, codified allowlists, and confirmed each script exits cleanly on the current tree.
   Prepared to capture verify reflections and wire the master command into handoff guidance.
+- 2025-10-20 — Verify phase: Ran each script individually and via `check-code-quality.mjs`, then stamped Memory Bank metadata and reran validation/drift.
+  Documented litmus tests for future negative checks and confirmed all utilities respect git-tracked sources only.
+  Ready to hand off scripts with guidance on integrating the aggregate command into CI or local lint workflows.
+- 2025-10-20 — Plan phase: Targeted the remaining `Effect.promise` usage in `register.handler.ts` to align with the new heuristic.
+  Acceptance: swap to `Effect.tryPromise` with internal error mapping so the quality check passes without allowlisting.
+  Non-goal: touching other handlers or introducing new logger wiring.
+- 2025-10-20 — Build phase: Replaced the argon2 invocation with `Effect.tryPromise`, wrapping failures in `InternalServerError`.
+  Confirmed no other files rely on `Effect.promise` and the handler still assembles the user payload unchanged.
+  Prepared verify steps to run the individual and aggregate quality scripts.
+- 2025-10-20 — Verify phase: Executed `check-effect-promise.mjs` and `check-code-quality.mjs` to confirm clean passes.
+  No Memory Bank drift post-change; ready to hand off with updated heuristics enforced in code.
+  Next steps: none — scripts and handler now align.
