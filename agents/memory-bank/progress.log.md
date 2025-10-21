@@ -37,3 +37,6 @@ last_reviewed: 2025-09-21
 - 2025-10-20: Plan phase for user repository service — documented acceptance criteria, constraints, risks, and target tests/files before entering the build phase.
 - 2025-10-20: Build phase for user repository service — validated create payloads, guarded identifier queries, refreshed heartbeat platform resolution, and expanded repository unit coverage.
 - 2025-10-20: Verify phase for user repository service — ran `npm run lint` and `npm run test`, captured expected heartbeat stderr, and queued Memory Bank stamping plus validation scripts.
+- 2025-10-20: Planned unsafe assertion audit script — documented AST-based detection, comment capture expectations, and the agent script target before implementation.
+- 2025-10-20: Build phase for unsafe assertion audit script — implemented the TypeScript AST scanner, comment aggregation, and CLI options, then validated the help output.
+- 2025-10-20: Verify phase for unsafe assertion audit script — ran the scanner, updated Memory Bank metadata, and completed memory validation plus drift checks.

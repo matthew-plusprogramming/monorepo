@@ -58,6 +58,39 @@ Next Steps
 
 - Summarize repository service updates, stamp Memory Bank metadata, and prepare final handoff guidance.
 
+## 2025-10-20 — Unsafe Type Assertion Audit Script
+
+Acceptance Criteria (Given/When/Then)
+
+- Given the script runs from the repo root, when it encounters `as any`, `as never`, or double assertions like `as unknown as SomeType` in tracked TypeScript sources, then it prints the file path and 1-based line number for each occurrence.
+- Given a matching assertion preceded by contiguous `//` or `/* ... */` comments with no intervening code, when the script reports it, then it emits that comment block above the flagged line.
+- Given a run with no unsafe assertions, when the scan completes, then the script exits 0 and prints a short confirmation message.
+
+Non-goals
+
+- Automatically fixing or rewriting the unsafe assertions.
+- Scanning non-TypeScript files or generated artifacts.
+
+Constraints & Assumptions
+
+- Use the TypeScript compiler API to parse files so nested assertions and comment adjacency are detected accurately.
+- Limit the scan to git-tracked TypeScript sources (excluding `.d.ts`) discovered via `git ls-files`.
+- Treat only `as any`, `as never`, and double assertions through `unknown` as unsafe by default while keeping the list extensible.
+
+Risks & Mitigations
+
+- Large repos could make parsing slow → iterate over git-tracked files and short-circuit with actionable errors if a file fails to parse.
+- False positives from comment literals → rely on AST traversal instead of regex scanning.
+
+Candidate Files & Tests
+
+- `agents/scripts/find-unsafe-as-casts.mjs`
+- Manual verification via `node agents/scripts/find-unsafe-as-casts.mjs`
+
+Testing Strategy
+
+- Execute the script against the repo to confirm expected matches print with associated comments and the no-match path works.
+
 Reflexion
 
 - 2025-09-03 — Bootstrapped the canonical Memory Bank, default workflow, and ADR-0001 covering retrieval tiers.
@@ -138,3 +171,12 @@ Reflexion
 - 2025-10-20 — Verify phase: Ran `npm run lint` and `npm run test` to confirm TypeScript compilation and Vitest suites succeed without warnings.
   Captured analytics heartbeat stderr as expected test noise, then queued Memory Bank stamping plus validation scripts.
   Ready to summarize repository service behavior, note remaining risks, and close the workflow.
+- 2025-10-20 — Plan phase: Scoped unsafe assertion audit script to flag `as any`, `as never`, and `as unknown as` double casts via the TypeScript AST.
+  Logged Given/When/Then acceptance criteria plus comment-handling constraints in Active Context ahead of implementation.
+  Identified the target agent script and manual verification run before moving into the build phase.
+- 2025-10-20 — Build phase: Implemented the AST-based unsafe assertion scanner with comment block capture and CLI toggles.
+  Wired git-tracked file discovery, parenthesis-aware double assertion detection, and resilient normalization utilities.
+  Ran the help command to confirm script ergonomics before entering verification.
+- 2025-10-20 — Verify phase: Executed the unsafe assertion scanner, confirmed reported matches include adjacent comments, and stamped Memory Bank metadata.
+  Reran memory validation and drift checks after updating the overview front matter to the latest HEAD.
+  Ready to summarize the agent utility, verification steps, and suggested follow-up actions.
