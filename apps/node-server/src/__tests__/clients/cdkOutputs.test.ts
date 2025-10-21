@@ -48,7 +48,10 @@ function isBackendServerCdkModule(
   if (typeof value !== 'object' || value === null) {
     return false;
   }
-  const loadCDKOutput = Reflect.get(value, 'loadCDKOutput');
+  if (!('loadCDKOutput' in value)) {
+    return false;
+  }
+  const { loadCDKOutput } = value as { loadCDKOutput: unknown };
   return typeof loadCDKOutput === 'function';
 }
 
