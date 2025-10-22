@@ -78,3 +78,4 @@ Phase: verify
 End
 
 - Close with summary, surfaced tests, proposed commit message, and next steps.
+- Make sure you propose a commit message.

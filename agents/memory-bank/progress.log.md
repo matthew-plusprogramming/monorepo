@@ -25,3 +25,9 @@ last_reviewed: 2025-10-21
 - 2025-10-21: Documented the Express testing utilities in the Effect.runPromise allowlist, updated the code-quality runner to aggregate failures, and reran `npm run phase:check` to capture the full suite output.
 - 2025-10-21: Removed remaining non-null assertions via DOM guards, script stack checks, and tightened test helpers; verified with `find-unsafe-assertions` and `npm run phase:check`.
 - 2025-10-22: Planned and built repository-service scaffolding automation, adding the CLI, modular bundle manifests (base + handler), workflow/README documentation, and validating with `npm run agent:finalize`.
+- 2025-10-22: Logged plan for lint warning investigation covering analytics resource generation and register handler, with scope, constraints, and next analysis steps.
+- 2025-10-22: Documented lint warning analysis, detailed root causes, and outlined helper-extraction remediation as the preferred follow-up.
+- 2025-10-22: Verified lint investigation outputs via `npm run agent:finalize`, captured results under `agents/workflows/runs/2025-10-22-lint-investigation/verify.md`, and left the decision point for maintainers.
+- 2025-10-22: Planned helper-based refactors to clear the remaining `max-lines-per-function` warnings while preserving analytics resources and registration behavior.
+- 2025-10-22: Extracted analytics resource builders and decomposed the register handler into Effect helpers, then reran lint and phase checks to verify the warnings cleared.
+- 2025-10-22: Closed the lint remediation by running `npm run agent:finalize`, confirming memory validation/drift, and documenting verification outputs.
