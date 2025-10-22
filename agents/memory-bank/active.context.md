@@ -59,3 +59,6 @@ Reflexion
 - 2025-10-21 — Plan phase: Scoped allowlisting for the Express testing utilities and an aggregator tweak so all quality scripts run before exiting.
   Build phase: Documented the express utilities in the Effect.runPromise allowlist, taught `check-code-quality` to collect failures instead of short-circuiting, and reran `npm run phase:check`.
   Verify phase: Observed the full quality suite output, confirmed `find-unsafe-assertions` still reports sites, and validated the allowlist resolved the prior failure.
+- 2025-10-21 — Plan phase: Targeted the remaining non-null assertions surfaced by the detector for safer guards/refactors.
+  Build phase: Added DOM lookup validation in `client-website`, replaced stack pops with defensive checks in CDK/node-server scripts, and tightened the register handler spec around mock initialization.
+  Verify phase: Reran `find-unsafe-assertions`, `npm run phase:check`, and confirmed the suite now reports zero unsafe assertions.

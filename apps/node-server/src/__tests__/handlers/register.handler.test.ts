@@ -97,19 +97,21 @@ async function returns201ForNewUser(): Promise<void> {
 
   // Act
   let hashMock: ReturnType<typeof getHashMock>;
-  let signMock: Mock<JwtSignMock>;
-  let userRepoFake: UserRepoFake;
+  let signMock: Mock<JwtSignMock> | undefined;
+  let userRepoFake: UserRepoFake | undefined;
 
   await withFixedTime('2024-01-01T00:00:00.000Z', async () => {
     const handler = await importRegisterHandler();
     hashMock = getHashMock();
-    signMock = getSignMock();
-    userRepoFake = getUserRepoFake();
+    const resolvedSignMock = getSignMock();
+    const resolvedUserRepoFake = getUserRepoFake();
+    signMock = resolvedSignMock;
+    userRepoFake = resolvedUserRepoFake;
 
     prepareSuccessfulRegistration({
       hashMock,
-      signMock,
-      userRepoFake,
+      signMock: resolvedSignMock,
+      userRepoFake: resolvedUserRepoFake,
       hashResult: 'hashed-password',
       tokenResult: 'signed.token.value',
     });
@@ -117,13 +119,20 @@ async function returns201ForNewUser(): Promise<void> {
   });
 
   // Assert
+  if (!signMock) {
+    throw new Error('Expected JWT sign mock to be initialized');
+  }
+  if (!userRepoFake) {
+    throw new Error('Expected user repository fake to be initialized');
+  }
+
   assertSuccessfulRegistration({
     body,
     captured,
     expectedToken: 'signed.token.value',
     issuedAtIso: '2024-01-01T00:00:00.000Z',
-    signMock: signMock!,
-    userRepoFake: userRepoFake!,
+    signMock,
+    userRepoFake,
   });
 }
 

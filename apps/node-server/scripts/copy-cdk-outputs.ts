@@ -46,7 +46,8 @@ const copyOutputsJson = (srcRoot: string, destRoot: string): number => {
   const stack = [srcRoot];
 
   while (stack.length) {
-    const current = stack.pop()!;
+    const current = stack.pop();
+    if (!current) continue;
     const entries = readdirSync(current, { withFileTypes: true });
 
     for (const entry of entries) {
