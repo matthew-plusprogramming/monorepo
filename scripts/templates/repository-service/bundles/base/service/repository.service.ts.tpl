@@ -88,7 +88,7 @@ const buildGetById =
               __ENTITY_CONSTANT___SCHEMA_CONSTANTS.projection.__ENTITY_CAMEL__Public,
           })
           .pipe(
-            Effect.map((res) => unmarshall__ENTITY_PASCAL__(res.Item ?? undefined)),
+            Effect.map((res) => unmarshall__ENTITY_PASCAL__(res.Item)),
             Effect.tapError((error) => deps.logger.logError(error)),
             Effect.mapError(
               (error) =>
