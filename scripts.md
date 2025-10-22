@@ -38,6 +38,7 @@ Scaffold a repository service workflow skeleton
 ```
 node scripts/create-repository-service.mjs <entity-slug>
 # Optional flags:
+#   --with handler           Include optional scaffolding bundles (comma separated or "all")
 #   --dry-run  Preview generated files without writing
 #   --force    Overwrite existing files created in a previous run
 ```

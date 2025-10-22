@@ -3,7 +3,8 @@
 import { access, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { constants as fsConstants } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
-import process from 'node:process';
+import process, { stdin, stdout } from 'node:process';
+import { createInterface } from 'node:readline/promises';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -31,16 +32,38 @@ const toCamelCase = (slug) => {
 };
 
 const toConstantCase = (slug) =>
-  slugToSegments(slug).map((segment) => segment.toUpperCase()).join('_');
+  slugToSegments(slug)
+    .map((segment) => segment.toUpperCase())
+    .join('_');
 
-const usage = () => {
+const usage = (bundles = []) => {
+  const optional = bundles.filter((bundle) => !bundle.required);
+  const optionalSummary =
+    optional.length > 0
+      ? [
+          '',
+          'Optional bundles:',
+          ...optional.map(
+            (bundle) => `  - ${bundle.name}: ${bundle.description}`,
+          ),
+        ]
+      : [];
+
   console.log(
     [
-      'Usage: node scripts/create-repository-service.mjs <entity-slug> [--dry-run] [--force]',
+      'Usage: node scripts/create-repository-service.mjs <entity-slug> [--dry-run] [--force] [--with bundleA,bundleB]',
       '',
       'Examples:',
       '  node scripts/create-repository-service.mjs user-profile',
-      '  node scripts/create-repository-service.mjs order --dry-run',
+      '  node scripts/create-repository-service.mjs order --with handler --dry-run',
+      '',
+      'Flags:',
+      '  --with bundleA,bundleB  Include optional bundles (use "all" to include everything)',
+      '  --dry-run               Preview generated files without writing them',
+      '  --force                 Overwrite existing files created by a previous run',
+      '',
+      'Run without --with in an interactive terminal to choose bundles via prompts.',
+      ...optionalSummary,
     ].join('\n'),
   );
 };
@@ -50,15 +73,31 @@ const parseArgs = (rawArgs) => {
     dryRun: false,
     force: false,
     slug: '',
+    withBundles: [],
   };
 
-  for (const arg of rawArgs) {
+  for (let index = 0; index < rawArgs.length; index += 1) {
+    const arg = rawArgs[index];
     if (arg === '--dry-run') {
       options.dryRun = true;
       continue;
     }
     if (arg === '--force') {
       options.force = true;
+      continue;
+    }
+    if (arg === '--with') {
+      const value = rawArgs[index + 1];
+      if (!value) {
+        throw new Error('Missing value for --with flag.');
+      }
+      options.withBundles.push(...value.split(',').map((item) => item.trim()));
+      index += 1;
+      continue;
+    }
+    if (arg.startsWith('--with=')) {
+      const [, value] = arg.split('=');
+      options.withBundles.push(...value.split(',').map((item) => item.trim()));
       continue;
     }
     if (arg.startsWith('--')) {
@@ -79,6 +118,10 @@ const parseArgs = (rawArgs) => {
       `Invalid slug "${options.slug}". Use kebab-case (letters, numbers, hyphen).`,
     );
   }
+
+  options.withBundles = options.withBundles
+    .filter(Boolean)
+    .map((name) => name.toLowerCase());
 
   return options;
 };
@@ -124,9 +167,118 @@ const writeFileSafely = async (targetPath, content, { dryRun, force }) => {
   await writeFile(targetPath, content, 'utf-8');
 };
 
+const loadManifest = async () => {
+  const manifestPath = join(TEMPLATE_ROOT, 'manifest.json');
+  const manifestContent = await readFile(manifestPath, 'utf-8');
+  const manifest = JSON.parse(manifestContent);
+  if (!Array.isArray(manifest?.bundles)) {
+    throw new Error('Template manifest must contain a "bundles" array.');
+  }
+  return manifest.bundles;
+};
+
+const normaliseName = (value) => value.toLowerCase();
+
+const selectBundles = async (bundles, requestedNames) => {
+  const requiredBundles = bundles.filter((bundle) => bundle.required);
+  const optionalBundles = bundles.filter((bundle) => !bundle.required);
+
+  const requested = new Set(requestedNames.map(normaliseName));
+
+  if (requested.has('all')) {
+    optionalBundles.forEach((bundle) =>
+      requested.add(normaliseName(bundle.name)),
+    );
+    requested.delete('all');
+  }
+
+  const bundleLookup = new Map(
+    bundles.map((bundle) => [normaliseName(bundle.name), bundle]),
+  );
+
+  const unknownSelection = [...requested].filter(
+    (name) => !bundleLookup.has(normaliseName(name)),
+  );
+  if (unknownSelection.length > 0) {
+    throw new Error(
+      `Unknown bundle(s): ${unknownSelection.join(
+        ', ',
+      )}. Run with --help for available bundles.`,
+    );
+  }
+
+  let selectedOptional = [...requested]
+    .map((name) => bundleLookup.get(normaliseName(name)))
+    .filter((bundle) => bundle && !bundle.required);
+
+  if (selectedOptional.length === 0 && requested.size === 0) {
+    const canPrompt = stdout.isTTY && stdin.isTTY && optionalBundles.length > 0;
+    if (canPrompt) {
+      const rl = createInterface({ input: stdin, output: stdout });
+      const optionsList = optionalBundles
+        .map(
+          (bundle, index) =>
+            `${index + 1}. ${bundle.name} — ${bundle.description}`,
+        )
+        .join('\n');
+      const answer = await rl.question(
+        [
+          'Select optional bundles (comma-separated numbers, leave blank for none):',
+          optionsList,
+          '> ',
+        ].join('\n'),
+      );
+      rl.close();
+
+      const indices = answer
+        .split(',')
+        .map((value) => Number.parseInt(value.trim(), 10))
+        .filter((num) => Number.isInteger(num) && num > 0);
+
+      selectedOptional = indices
+        .map((index) => optionalBundles[index - 1])
+        .filter(Boolean);
+    }
+  }
+
+  const selectedBundleNames = new Set(
+    [...requiredBundles, ...selectedOptional].map((bundle) => bundle.name),
+  );
+
+  return bundles.filter((bundle) => selectedBundleNames.has(bundle.name));
+};
+
+const buildChecklist = (entityName, timestamp, bundles, tokens) => {
+  const bundleNames = bundles.map((bundle) => bundle.name).join(', ');
+  const lines = [
+    `# Repository Service Checklist: ${entityName}`,
+    '',
+    '- Workflow reference: `agents/workflows/repository-service.workflow.md`',
+    `- Generated by \`scripts/create-repository-service.mjs\` on ${timestamp}`,
+    `- Selected bundles: ${bundleNames}`,
+    '',
+  ];
+
+  for (const bundle of bundles) {
+    if (!Array.isArray(bundle.checklist)) continue;
+    const replacedLines = bundle.checklist.map((line) =>
+      replaceTokens(line, tokens),
+    );
+    lines.push(...replacedLines, '');
+  }
+
+  if (lines.at(-1) === '') {
+    lines.pop();
+  }
+
+  return lines.join('\n');
+};
+
 const main = async () => {
+  const bundles = await loadManifest();
+
   if (process.argv.includes('--help') || process.argv.includes('-h')) {
-    usage();
+    usage(bundles);
     process.exit(0);
   }
 
@@ -135,11 +287,11 @@ const main = async () => {
     options = parseArgs(process.argv.slice(2));
   } catch (error) {
     console.error(error.message);
-    usage();
+    usage(bundles);
     process.exit(1);
   }
 
-  const { slug, dryRun, force } = options;
+  const { slug, dryRun, force, withBundles } = options;
 
   const replacements = {
     __ENTITY_SLUG__: slug,
@@ -154,170 +306,80 @@ const main = async () => {
     process.exit(1);
   }
 
-  const manifest = [
-    {
-      template: join(TEMPLATE_ROOT, 'schema', 'index.ts.tpl'),
-      target: join(
-        OUTPUT_ROOT,
-        'packages/core/schemas/schemas',
-        slug,
-        'index.ts',
-      ),
-    },
-    {
-      template: join(
-        TEMPLATE_ROOT,
-        'schema',
-        'constants',
-        'index.ts.tpl',
-      ),
-      target: join(
-        OUTPUT_ROOT,
-        'packages/core/schemas/schemas',
-        slug,
-        'constants',
-        'index.ts',
-      ),
-    },
-    {
-      template: join(
-        TEMPLATE_ROOT,
-        'schema',
-        'constants',
-        '__ENTITY_CAMEL__.ts.tpl',
-      ),
-      target: join(
-        OUTPUT_ROOT,
-        'packages/core/schemas/schemas',
-        slug,
-        'constants',
-        `${replacements.__ENTITY_CAMEL__}.ts`,
-      ),
-    },
-    {
-      template: join(TEMPLATE_ROOT, 'schema', '__ENTITY_CAMEL__.ts.tpl'),
-      target: join(
-        OUTPUT_ROOT,
-        'packages/core/schemas/schemas',
-        slug,
-        `${replacements.__ENTITY_CAMEL__}.ts`,
-      ),
-    },
-    {
-      template: join(
-        TEMPLATE_ROOT,
-        'schema',
-        '__ENTITY_CAMEL__Create.ts.tpl',
-      ),
-      target: join(
-        OUTPUT_ROOT,
-        'packages/core/schemas/schemas',
-        slug,
-        `${replacements.__ENTITY_CAMEL__}Create.ts`,
-      ),
-    },
-    {
-      template: join(
-        TEMPLATE_ROOT,
-        'schema',
-        '__ENTITY_CAMEL__.schemas.test.ts.tpl',
-      ),
-      target: join(
-        OUTPUT_ROOT,
-        'packages/core/schemas/schemas',
-        slug,
-        `${replacements.__ENTITY_CAMEL__}.schemas.test.ts`,
-      ),
-    },
-    {
-      template: join(
-        TEMPLATE_ROOT,
-        'service',
-        'repository.service.ts.tpl',
-      ),
-      target: join(
-        OUTPUT_ROOT,
-        'apps/node-server/src/services',
-        `${replacements.__ENTITY_CAMEL__}Repo.service.ts`,
-      ),
-    },
-    {
-      template: join(TEMPLATE_ROOT, 'fake', 'repository.fake.ts.tpl'),
-      target: join(
-        OUTPUT_ROOT,
-        'apps/node-server/src/__tests__/fakes',
-        `${replacements.__ENTITY_CAMEL__}Repo.ts`,
-      ),
-    },
-    {
-      template: join(
-        TEMPLATE_ROOT,
-        'cdk',
-        '__ENTITY_CAMEL__-table.constants.ts.tpl',
-      ),
-      target: join(
-        OUTPUT_ROOT,
-        'cdk/backend-server-cdk/src/stacks/api-stack',
-        `${replacements.__ENTITY_CAMEL__}-table.constants.ts`,
-      ),
-    },
-    {
-      template: join(TEMPLATE_ROOT, 'cdk', 'generate-table.ts.tpl'),
-      target: join(
-        OUTPUT_ROOT,
-        'cdk/backend-server-cdk/src/stacks/api-stack',
-        `generate-${slug}-table.ts`,
-      ),
-    },
-    {
-      template: join(
-        TEMPLATE_ROOT,
-        'checklist',
-        'checklist.md.tpl',
-      ),
-      target: join(
-        OUTPUT_ROOT,
-        'scripts/output/repository-service',
-        `${slug}-checklist.md`,
-      ),
-    },
-  ];
-
-  const checklistTarget =
-    manifest[manifest.length - 1]?.target ??
-    join(
-      OUTPUT_ROOT,
-      'scripts/output/repository-service',
-      `${slug}-checklist.md`,
-    );
+  const selectedBundles = await selectBundles(bundles, withBundles);
 
   const createdFiles = [];
 
-  for (const entry of manifest) {
-    const templateContent = await readFile(entry.template, 'utf-8');
-    const rendered = replaceTokens(templateContent, replacements);
+  for (const bundle of selectedBundles) {
+    if (!Array.isArray(bundle.templates)) continue;
+    for (const templateMeta of bundle.templates) {
+      const templatePath = join(
+        TEMPLATE_ROOT,
+        'bundles',
+        bundle.name,
+        templateMeta.source,
+      );
+      const targetPath = join(
+        OUTPUT_ROOT,
+        replaceTokens(templateMeta.target, replacements),
+      );
 
-    try {
-      await writeFileSafely(entry.target, rendered, { dryRun, force });
-    } catch (error) {
-      console.error(error.message);
-      process.exit(1);
+      const templateContent = await readFile(templatePath, 'utf-8');
+      const rendered = replaceTokens(templateContent, replacements);
+
+      try {
+        await writeFileSafely(targetPath, rendered, { dryRun, force });
+      } catch (error) {
+        console.error(error.message);
+        process.exit(1);
+      }
+
+      createdFiles.push({
+        location: relative(OUTPUT_ROOT, targetPath),
+        skipped: dryRun,
+        bundle: bundle.name,
+      });
     }
-
-    const location = relative(OUTPUT_ROOT, entry.target);
-    createdFiles.push({ location, skipped: dryRun });
   }
+
+  const checklistTarget = join(
+    OUTPUT_ROOT,
+    'scripts/output/repository-service',
+    `${slug}-checklist.md`,
+  );
+  const checklistContent = buildChecklist(
+    replacements.__ENTITY_PASCAL__,
+    replacements.__TIMESTAMP__,
+    selectedBundles,
+    replacements,
+  );
+
+  try {
+    await writeFileSafely(checklistTarget, checklistContent, { dryRun, force });
+  } catch (error) {
+    console.error(error.message);
+    process.exit(1);
+  }
+
+  createdFiles.push({
+    location: relative(OUTPUT_ROOT, checklistTarget),
+    skipped: dryRun,
+    bundle: 'checklist',
+  });
 
   const action = dryRun ? 'Planned' : 'Created';
   console.log(
-    `${action} repository-service scaffold for "${slug}" using:`,
+    `${action} repository-service scaffold for "${slug}" using bundles:`,
   );
   for (const file of createdFiles) {
-    console.log(`  - ${file.skipped ? '[dry-run] ' : ''}${file.location}`);
+    const prefix = file.skipped ? '[dry-run] ' : '';
+    console.log(`  - ${prefix}${file.location} (from ${file.bundle})`);
   }
+
   if (!dryRun) {
-    console.log('');
-    console.log(`Next steps: review ${relative(OUTPUT_ROOT, checklistTarget)} and work through the checklist.`);
+    console.log(
+      `Next steps: review ${relative(OUTPUT_ROOT, checklistTarget)} and work through the checklist.`,
+    );
   }
 };
 

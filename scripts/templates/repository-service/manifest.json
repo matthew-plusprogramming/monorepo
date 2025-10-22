@@ -1,0 +1,102 @@
+{
+  "bundles": [
+    {
+      "name": "base",
+      "description": "Core schema, CDK, service, and fake scaffolding that every repository needs.",
+      "required": true,
+      "templates": [
+        {
+          "source": "schema/index.ts.tpl",
+          "target": "packages/core/schemas/schemas/__ENTITY_SLUG__/index.ts"
+        },
+        {
+          "source": "schema/constants/index.ts.tpl",
+          "target": "packages/core/schemas/schemas/__ENTITY_SLUG__/constants/index.ts"
+        },
+        {
+          "source": "schema/constants/__ENTITY_CAMEL__.ts.tpl",
+          "target": "packages/core/schemas/schemas/__ENTITY_SLUG__/constants/__ENTITY_CAMEL__.ts"
+        },
+        {
+          "source": "schema/__ENTITY_CAMEL__.ts.tpl",
+          "target": "packages/core/schemas/schemas/__ENTITY_SLUG__/__ENTITY_CAMEL__.ts"
+        },
+        {
+          "source": "schema/__ENTITY_CAMEL__Create.ts.tpl",
+          "target": "packages/core/schemas/schemas/__ENTITY_SLUG__/__ENTITY_CAMEL__Create.ts"
+        },
+        {
+          "source": "schema/__ENTITY_CAMEL__.schemas.test.ts.tpl",
+          "target": "packages/core/schemas/schemas/__ENTITY_SLUG__/__ENTITY_CAMEL__.schemas.test.ts"
+        },
+        {
+          "source": "service/repository.service.ts.tpl",
+          "target": "apps/node-server/src/services/__ENTITY_CAMEL__Repo.service.ts"
+        },
+        {
+          "source": "fake/repository.fake.ts.tpl",
+          "target": "apps/node-server/src/__tests__/fakes/__ENTITY_CAMEL__Repo.ts"
+        },
+        {
+          "source": "cdk/__ENTITY_CAMEL__-table.constants.ts.tpl",
+          "target": "cdk/backend-server-cdk/src/stacks/api-stack/__ENTITY_CAMEL__-table.constants.ts"
+        },
+        {
+          "source": "cdk/generate-table.ts.tpl",
+          "target": "cdk/backend-server-cdk/src/stacks/api-stack/generate-__ENTITY_SLUG__-table.ts"
+        }
+      ],
+      "checklist": [
+        "## Schema (Step 1)",
+        "- [ ] Complete `packages/core/schemas/schemas/__ENTITY_SLUG__/__ENTITY_CAMEL__.ts` with domain attributes and refined validation constraints.",
+        "- [ ] Trim `packages/core/schemas/schemas/__ENTITY_SLUG__/__ENTITY_CAMEL__Create.ts` so only caller inputs remain (server-managed fields removed).",
+        "- [ ] Set accurate constants inside `packages/core/schemas/schemas/__ENTITY_SLUG__/constants/__ENTITY_CAMEL__.ts` (keys, GSIs, projections).",
+        "- [ ] Replace the skipped tests in `packages/core/schemas/schemas/__ENTITY_SLUG__/__ENTITY_CAMEL__.schemas.test.ts` with boundary coverage.",
+        "- [ ] Export any command/query schemas and expose them through the package index.",
+        "",
+        "## Infrastructure (Step 2-3)",
+        "- [ ] Design DynamoDB keys/GSIs and update `cdk/backend-server-cdk/src/stacks/api-stack/__ENTITY_CAMEL__-table.constants.ts`.",
+        "- [ ] Flesh out `cdk/backend-server-cdk/src/stacks/api-stack/generate-__ENTITY_SLUG__-table.ts` with attributes, TTL, and outputs.",
+        "- [ ] Wire `generate__ENTITY_PASCAL__Table` into `cdk/backend-server-cdk/src/stacks/api-stack/index.ts` and register any additional outputs.",
+        "- [ ] Extend `ApiStackOutputSchema` and `apps/node-server/src/clients/cdkOutputs.ts` (plus stubs/tests) with the new table name export.",
+        "",
+        "## Service Layer (Step 4)",
+        "- [ ] Replace the `tableName` placeholder in `apps/node-server/src/services/__ENTITY_CAMEL__Repo.service.ts` with the generated CDK output export.",
+        "- [ ] Map schema properties to DynamoDB operations (keys, GSIs, projections) and tighten error handling.",
+        "- [ ] Register the Live layer in `apps/node-server/src/layers/app.layer.ts`.",
+        "",
+        "## Fakes & Tests (Step 5-7)",
+        "- [ ] Tailor `apps/node-server/src/__tests__/fakes/__ENTITY_CAMEL__Repo.ts` to mirror the repository contract.",
+        "- [ ] Add repository unit/contract tests under `apps/node-server/src/__tests__/services` or package-specific suites.",
+        "- [ ] Update handler/service slices to inject the new repository and cover integration behaviour.",
+        "- [ ] Wire CDK output stubs and fakes in existing suites as needed.",
+        "",
+        "## Verification & Memory (Step 8)",
+        "- [ ] Run `npm run lint`, `npm run test`, and targeted CDK lint/synth commands.",
+        "- [ ] Update Memory Bank entries + add reflexion/progress log notes per workflow guidance.",
+        "- [ ] Execute `npm run memory:validate`, `npm run memory:drift`, and `npm run phase:check`."
+      ]
+    },
+    {
+      "name": "handler",
+      "description": "Adds an HTTP handler skeleton and test stub wired to the new repository.",
+      "required": false,
+      "templates": [
+        {
+          "source": "handlers/__ENTITY_CAMEL__.handler.ts.tpl",
+          "target": "apps/node-server/src/handlers/__ENTITY_CAMEL__.handler.ts"
+        },
+        {
+          "source": "tests/__ENTITY_CAMEL__.handler.test.ts.tpl",
+          "target": "apps/node-server/src/__tests__/handlers/__ENTITY_CAMEL__.handler.test.ts"
+        }
+      ],
+      "checklist": [
+        "## Handler Integration (Optional)",
+        "- [ ] Define the request schema, route registration, and response mapping inside `apps/node-server/src/handlers/__ENTITY_CAMEL__.handler.ts`.",
+        "- [ ] Provide concrete Arrange/Act/Assert steps in `apps/node-server/src/__tests__/handlers/__ENTITY_CAMEL__.handler.test.ts` and wire the fake repository.",
+        "- [ ] Register the handler with the appropriate router and ensure middleware requirements are satisfied."
+      ]
+    }
+  ]
+}
