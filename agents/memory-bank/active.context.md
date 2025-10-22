@@ -83,3 +83,13 @@ Reflexion
 - 2025-10-22 — Verify phase: Executed `npm run agent:finalize` to validate memory links, drift, and rerun quality automation for the refactor.
   Summarized verification steps in `agents/workflows/runs/2025-10-22-lint-remediation/verify.md` after confirming lint stays clean.
   Ready for review with helper-based refactors keeping behavior intact.
+- 2025-10-22 — Plan phase: Scoped a CDKTF state management CLI to script the bootstrap toggle/deploy/migrate flow.
+  Documented constraints, invariants, and stack-name derivation in `agents/workflows/runs/2025-10-22-cdktf-state-cli/plan.md`.
+  Next: implement the CLI, update automation docs, and prepare self-checks.
+- 2025-10-22 — Build phase: Implemented `scripts/manage-cdktf-state.mjs` to automate the bootstrap deploy/synth/migrate sequence and refreshed `scripts/README.md`.
+  Verified CLI scaffolding with `node scripts/manage-cdktf-state.mjs --help` ahead of running quality automation.
+  Updated cleanup to delete `cdk/backend-server-cdk/terraform.<stack>.tfstate` alongside the legacy `.terraform/terraform.tfstate`.
+  Next: run verification scripts, restore documentation stamps, and capture the finalize summary.
+- 2025-10-22 — Verify phase: Ran `npm run phase:check` successfully, then attempted `npm run agent:finalize`, which failed because referenced workflow run docs are absent.
+  Documented the gap so maintainers can restore the missing run artifacts or adjust references before finalize passes.
+  Next: summarize findings and highlight the outstanding memory validation issue in review notes.

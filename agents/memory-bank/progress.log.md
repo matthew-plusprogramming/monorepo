@@ -31,3 +31,7 @@ last_reviewed: 2025-10-21
 - 2025-10-22: Planned helper-based refactors to clear the remaining `max-lines-per-function` warnings while preserving analytics resources and registration behavior.
 - 2025-10-22: Extracted analytics resource builders and decomposed the register handler into Effect helpers, then reran lint and phase checks to verify the warnings cleared.
 - 2025-10-22: Closed the lint remediation by running `npm run agent:finalize`, confirming memory validation/drift, and documenting verification outputs.
+- 2025-10-22: Planned the CDKTF state automation CLI, capturing bootstrap toggles, command sequencing, and cleanup invariants ahead of implementation.
+- 2025-10-22: Implemented the CDKTF state CLI and refreshed automation docs, setting up verification of the bootstrap workflow.
+- 2025-10-22: Taught the CLI to remove `cdk/backend-server-cdk/terraform.<stack>.tfstate` in addition to the legacy `.terraform/terraform.tfstate` copy during cleanup.
+- 2025-10-22: Ran `npm run phase:check` and attempted `npm run agent:finalize`; validation failed due to missing historical workflow run artifacts referenced in the Memory Bank.

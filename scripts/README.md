@@ -50,3 +50,19 @@ node scripts/create-repository-service.mjs <entity-slug> [--with handler] [--dry
 ---
 
 Have an idea for a new automation bundle? Add templates under `scripts/templates/repository-service/bundles/<bundle>` and register the bundle in the manifest—then document it in this file so other contributors can discover it.
+
+## CDKTF State Manager
+
+```
+node scripts/manage-cdktf-state.mjs bootstrap-backend
+```
+
+### What it does
+
+- Automates the sanctioned bootstrap sequence for the CDKTF backend: toggles the bootstrap stack flag, deploys the bootstrap stack, restores the flag, synthesizes stacks, runs the state migration helper, and deletes the local Terraform state file.
+
+### Usage notes
+
+- Run from the repository root with credentials configured for the target environment.
+- The script derives the stack name from `cdk/backend-server-cdk/src/constants.ts`, removes `cdk/backend-server-cdk/terraform.<stack>.tfstate` (plus the legacy `.terraform/terraform.tfstate` copy), and restores `migrateStateToBootstrappedBackend` to its original value even if a command fails.
+- Command output streams directly to your terminal; rerun once issues are resolved.
