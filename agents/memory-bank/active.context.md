@@ -50,3 +50,9 @@ Reflexion
 - 2025-10-22 — Plan phase: Scoped analytics stack resource/output renames to improve clarity across CDK consumers.
   Build phase: Renamed analytics/API construct identifiers and outputs, aligning consumer schemas/tests with the new descriptive keys.
   Verify phase: Ran `npm run phase:check` and `npm run agent:finalize` to ensure lint, quality, and memory validation stayed green.
+- 2025-10-21 — Plan phase: Scoped script updates to flag non-null assertions alongside unsafe `as` casts and settled testing approach.
+  Build phase: Implemented the broader detector, updated messaging, and ran the script plus `npm run phase:check` (blocked by existing Effect.runPromise findings).
+  Verify phase: Ran memory validation/drift and attempted `agent:finalize`, which still fails on the pre-existing Effect.runPromise allowlist gap.
+- 2025-10-21 — Plan phase: Chose `find-unsafe-assertions.mjs` to reflect the detector’s broader scope and mapped dependent references.
+  Build phase: Renamed the script, refreshed CLI help text, updated `check-code-quality` orchestration, and reran the detector manually.
+  Verify phase: Re-executed `npm run phase:check`; it continues to fail on the standing `Effect.runPromise` allowlist violations.

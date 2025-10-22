@@ -18,3 +18,7 @@ last_reviewed: 2025-10-21
 - 2025-10-21: Refactored node-server suites onto shared CDK output stubs and runtime helpers, ran `npm run test -w apps/node-server`, and cleared `phase:check`.
 - 2025-10-21: Extracted reusable testing fakes/runtime/request context into `@packages/backend-core/testing`, trimmed the register handler spec below lint thresholds, and reran node-server tests plus `phase:check`.
 - 2025-10-22: Scoped analytics stack resource/output renames, refreshed construct IDs and outputs across CDK/API consumers, and reran phase plus finalize checks to confirm lint and memory validation.
+- 2025-10-21: Planned expansion of the unsafe assertion detector to cover non-null assertions and defined local validation strategy.
+- 2025-10-21: Implemented the detector updates, verified CLI output, and noted `phase:check` currently fails due to existing Effect.runPromise violations in testing utilities.
+- 2025-10-21: Ran memory validation, drift check, and `agent:finalize`; finalize still blocked by the same Effect.runPromise allowlist findings.
+- 2025-10-21: Renamed the unsafe assertion detector to `find-unsafe-assertions.mjs`, updated orchestrators/help text, and confirmed `phase:check` still fails on pre-existing Effect.runPromise usage.
