@@ -72,3 +72,6 @@ Reflexion
 - 2025-10-22 — Verify phase: Ran `npm run phase:check` successfully, then attempted `npm run agent:finalize`, which failed because referenced workflow run docs are absent.
   Documented the gap so maintainers can restore the missing run artifacts or adjust references before finalize passes.
   Next: summarize findings and highlight the outstanding memory validation issue in review notes.
+- 2025-10-22 — Plan phase: Investigated `npm run test:coverage` reporting zero files and traced the root cause to shared Vitest coverage globs targeting test files.
+  Chosen approach: update `@configs/vitest-config` coverage include/exclude to instrument source directories while leaving integration suite uninstrumented.
+  Next: implement config tweak, rerun coverage locally, and prepare Memory Bank stamps for verify.

@@ -17,6 +17,7 @@
     "// -- 🚀 Turborepo": "--",
     "build": "turbo run build",
     "clean": "turbo run clean && rm -rf node_modules && rm -rf .turbo",
+    "cache:clear": "rm -rf .turbo",
     "prelint": "npm run format:markdown",
     "lint": "turbo run lint",
     "prelint:fix": "npm run format:markdown",

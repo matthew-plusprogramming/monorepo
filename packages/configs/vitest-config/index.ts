@@ -20,6 +20,21 @@ const createBaseConfig = (
     alias,
   } = options;
 
+  const coverageInclude = [
+    `${srcDir}/**/*.ts`,
+    `${srcDir}/**/*.tsx`,
+    `${srcDir}/**/*.mts`,
+  ];
+
+  const coverageExclude = [
+    ...include,
+    `${srcDir}/**/__tests__/**/*`,
+    `${srcDir}/**/__mocks__/**/*`,
+    `${srcDir}/**/*.test.*`,
+    `${srcDir}/**/*.spec.*`,
+    `${srcDir}/**/*.d.ts`,
+  ];
+
   return {
     resolve: {
       alias: {
@@ -30,7 +45,8 @@ const createBaseConfig = (
     test: {
       include,
       coverage: {
-        include,
+        include: coverageInclude,
+        exclude: coverageExclude,
       },
     },
   } satisfies ViteUserConfig;
