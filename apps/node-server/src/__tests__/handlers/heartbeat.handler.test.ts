@@ -11,6 +11,11 @@ import type { DynamoDbServiceFake } from '@/__tests__/fakes/dynamodb';
 import type { EventBridgeServiceFake } from '@/__tests__/fakes/eventBridge';
 import type { LoggerServiceFake } from '@/__tests__/fakes/logger';
 import type { UserRepoFake } from '@/__tests__/fakes/userRepo';
+import { makeCdkOutputsStub } from '@/__tests__/stubs/cdkOutputs';
+import {
+  clearBundledRuntime,
+  setBundledRuntime,
+} from '@/__tests__/utils/runtime';
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null;
@@ -22,19 +27,7 @@ const eventBridgeModule = vi.hoisted(
 const loggerModule = vi.hoisted((): { fake?: LoggerServiceFake } => ({}));
 const userRepoModule = vi.hoisted((): { fake?: UserRepoFake } => ({}));
 
-vi.mock('@/clients/cdkOutputs', () => ({
-  analyticsEventBusArn: 'analytics-bus-arn',
-  analyticsEventBusName: 'analytics-bus',
-  analyticsDeadLetterQueueArn: 'analytics-dlq-arn',
-  analyticsDeadLetterQueueUrl: 'https://example.com/dlq',
-  analyticsDedupeTableName: 'analytics-dedupe-table',
-  analyticsAggregateTableName: 'analytics-aggregate-table',
-  analyticsEventLogGroupName: 'analytics-event-log-group',
-  analyticsProcessorLogGroupName: 'analytics-processor-log-group',
-  rateLimitTableName: 'rate-limit-table',
-  denyListTableName: 'deny-list-table',
-  usersTableName: 'users-table',
-}));
+vi.mock('@/clients/cdkOutputs', () => makeCdkOutputsStub());
 
 vi.mock('@/layers/app.layer', async () => {
   const { Layer } = await import('effect');
@@ -114,12 +107,13 @@ function initializeHeartbeatContext(): void {
   vi.resetModules();
   process.env.APP_ENV = 'test-env';
   process.env.APP_VERSION = '2.0.0';
-  Reflect.set(globalThis, '__BUNDLED__', false);
+  setBundledRuntime(false);
 }
 
 function cleanupHeartbeatContext(): void {
   Reflect.deleteProperty(process.env, 'APP_ENV');
   Reflect.deleteProperty(process.env, 'APP_VERSION');
+  clearBundledRuntime();
 }
 
 async function publishesHeartbeatEvent(): Promise<void> {
@@ -270,7 +264,3 @@ function attachUser(user: { sub: string; jti: string }) {
     next();
   };
 }
-vi.hoisted(() => {
-  Reflect.set(globalThis, '__BUNDLED__', false);
-  return undefined;
-});

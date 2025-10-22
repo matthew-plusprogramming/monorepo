@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { setBundledRuntime } from '@/__tests__/utils/runtime';
+
 type ExpressAppStub = {
   use: ReturnType<typeof vi.fn>;
   post: ReturnType<typeof vi.fn>;
@@ -146,7 +148,7 @@ vi.mock('@/middleware/isAuthenticated.middleware', () => {
 describe('lambda entrypoint', () => {
   beforeEach(() => {
     vi.resetModules();
-    Reflect.set(globalThis, '__BUNDLED__', false);
+    setBundledRuntime(false);
   });
 
   it('wraps the Express app with serverless-http and exports the handler', async () => {

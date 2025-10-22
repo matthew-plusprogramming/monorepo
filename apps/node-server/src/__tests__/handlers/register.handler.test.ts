@@ -8,10 +8,10 @@ import type { RequestHandler } from 'express';
 import type { Mock } from 'vitest';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-/* eslint-disable max-lines */
 import type { UserRepoFake } from '@/__tests__/fakes/userRepo';
-// no need for value imports; use simple tuple typing instead
+import { makeCdkOutputsStub } from '@/__tests__/stubs/cdkOutputs';
 import { makeRequestContext } from '@/__tests__/utils/express';
+import { setBundledRuntime } from '@/__tests__/utils/runtime';
 import { withFixedTime } from '@/__tests__/utils/time';
 import { restoreRandomUUID } from '@/__tests__/utils/uuid';
 
@@ -76,14 +76,7 @@ const isJwtSignCall = (
     (typeof candidate[2] === 'object' && candidate[2] !== null)) &&
   typeof candidate[3] === 'function';
 
-vi.hoisted(() => {
-  Reflect.set(globalThis, '__BUNDLED__', false);
-  return undefined;
-});
-
-vi.mock('@/clients/cdkOutputs', () => ({
-  usersTableName: 'users-table',
-}));
+vi.mock('@/clients/cdkOutputs', () => makeCdkOutputsStub());
 
 vi.mock('@/layers/app.layer', async () => {
   const { createUserRepoFake } = await import('@/__tests__/fakes/userRepo');
@@ -135,6 +128,7 @@ async function importRegisterHandler(): Promise<RegisterHandler> {
 
 function initializeRegisterContext(): void {
   vi.resetModules();
+  setBundledRuntime(false);
   restoreRandomUUID();
   process.env.PEPPER = 'test-pepper';
   process.env.JWT_SECRET = 'shh-its-a-secret';
@@ -382,5 +376,3 @@ describe('registerRequestHandler', () => {
     propagatesJwtFailure,
   );
 });
-
-/* eslint-enable max-lines */

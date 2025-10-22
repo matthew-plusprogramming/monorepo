@@ -6,12 +6,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { buildUserCreate, buildUserPublic } from '@/__tests__/builders/user';
 import { createDynamoDbServiceFake } from '@/__tests__/fakes/dynamodb';
 import { createLoggerServiceFake } from '@/__tests__/fakes/logger';
+import { makeCdkOutputsStub } from '@/__tests__/stubs/cdkOutputs';
 import type { UserRepoSchema } from '@/services/userRepo.service';
 import { LiveUserRepo, UserRepo } from '@/services/userRepo.service';
 
-vi.mock('@/clients/cdkOutputs', () => ({
-  usersTableName: 'test-users-table',
-}));
+vi.mock('@/clients/cdkOutputs', () =>
+  makeCdkOutputsStub({ usersTableName: 'test-users-table' }),
+);
 
 const dynamoFake = createDynamoDbServiceFake();
 const loggerFake = createLoggerServiceFake();

@@ -4,19 +4,14 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { buildUserPublic } from '@/__tests__/builders/user';
 import type { UserRepoFake } from '@/__tests__/fakes/userRepo';
+import { makeCdkOutputsStub } from '@/__tests__/stubs/cdkOutputs';
 import { makeRequestContext } from '@/__tests__/utils/express';
+import { setBundledRuntime } from '@/__tests__/utils/runtime';
 
 // Hoisted state to capture the fake exposed by the AppLayer mock
 const userRepoModule = vi.hoisted((): { fake?: UserRepoFake } => ({}));
 
-vi.hoisted(() => {
-  Reflect.set(globalThis, '__BUNDLED__', false);
-  return undefined;
-});
-
-vi.mock('@/clients/cdkOutputs', () => ({
-  usersTableName: 'users-table',
-}));
+vi.mock('@/clients/cdkOutputs', () => makeCdkOutputsStub());
 
 vi.mock('@/layers/app.layer', async () => {
   const { createUserRepoFake } = await import('@/__tests__/fakes/userRepo');
@@ -35,6 +30,7 @@ const getUserRepoFake = (): UserRepoFake => {
 describe('getUserRequestHandler', () => {
   beforeEach(() => {
     vi.resetModules();
+    setBundledRuntime(false);
   });
 
   it('returns 200 and the user for a valid identifier', async () => {
