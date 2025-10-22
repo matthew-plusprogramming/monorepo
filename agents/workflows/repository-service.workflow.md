@@ -110,7 +110,10 @@ Phase: plan
 Phase: build
 
 - Goal: Implement the schema, infrastructure, and repository service changes with tight diffs.
-- Checklist:
+- Checklist: 0. **Scaffold (optional but recommended)**
+  - Run `node scripts/create-repository-service.mjs <entity-slug>` to generate baseline schemas, CDK stubs, repository service, and fakes.
+  - Use `--with handler` (or `--with all`) to opt into additional bundles; run without `--with` in an interactive terminal to pick bundles via prompts.
+  - Review the generated checklist under `scripts/output/repository-service/<entity-slug>-checklist.md` and treat remaining TODOs as part of this phase.
   1. **Schemas**
      - Add/update Zod schemas, DTO types, and constants under `packages/core/schemas/schemas` (e.g., extend `packages/core/schemas/schemas/user`).
      - Export schema constants for table name/GSI usage; add schema tests.

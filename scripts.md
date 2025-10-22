@@ -1,5 +1,7 @@
 Scripts that may help during development:
 
+> Looking for automation details? See [scripts/README.md](scripts/README.md) for bundle options and deeper guidance.
+
 Build and deploy lambda (node-server)
 
 ```

@@ -63,5 +63,5 @@ Reflexion
   Build phase: Added DOM lookup validation in `client-website`, replaced stack pops with defensive checks in CDK/node-server scripts, and tightened the register handler spec around mock initialization.
   Verify phase: Reran `find-unsafe-assertions`, `npm run phase:check`, and confirmed the suite now reports zero unsafe assertions.
 - 2025-10-22 — Plan phase: Scoped an automation script and templates to accelerate the repository-service workflow without touching live layers yet.
-  Build phase: Implemented the CLI, modular template bundles (base + optional handler bundle), and documentation update; ran `npm run phase:check`.
-  Verify phase: Executed `npm run agent:finalize`, confirmed memory validation/drift, and documented follow-up guidance in the checklist.
+  Build phase: Implemented the CLI, modular template bundles (base + optional handler bundle), refreshed workflow and README guidance, and ran `npm run phase:check`.
+  Verify phase: Executed `npm run agent:finalize`, confirmed memory validation/drift, and documented follow-up guidance in the checklist plus automation docs.

@@ -39,6 +39,12 @@ Encrypted envs (dotenvx):
 - Run a workspace script: `npm -w <package-name> run <script>`
   - Examples: `npm -w node-server run build`, `npm -w @cdk/backend-server-cdk run cdk:deploy:dev`
 
+## Automation Scripts
+
+- Repository scaffolding: `node scripts/create-repository-service.mjs <entity-slug> [--with handler] [--dry-run] [--force]`
+  - Generates schema/CDK/service templates plus a workflow-aligned checklist.
+  - Details and bundle options live in [scripts/README.md](scripts/README.md).
+
 ## Lambda Packaging (overview)
 
 1) Ensure `LAMBDA=true` in the server’s env for the build stage
