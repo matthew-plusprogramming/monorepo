@@ -2,11 +2,12 @@ import type {
   PutEventsCommandInput,
   PutEventsCommandOutput,
 } from '@aws-sdk/client-eventbridge';
+import { Effect, Layer } from 'effect';
+
 import {
   EventBridgeService,
   type EventBridgeServiceSchema,
-} from '@packages/backend-core';
-import { Effect, Layer } from 'effect';
+} from '@/services/event-bridge.js';
 
 type ResponseEntry =
   | { type: 'success'; value: PutEventsCommandOutput }

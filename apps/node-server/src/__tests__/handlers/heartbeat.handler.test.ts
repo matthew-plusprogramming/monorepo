@@ -1,4 +1,11 @@
 import { HTTP_RESPONSE } from '@packages/backend-core';
+import {
+  clearBundledRuntime,
+  type DynamoDbServiceFake,
+  type EventBridgeServiceFake,
+  type LoggerServiceFake,
+  setBundledRuntime,
+} from '@packages/backend-core/testing';
 import express, {
   type NextFunction,
   type Request,
@@ -7,15 +14,8 @@ import express, {
 import request, { type Response } from 'supertest';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { DynamoDbServiceFake } from '@/__tests__/fakes/dynamodb';
-import type { EventBridgeServiceFake } from '@/__tests__/fakes/eventBridge';
-import type { LoggerServiceFake } from '@/__tests__/fakes/logger';
 import type { UserRepoFake } from '@/__tests__/fakes/userRepo';
 import { makeCdkOutputsStub } from '@/__tests__/stubs/cdkOutputs';
-import {
-  clearBundledRuntime,
-  setBundledRuntime,
-} from '@/__tests__/utils/runtime';
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null;
@@ -31,13 +31,11 @@ vi.mock('@/clients/cdkOutputs', () => makeCdkOutputsStub());
 
 vi.mock('@/layers/app.layer', async () => {
   const { Layer } = await import('effect');
-  const { createDynamoDbServiceFake } = await import(
-    '@/__tests__/fakes/dynamodb'
-  );
-  const { createEventBridgeServiceFake } = await import(
-    '@/__tests__/fakes/eventBridge'
-  );
-  const { createLoggerServiceFake } = await import('@/__tests__/fakes/logger');
+  const {
+    createDynamoDbServiceFake,
+    createEventBridgeServiceFake,
+    createLoggerServiceFake,
+  } = await import('@packages/backend-core/testing');
   const { createUserRepoFake } = await import('@/__tests__/fakes/userRepo');
 
   const dynamoFake = createDynamoDbServiceFake();

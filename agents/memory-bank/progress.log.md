@@ -16,4 +16,5 @@ last_reviewed: 2025-10-21
 - 2025-10-21: Condensed Memory Bank active context and progress log summaries, refreshed metadata stamps, and reran validation/drift plus phase checks to keep context high-signal.
 - 2025-10-21: Planned node-server test helper consolidation, cataloged duplicated CDK output stubs and bundling flag setup, and outlined refactor targets for shared utilities.
 - 2025-10-21: Refactored node-server suites onto shared CDK output stubs and runtime helpers, ran `npm run test -w apps/node-server`, and cleared `phase:check`.
+- 2025-10-21: Extracted reusable testing fakes/runtime/request context into `@packages/backend-core/testing`, trimmed the register handler spec below lint thresholds, and reran node-server tests plus `phase:check`.
 - 2025-10-22: Scoped analytics stack resource/output renames, refreshed construct IDs and outputs across CDK/API consumers, and reran phase plus finalize checks to confirm lint and memory validation.

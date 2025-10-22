@@ -1,17 +1,18 @@
-import type { handlerInput } from '@packages/backend-core';
 import { Effect } from 'effect';
 import type { NextFunction, Request, Response } from 'express';
 import type { ParsedQs } from 'qs';
 import { vi } from 'vitest';
 
+import type { handlerInput } from '@/types/handler.js';
+
 type RequestContextInit = {
-  headers?: Record<string, string | string[] | undefined>;
-  body?: unknown;
-  params?: Record<string, string>;
-  query?: ParsedQs;
-  method?: string;
-  url?: string;
-  ip?: string;
+  readonly headers?: Record<string, string | string[] | undefined>;
+  readonly body?: unknown;
+  readonly params?: Record<string, string>;
+  readonly query?: ParsedQs;
+  readonly method?: string;
+  readonly url?: string;
+  readonly ip?: string;
 };
 
 type CapturedResponse = {
@@ -71,10 +72,10 @@ type ResponseMock = ReturnType<typeof vi.fn>;
 const createResponse = (
   captured: CapturedResponse,
 ): {
-  response: Response;
-  statusMock: ResponseMock;
-  jsonMock: ResponseMock;
-  sendMock: ResponseMock;
+  readonly response: Response;
+  readonly statusMock: ResponseMock;
+  readonly jsonMock: ResponseMock;
+  readonly sendMock: ResponseMock;
 } => {
   // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
   const response = {} as Response;

@@ -1,6 +1,5 @@
+import { setBundledRuntime } from '@packages/backend-core/testing';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-
-import { setBundledRuntime } from '@/__tests__/utils/runtime';
 
 type ExpressAppStub = {
   use: ReturnType<typeof vi.fn>;

@@ -1,12 +1,14 @@
 import { HTTP_RESPONSE } from '@packages/backend-core';
+import {
+  makeRequestContext,
+  setBundledRuntime,
+} from '@packages/backend-core/testing';
 import type { UserPublic } from '@packages/schemas/user';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { buildUserPublic } from '@/__tests__/builders/user';
 import type { UserRepoFake } from '@/__tests__/fakes/userRepo';
 import { makeCdkOutputsStub } from '@/__tests__/stubs/cdkOutputs';
-import { makeRequestContext } from '@/__tests__/utils/express';
-import { setBundledRuntime } from '@/__tests__/utils/runtime';
 
 // Hoisted state to capture the fake exposed by the AppLayer mock
 const userRepoModule = vi.hoisted((): { fake?: UserRepoFake } => ({}));

@@ -21,8 +21,9 @@ last_reviewed: 2025-10-21
 - Add Test Data Builders (e.g., `UserBuilder`) under `src/**/__test__/builders.ts`; keep them close to the code under test for ergonomic imports.
 - Create factory helpers such as `makeRepoMock()`, `fixedNow()`, and `withEnv()` to standardize common arrangements.
 - Introduce shared in-memory fakes for frequently used repos/queues/cache interfaces when multiple suites need the same behavior.
+- Shared test utilities (service fakes, Express request context builder, and runtime helpers) live under `@packages/backend-core/testing`; import from there instead of cloning per app.
 - For CDK output dependencies, prefer `apps/node-server/src/__tests__/stubs/cdkOutputs.ts`'s `makeCdkOutputsStub()` and override only the keys a suite needs.
-- Manipulate the `__BUNDLED__` runtime flag via `apps/node-server/src/__tests__/utils/runtime.ts` (`setBundledRuntime`, `clearBundledRuntime`) instead of inlining `Reflect` access.
+- Manipulate the `__BUNDLED__` runtime flag via `@packages/backend-core/testing` exports (e.g., `setBundledRuntime`, `clearBundledRuntime`, `hoistUnbundledRuntime`) instead of inlining `Reflect` access.
 
 ## What to Test by Unit Type
 

@@ -8,11 +8,12 @@ import type {
   UpdateItemCommandInput,
   UpdateItemCommandOutput,
 } from '@aws-sdk/client-dynamodb';
+import { Effect, Layer } from 'effect';
+
 import {
   DynamoDbService,
   type DynamoDbServiceSchema,
-} from '@packages/backend-core';
-import { Effect, Layer } from 'effect';
+} from '@/services/dynamodb.js';
 
 const operations = ['getItem', 'putItem', 'query', 'updateItem'] as const;
 type OperationName = (typeof operations)[number];
@@ -22,17 +23,17 @@ type ResponseEntry<T> =
   | { type: 'error'; error: Error };
 
 type ResponseQueues = {
-  getItem: Array<ResponseEntry<GetItemCommandOutput>>;
-  putItem: Array<ResponseEntry<PutItemCommandOutput>>;
-  query: Array<ResponseEntry<QueryCommandOutput>>;
-  updateItem: Array<ResponseEntry<UpdateItemCommandOutput>>;
+  readonly getItem: Array<ResponseEntry<GetItemCommandOutput>>;
+  readonly putItem: Array<ResponseEntry<PutItemCommandOutput>>;
+  readonly query: Array<ResponseEntry<QueryCommandOutput>>;
+  readonly updateItem: Array<ResponseEntry<UpdateItemCommandOutput>>;
 };
 
 type CallHistory = {
-  getItem: Array<GetItemCommandInput>;
-  putItem: Array<PutItemCommandInput>;
-  query: Array<QueryCommandInput>;
-  updateItem: Array<UpdateItemCommandInput>;
+  readonly getItem: Array<GetItemCommandInput>;
+  readonly putItem: Array<PutItemCommandInput>;
+  readonly query: Array<QueryCommandInput>;
+  readonly updateItem: Array<UpdateItemCommandInput>;
 };
 
 export type DynamoDbServiceFake = {

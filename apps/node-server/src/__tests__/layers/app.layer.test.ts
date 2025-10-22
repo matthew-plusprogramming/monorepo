@@ -3,14 +3,16 @@ import {
   EventBridgeService,
   LoggerService,
 } from '@packages/backend-core';
+import {
+  type DynamoDbServiceFake,
+  type EventBridgeServiceFake,
+  type LoggerServiceFake,
+  setBundledRuntime,
+} from '@packages/backend-core/testing';
 import { Effect, Layer, Option } from 'effect';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { DynamoDbServiceFake } from '@/__tests__/fakes/dynamodb';
-import type { EventBridgeServiceFake } from '@/__tests__/fakes/eventBridge';
-import type { LoggerServiceFake } from '@/__tests__/fakes/logger';
 import { makeCdkOutputsStub } from '@/__tests__/stubs/cdkOutputs';
-import { setBundledRuntime } from '@/__tests__/utils/runtime';
 import type * as DynamoServiceModule from '@/services/dynamodb.service';
 import type * as EventBridgeServiceModule from '@/services/eventBridge.service';
 import type * as LoggerServiceModule from '@/services/logger.service';
@@ -29,7 +31,7 @@ vi.mock('@/clients/cdkOutputs', () => makeCdkOutputsStub());
 vi.mock('@/services/dynamodb.service', async (importOriginal) => {
   const actual: typeof DynamoServiceModule = await importOriginal();
   const { createDynamoDbServiceFake } = await import(
-    '@/__tests__/fakes/dynamodb'
+    '@packages/backend-core/testing'
   );
   const fake = createDynamoDbServiceFake();
   dynamoModule.fake = fake;
@@ -41,7 +43,9 @@ vi.mock('@/services/dynamodb.service', async (importOriginal) => {
 
 vi.mock('@/services/logger.service', async (importOriginal) => {
   const actual: typeof LoggerServiceModule = await importOriginal();
-  const { createLoggerServiceFake } = await import('@/__tests__/fakes/logger');
+  const { createLoggerServiceFake } = await import(
+    '@packages/backend-core/testing'
+  );
   const fake = createLoggerServiceFake();
   loggerModule.fake = fake;
   return {
@@ -54,7 +58,7 @@ vi.mock('@/services/logger.service', async (importOriginal) => {
 vi.mock('@/services/eventBridge.service', async (importOriginal) => {
   const actual: typeof EventBridgeServiceModule = await importOriginal();
   const { createEventBridgeServiceFake } = await import(
-    '@/__tests__/fakes/eventBridge'
+    '@packages/backend-core/testing'
   );
   const fake = createEventBridgeServiceFake();
   eventBridgeModule.fake = fake;
