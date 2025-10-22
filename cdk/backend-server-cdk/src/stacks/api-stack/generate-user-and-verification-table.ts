@@ -12,7 +12,7 @@ export const generateUserAndVerificationTable = (
   scope: Construct,
   region: string,
 ): void => {
-  const userTable = new DynamodbTable(scope, 'user-table', {
+  const userTable = new DynamodbTable(scope, USER_TABLE_NAME, {
     name: USER_TABLE_NAME,
     billingMode: 'PAY_PER_REQUEST',
     hashKey: USER_SCHEMA_CONSTANTS.key.id,
@@ -38,7 +38,7 @@ export const generateUserAndVerificationTable = (
 
   const verificationTable = new DynamodbTable(
     scope,
-    'user-verification-table',
+    USER_VERIFICATION_TABLE_NAME,
     {
       name: USER_VERIFICATION_TABLE_NAME,
       billingMode: 'PAY_PER_REQUEST',
@@ -57,12 +57,12 @@ export const generateUserAndVerificationTable = (
     },
   );
 
-  new TerraformOutput(scope, 'userTableName', {
+  new TerraformOutput(scope, 'apiUserTableName', {
     value: userTable.name,
-    description: 'The name of the user table',
+    description: 'The name of the API user table',
   });
-  new TerraformOutput(scope, 'verificationTableName', {
+  new TerraformOutput(scope, 'apiUserVerificationTableName', {
     value: verificationTable.name,
-    description: 'The name of the verification table',
+    description: 'The name of the API user verification table',
   });
 };

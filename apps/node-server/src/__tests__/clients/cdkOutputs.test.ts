@@ -3,20 +3,20 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const outputsByStack = {
   [API_STACK_NAME]: {
-    userTableName: 'users-table',
-    verificationTableName: 'verification-table',
-    rateLimitTableName: 'rate-limit-table',
-    denyListTableName: 'deny-list-table',
+    apiUserTableName: 'users-table',
+    apiUserVerificationTableName: 'verification-table',
+    apiRateLimitTableName: 'rate-limit-table',
+    apiDenyListTableName: 'deny-list-table',
   },
   [ANALYTICS_STACK_NAME]: {
-    eventBusArn: 'analytics-bus-arn',
-    eventBusName: 'analytics-bus',
-    deadLetterQueueArn: 'analytics-dlq-arn',
-    deadLetterQueueUrl: 'https://example.com/dlq',
-    dedupeTableName: 'analytics-dedupe-table',
-    aggregateTableName: 'analytics-aggregate-table',
-    eventLogGroupName: 'analytics-event-log-group',
-    processorLogGroupName: 'analytics-processor-log-group',
+    analyticsEventBusArn: 'analytics-bus-arn',
+    analyticsEventBusName: 'analytics-bus',
+    analyticsEventBusDeadLetterQueueArn: 'analytics-dlq-arn',
+    analyticsEventBusDeadLetterQueueUrl: 'https://example.com/dlq',
+    analyticsEventDedupeTableName: 'analytics-dedupe-table',
+    analyticsMetricsAggregateTableName: 'analytics-aggregate-table',
+    analyticsEventIngestionLogGroupName: 'analytics-event-log-group',
+    analyticsProcessorLogGroupName: 'analytics-processor-log-group',
   },
 } as const;
 

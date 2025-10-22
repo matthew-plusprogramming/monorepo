@@ -17,43 +17,43 @@ export class AnalyticsStack extends TerraformStack {
     new StandardBackend(this, id, region);
 
     const {
-      eventBus,
-      deadLetterQueue,
+      eventBridgeBus,
+      eventBridgeDeadLetterQueue,
       dedupeTable,
-      aggregateTable,
-      eventLogGroup,
+      metricsAggregateTable,
+      eventIngestionLogGroup,
       processorLogGroup,
     } = generateAnalyticsResources(this, region);
 
-    new TerraformOutput(this, 'eventBusArn', {
-      value: eventBus.arn,
+    new TerraformOutput(this, 'analyticsEventBusArn', {
+      value: eventBridgeBus.arn,
       description: 'ARN of the analytics EventBridge bus',
     });
-    new TerraformOutput(this, 'eventBusName', {
-      value: eventBus.name,
+    new TerraformOutput(this, 'analyticsEventBusName', {
+      value: eventBridgeBus.name,
       description: 'Name of the analytics EventBridge bus',
     });
-    new TerraformOutput(this, 'deadLetterQueueArn', {
-      value: deadLetterQueue.arn,
-      description: 'ARN of the analytics EventBridge DLQ',
+    new TerraformOutput(this, 'analyticsEventBusDeadLetterQueueArn', {
+      value: eventBridgeDeadLetterQueue.arn,
+      description: 'ARN of the analytics EventBridge dead-letter queue',
     });
-    new TerraformOutput(this, 'deadLetterQueueUrl', {
-      value: deadLetterQueue.url,
-      description: 'URL of the analytics EventBridge DLQ',
+    new TerraformOutput(this, 'analyticsEventBusDeadLetterQueueUrl', {
+      value: eventBridgeDeadLetterQueue.url,
+      description: 'URL of the analytics EventBridge dead-letter queue',
     });
-    new TerraformOutput(this, 'dedupeTableName', {
+    new TerraformOutput(this, 'analyticsEventDedupeTableName', {
       value: dedupeTable.name,
       description: 'Name of the DAU/MAU dedupe DynamoDB table',
     });
-    new TerraformOutput(this, 'aggregateTableName', {
-      value: aggregateTable.name,
+    new TerraformOutput(this, 'analyticsMetricsAggregateTableName', {
+      value: metricsAggregateTable.name,
       description: 'Name of the DAU/MAU aggregate DynamoDB table',
     });
-    new TerraformOutput(this, 'eventLogGroupName', {
-      value: eventLogGroup.name,
+    new TerraformOutput(this, 'analyticsEventIngestionLogGroupName', {
+      value: eventIngestionLogGroup.name,
       description: 'CloudWatch log group for analytics event ingestion',
     });
-    new TerraformOutput(this, 'processorLogGroupName', {
+    new TerraformOutput(this, 'analyticsProcessorLogGroupName', {
       value: processorLogGroup.name,
       description: 'CloudWatch log group for analytics processing Lambda',
     });

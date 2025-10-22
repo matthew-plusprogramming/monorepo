@@ -10,21 +10,26 @@ const apiOutput = loadCDKOutput<typeof API_STACK_NAME>(
   API_STACK_NAME,
   baseCdkOutputsPath,
 );
-export const usersTableName = apiOutput.userTableName;
-export const rateLimitTableName = apiOutput.rateLimitTableName;
-export const denyListTableName = apiOutput.denyListTableName;
+export const usersTableName = apiOutput.apiUserTableName;
+export const rateLimitTableName = apiOutput.apiRateLimitTableName;
+export const denyListTableName = apiOutput.apiDenyListTableName;
 
 const analyticsOutput = loadCDKOutput<typeof ANALYTICS_STACK_NAME>(
   ANALYTICS_STACK_NAME,
   baseCdkOutputsPath,
 );
 
-export const analyticsEventBusArn = analyticsOutput.eventBusArn;
-export const analyticsEventBusName = analyticsOutput.eventBusName;
-export const analyticsDeadLetterQueueArn = analyticsOutput.deadLetterQueueArn;
-export const analyticsDeadLetterQueueUrl = analyticsOutput.deadLetterQueueUrl;
-export const analyticsDedupeTableName = analyticsOutput.dedupeTableName;
-export const analyticsAggregateTableName = analyticsOutput.aggregateTableName;
-export const analyticsEventLogGroupName = analyticsOutput.eventLogGroupName;
+export const analyticsEventBusArn = analyticsOutput.analyticsEventBusArn;
+export const analyticsEventBusName = analyticsOutput.analyticsEventBusName;
+export const analyticsDeadLetterQueueArn =
+  analyticsOutput.analyticsEventBusDeadLetterQueueArn;
+export const analyticsDeadLetterQueueUrl =
+  analyticsOutput.analyticsEventBusDeadLetterQueueUrl;
+export const analyticsDedupeTableName =
+  analyticsOutput.analyticsEventDedupeTableName;
+export const analyticsAggregateTableName =
+  analyticsOutput.analyticsMetricsAggregateTableName;
+export const analyticsEventLogGroupName =
+  analyticsOutput.analyticsEventIngestionLogGroupName;
 export const analyticsProcessorLogGroupName =
-  analyticsOutput.processorLogGroupName;
+  analyticsOutput.analyticsProcessorLogGroupName;

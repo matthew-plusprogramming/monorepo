@@ -7,15 +7,18 @@ import type { Construct } from 'constructs';
 import {
   ANALYTICS_AGGREGATE_TABLE_NAME,
   ANALYTICS_DEDUPE_TABLE_NAME,
+  ANALYTICS_EVENT_BRIDGE_DLQ_NAME,
   ANALYTICS_EVENT_BUS_NAME,
+  ANALYTICS_EVENT_INGESTION_LOG_GROUP_NAME,
+  ANALYTICS_PROCESSOR_LOG_GROUP_NAME,
 } from './constants';
 
 export interface AnalyticsResources {
-  eventBus: CloudwatchEventBus;
-  deadLetterQueue: SqsQueue;
+  eventBridgeBus: CloudwatchEventBus;
+  eventBridgeDeadLetterQueue: SqsQueue;
   dedupeTable: DynamodbTable;
-  aggregateTable: DynamodbTable;
-  eventLogGroup: CloudwatchLogGroup;
+  metricsAggregateTable: DynamodbTable;
+  eventIngestionLogGroup: CloudwatchLogGroup;
   processorLogGroup: CloudwatchLogGroup;
 }
 
@@ -23,22 +26,31 @@ export const generateAnalyticsResources = (
   scope: Construct,
   region: string,
 ): AnalyticsResources => {
-  const deadLetterQueue = new SqsQueue(scope, 'analytics-metrics-dlq', {
-    messageRetentionSeconds: 1_209_600, // 14 days
-    sqsManagedSseEnabled: true,
-    region,
-  });
-
-  const eventBus = new CloudwatchEventBus(scope, 'analytics-event-bus', {
-    name: ANALYTICS_EVENT_BUS_NAME,
-    description: 'EventBridge bus for DAU/MAU analytics ingestion',
-    region,
-    deadLetterConfig: {
-      arn: deadLetterQueue.arn,
+  const eventBridgeDeadLetterQueue = new SqsQueue(
+    scope,
+    ANALYTICS_EVENT_BRIDGE_DLQ_NAME,
+    {
+      name: ANALYTICS_EVENT_BRIDGE_DLQ_NAME,
+      messageRetentionSeconds: 1_209_600, // 14 days
+      sqsManagedSseEnabled: true,
+      region,
     },
-  });
+  );
 
-  const dedupeTable = new DynamodbTable(scope, 'analytics-dedupe-table', {
+  const eventBridgeBus = new CloudwatchEventBus(
+    scope,
+    ANALYTICS_EVENT_BUS_NAME,
+    {
+      name: ANALYTICS_EVENT_BUS_NAME,
+      description: 'EventBridge bus for DAU/MAU analytics ingestion',
+      region,
+      deadLetterConfig: {
+        arn: eventBridgeDeadLetterQueue.arn,
+      },
+    },
+  );
+
+  const dedupeTable = new DynamodbTable(scope, ANALYTICS_DEDUPE_TABLE_NAME, {
     name: ANALYTICS_DEDUPE_TABLE_NAME,
     billingMode: 'PAY_PER_REQUEST',
     hashKey: 'pk',
@@ -55,37 +67,47 @@ export const generateAnalyticsResources = (
     region,
   });
 
-  const aggregateTable = new DynamodbTable(scope, 'analytics-aggregate-table', {
-    name: ANALYTICS_AGGREGATE_TABLE_NAME,
-    billingMode: 'PAY_PER_REQUEST',
-    hashKey: 'pk',
-    attribute: [
-      {
-        name: 'pk',
-        type: 'S',
-      },
-    ],
-    region,
-  });
+  const metricsAggregateTable = new DynamodbTable(
+    scope,
+    ANALYTICS_AGGREGATE_TABLE_NAME,
+    {
+      name: ANALYTICS_AGGREGATE_TABLE_NAME,
+      billingMode: 'PAY_PER_REQUEST',
+      hashKey: 'pk',
+      attribute: [
+        {
+          name: 'pk',
+          type: 'S',
+        },
+      ],
+      region,
+    },
+  );
 
-  const eventLogGroup = new CloudwatchLogGroup(scope, 'analytics-event-logs', {
-    retentionInDays: 30,
-  });
+  const eventIngestionLogGroup = new CloudwatchLogGroup(
+    scope,
+    ANALYTICS_EVENT_INGESTION_LOG_GROUP_NAME,
+    {
+      name: ANALYTICS_EVENT_INGESTION_LOG_GROUP_NAME,
+      retentionInDays: 30,
+    },
+  );
 
   const processorLogGroup = new CloudwatchLogGroup(
     scope,
-    'analytics-processor-logs',
+    ANALYTICS_PROCESSOR_LOG_GROUP_NAME,
     {
+      name: ANALYTICS_PROCESSOR_LOG_GROUP_NAME,
       retentionInDays: 30,
     },
   );
 
   return {
-    eventBus,
-    deadLetterQueue,
+    eventBridgeBus,
+    eventBridgeDeadLetterQueue,
     dedupeTable,
-    aggregateTable,
-    eventLogGroup,
+    metricsAggregateTable,
+    eventIngestionLogGroup,
     processorLogGroup,
   };
 };

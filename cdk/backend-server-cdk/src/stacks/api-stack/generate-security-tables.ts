@@ -12,7 +12,7 @@ export const generateSecurityTables = (
   scope: Construct,
   region: string,
 ): void => {
-  const rateLimitTable = new DynamodbTable(scope, 'rate-limit-table', {
+  const rateLimitTable = new DynamodbTable(scope, RATE_LIMIT_TABLE_NAME, {
     name: RATE_LIMIT_TABLE_NAME,
     billingMode: 'PAY_PER_REQUEST',
     hashKey: RATE_LIMITING_SCHEMA_CONSTANTS.key.base,
@@ -29,7 +29,7 @@ export const generateSecurityTables = (
     region,
   });
 
-  const denyListTable = new DynamodbTable(scope, 'deny-list-table', {
+  const denyListTable = new DynamodbTable(scope, DENY_LIST_TABLE_NAME, {
     name: DENY_LIST_TABLE_NAME,
     billingMode: 'PAY_PER_REQUEST',
     hashKey: DENY_LIST_SCHEMA_CONSTANTS.key.base,
@@ -46,12 +46,12 @@ export const generateSecurityTables = (
     region,
   });
 
-  new TerraformOutput(scope, 'rateLimitTableName', {
+  new TerraformOutput(scope, 'apiRateLimitTableName', {
     value: rateLimitTable.name,
-    description: 'The name of the rate limit table',
+    description: 'The name of the API rate limit table',
   });
-  new TerraformOutput(scope, 'denyListTableName', {
+  new TerraformOutput(scope, 'apiDenyListTableName', {
     value: denyListTable.name,
-    description: 'The name of the deny list table',
+    description: 'The name of the API deny list table',
   });
 };
