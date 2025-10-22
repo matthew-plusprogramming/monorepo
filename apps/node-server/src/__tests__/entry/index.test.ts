@@ -2,6 +2,9 @@ import type { MockInstance } from 'vitest';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ZodError } from 'zod';
 
+import { makeCdkOutputsStub } from '@/__tests__/stubs/cdkOutputs';
+import { setBundledRuntime } from '@/__tests__/utils/runtime';
+
 type ExpressAppStub = {
   use: ReturnType<typeof vi.fn>;
   post: ReturnType<typeof vi.fn>;
@@ -56,11 +59,6 @@ const environmentParseImpl = vi.hoisted<EnvironmentParseState>(() => ({
   impl: (env: NodeJS.ProcessEnv): NodeJS.ProcessEnv => env,
 }));
 
-vi.hoisted((): undefined => {
-  Reflect.set(globalThis, '__BUNDLED__', false);
-  return undefined;
-});
-
 vi.mock('@dotenvx/dotenvx/config', () => ({}));
 
 vi.mock('express', () => {
@@ -106,19 +104,7 @@ vi.mock('@/handlers/getUser.handler', () => {
   return { getUserRequestHandler: handler };
 });
 
-vi.mock('@/clients/cdkOutputs', () => ({
-  usersTableName: 'users-table',
-  rateLimitTableName: 'rate-limit-table',
-  denyListTableName: 'deny-list-table',
-  analyticsEventBusArn: 'analytics-bus-arn',
-  analyticsEventBusName: 'analytics-bus',
-  analyticsDeadLetterQueueArn: 'analytics-dlq-arn',
-  analyticsDeadLetterQueueUrl: 'https://example.com/dlq',
-  analyticsDedupeTableName: 'analytics-dedupe-table',
-  analyticsAggregateTableName: 'analytics-aggregate-table',
-  analyticsEventLogGroupName: 'analytics-event-log-group',
-  analyticsProcessorLogGroupName: 'analytics-processor-log-group',
-}));
+vi.mock('@/clients/cdkOutputs', () => makeCdkOutputsStub());
 
 vi.mock('@/types/environment', () => {
   const parse = vi.fn((env: NodeJS.ProcessEnv) =>
@@ -135,6 +121,7 @@ describe('node-server index entrypoint', () => {
   beforeEach(() => {
     vi.resetModules();
     vi.clearAllMocks();
+    setBundledRuntime(false);
     expressModule.app = undefined;
     expressModule.factory = undefined;
     expressModule.json = undefined;

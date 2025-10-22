@@ -4,6 +4,8 @@ import request from 'supertest';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { EventBridgeServiceFake } from '@/__tests__/fakes/eventBridge';
+import { makeCdkOutputsStub } from '@/__tests__/stubs/cdkOutputs';
+import { setBundledRuntime } from '@/__tests__/utils/runtime';
 import type * as EventBridgeServiceModule from '@/services/eventBridge.service';
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -13,21 +15,7 @@ const eventBridgeModule = vi.hoisted(
   (): { fake?: EventBridgeServiceFake } => ({}),
 );
 
-vi.hoisted(() => {
-  Reflect.set(globalThis, '__BUNDLED__', false);
-  return undefined;
-});
-
-vi.mock('@/clients/cdkOutputs', () => ({
-  analyticsEventBusArn: 'analytics-bus-arn',
-  analyticsEventBusName: 'analytics-bus',
-  analyticsDeadLetterQueueArn: 'analytics-dlq-arn',
-  analyticsDeadLetterQueueUrl: 'https://example.com/dlq',
-  analyticsDedupeTableName: 'analytics-dedupe-table',
-  analyticsAggregateTableName: 'analytics-aggregate-table',
-  analyticsEventLogGroupName: 'analytics-event-log-group',
-  analyticsProcessorLogGroupName: 'analytics-processor-log-group',
-}));
+vi.mock('@/clients/cdkOutputs', () => makeCdkOutputsStub());
 
 vi.mock('@/services/eventBridge.service', async (importOriginal) => {
   const actual: typeof EventBridgeServiceModule = await importOriginal();
@@ -46,7 +34,7 @@ describe('heartbeat integration', () => {
   beforeEach(() => {
     vi.resetModules();
     vi.clearAllMocks();
-    Reflect.set(globalThis, '__BUNDLED__', false);
+    setBundledRuntime(false);
     process.env.APP_ENV = 'test-env';
     process.env.APP_VERSION = '1.2.3';
   });

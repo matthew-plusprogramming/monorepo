@@ -11,22 +11,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { DynamoDbServiceFake } from '@/__tests__/fakes/dynamodb';
 import type { LoggerServiceFake } from '@/__tests__/fakes/logger';
+import { makeCdkOutputsStub } from '@/__tests__/stubs/cdkOutputs';
 import { makeRequestContext } from '@/__tests__/utils/express';
+import { setBundledRuntime } from '@/__tests__/utils/runtime';
 import { ipRateLimitingMiddlewareRequestHandler } from '@/middleware/ipRateLimiting.middleware';
-
-vi.hoisted(() => {
-  Reflect.set(globalThis, '__BUNDLED__', false);
-  return undefined;
-});
 
 const dynamoModule = vi.hoisted((): { fake?: DynamoDbServiceFake } => ({}));
 const loggerModule = vi.hoisted((): { fake?: LoggerServiceFake } => ({}));
 
-vi.mock('@/clients/cdkOutputs', () => ({
-  rateLimitTableName: 'rate-limit-table',
-  denyListTableName: 'deny-list-table',
-  usersTableName: 'users-table',
-}));
+vi.mock('@/clients/cdkOutputs', () => makeCdkOutputsStub());
 
 vi.mock('@/services/logger.service', async () => {
   const { createLoggerServiceFake } = await import('@/__tests__/fakes/logger');
@@ -101,6 +94,7 @@ describe('ipRateLimitingMiddlewareRequestHandler', () => {
 });
 
 function resetFakes(): void {
+  setBundledRuntime(false);
   getLoggerFake().reset();
   getDynamoFake().reset();
 }

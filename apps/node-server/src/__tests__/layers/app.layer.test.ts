@@ -9,16 +9,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { DynamoDbServiceFake } from '@/__tests__/fakes/dynamodb';
 import type { EventBridgeServiceFake } from '@/__tests__/fakes/eventBridge';
 import type { LoggerServiceFake } from '@/__tests__/fakes/logger';
+import { makeCdkOutputsStub } from '@/__tests__/stubs/cdkOutputs';
+import { setBundledRuntime } from '@/__tests__/utils/runtime';
 import type * as DynamoServiceModule from '@/services/dynamodb.service';
 import type * as EventBridgeServiceModule from '@/services/eventBridge.service';
 import type * as LoggerServiceModule from '@/services/logger.service';
 import type * as UserRepoModule from '@/services/userRepo.service';
 import type { UserRepoSchema } from '@/services/userRepo.service';
-
-vi.hoisted((): undefined => {
-  Reflect.set(globalThis, '__BUNDLED__', false);
-  return undefined;
-});
 
 const dynamoModule = vi.hoisted((): { fake?: DynamoDbServiceFake } => ({}));
 const loggerModule = vi.hoisted((): { fake?: LoggerServiceFake } => ({}));
@@ -27,19 +24,7 @@ const eventBridgeModule = vi.hoisted(
 );
 const userRepoModule = vi.hoisted((): { service?: UserRepoSchema } => ({}));
 
-vi.mock('@/clients/cdkOutputs', () => ({
-  usersTableName: 'users-table',
-  rateLimitTableName: 'rate-limit-table',
-  denyListTableName: 'deny-list-table',
-  analyticsEventBusArn: 'analytics-bus-arn',
-  analyticsEventBusName: 'analytics-bus',
-  analyticsDeadLetterQueueArn: 'analytics-dlq-arn',
-  analyticsDeadLetterQueueUrl: 'https://example.com/dlq',
-  analyticsDedupeTableName: 'analytics-dedupe-table',
-  analyticsAggregateTableName: 'analytics-aggregate-table',
-  analyticsEventLogGroupName: 'analytics-event-log-group',
-  analyticsProcessorLogGroupName: 'analytics-processor-log-group',
-}));
+vi.mock('@/clients/cdkOutputs', () => makeCdkOutputsStub());
 
 vi.mock('@/services/dynamodb.service', async (importOriginal) => {
   const actual: typeof DynamoServiceModule = await importOriginal();
@@ -95,6 +80,7 @@ vi.mock('@/services/userRepo.service', async (importOriginal) => {
 describe('AppLayer', () => {
   beforeEach(() => {
     vi.resetModules();
+    setBundledRuntime(false);
   });
 
   it('provides DynamoDb, Logger, EventBridge, and UserRepo services', async () => {

@@ -2,13 +2,10 @@ import { HTTP_RESPONSE, LoggerService } from '@packages/backend-core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { LoggerServiceFake } from '@/__tests__/fakes/logger';
+import { makeCdkOutputsStub } from '@/__tests__/stubs/cdkOutputs';
 import { makeRequestContext } from '@/__tests__/utils/express';
+import { setBundledRuntime } from '@/__tests__/utils/runtime';
 import { isAuthenticatedMiddlewareRequestHandler } from '@/middleware/isAuthenticated.middleware';
-
-vi.hoisted(() => {
-  Reflect.set(globalThis, '__BUNDLED__', false);
-  return undefined;
-});
 
 const verifyMock = vi.hoisted(() => ({
   fn: vi.fn<(token: string, secret: string | undefined) => unknown>(),
@@ -19,11 +16,7 @@ vi.mock('jsonwebtoken', () => ({
   verify: verifyMock.fn,
 }));
 
-vi.mock('@/clients/cdkOutputs', () => ({
-  rateLimitTableName: 'rate-limit-table',
-  denyListTableName: 'deny-list-table',
-  usersTableName: 'users-table',
-}));
+vi.mock('@/clients/cdkOutputs', () => makeCdkOutputsStub());
 
 vi.mock('@/services/logger.service', async () => {
   const { createLoggerServiceFake } = await import('@/__tests__/fakes/logger');
@@ -64,6 +57,7 @@ describe('isAuthenticatedMiddlewareRequestHandler', () => {
 });
 
 function initializeAuthContext(): void {
+  setBundledRuntime(false);
   getLoggerFake().reset();
   getVerifyMock().mockReset();
   process.env.JWT_SECRET = 'test-secret';
