@@ -5,7 +5,7 @@ import {
 } from '@packages/backend-core/testing';
 import type { RequestHandler } from 'express';
 import type { Mock } from 'vitest';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { UserRepoFake } from '@/__tests__/fakes/userRepo';
 import { makeCdkOutputsStub } from '@/__tests__/stubs/cdkOutputs';
@@ -77,11 +77,15 @@ function initializeRegisterContext(): void {
   vi.resetModules();
   setBundledRuntime(false);
   restoreRandomUUID();
-  process.env.PEPPER = 'test-pepper';
-  process.env.JWT_SECRET = 'shh-its-a-secret';
+  vi.stubEnv('PEPPER', 'test-pepper');
+  vi.stubEnv('JWT_SECRET', 'shh-its-a-secret');
   argonModule.hash?.mockReset();
   jwtModule.sign?.mockReset();
 }
+
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
 
 async function returns201ForNewUser(): Promise<void> {
   // Arrange

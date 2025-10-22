@@ -64,11 +64,11 @@ function initializeAuthContext(): void {
   setBundledRuntime(false);
   getLoggerFake().reset();
   getVerifyMock().mockReset();
-  process.env.JWT_SECRET = 'test-secret';
+  vi.stubEnv('JWT_SECRET', 'test-secret');
 }
 
 function cleanupAuthContext(): void {
-  Reflect.deleteProperty(process.env, 'JWT_SECRET');
+  vi.unstubAllEnvs();
 }
 
 async function rejectsWhenHeaderMissing(): Promise<void> {

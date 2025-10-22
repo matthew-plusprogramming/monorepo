@@ -37,13 +37,12 @@ describe('heartbeat integration', () => {
     vi.resetModules();
     vi.clearAllMocks();
     setBundledRuntime(false);
-    process.env.APP_ENV = 'test-env';
-    process.env.APP_VERSION = '1.2.3';
+    vi.stubEnv('APP_ENV', 'test-env');
+    vi.stubEnv('APP_VERSION', '1.2.3');
   });
 
   afterEach(() => {
-    Reflect.deleteProperty(process.env, 'APP_ENV');
-    Reflect.deleteProperty(process.env, 'APP_VERSION');
+    vi.unstubAllEnvs();
   });
 
   it('publishes analytics heartbeat event for authenticated requests', async () => {

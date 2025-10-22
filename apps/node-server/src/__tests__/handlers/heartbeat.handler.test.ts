@@ -103,14 +103,13 @@ function getUserRepoFake(): UserRepoFake {
 
 function initializeHeartbeatContext(): void {
   vi.resetModules();
-  process.env.APP_ENV = 'test-env';
-  process.env.APP_VERSION = '2.0.0';
+  vi.stubEnv('APP_ENV', 'test-env');
+  vi.stubEnv('APP_VERSION', '2.0.0');
   setBundledRuntime(false);
 }
 
 function cleanupHeartbeatContext(): void {
-  Reflect.deleteProperty(process.env, 'APP_ENV');
-  Reflect.deleteProperty(process.env, 'APP_VERSION');
+  vi.unstubAllEnvs();
   clearBundledRuntime();
 }
 

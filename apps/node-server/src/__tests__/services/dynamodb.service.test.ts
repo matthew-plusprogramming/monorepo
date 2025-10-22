@@ -26,16 +26,6 @@ const mocks = vi.hoisted<DynamoMocks>(() => ({
 const { sendMock } = mocks;
 
 vi.mock('@aws-sdk/client-dynamodb', () => {
-  class DynamoDBClient {
-    public constructor(config: Record<string, unknown>) {
-      mocks.lastClientConfig = config;
-    }
-
-    public send(command: CommandWithInput): Promise<unknown> {
-      return mocks.sendMock(command);
-    }
-  }
-
   class BaseCommand<TInput> {
     public readonly input: TInput;
 
@@ -45,7 +35,13 @@ vi.mock('@aws-sdk/client-dynamodb', () => {
   }
 
   return {
-    DynamoDBClient,
+    DynamoDBClient: vi.fn(function MockDynamoDbClient(
+      this: { send: typeof mocks.sendMock },
+      config: Record<string, unknown>,
+    ) {
+      mocks.lastClientConfig = config;
+      this.send = mocks.sendMock;
+    }),
     GetItemCommand: class GetItemCommand<TInput> extends BaseCommand<TInput> {},
     PutItemCommand: class PutItemCommand<TInput> extends BaseCommand<TInput> {},
     QueryCommand: class QueryCommand<TInput> extends BaseCommand<TInput> {},
@@ -56,14 +52,13 @@ vi.mock('@aws-sdk/client-dynamodb', () => {
 });
 
 vi.mock('@smithy/node-http-handler', () => ({
-  NodeHttpHandler: class NodeHttpHandler {
-    public readonly config: Record<string, unknown>;
-
-    public constructor(config: Record<string, unknown>) {
-      this.config = config;
-      mocks.httpHandlerConfig = config;
-    }
-  },
+  NodeHttpHandler: vi.fn(function MockNodeHttpHandler(
+    this: { config: Record<string, unknown> },
+    config: Record<string, unknown>,
+  ) {
+    this.config = config;
+    mocks.httpHandlerConfig = config;
+  }),
 }));
 
 describe('DynamoDbService adapter', () => {
@@ -93,11 +88,11 @@ const useService = <R>(
 function initializeDynamoContext(): void {
   sendMock.mockReset();
   mocks.lastClientConfig = undefined;
-  process.env.AWS_REGION = 'us-east-1';
+  vi.stubEnv('AWS_REGION', 'us-east-1');
 }
 
 function cleanupDynamoContext(): void {
-  Reflect.deleteProperty(process.env, 'AWS_REGION');
+  vi.unstubAllEnvs();
 }
 
 async function sendsGetItemCommand(): Promise<void> {

@@ -65,27 +65,6 @@ Reflexion
 - 2025-10-22 — Plan phase: Scoped an automation script and templates to accelerate the repository-service workflow without touching live layers yet.
   Build phase: Implemented the CLI, modular template bundles (base + optional handler bundle), refreshed workflow and README guidance, and ran `npm run phase:check`.
   Verify phase: Executed `npm run agent:finalize`, confirmed memory validation/drift, and documented follow-up guidance in the checklist plus automation docs.
-- 2025-10-22 — Plan phase: Confirmed `max-lines-per-function` lint warnings in analytics resource generation and register handler.
-  Documented problem statement, acceptance criteria, and options in `agents/workflows/runs/2025-10-22-lint-investigation/plan.md`.
-  Next: analyze each warning and capture remediation recommendations before proposing any code changes.
-- 2025-10-22 — Build phase: Captured root-cause notes and remediation paths for both lint warnings in `agents/workflows/runs/2025-10-22-lint-investigation/build.md`.
-  Highlighted helper extraction as the preferred solution, with config tweaks or suppressions as lower-priority alternatives.
-  Ready to proceed to verify phase once findings are reviewed and Memory Bank updates are validated.
-- 2025-10-22 — Verify phase: Ran `npm run agent:finalize`, confirmed memory validation/drift, and reran `phase:check` to keep lint output current.
-  Logged verification summary in `agents/workflows/runs/2025-10-22-lint-investigation/verify.md` to close the investigation loop.
-  Awaiting maintainer decision on implementation path (helper refactors vs. lint rule adjustment).
-- 2025-10-22 — Plan phase: Scoped helper-extraction refactors to resolve `max-lines-per-function` warnings without changing behavior.
-  Documented acceptance criteria in `agents/workflows/runs/2025-10-22-lint-remediation/plan.md` covering analytics resources and the register handler.
-  Next: implement helper functions, rerun lint, and confirm warnings clear.
-- 2025-10-22 — Build phase: Extracted analytics resource helper factories and decomposed the register handler into Effect helpers to shrink both functions.
-  Recorded the changes in `agents/workflows/runs/2025-10-22-lint-remediation/build.md`, ensuring construct identifiers and JWT payloads remain unchanged.
-  Ran `npm run lint` and `npm run phase:check` to confirm the warnings cleared and quality scripts stayed green.
-- 2025-10-22 — Verify phase: Executed `npm run agent:finalize` to validate memory links, drift, and rerun quality automation for the refactor.
-  Summarized verification steps in `agents/workflows/runs/2025-10-22-lint-remediation/verify.md` after confirming lint stays clean.
-  Ready for review with helper-based refactors keeping behavior intact.
-- 2025-10-22 — Plan phase: Scoped a CDKTF state management CLI to script the bootstrap toggle/deploy/migrate flow.
-  Documented constraints, invariants, and stack-name derivation in `agents/workflows/runs/2025-10-22-cdktf-state-cli/plan.md`.
-  Next: implement the CLI, update automation docs, and prepare self-checks.
 - 2025-10-22 — Build phase: Implemented `scripts/manage-cdktf-state.mjs` to automate the bootstrap deploy/synth/migrate sequence and refreshed `scripts/README.md`.
   Verified CLI scaffolding with `node scripts/manage-cdktf-state.mjs --help` ahead of running quality automation.
   Updated cleanup to delete `cdk/backend-server-cdk/terraform.<stack>.tfstate` alongside the legacy `.terraform/terraform.tfstate`.

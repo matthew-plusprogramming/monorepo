@@ -132,7 +132,7 @@ describe('node-server index entrypoint', () => {
     getUserModule.handler = undefined;
     environmentModule.parse = undefined;
     environmentParseImpl.impl = (env): NodeJS.ProcessEnv => env;
-    process.env.PORT = 3000;
+    vi.stubEnv('PORT', '3000');
 
     exitSpy = vi.spyOn(process, 'exit');
     exitSpy.mockImplementation((code?: string | number | null) => {
@@ -149,7 +149,7 @@ describe('node-server index entrypoint', () => {
   afterEach(() => {
     exitSpy.mockRestore();
     consoleErrorSpy.mockRestore();
-    Reflect.deleteProperty(process.env, 'PORT');
+    vi.unstubAllEnvs();
   });
 
   it('bootstraps express app when environment validation succeeds', async () => {
