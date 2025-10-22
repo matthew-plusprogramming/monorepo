@@ -32,3 +32,12 @@ npm -w @cdk/backend-server-cdk run cdk:deploy:dev myapp-api-lambda-stack
 npm -w node-server run encrypt-envs
 npm run test
 ```
+
+Scaffold a repository service workflow skeleton
+
+```
+node scripts/create-repository-service.mjs <entity-slug>
+# Optional flags:
+#   --dry-run  Preview generated files without writing
+#   --force    Overwrite existing files created in a previous run
+```

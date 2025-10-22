@@ -24,3 +24,4 @@ last_reviewed: 2025-10-21
 - 2025-10-21: Renamed the unsafe assertion detector to `find-unsafe-assertions.mjs`, updated orchestrators/help text, and confirmed `phase:check` still fails on pre-existing Effect.runPromise usage.
 - 2025-10-21: Documented the Express testing utilities in the Effect.runPromise allowlist, updated the code-quality runner to aggregate failures, and reran `npm run phase:check` to capture the full suite output.
 - 2025-10-21: Removed remaining non-null assertions via DOM guards, script stack checks, and tightened test helpers; verified with `find-unsafe-assertions` and `npm run phase:check`.
+- 2025-10-22: Planned and built repository-service scaffolding automation, adding the CLI, template manifests, usage docs, and validating with `npm run agent:finalize`.
