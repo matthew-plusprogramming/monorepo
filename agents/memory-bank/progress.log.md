@@ -22,3 +22,4 @@ last_reviewed: 2025-10-21
 - 2025-10-21: Implemented the detector updates, verified CLI output, and noted `phase:check` currently fails due to existing Effect.runPromise violations in testing utilities.
 - 2025-10-21: Ran memory validation, drift check, and `agent:finalize`; finalize still blocked by the same Effect.runPromise allowlist findings.
 - 2025-10-21: Renamed the unsafe assertion detector to `find-unsafe-assertions.mjs`, updated orchestrators/help text, and confirmed `phase:check` still fails on pre-existing Effect.runPromise usage.
+- 2025-10-21: Documented the Express testing utilities in the Effect.runPromise allowlist, updated the code-quality runner to aggregate failures, and reran `npm run phase:check` to capture the full suite output.

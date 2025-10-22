@@ -56,3 +56,6 @@ Reflexion
 - 2025-10-21 — Plan phase: Chose `find-unsafe-assertions.mjs` to reflect the detector’s broader scope and mapped dependent references.
   Build phase: Renamed the script, refreshed CLI help text, updated `check-code-quality` orchestration, and reran the detector manually.
   Verify phase: Re-executed `npm run phase:check`; it continues to fail on the standing `Effect.runPromise` allowlist violations.
+- 2025-10-21 — Plan phase: Scoped allowlisting for the Express testing utilities and an aggregator tweak so all quality scripts run before exiting.
+  Build phase: Documented the express utilities in the Effect.runPromise allowlist, taught `check-code-quality` to collect failures instead of short-circuiting, and reran `npm run phase:check`.
+  Verify phase: Observed the full quality suite output, confirmed `find-unsafe-assertions` still reports sites, and validated the allowlist resolved the prior failure.

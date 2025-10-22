@@ -26,6 +26,8 @@ Options
   process.exit(0);
 }
 
+const failures = [];
+
 for (const script of scripts) {
   console.log(`▶️  Running ${script}...`);
   const result = spawnSync(process.execPath, [resolve(root, script)], {
@@ -34,9 +36,18 @@ for (const script of scripts) {
   });
 
   if (result.status !== 0) {
-    console.error(`❌ ${script} failed.`);
-    process.exit(result.status ?? 1);
+    console.error(`❌ ${script} failed (exit code ${result.status ?? 1}).`);
+    failures.push(script);
   }
+}
+
+if (failures.length > 0) {
+  console.error('');
+  console.error('❌ Code quality checks finished with failures:');
+  for (const script of failures) {
+    console.error(`  - ${script}`);
+  }
+  process.exit(1);
 }
 
 console.log('✅ All code quality checks passed.');
