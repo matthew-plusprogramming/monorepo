@@ -1,11 +1,13 @@
 import { HTTP_RESPONSE } from '@packages/backend-core';
+import {
+  type EventBridgeServiceFake,
+  setBundledRuntime,
+} from '@packages/backend-core/testing';
 import express, { type Express } from 'express';
 import request from 'supertest';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { EventBridgeServiceFake } from '@/__tests__/fakes/eventBridge';
 import { makeCdkOutputsStub } from '@/__tests__/stubs/cdkOutputs';
-import { setBundledRuntime } from '@/__tests__/utils/runtime';
 import type * as EventBridgeServiceModule from '@/services/eventBridge.service';
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -20,7 +22,7 @@ vi.mock('@/clients/cdkOutputs', () => makeCdkOutputsStub());
 vi.mock('@/services/eventBridge.service', async (importOriginal) => {
   const actual: typeof EventBridgeServiceModule = await importOriginal();
   const { createEventBridgeServiceFake } = await import(
-    '@/__tests__/fakes/eventBridge'
+    '@packages/backend-core/testing'
   );
   const fake = createEventBridgeServiceFake();
   eventBridgeModule.fake = fake;

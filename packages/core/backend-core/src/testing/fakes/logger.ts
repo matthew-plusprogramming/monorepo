@@ -1,8 +1,6 @@
-import {
-  LoggerService,
-  type LoggerServiceSchema,
-} from '@packages/backend-core';
 import { Effect, Layer } from 'effect';
+
+import { LoggerService, type LoggerServiceSchema } from '@/services/logger.js';
 
 export type CapturedLoggerEntries = {
   readonly logs: Array<ReadonlyArray<unknown>>;

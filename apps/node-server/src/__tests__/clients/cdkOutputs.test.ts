@@ -1,10 +1,9 @@
 import { ANALYTICS_STACK_NAME, API_STACK_NAME } from '@cdk/backend-server-cdk';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-
 import {
   clearBundledRuntime,
   setBundledRuntime,
-} from '@/__tests__/utils/runtime';
+} from '@packages/backend-core/testing';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const outputsByStack = {
   [API_STACK_NAME]: {

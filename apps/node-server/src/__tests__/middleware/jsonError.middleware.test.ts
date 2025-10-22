@@ -1,6 +1,6 @@
+import { makeRequestContext } from '@packages/backend-core/testing';
 import { describe, expect, it } from 'vitest';
 
-import { makeRequestContext } from '@/__tests__/utils/express';
 import { jsonErrorMiddleware } from '@/middleware/jsonError.middleware';
 
 describe('jsonErrorMiddleware', () => {

@@ -44,9 +44,9 @@ Reflexion
 - 2025-10-21 — Plan phase: Scoped Memory Bank pruning to keep high-signal context while preserving durable references.
   Build phase: Condensed `active.context.md` and `progress.log.md`, updated metadata, and ran `npm run phase:check`.
   Verify phase: Executed memory validation/drift, ran `npm run agent:finalize`, and logged condensed outcomes for future hygiene passes.
-- 2025-10-21 — Plan phase: Scoped node-server test helper consolidation, cataloged duplicated boundary mocks, and set acceptance criteria for refactors.
-  Build phase: Added shared node-server utilities (`makeCdkOutputsStub`, runtime flag helpers), refactored suites to consume them, and ran `npm run phase:check`.
-  Verify phase: Executed `npm run test -w apps/node-server` and `npm run agent:finalize` to confirm suite, lint, and memory validation stayed green.
+- 2025-10-21 — Plan phase: Scoped shared testing package extraction and register handler test cleanup to address lint and duplication.
+  Build phase: Introduced `@packages/backend-core/testing` (service fakes, request context, runtime helpers), updated node-server suites to consume it, removed local duplicates, split register helpers into a shared module, and built the package.
+  Verify phase: Ran `npm run test -w apps/node-server` and `npm run phase:check` to confirm tests, lint, and automation stayed green.
 - 2025-10-22 — Plan phase: Scoped analytics stack resource/output renames to improve clarity across CDK consumers.
   Build phase: Renamed analytics/API construct identifiers and outputs, aligning consumer schemas/tests with the new descriptive keys.
   Verify phase: Ran `npm run phase:check` and `npm run agent:finalize` to ensure lint, quality, and memory validation stayed green.

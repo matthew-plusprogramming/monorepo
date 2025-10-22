@@ -7,13 +7,15 @@ import {
   HTTP_RESPONSE,
   LoggerService,
 } from '@packages/backend-core';
+import {
+  type DynamoDbServiceFake,
+  type LoggerServiceFake,
+  makeRequestContext,
+  setBundledRuntime,
+} from '@packages/backend-core/testing';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { DynamoDbServiceFake } from '@/__tests__/fakes/dynamodb';
-import type { LoggerServiceFake } from '@/__tests__/fakes/logger';
 import { makeCdkOutputsStub } from '@/__tests__/stubs/cdkOutputs';
-import { makeRequestContext } from '@/__tests__/utils/express';
-import { setBundledRuntime } from '@/__tests__/utils/runtime';
 import { ipRateLimitingMiddlewareRequestHandler } from '@/middleware/ipRateLimiting.middleware';
 
 const dynamoModule = vi.hoisted((): { fake?: DynamoDbServiceFake } => ({}));
@@ -22,7 +24,9 @@ const loggerModule = vi.hoisted((): { fake?: LoggerServiceFake } => ({}));
 vi.mock('@/clients/cdkOutputs', () => makeCdkOutputsStub());
 
 vi.mock('@/services/logger.service', async () => {
-  const { createLoggerServiceFake } = await import('@/__tests__/fakes/logger');
+  const { createLoggerServiceFake } = await import(
+    '@packages/backend-core/testing'
+  );
   const fake = createLoggerServiceFake();
   loggerModule.fake = fake;
   return {
@@ -34,7 +38,7 @@ vi.mock('@/services/logger.service', async () => {
 
 vi.mock('@/services/dynamodb.service', async () => {
   const { createDynamoDbServiceFake } = await import(
-    '@/__tests__/fakes/dynamodb'
+    '@packages/backend-core/testing'
   );
   const fake = createDynamoDbServiceFake();
   dynamoModule.fake = fake;

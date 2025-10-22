@@ -17,6 +17,10 @@
     "./types": {
       "types": "./dist/types/index.d.ts",
       "import": "./dist/types/index.js"
+    },
+    "./testing": {
+      "types": "./dist/testing/index.d.ts",
+      "import": "./dist/testing/index.js"
     }
   },
   "scripts": {

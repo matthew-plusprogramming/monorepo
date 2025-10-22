@@ -1,9 +1,9 @@
+import { setBundledRuntime } from '@packages/backend-core/testing';
 import type { MockInstance } from 'vitest';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ZodError } from 'zod';
 
 import { makeCdkOutputsStub } from '@/__tests__/stubs/cdkOutputs';
-import { setBundledRuntime } from '@/__tests__/utils/runtime';
 
 type ExpressAppStub = {
   use: ReturnType<typeof vi.fn>;

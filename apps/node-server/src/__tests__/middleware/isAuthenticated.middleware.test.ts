@@ -1,10 +1,12 @@
 import { HTTP_RESPONSE, LoggerService } from '@packages/backend-core';
+import {
+  type LoggerServiceFake,
+  makeRequestContext,
+  setBundledRuntime,
+} from '@packages/backend-core/testing';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { LoggerServiceFake } from '@/__tests__/fakes/logger';
 import { makeCdkOutputsStub } from '@/__tests__/stubs/cdkOutputs';
-import { makeRequestContext } from '@/__tests__/utils/express';
-import { setBundledRuntime } from '@/__tests__/utils/runtime';
 import { isAuthenticatedMiddlewareRequestHandler } from '@/middleware/isAuthenticated.middleware';
 
 const verifyMock = vi.hoisted(() => ({
@@ -19,7 +21,9 @@ vi.mock('jsonwebtoken', () => ({
 vi.mock('@/clients/cdkOutputs', () => makeCdkOutputsStub());
 
 vi.mock('@/services/logger.service', async () => {
-  const { createLoggerServiceFake } = await import('@/__tests__/fakes/logger');
+  const { createLoggerServiceFake } = await import(
+    '@packages/backend-core/testing'
+  );
   const fake = createLoggerServiceFake();
   loggerModule.fake = fake;
   return {
