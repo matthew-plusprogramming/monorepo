@@ -10,8 +10,15 @@ export interface SharedVitestConfigOptions {
 
 const defaultInclude = ['src/**/*.test.ts'];
 
-const createBaseConfig = (options: SharedVitestConfigOptions): ViteUserConfig => {
-  const { projectRoot, srcDir = 'src', include = defaultInclude, alias } = options;
+const createBaseConfig = (
+  options: SharedVitestConfigOptions,
+): ViteUserConfig => {
+  const {
+    projectRoot,
+    srcDir = 'src',
+    include = defaultInclude,
+    alias,
+  } = options;
 
   return {
     resolve: {
@@ -22,11 +29,16 @@ const createBaseConfig = (options: SharedVitestConfigOptions): ViteUserConfig =>
     },
     test: {
       include,
+      coverage: {
+        include,
+      },
     },
   } satisfies ViteUserConfig;
 };
 
-export const nodeConfig = (options: SharedVitestConfigOptions): ViteUserConfig => {
+export const nodeConfig = (
+  options: SharedVitestConfigOptions,
+): ViteUserConfig => {
   const base = createBaseConfig(options);
   const baseTest = base.test ?? {};
 
@@ -39,7 +51,9 @@ export const nodeConfig = (options: SharedVitestConfigOptions): ViteUserConfig =
   });
 };
 
-export const browserConfig = (options: SharedVitestConfigOptions): ViteUserConfig => {
+export const browserConfig = (
+  options: SharedVitestConfigOptions,
+): ViteUserConfig => {
   const base = createBaseConfig(options);
   const baseTest = base.test ?? {};
 
