@@ -21,11 +21,13 @@ try {
   process.chdir(workDir);
 
   // Run dotenvx + tofu command
-  execSync(`dotenvx run -f ${envFile} -- tofu init -migrate-state`, {
+  execSync(`dotenvx run -f "${envFile}" -- tofu init -migrate-state`, {
     stdio: 'inherit',
     env: process.env,
   });
 } catch (err) {
-  console.error('❌ Error during bootstrap migration:', err.message);
+  console.error(
+    `❌ Error during bootstrap migration${err instanceof Error ? `: ${err.message}` : ''}`,
+  );
   process.exit(1);
 }
