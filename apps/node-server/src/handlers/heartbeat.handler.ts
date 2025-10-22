@@ -29,8 +29,8 @@ type HeartbeatDetail = {
 };
 
 const resolvePlatform = (req: Request): string => {
-  const platformValue = req.get(PLATFORM_HEADER) ?? undefined;
-  const userAgentValue = req.get('user-agent') ?? undefined;
+  const platformValue = req.get(PLATFORM_HEADER);
+  const userAgentValue = req.get('user-agent');
 
   return z
     .string()

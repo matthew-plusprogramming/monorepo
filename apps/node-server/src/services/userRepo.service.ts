@@ -102,7 +102,7 @@ const findById = (
       ProjectionExpression: USER_SCHEMA_CONSTANTS.projection.userPublic,
     })
     .pipe(
-      Effect.map((res) => unmarshallUser(res.Item ?? undefined)),
+      Effect.map((res) => unmarshallUser(res.Item)),
       Effect.tapError((error) => deps.logger.logError(error)),
       Effect.mapError(
         (error) => new InternalServerError({ message: error.message }),
