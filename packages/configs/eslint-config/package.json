@@ -38,9 +38,9 @@
     "@types/node": "^24.9.1"
   },
   "peerDependencies": {
-    "eslint": "^9.31.0",
-    "jiti": "^2.4.2",
+    "eslint": "^9.38.0",
+    "jiti": "^2.6.1",
     "prettier": "^3.6.2",
-    "typescript": "^5.8.3"
+    "typescript": "^5.9.3"
   }
 }

@@ -20,6 +20,6 @@
     "@configs/ts-config": "*"
   },
   "peerDependencies": {
-    "vite": "^7.0.4"
+    "vite": "^7.1.11"
   }
 }
