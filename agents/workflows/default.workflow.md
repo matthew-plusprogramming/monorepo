@@ -77,4 +77,4 @@ Phase: verify
 
 End
 
-- Close with summary and next steps.
+- Close with summary, surfaced tests, proposed commit message, and next steps.
