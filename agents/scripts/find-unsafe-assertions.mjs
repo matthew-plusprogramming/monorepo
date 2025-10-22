@@ -17,12 +17,12 @@ const options = {
 };
 
 const printHelp = () => {
-  console.log(`Usage: node agents/scripts/find-unsafe-as-casts.mjs [options]
+  console.log(`Usage: node agents/scripts/find-unsafe-assertions.mjs [options]
 
 Options
   --unsafe-types=types   Comma-separated list of lower-case type names treated as unsafe (default: any,never)
   --no-double            Disable detection of chained assertions (e.g., "as unknown as Target")
-  --include-all          Report every "as" assertion (not just unsafe/double heuristics)
+  --include-all          Report every "as" assertion (non-null assertions are always reported)
   --fail-on-match        Exit with code 1 if any unsafe assertions are found
   -h, --help             Show this message
 `);
@@ -203,7 +203,10 @@ for (const relativePath of trackedFiles) {
   const skip = new Set();
 
   const visit = (node) => {
-    if (skip.has(node)) return;
+    if (skip.has(node)) {
+      ts.forEachChild(node, visit);
+      return;
+    }
 
     if (ts.isAsExpression(node)) {
       const typeTextRaw = node.type.getText(sourceFile);
@@ -250,6 +253,29 @@ for (const relativePath of trackedFiles) {
           typeDisplay: typeDisplay.replace(/\s+/g, ' '),
         });
       }
+    }
+
+    if (ts.isNonNullExpression(node)) {
+      const { line } = sourceFile.getLineAndCharacterOfPosition(
+        node.getStart(sourceFile),
+      );
+      const commentBlock = collectLeadingComments(lines, line);
+      const codeLine = lines[line] ?? '';
+      let reason = 'non-null assertion via "!"';
+
+      const inner = unwrapExpression(node.expression);
+      if (ts.isNonNullExpression(inner)) {
+        reason = 'stacked non-null assertion (`!!`)';
+        skip.add(inner);
+      }
+
+      results.push({
+        file: relativePath,
+        line: line + 1,
+        reason,
+        commentBlock,
+        codeLine,
+      });
     }
 
     ts.forEachChild(node, visit);

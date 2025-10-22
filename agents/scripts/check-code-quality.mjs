@@ -10,7 +10,7 @@ const scripts = [
   'agents/scripts/check-resource-names.mjs',
   'agents/scripts/check-console-usage.mjs',
   'agents/scripts/check-test-aaa-comments.mjs',
-  'agents/scripts/find-unsafe-as-casts.mjs',
+  'agents/scripts/find-unsafe-assertions.mjs',
 ];
 
 const args = process.argv.slice(2);

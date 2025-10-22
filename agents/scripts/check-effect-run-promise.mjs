@@ -13,6 +13,7 @@ const ALLOWLIST = new Set([
   'packages/core/backend-core/src/request.handler.ts',
   'apps/node-server/src/middleware/ipRateLimiting.middleware.ts',
   'apps/node-server/src/middleware/isAuthenticated.middleware.ts',
+  'packages/core/backend-core/src/testing/utils/express.ts',
 ]);
 
 const args = new Set(process.argv.slice(2));
