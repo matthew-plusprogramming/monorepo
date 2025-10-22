@@ -25,6 +25,7 @@
     "cdk:destroy": "cross-env-shell 'dotenvx run -f .env.$ENV -- cdktf destroy'",
     "cdk:synth": "cross-env-shell 'dotenvx run -f .env.$ENV -- cdktf synth'",
     "cdk:output": "cross-env-shell 'dotenvx run -f .env.$ENV -- cdktf output --outputs-file cdktf-outputs/stacks/$STACK/outputs.json $STACK'",
+    "cdk:list": "cross-env-shell 'dotenvx run -f .env.$ENV -- cdktf list'",
     "cdk:bootstrap:migrate:dev": "cross-env ENV=dev npm run cdk:bootstrap:migrate",
     "cdk:bootstrap:migrate:prod": "cross-env ENV=production npm run cdk:bootstrap:migrate",
     "cdk:deploy:dev": "cross-env ENV=dev npm run cdk:deploy",
@@ -35,6 +36,8 @@
     "cdk:synth:prod": "cross-env ENV=production npm run cdk:synth",
     "cdk:output:dev": "cross-env ENV=dev tsx scripts/cdk-output.ts",
     "cdk:output:prod": "cross-env ENV=production tsx scripts/cdk-output.ts",
+    "cdk:list:dev": "cross-env ENV=dev npm run cdk:list",
+    "cdk:list:prod": "cross-env ENV=production npm run cdk:list",
     "// -- 🔧 Miscellaneous": "--",
     "encrypt-envs": "dotenvx encrypt -f .env.dev .env.production",
     "decrypt-envs": "dotenvx decrypt -f .env.dev .env.production&& echo 'WARNING: DO NOT COMMIT decrypted .env files to the repository!'"
