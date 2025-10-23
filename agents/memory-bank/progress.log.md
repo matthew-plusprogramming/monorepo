@@ -47,3 +47,5 @@ last_reviewed: 2025-10-21
 - 2025-10-23: Automated repository-service schema exports and default GET handler scaffolding, then cleared `npm run agent:finalize` after updating memory metadata.
 - 2025-10-23: Automated memory-bank stamp updates and log entry helpers for active context and progress log.
 - 2025-10-23: Normalized AppLayer layering and taught the repository scaffolder to auto-register new services.
+- 2025-10-23: Refined repository-service scaffold checklist into granular, testable increments with command guidance.
+- 2025-10-23: Refined repository-service scaffold checklist to smaller, verifiable increments with explicit commands.

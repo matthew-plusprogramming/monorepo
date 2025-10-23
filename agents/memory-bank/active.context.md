@@ -96,3 +96,9 @@ Reflexion
 - 2025-10-23 — Plan phase: Expanded repository scaffolder to register new repos in the shared AppLayer.
   Build phase: Normalized node-server AppLayer to a reusable repository array and wired the generator to insert new providers.
   Verify phase: Validated with npm run phase:check to confirm linting and quality gates remain clean.
+- 2025-10-23 — Plan phase: Restructured repository-service checklist into compile-safe micro steps.
+  Build phase: Split schema, infra, service, and test tasks with explicit verification commands for each increment.
+  Verify phase: Ran npm run phase:check to ensure formatting/linting updates remain green.
+- 2025-10-23 — Plan phase: Audited repository checklist for more granular, build-safe steps.
+  Build phase: Replaced section blocks with incremental schema, infra, service, and fake tasks plus commands for each.
+  Verify phase: Confirmed with npm run phase:check that formatting and lint automation remain green.

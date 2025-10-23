@@ -47,34 +47,36 @@
         }
       ],
       "checklist": [
-        "## Schema (Step 1)",
-        "- [ ] Complete `packages/core/schemas/schemas/__ENTITY_SLUG__/__ENTITY_CAMEL__.ts` with domain attributes and refined validation constraints.",
-        "- [ ] Trim `packages/core/schemas/schemas/__ENTITY_SLUG__/__ENTITY_CAMEL__Create.ts` so only caller inputs remain (server-managed fields removed).",
-        "- [ ] Set accurate constants inside `packages/core/schemas/schemas/__ENTITY_SLUG__/constants/__ENTITY_CAMEL__.ts` (keys, GSIs, projections).",
-        "- [ ] Replace the skipped tests in `packages/core/schemas/schemas/__ENTITY_SLUG__/__ENTITY_CAMEL__.schemas.test.ts` with boundary coverage.",
-        "- [ ] Export any command/query schemas and expose them through the package index.",
+        "## Schema — incremental validation",
+        "- [ ] Populate domain attributes in `packages/core/schemas/schemas/__ENTITY_SLUG__/__ENTITY_CAMEL__.ts`; run `npm -w @packages/schemas run lint`.",
+        "- [ ] Trim caller inputs in `packages/core/schemas/schemas/__ENTITY_SLUG__/__ENTITY_CAMEL__Create.ts`; re-run `npm -w @packages/schemas run lint`.",
+        "- [ ] Define key/index constants in `packages/core/schemas/schemas/__ENTITY_SLUG__/constants/__ENTITY_CAMEL__.ts` and confirm `npm -w @packages/schemas run lint` stays green.",
+        "- [ ] Update the schema barrel exports to surface the new DTOs/constants; run `npm -w @packages/schemas run lint`.",
+        "- [ ] Replace skipped cases in `packages/core/schemas/schemas/__ENTITY_SLUG__/__ENTITY_CAMEL__.schemas.test.ts`, then execute `npm -w @packages/schemas run test -- --runTestsByPath schemas/__ENTITY_SLUG__/__ENTITY_CAMEL__.schemas.test.ts`.",
         "",
-        "## Infrastructure (Step 2-3)",
-        "- [ ] Design DynamoDB keys/GSIs and update `cdk/backend-server-cdk/src/stacks/api-stack/__ENTITY_CAMEL__-table.constants.ts`.",
-        "- [ ] Flesh out `cdk/backend-server-cdk/src/stacks/api-stack/generate-__ENTITY_SLUG__-table.ts` with attributes, TTL, and outputs.",
-        "- [ ] Wire `generate__ENTITY_PASCAL__Table` into `cdk/backend-server-cdk/src/stacks/api-stack/index.ts` and register any additional outputs.",
-        "- [ ] Extend `ApiStackOutputSchema` and `apps/node-server/src/clients/cdkOutputs.ts` (plus stubs/tests) with the new table name export.",
+        "## Infrastructure — staged updates",
+        "- [ ] Describe the table and placeholder GSIs inside `cdk/backend-server-cdk/src/stacks/api-stack/__ENTITY_CAMEL__-table.constants.ts`; run `npm -w @cdk/backend-server-cdk run lint`.",
+        "- [ ] Flesh out `cdk/backend-server-cdk/src/stacks/api-stack/generate-__ENTITY_SLUG__-table.ts` (attributes, TTL, outputs) and re-run `npm -w @cdk/backend-server-cdk run lint`.",
+        "- [ ] Wire `generate__ENTITY_PASCAL__Table` into the stack index plus any required exports; confirm `npm -w @cdk/backend-server-cdk run lint` stays green.",
+        "- [ ] Extend `ApiStackOutputSchema`, `apps/node-server/src/clients/cdkOutputs.ts`, and related stubs/tests with the table name; execute `npm -w apps/node-server run lint`.",
         "",
-        "## Service Layer (Step 4)",
-        "- [ ] Replace the `tableName` placeholder in `apps/node-server/src/services/__ENTITY_CAMEL__Repo.service.ts` with the generated CDK output export.",
-        "- [ ] Map schema properties to DynamoDB operations (keys, GSIs, projections) and tighten error handling.",
-        "- [ ] Register the Live layer in `apps/node-server/src/layers/app.layer.ts`.",
+        "## Service layer — incremental wiring",
+        "- [ ] Replace the `tableName` placeholder in `apps/node-server/src/services/__ENTITY_CAMEL__Repo.service.ts` with the generated CDK output; run `npm -w apps/node-server run lint`.",
+        "- [ ] Adapt get/create operations to the new schema (keys, projections, validations); add/update targeted service tests and execute `npm -w apps/node-server run test -- --runTestsByPath src/__tests__/services/__ENTITY_CAMEL__Repo.service.test.ts`.",
+        "- [ ] Register the live layer in `apps/node-server/src/layers/app.layer.ts` and confirm `npm -w apps/node-server run test -- --runTestsByPath src/__tests__/layers/app.layer.test.ts` stays green.",
         "",
-        "## Fakes & Tests (Step 5-7)",
-        "- [ ] Tailor `apps/node-server/src/__tests__/fakes/__ENTITY_CAMEL__Repo.ts` to mirror the repository contract.",
-        "- [ ] Add repository unit/contract tests under `apps/node-server/src/__tests__/services` or package-specific suites.",
-        "- [ ] Update handler/service slices to inject the new repository and cover integration behaviour.",
-        "- [ ] Wire CDK output stubs and fakes in existing suites as needed.",
+        "## Fakes & integration coverage",
+        "- [ ] Tailor `apps/node-server/src/__tests__/fakes/__ENTITY_CAMEL__Repo.ts` to the repository contract; run `npm -w apps/node-server run test -- --runTestsByPath src/__tests__/fakes/__ENTITY_CAMEL__Repo.ts`.",
+        "- [ ] Add or update repository unit/contract tests (e.g. under `src/__tests__/services`) and execute that suite.",
+        "- [ ] Update handler/service slices to inject the repository where relevant and re-run affected Vitest/supertest suites.",
+        "- [ ] Wire CDK output stubs/fakes in existing suites; rerun the impacted tests to ensure they pass.",
         "",
-        "## Verification & Memory (Step 8)",
-        "- [ ] Run `npm run lint`, `npm run test`, and targeted CDK lint/synth commands.",
-        "- [ ] Update Memory Bank entries + add reflexion/progress log notes per workflow guidance.",
-        "- [ ] Execute `npm run memory:validate`, `npm run memory:drift`, and `npm run phase:check`."
+        "## Verification & memory — closeout",
+        "- [ ] Run `npm run lint` at the repo root.",
+        "- [ ] Run `npm run test` (or the targeted suites touched).",
+        "- [ ] Execute `npm run memory:validate` and `npm run memory:drift`.",
+        "- [ ] Append Memory Bank reflexion/progress log entries and stamp `agents/memory-bank.md`.",
+        "- [ ] Finish with `npm run phase:check`."
       ]
     },
     {
@@ -92,10 +94,10 @@
         }
       ],
       "checklist": [
-        "## Handler Integration (Optional)",
-        "- [ ] Define the request schema, route registration, and response mapping inside `apps/node-server/src/handlers/get__ENTITY_PASCAL__.handler.ts`.",
-        "- [ ] Provide concrete Arrange/Act/Assert steps in `apps/node-server/src/__tests__/handlers/get__ENTITY_PASCAL__.handler.test.ts` and wire the fake repository.",
-        "- [ ] Register the handler with the appropriate router and ensure middleware requirements are satisfied."
+        "## Handler integration (optional bundle)",
+        "- [ ] Define the request schema + repository interaction in `apps/node-server/src/handlers/get__ENTITY_PASCAL__.handler.ts`; ensure `npm -w apps/node-server run lint` stays green.",
+        "- [ ] Flesh out Arrange/Act/Assert coverage in `apps/node-server/src/__tests__/handlers/get__ENTITY_PASCAL__.handler.test.ts` and run the test directly.",
+        "- [ ] Register the handler with the appropriate router and rerun affected integration suites."
       ]
     }
   ]
