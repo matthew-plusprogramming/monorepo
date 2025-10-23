@@ -1,6 +1,6 @@
 ## 🔧 Start Here (for AI agents)
 
-Before modifying code, use the repo-native agent system under `agents/`.
+Before modifying code, load required context with `node agents/scripts/load-context.mjs`, then use the repo-native agent system under `agents/`.
 
 - Memory Bank overview: `agents/memory-bank.md`
 - Workflows overview: `agents/workflows.md`

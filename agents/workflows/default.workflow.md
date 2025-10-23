@@ -18,6 +18,7 @@ Phase: plan
 - Goal: Clarify scope, gather context, and propose approach.
 - Inputs: Issue/ask; `agents/memory-bank/project.brief.md`; `agents/memory-bank/product.context.md` (if present); `agents/memory-bank/system.patterns.md`; `agents/memory-bank/tech.context.md`; recent `agents/memory-bank/progress.log.md`; ADR template for system-impacting changes.
 - Checklist:
+  - Run `node agents/scripts/load-context.mjs` (add `--include-optional` when optional tiers are relevant) to review required Memory Bank context.
   - Define problem statement, desired outcome, and acceptance criteria using a short Given/When/Then block; add a Non-goals bullet.
   - Identify constraints, risks, and assumptions.
   - Map impacted components and critical paths.

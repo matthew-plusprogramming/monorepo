@@ -40,3 +40,7 @@ last_reviewed: 2025-10-21
 - 2025-10-22: Scoped the git diff line-number reporter for verify-phase summaries and captured future context-loader expansion goals.
 - 2025-10-22: Implemented the diff reporter script, updated the verify checklist reminder, and cleared `npm run phase:check` to validate the changes.
 - 2025-10-22: Ran the line-number diff reporter, refreshed Memory Bank metadata/logs, and executed `npm run agent:finalize` to close the loop.
+- 2025-10-22: Scoped the context-loading utility by mapping the Retrieval Policy’s required files and CLI expectations.
+- 2025-10-22: Built `agents/scripts/load-context.mjs`, added the plan-phase checklist reminder, and verified optional/list modes locally.
+- 2025-10-22: Executed the loader, updated Memory Bank reflexions/logs, and ran finalize scripts to ensure validation remains green.
+- 2025-10-22: Elevated the load-context reminder into `AGENTS.md`, keeping the instruction flag-agnostic so agents can opt into optional tiers later.

@@ -78,3 +78,9 @@ Reflexion
 - 2025-10-22 — Plan phase: Scoped a git diff line-number reporter and noted future expansion to preload Memory Bank and workflow context.
   Build phase: Implemented the diff reporter script, wired the verify checklist reminder, validated output, and cleared `npm run phase:check`.
   Verify phase: Captured the line-numbered diff, stamped Memory Bank metadata/logs, and ran `npm run agent:finalize` to confirm validation.
+- 2025-10-22 — Plan phase: Identified required context files per Retrieval Policy and acceptance criteria for a load-context utility.
+  Build phase: Added `agents/scripts/load-context.mjs`, updated the plan checklist reminder, and verified CLI flags (`--include-optional`, `--list`).
+  Verify phase: Ran the loader, updated Memory Bank reflexions/logs, and executed finalize scripts.
+- 2025-10-22 — Plan phase: Promoted the load-context reminder to `AGENTS.md` so agents run it before diving into workflows.
+  Build phase: Updated the top-level instructions (now flag-agnostic), reformatted docs, and prepared Memory Bank entries.
+  Verify phase: Documented the change, refreshed metadata, and reran validation scripts.
