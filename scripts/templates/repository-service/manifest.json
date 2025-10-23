@@ -84,17 +84,17 @@
       "templates": [
         {
           "source": "handlers/__ENTITY_CAMEL__.handler.ts.tpl",
-          "target": "apps/node-server/src/handlers/__ENTITY_CAMEL__.handler.ts"
+          "target": "apps/node-server/src/handlers/get__ENTITY_PASCAL__.handler.ts"
         },
         {
           "source": "tests/__ENTITY_CAMEL__.handler.test.ts.tpl",
-          "target": "apps/node-server/src/__tests__/handlers/__ENTITY_CAMEL__.handler.test.ts"
+          "target": "apps/node-server/src/__tests__/handlers/get__ENTITY_PASCAL__.handler.test.ts"
         }
       ],
       "checklist": [
         "## Handler Integration (Optional)",
-        "- [ ] Define the request schema, route registration, and response mapping inside `apps/node-server/src/handlers/__ENTITY_CAMEL__.handler.ts`.",
-        "- [ ] Provide concrete Arrange/Act/Assert steps in `apps/node-server/src/__tests__/handlers/__ENTITY_CAMEL__.handler.test.ts` and wire the fake repository.",
+        "- [ ] Define the request schema, route registration, and response mapping inside `apps/node-server/src/handlers/get__ENTITY_PASCAL__.handler.ts`.",
+        "- [ ] Provide concrete Arrange/Act/Assert steps in `apps/node-server/src/__tests__/handlers/get__ENTITY_PASCAL__.handler.test.ts` and wire the fake repository.",
         "- [ ] Register the handler with the appropriate router and ensure middleware requirements are satisfied."
       ]
     }

@@ -1,63 +1,66 @@
 import {
   generateRequestHandler,
+  type handlerInput,
   HTTP_RESPONSE,
   InternalServerError,
-  type handlerInput,
+  NotFoundError,
 } from '@packages/backend-core';
+import {
+  __ENTITY_PASCAL__IdSchema,
+  type __ENTITY_PASCAL__Public,
+} from '@packages/schemas/__ENTITY_SLUG__';
 import { Effect } from 'effect';
-import { z } from 'zod';
+import z, { ZodError } from 'zod';
 
 import { parseInput } from '@/helpers/zodParser';
 import { AppLayer } from '@/layers/app.layer';
-import {
-  __ENTITY_PASCAL__Repo,
-  type __ENTITY_PASCAL__RepoSchema,
-} from '@/services/__ENTITY_CAMEL__Repo.service';
+import { __ENTITY_PASCAL__Repo } from '@/services/__ENTITY_CAMEL__Repo.service';
 
-const __ENTITY_CAMEL__RequestSchema = z.object({
-  /**
-   * TODO: define the request payload expected by this handler.
-   */
-});
-
-const handle__ENTITY_PASCAL__Request = (
+const get__ENTITY_PASCAL__Handler = (
   input: handlerInput,
 ): Effect.Effect<
-  unknown,
-  InternalServerError | z.ZodError,
+  __ENTITY_PASCAL__Public,
+  InternalServerError | NotFoundError | ZodError,
   __ENTITY_PASCAL__Repo
 > =>
   Effect.gen(function* () {
     const req = yield* input;
-    const parsed = yield* parseInput(__ENTITY_CAMEL__RequestSchema, req.body);
+
+    const entityId = yield* parseInput<typeof __ENTITY_PASCAL__IdSchema>(
+      __ENTITY_PASCAL__IdSchema,
+      /**
+       * TODO: align the param name with the router definition (e.g., `identifier`).
+       */
+      req.params?.id,
+    );
 
     const repo = yield* __ENTITY_PASCAL__Repo;
+    const maybeEntity = yield* repo.getById(entityId);
 
-    /**
-     * TODO: replace with real repository calls (e.g., create, query by GSI).
-     * Avoid hardcoding table names; rely on generated CDK outputs wired through AppLayer.
-     */
-    yield* repo.create(parsed as __ENTITY_PASCAL__RepoSchema['create'] extends (
-      arg: infer A,
-    ) => unknown
-      ? A
-      : never);
+    if (maybeEntity._tag === 'None') {
+      return yield* new NotFoundError({
+        message: `__ENTITY_PASCAL__ not found for id: ${entityId}`,
+      });
+    }
 
-    return {
-      status: 'TODO: replace with domain response',
-    };
+    return maybeEntity.value;
   });
 
-export const __ENTITY_CAMEL__RequestHandler = generateRequestHandler<
-  unknown,
-  InternalServerError | z.ZodError
+export const get__ENTITY_PASCAL__RequestHandler = generateRequestHandler<
+  __ENTITY_PASCAL__Public,
+  InternalServerError | NotFoundError | ZodError
 >({
   effectfulHandler: (input) =>
-    handle__ENTITY_PASCAL__Request(input).pipe(Effect.provide(AppLayer)),
+    get__ENTITY_PASCAL__Handler(input).pipe(Effect.provide(AppLayer)),
+  shouldObfuscate: () => true,
   statusCodesToErrors: {
     [HTTP_RESPONSE.BAD_REQUEST]: {
-      errorType: z.ZodError,
-      mapper: (error) => z.prettifyError(error as z.ZodError),
+      errorType: ZodError,
+      mapper: (error) => z.prettifyError(error as ZodError),
+    },
+    [HTTP_RESPONSE.NOT_FOUND]: {
+      errorType: NotFoundError,
+      mapper: (error) => error.message,
     },
     [HTTP_RESPONSE.INTERNAL_SERVER_ERROR]: {
       errorType: InternalServerError,

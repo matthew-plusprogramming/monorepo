@@ -10,6 +10,13 @@ import { fileURLToPath } from 'node:url';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const TEMPLATE_ROOT = join(__dirname, 'templates', 'repository-service');
 const OUTPUT_ROOT = resolve(__dirname, '..');
+const SCHEMAS_PACKAGE_JSON_PATH = join(
+  OUTPUT_ROOT,
+  'packages',
+  'core',
+  'schemas',
+  'package.json',
+);
 
 const slugToSegments = (slug) =>
   slug
@@ -165,6 +172,74 @@ const writeFileSafely = async (targetPath, content, { dryRun, force }) => {
 
   await ensureDir(dirname(targetPath));
   await writeFile(targetPath, content, 'utf-8');
+};
+
+const updateSchemasPackageJson = async (slug, { dryRun, force }) => {
+  const raw = await readFile(SCHEMAS_PACKAGE_JSON_PATH, 'utf-8');
+  const data = JSON.parse(raw);
+
+  if (!data.exports || typeof data.exports !== 'object') {
+    throw new Error(
+      `Unable to update exports in ${relative(
+        OUTPUT_ROOT,
+        SCHEMAS_PACKAGE_JSON_PATH,
+      )}: missing "exports" field.`,
+    );
+  }
+
+  const exportKey = `./${slug}`;
+  const desiredExport = {
+    types: `./dist/${slug}/index.d.ts`,
+    import: `./dist/${slug}/index.js`,
+  };
+
+  const existingExport = data.exports[exportKey];
+
+  const matchesExisting =
+    existingExport &&
+    existingExport.types === desiredExport.types &&
+    existingExport.import === desiredExport.import;
+
+  if (matchesExisting) {
+    return { changed: false };
+  }
+
+  if (existingExport && !force) {
+    throw new Error(
+      [
+        `Export "${exportKey}" already exists in ${relative(
+          OUTPUT_ROOT,
+          SCHEMAS_PACKAGE_JSON_PATH,
+        )}.`,
+        'Run again with --force to overwrite the existing export.',
+      ].join(' '),
+    );
+  }
+
+  const updatedExports = {
+    ...data.exports,
+    [exportKey]: desiredExport,
+  };
+
+  const sortedEntries = Object.entries(updatedExports).sort(([a], [b]) =>
+    a.localeCompare(b),
+  );
+
+  data.exports = Object.fromEntries(sortedEntries);
+
+  if (!dryRun) {
+    await writeFile(
+      SCHEMAS_PACKAGE_JSON_PATH,
+      `${JSON.stringify(data, null, 2)}\n`,
+      'utf-8',
+    );
+  }
+
+  return {
+    changed: true,
+    action: existingExport ? 'updated export' : 'added export',
+    location: SCHEMAS_PACKAGE_JSON_PATH,
+  };
 };
 
 const loadManifest = async () => {
@@ -338,8 +413,27 @@ const main = async () => {
         location: relative(OUTPUT_ROOT, targetPath),
         skipped: dryRun,
         bundle: bundle.name,
+        action: 'created',
       });
     }
+  }
+
+  try {
+    const schemasUpdate = await updateSchemasPackageJson(slug, {
+      dryRun,
+      force,
+    });
+    if (schemasUpdate.changed) {
+      createdFiles.push({
+        location: relative(OUTPUT_ROOT, schemasUpdate.location),
+        skipped: dryRun,
+        bundle: 'schemas-package',
+        action: schemasUpdate.action,
+      });
+    }
+  } catch (error) {
+    console.error(error.message);
+    process.exit(1);
   }
 
   const checklistTarget = join(
@@ -365,6 +459,7 @@ const main = async () => {
     location: relative(OUTPUT_ROOT, checklistTarget),
     skipped: dryRun,
     bundle: 'checklist',
+    action: 'created',
   });
 
   const action = dryRun ? 'Planned' : 'Created';
@@ -373,7 +468,9 @@ const main = async () => {
   );
   for (const file of createdFiles) {
     const prefix = file.skipped ? '[dry-run] ' : '';
-    console.log(`  - ${prefix}${file.location} (from ${file.bundle})`);
+    console.log(
+      `  - ${prefix}${file.location} (${file.action} from ${file.bundle})`,
+    );
   }
 
   if (!dryRun) {
