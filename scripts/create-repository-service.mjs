@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+import { spawnSync } from 'node:child_process';
 import { access, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { constants as fsConstants } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
@@ -16,6 +17,14 @@ const SCHEMAS_PACKAGE_JSON_PATH = join(
   'core',
   'schemas',
   'package.json',
+);
+const APP_LAYER_PATH = join(
+  OUTPUT_ROOT,
+  'apps',
+  'node-server',
+  'src',
+  'layers',
+  'app.layer.ts',
 );
 
 const slugToSegments = (slug) =>
@@ -252,6 +261,118 @@ const loadManifest = async () => {
   return manifest.bundles;
 };
 
+const updateAppLayer = async (
+  pascalCase,
+  camelCase,
+  { dryRun },
+) => {
+  const originalContent = await readFile(APP_LAYER_PATH, 'utf-8');
+
+  const repositoryImportPattern =
+    /^import { (Live[A-Za-z0-9]+Repo) } from '(@\/services\/[a-zA-Z0-9]+Repo\.service)';$/gm;
+
+  const repositoryImports = new Map();
+  let match;
+  while ((match = repositoryImportPattern.exec(originalContent)) !== null) {
+    repositoryImports.set(match[1], match[2]);
+  }
+
+  const importName = `Live${pascalCase}Repo`;
+  const importPath = `@/services/${camelCase}Repo.service`;
+  const alreadyPresent = repositoryImports.has(importName);
+
+  if (!alreadyPresent) {
+    repositoryImports.set(importName, importPath);
+  }
+
+  const sortedRepositoryImports = [...repositoryImports.entries()].sort(
+    ([a], [b]) => a.localeCompare(b),
+  );
+
+  const repositoryImportLines = sortedRepositoryImports.map(
+    ([name, path]) => `import { ${name} } from '${path}';`,
+  );
+
+  const headerImports = [
+    "import { Layer } from 'effect';",
+    '',
+    "import { LiveDynamoDbService } from '@/services/dynamodb.service';",
+    "import { LiveEventBridgeService } from '@/services/eventBridge.service';",
+    "import { ApplicationLoggerService } from '@/services/logger.service';",
+    ...repositoryImportLines,
+    '',
+  ];
+
+  const repositoryNames = sortedRepositoryImports.map(([name]) => name);
+
+  const providedVariableNames = repositoryNames.map(
+    (name) => `${name}Provided`,
+  );
+
+  const providedConstants = repositoryNames.map(
+    (name, index) =>
+      `const ${providedVariableNames[index]} = ${name}.pipe(Layer.provide(Base));`,
+  );
+
+  const mergeCalls = providedVariableNames.map(
+    (providedName) => `Layer.merge(${providedName})`,
+  );
+
+  const appLayerBlock =
+    mergeCalls.length > 0
+      ? `export const AppLayer = Base.pipe(
+  ${mergeCalls.join(',\n  ')}
+);`
+      : 'export const AppLayer = Base;';
+
+  const baseSection = `const Base = LiveDynamoDbService.pipe(
+  Layer.merge(ApplicationLoggerService),
+).pipe(Layer.merge(LiveEventBridgeService));`;
+
+  const updatedContent = [
+    ...headerImports,
+    baseSection,
+    '',
+    ...providedConstants,
+    '',
+    appLayerBlock,
+    '',
+  ].join('\n');
+
+  if (updatedContent === originalContent) {
+    return { changed: false };
+  }
+
+  if (!dryRun) {
+    await writeFile(APP_LAYER_PATH, updatedContent, 'utf-8');
+  }
+
+  return {
+    changed: true,
+    action: alreadyPresent ? 'normalized AppLayer' : 'updated AppLayer',
+    location: APP_LAYER_PATH,
+  };
+};
+
+const runLintFix = ({ dryRun }) => {
+  if (dryRun) {
+    console.log('ℹ️  Skipping `npm run lint:fix` (dry run).');
+    return false;
+  }
+
+  console.log('▶️  Running `npm run lint:fix` to format new scaffolding...');
+  const result = spawnSync('npm', ['run', 'lint:fix'], {
+    cwd: OUTPUT_ROOT,
+    stdio: 'inherit',
+  });
+
+  if (result.status !== 0) {
+    throw new Error('`npm run lint:fix` failed. See output above for details.');
+  }
+
+  return true;
+};
+
 const normaliseName = (value) => value.toLowerCase();
 
 const selectBundles = async (bundles, requestedNames) => {
@@ -429,6 +550,40 @@ const main = async () => {
         skipped: dryRun,
         bundle: 'schemas-package',
         action: schemasUpdate.action,
+      });
+    }
+  } catch (error) {
+    console.error(error.message);
+    process.exit(1);
+  }
+
+  try {
+    const appLayerUpdate = await updateAppLayer(
+      replacements.__ENTITY_PASCAL__,
+      replacements.__ENTITY_CAMEL__,
+      { dryRun },
+    );
+    if (appLayerUpdate.changed) {
+      createdFiles.push({
+        location: relative(OUTPUT_ROOT, appLayerUpdate.location),
+        skipped: dryRun,
+        bundle: 'app-layer',
+        action: appLayerUpdate.action,
+      });
+    }
+  } catch (error) {
+    console.error(error.message);
+    process.exit(1);
+  }
+
+  try {
+    const lintRan = runLintFix({ dryRun });
+    if (lintRan) {
+      createdFiles.push({
+        location: 'npm run lint:fix',
+        skipped: dryRun,
+        bundle: 'post-process',
+        action: 'executed',
       });
     }
   } catch (error) {

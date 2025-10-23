@@ -93,3 +93,6 @@ Reflexion
 - 2025-10-23 — Plan phase: Outlined automation for memory stamp and log updates.
   Build phase: Added CLI helpers plus AGENTS.md guidance for stamps/log entries.
   Verify phase: Validated with npm run phase:check and exercised both scripts.
+- 2025-10-23 — Plan phase: Expanded repository scaffolder to register new repos in the shared AppLayer.
+  Build phase: Normalized node-server AppLayer to a reusable repository array and wired the generator to insert new providers.
+  Verify phase: Validated with npm run phase:check to confirm linting and quality gates remain clean.

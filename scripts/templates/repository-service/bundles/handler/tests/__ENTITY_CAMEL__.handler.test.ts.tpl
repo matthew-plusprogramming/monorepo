@@ -3,7 +3,6 @@ import {
   makeRequestContext,
   setBundledRuntime,
 } from '@packages/backend-core/testing';
-import type { __ENTITY_PASCAL__Public } from '@packages/schemas/__ENTITY_SLUG__';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { __ENTITY_PASCAL__RepoFake } from '@/__tests__/fakes/__ENTITY_CAMEL__Repo';

@@ -55,56 +55,55 @@ const dequeue = <T>(
     : Effect.fail(next.error);
 };
 
-export const create__ENTITY_PASCAL__RepoFake =
-  (): __ENTITY_PASCAL__RepoFake => {
-    const queues: Queues = {
-      getById: [],
-      create: [],
-    };
-
-    const calls: Calls = {
-      getById: [],
-      create: [],
-    };
-
-    const service: __ENTITY_PASCAL__RepoSchema = {
-      getById: (id: string) => {
-        calls.getById.push(id);
-        return dequeue(queues.getById, 'getById');
-      },
-      create: (entity) => {
-        calls.create.push(entity);
-        return dequeue(queues.create, 'create');
-      },
-    };
-
-    return {
-      service,
-      layer: Layer.succeed(__ENTITY_PASCAL__Repo, service),
-      calls,
-      reset: (): void => {
-        queues.getById.length = 0;
-        queues.create.length = 0;
-        calls.getById.length = 0;
-        calls.create.length = 0;
-      },
-      queueGetSome: (value: __ENTITY_PASCAL__Public): void => {
-        queues.getById.push({
-          type: 'success',
-          value: Option.some(value),
-        });
-      },
-      queueGetNone: (): void => {
-        queues.getById.push({ type: 'success', value: Option.none() });
-      },
-      queueGetFailure: (error: InternalServerError): void => {
-        queues.getById.push({ type: 'error', error });
-      },
-      queueCreateSuccess: (): void => {
-        queues.create.push({ type: 'success', value: true });
-      },
-      queueCreateFailure: (error: InternalServerError): void => {
-        queues.create.push({ type: 'error', error });
-      },
-    };
+export const create__ENTITY_PASCAL__RepoFake = (): __ENTITY_PASCAL__RepoFake => {
+  const queues: Queues = {
+    getById: [],
+    create: [],
   };
+
+  const calls: Calls = {
+    getById: [],
+    create: [],
+  };
+
+  const service: __ENTITY_PASCAL__RepoSchema = {
+    getById: (id: string) => {
+      calls.getById.push(id);
+      return dequeue(queues.getById, 'getById');
+    },
+    create: (entity) => {
+      calls.create.push(entity);
+      return dequeue(queues.create, 'create');
+    },
+  };
+
+  return {
+    service,
+    layer: Layer.succeed(__ENTITY_PASCAL__Repo, service),
+    calls,
+    reset: (): void => {
+      queues.getById.length = 0;
+      queues.create.length = 0;
+      calls.getById.length = 0;
+      calls.create.length = 0;
+    },
+    queueGetSome: (value: __ENTITY_PASCAL__Public): void => {
+      queues.getById.push({
+        type: 'success',
+        value: Option.some(value),
+      });
+    },
+    queueGetNone: (): void => {
+      queues.getById.push({ type: 'success', value: Option.none() });
+    },
+    queueGetFailure: (error: InternalServerError): void => {
+      queues.getById.push({ type: 'error', error });
+    },
+    queueCreateSuccess: (): void => {
+      queues.create.push({ type: 'success', value: true });
+    },
+    queueCreateFailure: (error: InternalServerError): void => {
+      queues.create.push({ type: 'error', error });
+    },
+  };
+};

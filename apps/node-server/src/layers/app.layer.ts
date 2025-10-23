@@ -8,6 +8,7 @@ import { LiveUserRepo } from '@/services/userRepo.service';
 const Base = LiveDynamoDbService.pipe(
   Layer.merge(ApplicationLoggerService),
 ).pipe(Layer.merge(LiveEventBridgeService));
-const UserRepoProvided = LiveUserRepo.pipe(Layer.provide(Base));
 
-export const AppLayer = Base.pipe(Layer.merge(UserRepoProvided));
+const LiveUserRepoProvided = LiveUserRepo.pipe(Layer.provide(Base));
+
+export const AppLayer = Base.pipe(Layer.merge(LiveUserRepoProvided));
