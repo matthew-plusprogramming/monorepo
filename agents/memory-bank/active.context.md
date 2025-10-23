@@ -90,3 +90,6 @@ Reflexion
 - 2025-10-23 — Plan phase: Reaffirmed automation scope against updated templates before verification.
   Build phase: Completed self-review of scaffold outputs and manifest renames to ensure consistency.
   Verify phase: Ran the diff reporter plus `npm run agent:finalize`, confirming memory validation, drift checks, and code-quality gates remained green.
+- 2025-10-23 — Plan phase: Outlined automation for memory stamp and log updates.
+  Build phase: Added CLI helpers plus AGENTS.md guidance for stamps/log entries.
+  Verify phase: Validated with npm run phase:check and exercised both scripts.

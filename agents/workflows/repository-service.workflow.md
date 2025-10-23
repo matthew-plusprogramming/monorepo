@@ -21,7 +21,7 @@ Global Prompts
 
 - Follow Memory Bank retrieval policy before starting.
 - Coordinate infra/app/schema changes in the same PR; avoid leaving intermediate states that break boot.
-- Update the Memory Bank (Reflexion + progress log) after each phase; rerun validation/drift scripts in verify.
+- Update the Memory Bank (Reflexion + progress log) after each phase; the CLI helper `node agents/scripts/append-memory-entry.mjs` keeps entries consistent; rerun validation/drift scripts in verify.
 
 Phase: plan
 
@@ -83,8 +83,8 @@ Phase: verify
   - Map each Given/When/Then acceptance criterion to a completed test or manual verification.
   - Run `npm run lint`, `npm run test`, and targeted CDK/handler suites; capture results.
   - Confirm infra outputs compile by running `npm -w @cdk/backend-server-cdk run lint` (and synth if relevant).
-  - Update `agents/memory-bank` entries (plan summary, new invariants, system patterns if the workflow evolves).
-  - Stamp `agents/memory-bank.md` (`generated_at`, `repo_git_sha`) and rerun validation scripts:
+  - Update `agents/memory-bank` entries (plan summary, new invariants, system patterns if the workflow evolves); leverage `node agents/scripts/append-memory-entry.mjs` for reflexions and progress entries.
+  - Stamp `agents/memory-bank.md` via `node agents/scripts/update-memory-stamp.mjs` (`generated_at`, `repo_git_sha`) and rerun validation scripts:
     - `npm run memory:validate`
     - `npm run memory:drift`
   - Ensure documentation references (READMEs, ADRs) are updated if contracts changed.

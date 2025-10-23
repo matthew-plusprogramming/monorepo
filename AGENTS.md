@@ -18,10 +18,16 @@ Update Requirements (per task)
 - Stamp `agents/memory-bank.md` front matter:
   - `generated_at`: today (YYYY‑MM‑DD)
   - `repo_git_sha`: `git rev-parse HEAD`
+- Use `node agents/scripts/update-memory-stamp.mjs` to automatically apply the stamp once updates are ready.
 - Validate and check drift:
   - `npm run memory:validate` — verify referenced paths exist across all memory files
   - `npm run memory:drift` — ensure stamped SHA matches or intentionally update
 - Include Memory Bank updates in the same PR.
+
+Convenience helpers
+
+- `node agents/scripts/append-memory-entry.mjs --target active --plan "..." --build "..." --verify "..."` appends a reflexion block to `active.context.md`.
+- `node agents/scripts/append-memory-entry.mjs --target progress --message "..."` appends a line to `progress.log.md`.
 
 ## 🧭 Workflow Process List
 
