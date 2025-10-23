@@ -174,5 +174,5 @@ export const heartbeatRequestHandler = generateRequestHandler<
       mapper: (error) => error.message,
     },
   },
-  successCode: HTTP_RESPONSE.SUCCESS,
+  successCode: HTTP_RESPONSE.OK,
 });

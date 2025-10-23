@@ -62,5 +62,5 @@ export const getUserRequestHandler = generateRequestHandler<
       mapper: (e) => e.message,
     },
   },
-  successCode: HTTP_RESPONSE.SUCCESS,
+  successCode: HTTP_RESPONSE.OK,
 });

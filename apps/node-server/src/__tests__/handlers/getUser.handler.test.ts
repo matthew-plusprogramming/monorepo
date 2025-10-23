@@ -54,7 +54,7 @@ describe('getUserRequestHandler', () => {
     // Assert
     // Verify the fake was invoked with the parsed identifier
     expect(getUserRepoFake().calls.findByIdentifier[0]).toBe(user.email);
-    expect(captured.statusCode).toBe(HTTP_RESPONSE.SUCCESS);
+    expect(captured.statusCode).toBe(HTTP_RESPONSE.OK);
     expect(captured.sendBody).toStrictEqual(user);
   });
 

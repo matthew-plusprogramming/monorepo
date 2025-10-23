@@ -131,7 +131,7 @@ async function publishesHeartbeatEvent(): Promise<void> {
     await runHeartbeatScenario(scenario);
 
   // Assert
-  expect(response.status).toBe(HTTP_RESPONSE.SUCCESS);
+  expect(response.status).toBe(HTTP_RESPONSE.OK);
   expect(response.text).toBe('OK');
   expect(eventBridgeFake.calls).toHaveLength(1);
   const [entry] = eventBridgeFake.calls[0]?.Entries ?? [];
