@@ -62,6 +62,7 @@ Phase: verify
 - Goal: Validate behavior against criteria and finalize Memory Bank updates.
 - Inputs: Plan; acceptance criteria; test harness; diff.
 - Checklist:
+  - Run `node agents/scripts/git-diff-with-lines.mjs` to capture line-numbered diff context for the verification report.
   - Run targeted tests; add missing ones nearby if an adjacent pattern exists.
   - Trace each Given/When/Then to a verification step; confirm Non-goals remain out of scope.
   - Confirm implemented tests follow `agents/memory-bank/testing.guidelines.md` (boundaries, DI, fakes/mocks, flake-proofing).

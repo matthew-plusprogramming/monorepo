@@ -75,3 +75,6 @@ Reflexion
 - 2025-10-22 — Plan phase: Investigated `npm run test:coverage` reporting zero files and traced the root cause to shared Vitest coverage globs targeting test files.
   Chosen approach: update `@configs/vitest-config` coverage include/exclude to instrument source directories while leaving integration suite uninstrumented.
   Next: implement config tweak, rerun coverage locally, and prepare Memory Bank stamps for verify.
+- 2025-10-22 — Plan phase: Scoped a git diff line-number reporter and noted future expansion to preload Memory Bank and workflow context.
+  Build phase: Implemented the diff reporter script, wired the verify checklist reminder, validated output, and cleared `npm run phase:check`.
+  Verify phase: Captured the line-numbered diff, stamped Memory Bank metadata/logs, and ran `npm run agent:finalize` to confirm validation.
