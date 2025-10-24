@@ -16,6 +16,11 @@ Scripts under `agents/scripts/` give coding agents a consistent toolbox for load
 - `node agents/scripts/check-code-quality.mjs`
   Runs the bundled heuristics (`check-effect-*`, env schema usage, resource naming, console usage, AAA comments, unsafe assertions).
 
+## Search & Discovery
+
+- `node agents/scripts/smart-file-query.mjs --regex "<pattern>" [--glob ...] [--contextLines ...] [--includeAllContent]`
+  Finds regex matches across the repo with optional glob scoping, surrounding context lines, and full file contents, returning a minified JSON payload for downstream tooling.
+
 ## Reporting & Diff Utilities
 
 - `node agents/scripts/list-files-recursively.mjs --root <path> --pattern <pattern> [--types ...] [--regex] [--case-sensitive]`
