@@ -51,3 +51,6 @@ last_reviewed: 2025-10-21
 - 2025-10-23: Refined repository-service scaffold checklist to smaller, verifiable increments with explicit commands.
 - 2025-10-24: Documented agent tooling catalog and linked it from workflows and memory overview.
 - 2025-10-24: Documented list-files-recursively tool usage in agents/tools.md, ran phase:check plus git-diff reporter, and refreshed Memory Bank context before npm run agent:finalize.
+- 2025-10-24: Captured planning context for smart-file-query design doc and confirmed memory/workflow touchpoints before drafting.
+- 2025-10-24: Authored smart-file-query design doc and confirmed lint/code-quality checks via npm run phase:check.
+- 2025-10-24: Verified smart-file-query design doc changes with git-diff-with-lines and npm run agent:finalize to keep memory validation green.
