@@ -9,7 +9,7 @@ Intent
 Global Prompts
 
 - Information Retrieval: Follow the Retrieval Policy in `agents/memory-bank.md`.
-- File inspection: Prefer `node agents/scripts/list-files-recursively.mjs` for enumerating files and `node agents/scripts/smart-file-query.mjs` for reading/searching contents instead of generic shell commands.
+- File inspection: Prefer `node agents/scripts/list-files-recursively.mjs` for enumerating files, `node agents/scripts/smart-file-query.mjs` for targeted searches, and `node agents/scripts/read-files.mjs` when streaming multiple file contents instead of generic shell commands.
 - reflection note: After each phase, add a 3-line reflection to `active.context.md` and append a succinct entry to `progress.log.md`; doc-only or advisory tasks may batch these updates upon completion when no canonical files change.
   - CLI helpers: `node agents/scripts/append-memory-entry.mjs --target active ...` for reflections and `--target progress ...` for log entries keep formatting consistent.
 - Markdown standards: See `AGENTS.md`.

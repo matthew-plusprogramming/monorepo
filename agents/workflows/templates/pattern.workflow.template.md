@@ -10,7 +10,7 @@ Global Prompts
 
 - Follow the same phase structure as default; customize checklists to the pattern’s steps.
 - Keep unrelated changes out; update Memory Bank as needed.
-- Use `node agents/scripts/list-files-recursively.mjs` and `node agents/scripts/smart-file-query.mjs` for file discovery and content inspection rather than default shell tooling.
+- Use `node agents/scripts/list-files-recursively.mjs` for discovery, `node agents/scripts/smart-file-query.mjs` for targeted searches, and `node agents/scripts/read-files.mjs` when you need ordered contents from multiple files instead of default shell tooling.
 
 Phase: plan
 
