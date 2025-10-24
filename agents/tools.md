@@ -18,5 +18,7 @@ Scripts under `agents/scripts/` give coding agents a consistent toolbox for load
 
 ## Reporting & Diff Utilities
 
+- `node agents/scripts/list-files-recursively.mjs --root <path> --pattern <pattern> [--types ...] [--regex] [--case-sensitive]`
+  Emits a CSV (`path,size,modifiedAt`) of files under the given root whose repo-relative paths match the pattern; supports substring or regex matching plus optional type filters (`ts`, `md`, `all`).
 - `node agents/scripts/git-diff-with-lines.mjs [--cached]`
   Emits the working tree (or staged) diff against `HEAD` with old/new line numbers for verification reports.

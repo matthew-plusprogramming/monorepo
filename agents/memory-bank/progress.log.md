@@ -50,3 +50,4 @@ last_reviewed: 2025-10-21
 - 2025-10-23: Refined repository-service scaffold checklist into granular, testable increments with command guidance.
 - 2025-10-23: Refined repository-service scaffold checklist to smaller, verifiable increments with explicit commands.
 - 2025-10-24: Documented agent tooling catalog and linked it from workflows and memory overview.
+- 2025-10-24: Documented list-files-recursively tool usage in agents/tools.md, ran phase:check plus git-diff reporter, and refreshed Memory Bank context before npm run agent:finalize.

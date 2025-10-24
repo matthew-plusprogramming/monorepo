@@ -105,3 +105,6 @@ reflection
 - 2025-10-24 — Plan phase: Documented agent scripts for easier discovery.
   Build phase: Added agents/tools.md, linked it from core docs, and ran npm run phase:check.
   Verify phase: Stamped memory metadata, reviewed diff output, and queued agent:finalize.
+- 2025-10-24 — Plan phase: Scoped documentation addition for list-files-recursively.mjs, focusing on usage summary, filter flags, and CSV output details.
+  Build phase: Updated agents/tools.md Reporting & Diff Utilities section with command syntax plus notes on pattern matching and type filters after reviewing the script options.
+  Verify phase: Ran npm run phase:check, node agents/scripts/git-diff-with-lines.mjs, and npm run agent:finalize after memory updates to keep validation green.
