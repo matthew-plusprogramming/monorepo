@@ -11,7 +11,7 @@
     "// -- 🛠️ Build & Clean": "--",
     "prebuild": "tsc",
     "build": "dotenvx run -f .env.production -- vite build --mode production",
-    "postbuild": "tsx scripts/bundle-argon-2 && npm run copy-cdk-outputs && npm run copy-env-prod",
+    "postbuild": "tsx scripts/bundle && npm run copy-cdk-outputs && npm run copy-env-prod",
     "copy-cdk-outputs": "dotenvx run -f .env.production -- cross-env ENV=production tsx scripts/copy-cdk-outputs.ts",
     "copy-env-dev": "cross-env ENV=development tsx scripts/copy-env.ts",
     "copy-env-prod": "cross-env ENV=production tsx scripts/copy-env.ts",
@@ -29,20 +29,27 @@
     "encrypt-envs": "dotenvx encrypt -f .env.dev .env.production",
     "decrypt-envs": "dotenvx decrypt -f .env.dev .env.production&& echo 'WARNING: DO NOT COMMIT decrypted .env files to the repository!'"
   },
-  "devDependencies": {
+  "dependencies": {
     "@aws-sdk/client-cloudwatch-logs": "^3.914.0",
     "@aws-sdk/client-dynamodb": "^3.914.0",
     "@aws-sdk/client-eventbridge": "^3.914.0",
     "@aws-sdk/util-dynamodb": "^3.914.0",
     "@cdk/backend-server-cdk": "*",
-    "@configs/eslint-config": "*",
-    "@configs/ts-config": "*",
-    "@configs/vite-config": "*",
-    "@configs/vitest-config": "*",
     "@dotenvx/dotenvx": "^1.51.0",
     "@node-rs/argon2": "^2.0.2",
     "@packages/backend-core": "*",
     "@packages/schemas": "*",
+    "effect": "^3.18.4",
+    "express": "^5.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "serverless-http": "^4.0.0",
+    "zod": "^4.1.12"
+  },
+  "devDependencies": {
+    "@configs/eslint-config": "*",
+    "@configs/ts-config": "*",
+    "@configs/vite-config": "*",
+    "@configs/vitest-config": "*",
     "@types/express": "^5.0.3",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/supertest": "^6.0.3",
@@ -50,16 +57,11 @@
     "@vitest/coverage-v8": "^4.0.1",
     "concurrently": "^9.2.1",
     "cross-env": "^10.1.0",
-    "effect": "^3.18.4",
     "eslint": "^9.38.0",
-    "express": "^5.1.0",
     "jiti": "^2.6.1",
-    "jsonwebtoken": "^9.0.2",
-    "serverless-http": "^4.0.0",
     "supertest": "^7.1.4",
     "typescript": "^5.9.3",
     "vite": "^7.1.11",
-    "vitest": "^4.0.1",
-    "zod": "^4.1.12"
+    "vitest": "^4.0.1"
   }
 }
