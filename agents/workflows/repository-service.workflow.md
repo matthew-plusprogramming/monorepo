@@ -39,39 +39,40 @@ Phase: plan
 Phase: build
 
 - Goal: Implement the schema, infrastructure, and repository service changes with tight diffs.
-- Checklist: 0. **Scaffold (highly recommended)**
-  - Run `node scripts/create-repository-service.mjs <entity-slug>` to generate baseline schemas, CDK stubs, repository service, and fakes.
-  - Use `--with handler` (or `--with all`) to opt into additional bundles; run without `--with` in an interactive terminal to pick bundles via prompts.
-  - Review the generated checklist under `scripts/output/repository-service/<entity-slug>-checklist.md` and treat remaining TODOs as part of this phase.
-  - You can read more at `scripts/README.md`
-  1. **Schemas**
-     - Add/update Zod schemas, DTO types, and constants under `packages/core/schemas/schemas` (e.g., extend `packages/core/schemas/schemas/user`).
-     - Export schema constants for table name/GSI usage; add schema tests.
-  2. **Infrastructure**
-     - Update or create DynamoDB stack modules in `cdk/backend-server-cdk/src/stacks`.
-     - Register new stacks in `stacks.ts`; expose outputs via consumers and re-export table names through `@cdk/backend-server-cdk`.
-     - Update CDK outputs loader tests and re-run `npm -w @cdk/backend-server-cdk run lint`.
-  3. **Backend Core (if needed)**
-     - Define additional domain errors or shared types in `packages/core/backend-core` (e.g., `packages/core/backend-core/src/types/errors`).
-  4. **Repository Service**
-     - Scaffold a `<Entity>Repo.service.ts` module under `apps/node-server/src/services` (e.g., follow `apps/node-server/src/services/userRepo.service.ts`) using Effect pattern (`Context.Tag`, `Layer.effect`).
-     - Inject `DynamoDbService` and `LoggerService`; validate inputs with schemas before persistence; convert AWS SDK errors to `InternalServerError` or domain errors.
-     - Load table names via `@/clients/cdkOutputs`; avoid hardcoded literals.
-  5. **Layer Wiring & Consumption**
-     - Export the repository layer from `apps/node-server/src/layers/app.layer.ts` (or relevant layer module).
-     - Update handlers/use cases to inject and use the repository; adjust middleware or service composition as needed.
-  6. **Repository Fake**
-     - Create or update `apps/node-server/src/__tests__/fakes/<entity>Repo.ts` to implement the repository interface with queue-backed responses.
-     - Expose a `Layer` via `Layer.succeed(<Entity>Repo, service)` so tests can provide the fake without additional wiring.
-     - Track calls and expose `reset` utilities to clear queues/counters between expectations.
-     - Offer helper functions (e.g., `queueFindSome`, `queueCreateFailure`) that enqueue `Effect` results matching the real repository contract.
-  7. **Tests**
-     - Add repository unit tests (mocking DynamoDB client or using local fake) covering happy path, validation failure, and AWS errors.
-     - Extend handler/service integration tests to cover repository usage.
-     - Ensure schema and CDK consumer tests reflect new outputs.
-  8. **Self-review**
-     - Verify imports use barrel exports consistently; ensure no unused exports remain.
-     - Run `npm run lint`, targeted package lint/test scripts, and Vitest suites you touched.
+- Checklist:
+  - Scaffold (highly recommended)
+    - Run `node scripts/create-repository-service.mjs <entity-slug>` to generate baseline schemas, CDK stubs, repository service, and fakes.
+    - Use `--with handler` (or `--with all`) to opt into additional bundles; run without `--with` in an interactive terminal to pick bundles via prompts.
+    - Review the generated checklist under `scripts/output/repository-service/<entity-slug>-checklist.md` and treat remaining TODOs as part of this phase.
+    - You can read more at `scripts/README.md`
+  - Schemas
+    - Add/update Zod schemas, DTO types, and constants under `packages/core/schemas/schemas` (e.g., extend `packages/core/schemas/schemas/user`).
+    - Export schema constants for table name/GSI usage; add schema tests.
+  - Infrastructure
+    - Update or create DynamoDB stack modules in `cdk/backend-server-cdk/src/stacks`.
+    - Register new stacks in `stacks.ts`; expose outputs via consumers and re-export table names through `@cdk/backend-server-cdk`.
+    - Update CDK outputs loader tests and re-run `npm -w @cdk/backend-server-cdk run lint`.
+  - Backend Core (if needed)
+    - Define additional domain errors or shared types in `packages/core/backend-core` (e.g., `packages/core/backend-core/src/types/errors`).
+  - Repository Service
+    - Scaffold a `<Entity>Repo.service.ts` module under `apps/node-server/src/services` (e.g., follow `apps/node-server/src/services/userRepo.service.ts`) using Effect pattern (`Context.Tag`, `Layer.effect`).
+    - Inject `DynamoDbService` and `LoggerService`; validate inputs with schemas before persistence; convert AWS SDK errors to `InternalServerError` or domain errors.
+    - Load table names via `@/clients/cdkOutputs`; avoid hardcoded literals.
+  - Layer Wiring & Consumption
+    - Export the repository layer from `apps/node-server/src/layers/app.layer.ts` (or relevant layer module).
+    - Update handlers/use cases to inject and use the repository; adjust middleware or service composition as needed.
+  - Repository Fake
+    - Create or update `apps/node-server/src/__tests__/fakes/<entity>Repo.ts` to implement the repository interface with queue-backed responses.
+    - Expose a `Layer` via `Layer.succeed(<Entity>Repo, service)` so tests can provide the fake without additional wiring.
+    - Track calls and expose `reset` utilities to clear queues/counters between expectations.
+    - Offer helper functions (e.g., `queueFindSome`, `queueCreateFailure`) that enqueue `Effect` results matching the real repository contract.
+  - Tests
+    - Add repository unit tests (mocking DynamoDB client or using local fake) covering happy path, validation failure, and AWS errors.
+    - Extend handler/service integration tests to cover repository usage.
+    - Ensure schema and CDK consumer tests reflect new outputs.
+  - Self-review
+    - Verify imports use barrel exports consistently; ensure no unused exports remain.
+    - Run `npm run lint`, targeted package lint/test scripts, and Vitest suites you touched.
 
 - Outputs: Repository service implementation, schema/infra/test updates, passing local checks.
 - Next: verify
@@ -82,7 +83,7 @@ Phase: verify
 - Checklist:
   - Map each Given/When/Then acceptance criterion to a completed test or manual verification.
   - Run `npm run lint`, `npm run test`, and targeted CDK/handler suites; capture results.
-  - Confirm infra outputs compile by running `npm -w @cdk/backend-server-cdk run lint` (and synth if relevant).
+  - Confirm infra outputs compile by running `npm -w @cdk/backend-server-cdk run cdk:synth:dev`.
   - Update `agents/memory-bank` entries (plan summary, new invariants, system patterns if the workflow evolves); leverage `node agents/scripts/append-memory-entry.mjs` for reflexions and progress entries.
   - Stamp `agents/memory-bank.md` via `node agents/scripts/update-memory-stamp.mjs`
   - Ensure documentation references (READMEs, ADRs) are updated if contracts changed.
