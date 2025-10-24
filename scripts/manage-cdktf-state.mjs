@@ -32,10 +32,11 @@ const usage = () => {
       '  bootstrap-backend         Deploys the bootstrap stack, migrates state, and removes the local tfstate file.',
       '  cdk list                  Lists available stacks with descriptions.',
       '  cdk deploy <stack> [--prod]  Deploys the specified stack (defaults to dev).',
+      '  cdk output <stack> [--prod]  Writes CDK outputs for the specified stack (defaults to dev).',
       '',
       'Flags:',
       '  -h, --help                Show this help message.',
-      '  --prod                    Deploy to production (cdk deploy).',
+      '  --prod                    Target production (cdk deploy/output).',
     ].join('\n'),
   );
 };
@@ -152,6 +153,47 @@ const readStackMetadata = async () => {
   }
 
   return stacks;
+};
+
+const resolveStackArgs = async (args, subcommand) => {
+  let isProd = false;
+  const positional = [];
+
+  for (const arg of args) {
+    if (arg === '--prod') {
+      isProd = true;
+      continue;
+    }
+    positional.push(arg);
+  }
+
+  if (positional.length === 0) {
+    throw new Error(
+      `Missing stack identifier. Usage: node scripts/manage-cdktf-state.mjs cdk ${subcommand} <stack> [--prod]`,
+    );
+  }
+
+  const [stackIdentifier, ...extraArgs] = positional;
+  const stacks = await readStackMetadata();
+
+  const stack = stacks.find(
+    (entry) =>
+      entry.stackName === stackIdentifier ||
+      entry.constName === stackIdentifier,
+  );
+
+  if (!stack) {
+    const available = stacks.map((entry) => entry.stackName).join(', ');
+    throw new Error(
+      `Unknown stack "${stackIdentifier}". Available stacks: ${available}`,
+    );
+  }
+
+  return {
+    stack,
+    extraArgs,
+    isProd,
+  };
 };
 
 const runCommand = (command, args, { env, step } = {}) =>
@@ -308,39 +350,7 @@ const handleCdkList = async () => {
 };
 
 const handleCdkDeploy = async (args) => {
-  let isProd = false;
-  const positional = [];
-
-  for (const arg of args) {
-    if (arg === '--prod') {
-      isProd = true;
-      continue;
-    }
-    positional.push(arg);
-  }
-
-  if (positional.length === 0) {
-    throw new Error(
-      'Missing stack identifier. Usage: node scripts/manage-cdktf-state.mjs cdk deploy <stack> [--prod]',
-    );
-  }
-
-  const [stackIdentifier, ...extraArgs] = positional;
-  const stacks = await readStackMetadata();
-
-  const stack = stacks.find(
-    (entry) =>
-      entry.stackName === stackIdentifier ||
-      entry.constName === stackIdentifier,
-  );
-
-  if (!stack) {
-    const available = stacks.map((entry) => entry.stackName).join(', ');
-    throw new Error(
-      `Unknown stack "${stackIdentifier}". Available stacks: ${available}`,
-    );
-  }
-
+  const { stack, extraArgs, isProd } = await resolveStackArgs(args, 'deploy');
   const stage = isProd ? 'prod' : 'dev';
   const scriptName = `cdk:deploy:${stage}`;
   const npmArgs = [
@@ -358,11 +368,32 @@ const handleCdkDeploy = async (args) => {
   });
 };
 
+const handleCdkOutput = async (args) => {
+  const { stack, extraArgs, isProd } = await resolveStackArgs(args, 'output');
+  const stage = isProd ? 'prod' : 'dev';
+  const scriptName = `cdk:output:${stage}`;
+  const npmArgs = [
+    '-w',
+    '@cdk/backend-server-cdk',
+    'run',
+    scriptName,
+    stack.stackName,
+    ...extraArgs,
+  ];
+
+  await runCommand('npm', npmArgs, {
+    env: { STACK: stack.stackName },
+    step: `Writing ${isProd ? 'production' : 'development'} outputs`,
+  });
+};
+
 const handleCdkCommand = async (args) => {
   const subcommand = args.shift();
 
   if (!subcommand) {
-    throw new Error('Missing CDK subcommand. Expected one of: list, deploy.');
+    throw new Error(
+      'Missing CDK subcommand. Expected one of: list, deploy, output.',
+    );
   }
 
   switch (subcommand) {
@@ -371,6 +402,9 @@ const handleCdkCommand = async (args) => {
       break;
     case 'deploy':
       await handleCdkDeploy(args);
+      break;
+    case 'output':
+      await handleCdkOutput(args);
       break;
     default:
       throw new Error(`Unknown CDK subcommand "${subcommand}".`);

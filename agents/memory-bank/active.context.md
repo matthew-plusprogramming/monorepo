@@ -129,3 +129,12 @@ reflection
 - 2025-10-24 — Plan phase: Plan: Scope fully addressed with new cdk list/deploy operations added.
   Build phase: Build: Self-reviewed CLI changes and kept bootstrap path untouched.
   Verify phase: Verify: git-diff-with-lines, cdk list dry run, and npm run agent:finalize all succeeded.
+- 2025-10-24 — Plan phase: Plan: Extend manage-cdktf-state cdk command with output stage support.
+  Build phase: Next: Share stack resolution logic and reuse runCommand for output scripts.
+  Verify phase: Verify: Validate output listing command path and rerun phase:check.
+- 2025-10-24 — Plan phase: Plan: Extend manage-cdktf-state cdk command with output stage support.
+  Build phase: Build: Added shared stack arg resolver and new cdk output handler with prod support.
+  Verify phase: Verify: Exercised error path for cdk output and reran phase:check; finalize pending after stamp.
+- 2025-10-24 — Plan phase: Plan: Output support landed alongside deploy in manage-cdktf-state.
+  Build phase: Build: Reused resolver helper for deploy/output; help text now covers new subcommand.
+  Verify phase: Verify: git-diff-with-lines, npm run agent:finalize, and error-path check for missing stack all succeeded.
