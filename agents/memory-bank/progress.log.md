@@ -57,3 +57,4 @@ last_reviewed: 2025-10-21
 - 2025-10-24: Planned smart-file-query implementation path including dependency choice, doc updates, and verification commands.
 - 2025-10-24: Shipped smart-file-query script with glob-aware search plus updated tooling catalog and picomatch dependency.
 - 2025-10-24: Verified smart-file-query script via git-diff-with-lines and agent:finalize ensuring memory validation and code-quality gates stayed green.
+- 2025-10-24: Updated retrieval guidance across AGENTS.md, workflows, and the Memory Bank to favor list-files-recursively and smart-file-query; npm run phase:check passed, npm run agent:finalize flagged a preexisting smart-file-query design doc reference.

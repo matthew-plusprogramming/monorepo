@@ -108,9 +108,12 @@ reflection
 - 2025-10-24 — Plan phase: Scoped documentation addition for list-files-recursively.mjs, focusing on usage summary, filter flags, and CSV output details.
   Build phase: Updated agents/tools.md Reporting & Diff Utilities section with command syntax plus notes on pattern matching and type filters after reviewing the script options.
   Verify phase: Ran npm run phase:check, node agents/scripts/git-diff-with-lines.mjs, and npm run agent:finalize after memory updates to keep validation green.
-- 2025-10-24 — Plan phase: Scoped smart-file-query design doc requirements, reviewed existing search utilities, and identified agents/scripts/smart-file-query.design.md as the design home.
+- 2025-10-24 — Plan phase: Scoped smart-file-query design doc requirements, reviewed existing search utilities.
 - 2025-10-24 — Build phase: Drafted the smart-file-query design doc covering CLI contract, glob strategy, JSON payload, and safety rails, then ran npm run phase:check to keep automation green.
 - 2025-10-24 — Verify phase: Captured line-numbered diff via git-diff-with-lines, ran npm run agent:finalize to validate memory/drift plus automation gates, and confirmed design doc-only changes.
 - 2025-10-24 — Plan phase: Outlined smart-file-query implementation covering CLI parsing, glob filtering via picomatch, safety rails, tools documentation, and verification through npm run phase:check plus agent:finalize.
 - 2025-10-24 — Build phase: Implemented smart-file-query CLI with picomatch-based glob filtering, safety rails, and minified JSON output; updated agents/tools.md and added picomatch dev dependency.
 - 2025-10-24 — Verify phase: Captured git-diff-with-lines output, ran npm run phase:check and npm run agent:finalize to validate smart-file-query implementation plus memory/log updates.
+- 2025-10-24 — Plan phase: Clarified documentation updates to prioritize list-files-recursively and smart-file-query across retrieval guidance.
+  Build phase: Updated AGENTS.md, the Retrieval Policy, and workflow prompts to point agents at list-files-recursively and smart-file-query; ran npm run phase:check for confirmation.
+  Verify phase: Captured git-diff-with-lines output and attempted npm run agent:finalize (blocked by a preexisting missing smart-file-query design doc reference); documented the gap for follow-up.

@@ -13,6 +13,7 @@ Usage
 - Reference `agents/tools.md` for script helpers that support each phase.
   - Use `node agents/scripts/append-memory-entry.mjs --target active --plan "..." --build "..." --verify "..."` to capture reflections.
   - Use `node agents/scripts/append-memory-entry.mjs --target progress --message "..."` for the progress log.
+  - Use `node agents/scripts/list-files-recursively.mjs` for file discovery and `node agents/scripts/smart-file-query.mjs` for scoped content searches instead of default shell tooling.
 - For system-impacting changes, open an ADR stub using `agents/memory-bank/decisions/ADR-0000-template.md`.
 
 Policies

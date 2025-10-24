@@ -5,6 +5,7 @@ Before modifying code, load required context with `node agents/scripts/load-cont
 - Memory Bank overview: `agents/memory-bank.md`
 - Workflows overview: `agents/workflows.md`
 - Tool catalog: `agents/tools.md`
+- File discovery & search: prefer `node agents/scripts/list-files-recursively.mjs` and `node agents/scripts/smart-file-query.mjs` for browsing file lists and reading content instead of ad-hoc shell commands.
 
 ## 🔑 Memory Bank
 
@@ -19,6 +20,7 @@ Update Requirements (per task)
 - Use `node agents/scripts/update-memory-stamp.mjs` to automatically apply the stamp once updates are ready.
 - Validate and check drift:
   - `npm run agent:finalize` - verify referenced paths exist across all memory files, check stamped SHA matches
+- Retrieval helpers: when you need to inspect files, use `node agents/scripts/list-files-recursively.mjs` for structured file listings and `node agents/scripts/smart-file-query.mjs` for scoped content searches to avoid noisy default tooling.
 
 Convenience helpers
 

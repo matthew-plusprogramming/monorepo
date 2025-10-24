@@ -10,6 +10,7 @@ Global Prompts
 
 - Follow the same phase structure as default; customize checklists to the pattern’s steps.
 - Keep unrelated changes out; update Memory Bank as needed.
+- Use `node agents/scripts/list-files-recursively.mjs` and `node agents/scripts/smart-file-query.mjs` for file discovery and content inspection rather than default shell tooling.
 
 Phase: plan
 
@@ -40,8 +41,7 @@ Phase: verify
   - Update `agents/memory-bank` as needed; record outcomes.
   - If the workflow template evolved or a new procedural pattern emerged, update/create a workflow and consider an ADR stub.
   - Run memory validation and drift checks:
-    - `npm run memory:validate`
-    - `npm run memory:drift`
+    - Run `npm run phase:check`
 - Outputs: Test results; updated Memory Bank; notes.
 - Next: done
 
