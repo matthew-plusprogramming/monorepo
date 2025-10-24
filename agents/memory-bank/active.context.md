@@ -7,18 +7,18 @@ last_reviewed: 2025-10-21
 Current Focus
 
 - Keep the Memory Bank and default workflow concise, accurate, and aligned with AGENTS.md guidance.
-- Maintain high-signal reflexion summaries that point to the latest workflows, scripts, and ADRs.
+- Maintain high-signal reflection summaries that point to the latest workflows, scripts, and ADRs.
 
 Next Steps
 
 - Track upstream agent-template updates and capture repo-specific deviations through ADRs when policies diverge.
-- Periodically prune reflexion/log entries to preserve readability without losing key decisions.
+- Periodically prune reflection/log entries to preserve readability without losing key decisions.
 
 Open Decisions
 
 - Define the long-term ADR indexing cadence as the system matures.
 
-Reflexion
+reflection
 
 - 2025-09-03 — Bootstrapped the Memory Bank, default workflow, and ADR-0001 to anchor retrieval tiers.
   2025-09-10 to 2025-09-13 — Hardened logging, repositories, and planning discipline via ADR-0002 through ADR-0005.
@@ -80,7 +80,7 @@ Reflexion
   Verify phase: Captured the line-numbered diff, stamped Memory Bank metadata/logs, and ran `npm run agent:finalize` to confirm validation.
 - 2025-10-22 — Plan phase: Identified required context files per Retrieval Policy and acceptance criteria for a load-context utility.
   Build phase: Added `agents/scripts/load-context.mjs`, updated the plan checklist reminder, and verified CLI flags (`--include-optional`, `--list`).
-  Verify phase: Ran the loader, updated Memory Bank reflexions/logs, and executed finalize scripts.
+  Verify phase: Ran the loader, updated Memory Bank reflections/logs, and executed finalize scripts.
 - 2025-10-22 — Plan phase: Promoted the load-context reminder to `AGENTS.md` so agents run it before diving into workflows.
   Build phase: Updated the top-level instructions (now flag-agnostic), reformatted docs, and prepared Memory Bank entries.
   Verify phase: Documented the change, refreshed metadata, and reran validation scripts.

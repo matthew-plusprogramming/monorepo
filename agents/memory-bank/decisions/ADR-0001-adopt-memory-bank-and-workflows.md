@@ -14,10 +14,10 @@ Context:
   Decision:
 - Adopt a Memory Bank with three storage tiers:
   - Tier 0 – Task Context: ephemeral, within workflow files.
-  - Tier 1 – Active Context Ring: summarized in active.context.md with Reflexion entries per phase.
+  - Tier 1 – Active Context Ring: summarized in active.context.md with reflection entries per phase.
   - Tier 2 – Canonical Files: PR-reviewed under agents/memory-bank/\*.
 - Establish a default, multi-phase workflow (planner → retriever → architect → implementer → reviewer → tester → documenter) under agents/workflows/.
-- Require a 3-line Reflexion after each phase; roll stable learnings into ADRs or system.patterns.md.
+- Require a 3-line reflection after each phase; roll stable learnings into ADRs or system.patterns.md.
 - For system-impacting changes, open ADR stubs using decisions/ADR-0000-template.md.
 - Prefer GitHub MCP for git workflows.
 - Validate memory integrity via npm run memory:validate and npm run memory:drift.

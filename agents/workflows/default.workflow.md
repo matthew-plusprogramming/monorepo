@@ -9,8 +9,8 @@ Intent
 Global Prompts
 
 - Information Retrieval: Follow the Retrieval Policy in `agents/memory-bank.md`.
-- Reflexion note: After each phase, add a 3-line Reflexion to `active.context.md` and append a succinct entry to `progress.log.md`; doc-only or advisory tasks may batch these updates upon completion when no canonical files change.
-  - CLI helpers: `node agents/scripts/append-memory-entry.mjs --target active ...` for reflexions and `--target progress ...` for log entries keep formatting consistent.
+- reflection note: After each phase, add a 3-line reflection to `active.context.md` and append a succinct entry to `progress.log.md`; doc-only or advisory tasks may batch these updates upon completion when no canonical files change.
+  - CLI helpers: `node agents/scripts/append-memory-entry.mjs --target active ...` for reflections and `--target progress ...` for log entries keep formatting consistent.
 - Markdown standards: See `AGENTS.md`.
 
 Phase: plan
@@ -68,7 +68,7 @@ Phase: verify
   - Trace each Given/When/Then to a verification step; confirm Non-goals remain out of scope.
   - Confirm implemented tests follow `agents/memory-bank/testing.guidelines.md` (boundaries, DI, fakes/mocks, flake-proofing).
   - Validate error paths and edge cases; re-run build.
-  - Update Memory Bank: canonical files under `agents/memory-bank/`; add/update ADRs for accepted decisions; append Reflexion and progress log entries (use `node agents/scripts/append-memory-entry.mjs` helpers for consistent formatting).
+  - Update Memory Bank: canonical files under `agents/memory-bank/`; add/update ADRs for accepted decisions; append reflection and progress log entries (use `node agents/scripts/append-memory-entry.mjs` helpers for consistent formatting).
   - Stamp `agents/memory-bank.md` via `node agents/scripts/update-memory-stamp.mjs` once updates are recorded.
   - Workflow Synthesis: If `agents/memory-bank/system.patterns.md` contains new high-importance procedural patterns, then update an existing workflow or create a new one from `agents/workflows/templates/pattern.workflow.template.md`; for workflow changes that alter behavior, open an ADR stub.
   - Validate Memory Bank and drift:

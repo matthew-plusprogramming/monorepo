@@ -60,7 +60,7 @@ Phase: verify
     - Confidence statement: name any assumptions or remaining doubts.
   - Ensure tone stays respectful, collaborative, and specific; avoid vague language ("looks wrong").
   - Verify no fabricated evidence or unstated checks; if something was not inspected, say so.
-  - Update Memory Bank artifacts and reflexions per repo policy after delivering the review.
+  - Update Memory Bank artifacts and reflections per repo policy after delivering the review.
 - Outputs: Publishable review message, inline comment plan, updated Memory Bank notes.
 - Next: done
 

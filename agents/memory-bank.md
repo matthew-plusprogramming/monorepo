@@ -20,4 +20,4 @@ Retrieval Policy
 - Always include: `agents/workflows/default.workflow.md`, `agents/memory-bank/project.brief.md`, recent `agents/memory-bank/progress.log.md`, and `agents/memory-bank/active.context.md`.
 - Gate optional files by substance: include `agents/memory-bank/tech.context.md` and `agents/memory-bank/system.patterns.md` only when they contain substantive, non-placeholder content (more than headings/TBDs). Include relevant ADRs under `agents/memory-bank/decisions/` when directly applicable.
 - For system-impacting changes, open an ADR stub using `agents/memory-bank/decisions/ADR-0000-template.md`.
-- After each phase, append a reflexion to `agents/memory-bank/active.context.md` via the append-memory-entry script; when stable, roll up into an ADR or a relevant stable memory bank file.
+- After each phase, append a reflection to `agents/memory-bank/active.context.md` via the append-memory-entry script; when stable, roll up into an ADR or a relevant stable memory bank file.

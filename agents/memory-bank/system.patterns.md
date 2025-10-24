@@ -28,7 +28,7 @@ Pattern Entry Format
 
 Synthesis Rule
 
-- If Type=procedural and Importance>=medium and recurring across ≥2 tasks (per `agents/memory-bank/progress.log.md` or Reflexion), then:
+- If Type=procedural and Importance>=medium and recurring across ≥2 tasks (per `agents/memory-bank/progress.log.md` or reflection), then:
   - Propose Workflow_Impact=modify:<existing> if pattern naturally augments an existing workflow phase; else Workflow_Impact=create:<slug>.
   - During the verify phase, perform "Workflow Synthesis":
     - Modify an existing workflow under `agents/workflows/*.workflow.md`, or
@@ -42,13 +42,13 @@ Example (Procedural)
 - Type: procedural
 - Importance: high
 - Context: When a repeatable implementation/testing recipe emerges across tasks
-- Trigger: Two or more Reflexion entries cite the same steps
+- Trigger: Two or more reflection entries cite the same steps
 - Steps:
   1. Capture the steps succinctly here
   2. Decide modify vs create
   3. Apply changes to `agents/workflows/*`
   4. Add ADR stub if impactful
-  5. Log progress and Reflexion
+  5. Log progress and reflection
 - Signals: Fewer ad-hoc steps in similar tasks; faster execution
 - Workflow_Impact: modify:default.workflow.md (or create:pattern-specific)
 - Status: adopted

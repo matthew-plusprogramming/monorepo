@@ -21,7 +21,7 @@ Update Requirements (per task)
 
 Convenience helpers
 
-- `node agents/scripts/append-memory-entry.mjs --target active --plan "..." --build "..." --verify "..."` appends a reflexion block to `active.context.md`.
+- `node agents/scripts/append-memory-entry.mjs --target active --plan "..." --build "..." --verify "..."` appends a reflection block to `active.context.md`.
 - `node agents/scripts/append-memory-entry.mjs --target progress --message "..."` appends a line to `progress.log.md`.
 
 ## 🧭 Workflow Process List
@@ -30,7 +30,7 @@ One LLM executes work by following process markdowns in `agents/workflows/`.
 
 - Phases: plan → build → verify
 - Each process file defines checklists, inputs/outputs, and quality gates.
-- The LLM loads the process .md (+ linked partials), executes the current phase, writes artifacts, updates phase state, advances when gates pass, and logs a short Reflexion to the Memory Bank.
+- The LLM loads the process .md (+ linked partials), executes the current phase, writes artifacts, updates phase state, advances when gates pass, and logs a short reflection to the Memory Bank.
 
 IT IS VERY IMPORTANT YOU STRICTLY FOLLOW AGENT WORKFLOWS
 
