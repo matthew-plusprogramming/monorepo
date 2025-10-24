@@ -79,7 +79,11 @@ for (const rawLine of lines) {
     continue;
   }
 
-  if (line.startsWith('index ') || line.startsWith('--- ') || line.startsWith('+++ ')) {
+  if (
+    line.startsWith('index ') ||
+    line.startsWith('--- ') ||
+    line.startsWith('+++ ')
+  ) {
     currentOld = null;
     currentNew = null;
     console.log(line);

@@ -50,7 +50,9 @@ const replaceField = (content, field, value) => {
   const match = content.match(pattern);
 
   if (!match) {
-    console.error(`❌ Unable to locate "${field}" inside agents/memory-bank.md.`);
+    console.error(
+      `❌ Unable to locate "${field}" inside agents/memory-bank.md.`,
+    );
     process.exit(1);
   }
 

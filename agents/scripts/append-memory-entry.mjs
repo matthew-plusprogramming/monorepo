@@ -169,12 +169,20 @@ const main = async () => {
 
   if (target === 'active') {
     const entry = buildActiveEntry(date, options);
-    await appendEntry('agents/memory-bank/active.context.md', entry, options.dryRun);
+    await appendEntry(
+      'agents/memory-bank/active.context.md',
+      entry,
+      options.dryRun,
+    );
     return;
   }
 
   const entry = buildProgressEntry(date, options.message);
-  await appendEntry('agents/memory-bank/progress.log.md', entry, options.dryRun);
+  await appendEntry(
+    'agents/memory-bank/progress.log.md',
+    entry,
+    options.dryRun,
+  );
 };
 
 main().catch((error) => {

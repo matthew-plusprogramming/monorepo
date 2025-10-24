@@ -7,7 +7,6 @@ import {
   splitLines,
 } from './utils.mjs';
 
-
 const ALLOWLIST = new Set([
   // Approved runtime entry points
   'packages/core/backend-core/src/request.handler.ts',
