@@ -4,6 +4,7 @@ Before modifying code, load required context with `node agents/scripts/load-cont
 
 - Memory Bank overview: `agents/memory-bank.md`
 - Workflows overview: `agents/workflows.md`
+- Tool catalog: `agents/tools.md`
 
 ## 🔑 Memory Bank
 

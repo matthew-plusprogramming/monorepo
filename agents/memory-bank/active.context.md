@@ -102,3 +102,6 @@ reflection
 - 2025-10-23 — Plan phase: Audited repository checklist for more granular, build-safe steps.
   Build phase: Replaced section blocks with incremental schema, infra, service, and fake tasks plus commands for each.
   Verify phase: Confirmed with npm run phase:check that formatting and lint automation remain green.
+- 2025-10-24 — Plan phase: Documented agent scripts for easier discovery.
+  Build phase: Added agents/tools.md, linked it from core docs, and ran npm run phase:check.
+  Verify phase: Stamped memory metadata, reviewed diff output, and queued agent:finalize.

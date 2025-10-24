@@ -49,3 +49,4 @@ last_reviewed: 2025-10-21
 - 2025-10-23: Normalized AppLayer layering and taught the repository scaffolder to auto-register new services.
 - 2025-10-23: Refined repository-service scaffold checklist into granular, testable increments with command guidance.
 - 2025-10-23: Refined repository-service scaffold checklist to smaller, verifiable increments with explicit commands.
+- 2025-10-24: Documented agent tooling catalog and linked it from workflows and memory overview.

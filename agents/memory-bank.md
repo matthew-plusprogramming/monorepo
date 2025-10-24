@@ -1,13 +1,14 @@
 ---
 memory_bank: v1
-generated_at: 2025-10-23
-repo_git_sha: 9b2fef7d994057fd82871bcd071c85ee93045ff0
+generated_at: 2025-10-24
+repo_git_sha: 5ea23432c6b360ef38553548ac56906c00310e11
 ---
 
 Memory Bank
 
 - Canonical: `agents/memory-bank/*`
 - Single source of truth: This file defines knowledge representation. Other docs should reference (not duplicate) these rules.
+- Script catalog: `agents/tools.md` lists automation helpers for loading context, stamping metadata, and running validations.
 
 Procedural vs Declarative
 
