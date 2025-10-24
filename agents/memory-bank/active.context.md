@@ -120,3 +120,12 @@ reflection
 - 2025-10-24 — Plan phase: Scoped multi-file reader CLI, identified doc touchpoints, and mapped verify steps.
 - 2025-10-24 — Build phase: Implemented read-files CLI, refreshed docs/workflows, and confirmed lint + quality checks.
 - 2025-10-24 — Verify phase: Exercised read-files CLI (help + sample, error path), captured diff, and passed agent:finalize validation.
+- 2025-10-24 — Plan phase: Plan: Extend manage-cdktf-state CLI with cdk list/deploy paths while keeping bootstrap flow stable.
+  Build phase: Next: Parse stacks metadata, add CLI branching, reuse runCommand for deploy.
+  Verify phase: Verify: Exercise new commands locally; ensure npm phase:check passes.
+- 2025-10-24 — Plan phase: Plan: Scope confirmed before coding; no new requirements added.
+  Build phase: Build: Added stacks metadata parser plus cdk list/deploy commands and verified phase:check.
+  Verify phase: Verify: Capture diff context, exercise list command, and finalize memory validation.
+- 2025-10-24 — Plan phase: Plan: Scope fully addressed with new cdk list/deploy operations added.
+  Build phase: Build: Self-reviewed CLI changes and kept bootstrap path untouched.
+  Verify phase: Verify: git-diff-with-lines, cdk list dry run, and npm run agent:finalize all succeeded.
