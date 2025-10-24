@@ -1,4 +1,5 @@
 import { z } from 'zod';
+
 import { UserIdSchema } from './components/index.js';
 
 export const UserTokenSchema = z.object({

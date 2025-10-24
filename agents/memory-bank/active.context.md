@@ -138,3 +138,6 @@ reflection
 - 2025-10-24 — Plan phase: Plan: Output support landed alongside deploy in manage-cdktf-state.
   Build phase: Build: Reused resolver helper for deploy/output; help text now covers new subcommand.
   Verify phase: Verify: git-diff-with-lines, npm run agent:finalize, and error-path check for missing stack all succeeded.
+- 2025-10-24 — Plan phase: Scoped linting additions for packages/core workspaces to align with shared configs.
+  Build phase: Added lint scripts/configs for backend-core and schemas, introduced shared ESLint config for schemas, and cleaned up user constants to satisfy new rules.
+  Verify phase: Ran workspace lint commands, updated the memory stamp, and cleared `npm run agent:finalize` to keep drift and quality gates green.

@@ -43,9 +43,7 @@ describe('user schemas', () => {
     // Act
     const parsedId = GetUserSchema.parse(id);
     const parsedEmail = GetUserSchema.parse(baseRegisterInput.email);
-    const invalidIdentifier = GetUserSchema.safeParse(
-      'not-a-valid-identifier',
-    );
+    const invalidIdentifier = GetUserSchema.safeParse('not-a-valid-identifier');
 
     // Assert
     expect(parsedId).toBe(id);

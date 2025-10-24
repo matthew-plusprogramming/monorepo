@@ -1,4 +1,5 @@
 import { z } from 'zod';
+
 import {
   UserEmailSchema,
   UserIdSchema,
@@ -14,4 +15,3 @@ export const UserCreateSchema = z.object({
 });
 
 export type UserCreate = z.infer<typeof UserCreateSchema>;
-

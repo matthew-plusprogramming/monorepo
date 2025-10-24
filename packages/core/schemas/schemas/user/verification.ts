@@ -1,4 +1,5 @@
 import { z } from 'zod';
+
 import { UserEmailSchema, UserIdSchema } from './components/index.js';
 
 export const UserVerificationSchema = z.object({

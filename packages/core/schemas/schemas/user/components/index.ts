@@ -1,4 +1,5 @@
 import { z } from 'zod';
+
 import { USER_SCHEMA_CONSTANTS } from '../constants/index.js';
 
 export const UserIdSchema = z.uuid().meta({

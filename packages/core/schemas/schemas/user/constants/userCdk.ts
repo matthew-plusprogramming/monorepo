@@ -1,8 +1,8 @@
 import { USER_SCHEMA_CONSTANTS } from './user.js';
 
-const UserTableKeys = [
+export const USER_TABLE_KEYS = [
   USER_SCHEMA_CONSTANTS.key.id,
   USER_SCHEMA_CONSTANTS.gsi.email,
 ] as const;
 
-export type UserTableKey = (typeof UserTableKeys)[number];
+export type UserTableKey = (typeof USER_TABLE_KEYS)[number];

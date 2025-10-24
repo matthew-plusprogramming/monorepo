@@ -30,6 +30,9 @@
     "clean": "rm -rf node_modules && rm -rf .turbo && rm -rf dist",
     "// -- 🧪 Testing": "--",
     "// -- 🧹 Linting & Formatting": "--",
+    "lint": "eslint src --cache",
+    "lint:fix": "eslint src --fix --cache",
+    "lint:no-cache": "eslint src",
     "// -- ✅ Verification & CI": "--",
     "// -- 🔧 Miscellaneous": "--"
   },

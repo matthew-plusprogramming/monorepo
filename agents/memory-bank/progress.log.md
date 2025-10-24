@@ -67,3 +67,6 @@ last_reviewed: 2025-10-21
 - 2025-10-24: Started plan to add cdk output support to manage-cdktf-state.
 - 2025-10-24: Build phase: added manage-cdktf-state cdk output handler and shared stack arg parsing.
 - 2025-10-24: Verify phase: ran git-diff-with-lines, updated memory stamp, and cleared agent:finalize for cdk output change.
+- 2025-10-24: Plan: Identified lint script gaps for packages/core backend-core and schemas; will wire shared ESLint config and add scripts.
+- 2025-10-24: Build: Added lint scripts/configs for backend-core and schemas, exported shared user table keys, and confirmed workspace lint commands succeed.
+- 2025-10-24: Verify: Captured diff context, reran lint pipelines via agent:finalize, and updated the memory stamp for core linting changes.

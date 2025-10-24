@@ -21,6 +21,9 @@
     "// -- 🧪 Testing": "--",
     "test": "vitest run",
     "// -- 🧹 Linting & Formatting": "--",
+    "lint": "eslint schemas --cache",
+    "lint:fix": "eslint schemas --fix --cache",
+    "lint:no-cache": "eslint schemas",
     "// -- ✅ Verification & CI": "--",
     "// -- 🔧 Miscellaneous": "--"
   },
@@ -32,7 +35,9 @@
     "typescript": "^5.9.3"
   },
   "devDependencies": {
+    "@configs/eslint-config": "*",
     "@configs/ts-config": "*",
+    "eslint": "^9.38.0",
     "vitest": "^4.0.1"
   },
   "peerDependencies": {
