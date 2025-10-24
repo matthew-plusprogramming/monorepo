@@ -1,6 +1,6 @@
-| key   | value                   |
-| ----- | ----------------------- |
-| Title | <Pattern Name> Workflow |
+---
+Title: <Pattern Name> Workflow
+---
 
 Intent
 
