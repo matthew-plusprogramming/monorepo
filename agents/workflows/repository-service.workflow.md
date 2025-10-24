@@ -84,9 +84,7 @@ Phase: verify
   - Run `npm run lint`, `npm run test`, and targeted CDK/handler suites; capture results.
   - Confirm infra outputs compile by running `npm -w @cdk/backend-server-cdk run lint` (and synth if relevant).
   - Update `agents/memory-bank` entries (plan summary, new invariants, system patterns if the workflow evolves); leverage `node agents/scripts/append-memory-entry.mjs` for reflexions and progress entries.
-  - Stamp `agents/memory-bank.md` via `node agents/scripts/update-memory-stamp.mjs` (`generated_at`, `repo_git_sha`) and rerun validation scripts:
-    - `npm run memory:validate`
-    - `npm run memory:drift`
+  - Stamp `agents/memory-bank.md` via `node agents/scripts/update-memory-stamp.mjs`
   - Ensure documentation references (READMEs, ADRs) are updated if contracts changed.
 - Outputs: Test logs, Memory Bank updates, ready-to-merge diff.
 - Next: done
