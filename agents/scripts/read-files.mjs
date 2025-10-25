@@ -14,6 +14,8 @@ Options
   --file-list <path>           File containing newline-delimited repo-relative paths
   --encoding <value>           Text encoding (default: utf8)
   --maxFileSizeKB <number>     Reject files larger than this size in KB (default: 256)
+  --json                       Emit the legacy JSON payload (default: numbered text output)
+  --text                       Force numbered text output (default)
   -h, --help                   Show this help message
 
 Examples
@@ -30,6 +32,7 @@ const options = {
   encoding: 'utf8',
   maxFileSizeKB: 256,
   showHelp: false,
+  outputMode: 'text',
 };
 
 const parseListArgument = (value) =>
@@ -88,6 +91,12 @@ for (let index = 0; index < args.length; index += 1) {
       if (inlineValue === undefined) index += 1;
       break;
     }
+    case '--json':
+      options.outputMode = 'json';
+      break;
+    case '--text':
+      options.outputMode = 'text';
+      break;
     default:
       if (token.startsWith('-')) {
         console.error(`❌ Unknown option: ${token}`);
@@ -247,6 +256,21 @@ const readFileContent = async (inputPath) => {
   return { path: relativePath, content };
 };
 
+const buildNumberedText = (path, content) => {
+  const normalized = content.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  const lines = normalized.split('\n');
+  const width = String(lines.length).length;
+  const divider = '='.repeat(path.length + 8);
+
+  const numbered = lines
+    .map(
+      (line, index) => `${String(index + 1).padStart(width, ' ')} | ${line}`,
+    )
+    .join('\n');
+
+  return `${divider}\n=== ${path} ===\n${divider}\n${numbered}`;
+};
+
 const main = async () => {
   const requestedFiles = await gatherRequestedFiles();
   const results = [];
@@ -256,7 +280,16 @@ const main = async () => {
     results.push(record);
   }
 
-  process.stdout.write(JSON.stringify({ files: results }));
+  if (options.outputMode === 'json') {
+    process.stdout.write(JSON.stringify({ files: results }));
+    return;
+  }
+
+  const formatted = results.map(({ path, content }) =>
+    buildNumberedText(path, content),
+  );
+
+  process.stdout.write(`${formatted.join('\n\n')}\n`);
 };
 
 main().catch((error) => {

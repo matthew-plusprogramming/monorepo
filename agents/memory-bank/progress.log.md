@@ -70,3 +70,4 @@ last_reviewed: 2025-10-21
 - 2025-10-24: Plan: Identified lint script gaps for packages/core backend-core and schemas; will wire shared ESLint config and add scripts.
 - 2025-10-24: Build: Added lint scripts/configs for backend-core and schemas, exported shared user table keys, and confirmed workspace lint commands succeed.
 - 2025-10-24: Verify: Captured diff context, reran lint pipelines via agent:finalize, and updated the memory stamp for core linting changes.
+- 2025-10-25: Updated agent instructions plus load-context/read-files/smart-file-query to default to numbered text, added --json escape hatches, and ran npm run phase:check + git-diff-with-lines for verification.

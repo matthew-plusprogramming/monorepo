@@ -42,6 +42,18 @@ const collectPaths = () => {
   return includeOptional ? [...alwaysInclude, ...optional] : alwaysInclude;
 };
 
+const formatWithLineNumbers = (content) => {
+  const normalized = content.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  const lines = normalized.split('\n');
+  const width = String(lines.length).length;
+
+  return lines
+    .map(
+      (line, index) => `${String(index + 1).padStart(width, ' ')} | ${line}`,
+    )
+    .join('\n');
+};
+
 const printSectionHeader = (relativePath) => {
   const divider = '='.repeat(relativePath.length + 8);
   console.log(divider);
@@ -89,6 +101,6 @@ for (const relativePath of selectedPaths) {
   }
 
   printSectionHeader(relativePath);
-  console.log(content.trimEnd());
+  console.log(formatWithLineNumbers(content));
   console.log('');
 }

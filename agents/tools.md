@@ -7,16 +7,16 @@ Prefer the purpose-built discovery scripts (`list-files-recursively.mjs`, `smart
 ## Context & Memory Management
 
 - `node agents/scripts/load-context.mjs [--include-optional] [--list]`
-  Prints required Memory Bank + workflow files for the current task. Add `--include-optional` to pull in supplemental context and `--list` to show paths without content.
+  Prints required Memory Bank + workflow files for the current task with numbered lines to encourage single-pass note taking. Add `--include-optional` to pull in supplemental context and `--list` to show paths without content.
 - `node agents/scripts/append-memory-entry.mjs --target <active|progress> [...]`
   Appends formatted reflections to `active.context.md` or `progress.log.md`. Supply `--plan`, `--build`, `--verify` for active context entries or `--message` for the progress log; `--dry-run` previews the output.
 
 ## Search & Discovery
 
-- `node agents/scripts/smart-file-query.mjs --regex "<pattern>" [--glob ...] [--contextLines ...] [--includeAllContent]`
-  Finds regex matches across the repo with optional glob scoping, surrounding context lines, and full file contents, returning a minified JSON payload for downstream tooling.
-- `node agents/scripts/read-files.mjs --files "<path[,path...]>" [--file-list ...] [--encoding ...] [--maxFileSizeKB ...]`
-  Reads multiple repo-relative files, applying size/binary guards, and prints a JSON array preserving the requested order (`{ files: [{ path, content }] }`).
+- `node agents/scripts/smart-file-query.mjs --regex "<pattern>" [--glob ...] [--contextLines ...] [--includeAllContent] [--json]`
+  Finds regex matches across the repo with optional glob scoping, numbered context lines, and optional full file contents. Text output is default; pass `--json` to recover the prior machine-readable payload.
+- `node agents/scripts/read-files.mjs --files "<path[,path...]>" [--file-list ...] [--encoding ...] [--maxFileSizeKB ...] [--json]`
+  Reads multiple repo-relative files, applying size/binary guards, and prints numbered text blocks by default so you can cite `path:line` without re-reading. Use `--json` when automation requires the legacy `{ files: [{ path, content }] }` payload.
 
 ## Reporting & Diff Utilities
 

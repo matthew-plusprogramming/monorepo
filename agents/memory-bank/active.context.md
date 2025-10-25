@@ -141,3 +141,6 @@ reflection
 - 2025-10-24 — Plan phase: Scoped linting additions for packages/core workspaces to align with shared configs.
   Build phase: Added lint scripts/configs for backend-core and schemas, introduced shared ESLint config for schemas, and cleaned up user constants to satisfy new rules.
   Verify phase: Ran workspace lint commands, updated the memory stamp, and cleared `npm run agent:finalize` to keep drift and quality gates green.
+- 2025-10-25 — Plan phase: Scoped doc + script updates to enforce one-pass context and default line-numbered outputs
+  Build phase: Updated AGENTS/workflows/memory policy plus load-context/read-files/smart-file-query to emit numbered text with optional --json fallback
+  Verify phase: Ran npm run phase:check, git-diff-with-lines, and spot-checked new script modes to confirm line numbers without regressing JSON consumers

@@ -20,7 +20,7 @@ Desired Outcome
 Global Prompts
 
 - Follow Memory Bank retrieval policy before starting.
-- Use `node agents/scripts/list-files-recursively.mjs` and `node agents/scripts/smart-file-query.mjs` for file discovery and content inspection instead of raw shell utilities.
+- Use `node agents/scripts/list-files-recursively.mjs` and `node agents/scripts/smart-file-query.mjs`/`node agents/scripts/read-files.mjs` for file discovery and content inspection; rely on the default line-numbered output to take notes once and avoid rerunning unless files change.
 - Coordinate infra/app/schema changes in the same PR; avoid leaving intermediate states that break boot.
 - Update the Memory Bank (reflection + progress log) after each phase; the CLI helper `node agents/scripts/append-memory-entry.mjs` keeps entries consistent; rerun validation/drift scripts in verify.
 

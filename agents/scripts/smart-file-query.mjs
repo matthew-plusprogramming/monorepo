@@ -21,6 +21,8 @@ Options
   --maxFileSizeKB <number>    Skip files larger than this size in KB (default: 256)
   --maxMatches <number>       Maximum total matches to return (default: 500)
   --encoding <value>          File encoding (default: utf8)
+  --json                      Emit JSON payload (default: numbered text summary)
+  --text                      Force numbered text summary output (default)
   -h, --help                  Show this help message
 `;
 
@@ -49,6 +51,7 @@ const parseArgs = () => {
     maxMatches: 500,
     encoding: 'utf8',
     showHelp: false,
+    outputMode: 'text',
   };
 
   const consumeValue = (index, flag) => {
@@ -135,6 +138,12 @@ const parseArgs = () => {
         if (inlineValue === undefined) index += 1;
         break;
       }
+      case '--json':
+        options.outputMode = 'json';
+        break;
+      case '--text':
+        options.outputMode = 'text';
+        break;
       default:
         if (token.startsWith('-')) {
           console.error(`❌ Unknown option: ${token}`);
@@ -351,21 +360,25 @@ const searchFile = (text, baseRegex, contextLines, maxRemainingMatches) => {
     const column = Array.from(line.slice(0, columnOffset)).length + 1;
 
     const before = [];
+    const beforeNumbers = [];
     for (let offset = 1; offset <= contextLines; offset += 1) {
       const targetIndex = lineIndex - offset;
       if (targetIndex < 0) {
         break;
       }
       before.unshift(lines[targetIndex] ?? '');
+      beforeNumbers.unshift(targetIndex + 1);
     }
 
     const after = [];
+    const afterNumbers = [];
     for (let offset = 1; offset <= contextLines; offset += 1) {
       const targetIndex = lineIndex + offset;
       if (targetIndex >= lines.length) {
         break;
       }
       after.push(lines[targetIndex] ?? '');
+      afterNumbers.push(targetIndex + 1);
     }
 
     matches.push({
@@ -377,6 +390,11 @@ const searchFile = (text, baseRegex, contextLines, maxRemainingMatches) => {
         line,
         after,
       },
+      lineNumbers: {
+        before: beforeNumbers,
+        line: lineIndex + 1,
+        after: afterNumbers,
+      },
     });
 
     if (matches.length >= maxRemainingMatches) {
@@ -385,7 +403,7 @@ const searchFile = (text, baseRegex, contextLines, maxRemainingMatches) => {
     }
   }
 
-  return { matches, truncated };
+  return { matches, truncated, lineCount: lines.length };
 };
 
 const summarizeSkipped = (skipped) => {
@@ -403,6 +421,112 @@ const summarizeSkipped = (skipped) => {
     .join(', ');
 
   console.error(`⚠️  Skipped ${skipped.length} file(s): ${details}`);
+};
+
+const normalizeNewlines = (text) => text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+
+const buildNumberedLines = (text, lineCountHint) => {
+  const normalized = normalizeNewlines(text);
+  const lines = normalized.split('\n');
+  const width = String(lineCountHint ?? lines.length).length;
+
+  return lines
+    .map(
+      (line, index) => `${String(index + 1).padStart(width, ' ')} | ${line}`,
+    )
+    .join('\n');
+};
+
+const formatContextBlock = (match, width) => {
+  const rows = [];
+
+  const beforeNumbers = match.lineNumbers?.before ?? [];
+  match.context.before.forEach((text, index) => {
+    rows.push({
+      lineNumber: beforeNumbers[index],
+      text,
+      isMatch: false,
+    });
+  });
+
+  rows.push({
+    lineNumber: match.lineNumbers?.line ?? match.lineNumber,
+    text: match.context.line,
+    isMatch: true,
+  });
+
+  const afterNumbers = match.lineNumbers?.after ?? [];
+  match.context.after.forEach((text, index) => {
+    rows.push({
+      lineNumber: afterNumbers[index],
+      text,
+      isMatch: false,
+    });
+  });
+
+  return rows
+    .map((segment) => {
+      const marker = segment.isMatch ? '>' : ' ';
+      const label =
+        segment.lineNumber !== undefined
+          ? String(segment.lineNumber).padStart(width, ' ')
+          : ' '.repeat(width);
+      return `${marker} ${label} | ${segment.text}`;
+    })
+    .join('\n');
+};
+
+const formatFileResult = (fileResult, includeAllContent) => {
+  const digits = String(fileResult.lineCount ?? 1).length;
+  const divider = '='.repeat(fileResult.path.length + 8);
+  const lines = [
+    divider,
+    `=== ${fileResult.path} ===`,
+    divider,
+    `Matches: ${fileResult.matchCount}${
+      fileResult.truncated ? ' (truncated)' : ''
+    }`,
+  ];
+
+  fileResult.matches.forEach((match, index) => {
+    lines.push('');
+    lines.push(
+      `Match ${index + 1}: L${match.lineNumber}:C${match.column} — ${
+        match.match
+      }`,
+    );
+    lines.push(formatContextBlock(match, digits));
+  });
+
+  if (includeAllContent && fileResult.content) {
+    lines.push('');
+    lines.push('Full content');
+    lines.push('-'.repeat(12));
+    lines.push(buildNumberedLines(fileResult.content, fileResult.lineCount));
+  }
+
+  return lines.join('\n');
+};
+
+const formatTextOutput = (payload, includeAllContent) => {
+  if (payload.results.length === 0) {
+    return `No matches found for /${payload.query.regex}/${payload.query.flags}.`;
+  }
+
+  const formattedFiles = payload.results.map((fileResult) =>
+    formatFileResult(fileResult, includeAllContent),
+  );
+
+  const summary = [
+    `Query: /${payload.query.regex}/${payload.query.flags}`,
+    `Files visited: ${payload.aggregate.filesVisited}`,
+    `Files matched: ${payload.aggregate.filesMatched}`,
+    `Total matches: ${payload.aggregate.totalMatches}${
+      payload.aggregate.truncated ? ' (truncated)' : ''
+    }`,
+  ].join('\n');
+
+  return `${summary}\n\n${formattedFiles.join('\n\n')}\n`;
 };
 
 const main = async () => {
@@ -502,7 +626,7 @@ const main = async () => {
     }
 
     const remainingAllowed = options.maxMatches - totalMatches;
-    const { matches, truncated } = searchFile(
+    const { matches, truncated, lineCount } = searchFile(
       text,
       baseRegex,
       options.contextLines,
@@ -521,6 +645,7 @@ const main = async () => {
       matchCount: matches.length,
       matches,
       truncated,
+      lineCount,
     };
 
     if (options.includeAllContent) {
@@ -562,7 +687,11 @@ const main = async () => {
     console.error('⚠️  Match results truncated by maxMatches limit.');
   }
 
-  process.stdout.write(JSON.stringify(payload));
+  if (options.outputMode === 'json') {
+    process.stdout.write(JSON.stringify(payload));
+  } else {
+    process.stdout.write(formatTextOutput(payload, options.includeAllContent));
+  }
 };
 
 main().catch((error) => {
