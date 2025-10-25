@@ -11,7 +11,7 @@
     "// -- 🛠️ Build & Clean": "--",
     "prebuild": "tsc",
     "build": "dotenvx run -f .env.production -- vite build --mode production",
-    "postbuild": "tsx scripts/bundle && npm run copy-cdk-outputs && npm run copy-env-prod",
+    "postbuild": "tsx scripts/bundle-argon-2 && npm run copy-cdk-outputs && npm run copy-env-prod",
     "copy-cdk-outputs": "dotenvx run -f .env.production -- cross-env ENV=production tsx scripts/copy-cdk-outputs.ts",
     "copy-env-dev": "cross-env ENV=development tsx scripts/copy-env.ts",
     "copy-env-prod": "cross-env ENV=production tsx scripts/copy-env.ts",
