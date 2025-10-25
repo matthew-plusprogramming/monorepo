@@ -32,6 +32,7 @@ export const stacks = [
     Stack: ApiStack,
     props: {},
     outputSchema: ApiStackOutputSchema,
+    stages: ['dev', 'prod'],
   } as const satisfies Stack<ApiStackProps>,
   {
     name: API_LAMBDA_STACK_NAME,
@@ -39,6 +40,7 @@ export const stacks = [
     Stack: ApiLambdaStack,
     props: {},
     outputSchema: z.object(),
+    stages: ['dev', 'prod'],
   },
   {
     name: ANALYTICS_STACK_NAME,
@@ -46,5 +48,6 @@ export const stacks = [
     Stack: AnalyticsStack,
     props: {},
     outputSchema: AnalyticsStackOutputSchema,
+    stages: ['dev', 'prod'],
   },
 ] as const satisfies Stack<UniversalStackProps>[];

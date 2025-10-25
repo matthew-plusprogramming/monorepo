@@ -16,6 +16,7 @@ export interface Stack<
   Stack: new (scope: Construct, id: string, props: TProps) => TerraformStack;
   props: Omit<TProps, keyof UniversalStackProps>;
   outputSchema: TOutputSchema;
+  stages?: string[];
 }
 
 export type AnyStack = Prettify<Stack<UniversalStackProps>>;

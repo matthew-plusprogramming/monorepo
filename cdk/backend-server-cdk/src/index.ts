@@ -70,10 +70,20 @@ stacks.forEach((stack) => {
   }
 
   const { Stack } = stack;
-  new Stack(app, stack.name, {
-    region,
-    ...stack.props,
-  });
+
+  if (stack.name !== 'myapp-bootstrap-stack' && stack?.stages) {
+    stack.stages.forEach((stage) => {
+      new Stack(app, `${stack.name}-${stage}`, {
+        region,
+        ...stack.props,
+      });
+    });
+  } else {
+    new Stack(app, stack.name, {
+      region,
+      ...stack.props,
+    });
+  }
 });
 
 app.synth();
