@@ -1,50 +1,51 @@
 ---
-Title: <Pattern Name> Workflow
+Title: <Workflow Title Placeholder>
 ---
 
 Intent
 
-- Encapsulate a high-importance procedural pattern discovered in `agents/memory-bank/system.patterns.md` as a reusable, diff-able workflow.
+- Describe what this workflow automates and why it exists.
+- Outline the boundaries or components it governs.
+
+Problem Statement
+
+- Summarize the pain this workflow resolves.
+- Note any constraints, guardrails, or non-goals.
+
+Desired Outcome
+
+- List the concrete success criteria this workflow should guarantee.
 
 Global Prompts
 
-- Follow the same phase structure as default; customize checklists to the pattern’s steps.
-- Keep unrelated changes out; update Memory Bank as needed.
-- Use `node agents/scripts/list-files-recursively.mjs` for discovery, `node agents/scripts/smart-file-query.mjs` for targeted searches, and `node agents/scripts/read-files.mjs` (numbered text by default, `--json` if automation requires) when you need ordered contents from multiple files; take notes once and avoid re-running unless files change.
+- Reference `agents/memory-bank.md#retrieval-policy` for discovery tooling, numbered output expectations, and single-pass context discipline.
+- Call out any workflow-specific safety, coordination, or communication rules.
 
 Phase: plan
 
-- Goal: Frame applicability, gather context, and tailor the approach.
-- Inputs: Pattern entry in `agents/memory-bank/system.patterns.md`; relevant tech/product context; recent progress and active context.
+- Goal: <What the plan phase must accomplish.>
+- Inputs: <Key files, context, or systems to inspect before proposing work.>
 - Checklist:
-  - Identify when to apply this pattern and success criteria.
-  - Note constraints and risks; map impacted components/interfaces.
-  - Validate pattern steps; adjust for current constraints; consider performance and security implications.
-- Outputs: Tailored plan; scope and criteria for using this workflow; focused context notes.
+  - <Add bullet items that define planning steps and acceptance criteria.>
+- Outputs: <Artifacts required to exit the phase.>
 - Next: build
 
 Phase: build
 
-- Goal: Execute the pattern steps with minimal diffs and high clarity.
+- Goal: <What implementation should deliver.>
 - Checklist:
-  - Implement scoped changes according to the pattern; follow repo style.
-  - Keep diffs minimal; update docs as needed.
-  - Self-review diffs against pattern intent, criteria, and invariants.
-- Outputs: Code changes; documentation updates; fixups.
+  - <Implementation tasks and verification steps.>
+- Outputs: <Code/doc changes, migrations, etc.>
 - Next: verify
 
 Phase: verify
 
-- Goal: Validate behavior, edge cases, and update Memory Bank.
+- Goal: <How to prove the change met expectations.>
 - Checklist:
-  - Run targeted tests; validate signals from the pattern.
-  - Update `agents/memory-bank` as needed; record outcomes.
-  - If the workflow template evolved or a new procedural pattern emerged, update/create a workflow and consider an ADR stub.
-  - Run memory validation and drift checks:
-    - Run `npm run phase:check`
-- Outputs: Test results; updated Memory Bank; notes.
+  - <Tests, validations, and Memory Bank updates.>
+- Outputs: <Evidence collected plus any follow-up actions.>
 - Next: done
 
 End
 
-- Close with a brief summary and any follow-ups.
+- Capture closing notes, deployment sequencing, or follow-up tracking guidance.

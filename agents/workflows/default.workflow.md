@@ -8,11 +8,9 @@ Intent
 
 Global Prompts
 
-- Information Retrieval: Follow the Retrieval Policy in `agents/memory-bank.md`.
-- File inspection: Prefer `node agents/scripts/list-files-recursively.mjs` for enumerating files, `node agents/scripts/smart-file-query.mjs` for targeted searches, and `node agents/scripts/read-files.mjs` (numbered text by default, `--json` on demand) when streaming multiple file contents instead of generic shell commands.
-- Context discipline: Capture `file:line` references the first time you load a file and only re-run these scripts if the underlying file changed; the default numbered output is meant to eliminate re-reading.
-- reflection note: After each phase, add a 3-line reflection to `active.context.md` and append a succinct entry to `progress.log.md`; doc-only or advisory tasks may batch these updates upon completion when no canonical files change.
-  - CLI helpers: `node agents/scripts/append-memory-entry.mjs --target active ...` for reflections and `--target progress ...` for log entries keep formatting consistent.
+- Retrieval & context discipline: Follow the Retrieval Policy in `agents/memory-bank.md` for required discovery tooling, numbered text defaults, and the single-pass note-taking rule; treat that section as canonical for file inspection guidance.
+- reflection note: After each phase, add a 3-line reflection to `active.context.md`; doc-only or advisory tasks may batch these updates upon completion when no canonical files change.
+  - CLI helpers: `node agents/scripts/append-memory-entry.mjs ...` for reflections keep formatting consistent.
 - Markdown standards: See `AGENTS.md`.
 
 Phase: plan
@@ -70,9 +68,8 @@ Phase: verify
   - Trace each Given/When/Then to a verification step; confirm Non-goals remain out of scope.
   - Confirm implemented tests follow `agents/memory-bank/testing.guidelines.md` (boundaries, DI, fakes/mocks, flake-proofing).
   - Validate error paths and edge cases; re-run build.
-  - Update Memory Bank: canonical files under `agents/memory-bank/`; add/update ADRs for accepted decisions; append reflection and progress log entries (use `node agents/scripts/append-memory-entry.mjs` helpers for consistent formatting).
+  - Update Memory Bank: canonical files under `agents/memory-bank/`; add/update ADRs for accepted decisions; append reflection (use `node agents/scripts/append-memory-entry.mjs` helpers for consistent formatting).
   - Stamp `agents/memory-bank.md` via `node agents/scripts/update-memory-stamp.mjs` once updates are recorded.
-  - Workflow Synthesis: If `agents/memory-bank/system.patterns.md` contains new high-importance procedural patterns, then update an existing workflow or create a new one from `agents/workflows/templates/pattern.workflow.template.md`; for workflow changes that alter behavior, open an ADR stub.
   - Validate Memory Bank and drift:
     - `npm run agent:finalize`
 - Outputs: Test results; fixes; updated Memory Bank; optional workflow updates.

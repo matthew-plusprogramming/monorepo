@@ -8,8 +8,7 @@ Intent
 
 Global Prompts
 
-- Retrieval: Load context per `agents/memory-bank.md` (workflow, brief, progress log, active context, optional tech/system patterns when substantive).
-- Discovery tools: Prefer `node agents/scripts/list-files-recursively.mjs` and `node agents/scripts/smart-file-query.mjs` (numbered text by default, `--json` when automation requires) for enumerating files and reading contents; capture references on the first pass and only re-run when a file actually changes.
+- Retrieval & discovery: Load context per `agents/memory-bank.md` (workflow, brief, active context, optional tech patterns when substantive) and follow the Retrieval Policy in that file for the required discovery scripts plus single-pass note-taking expectations.
 - Tone: Be constructive, specific, and solution-oriented; prefer "Consider ... because ..." to blunt rejections.
 - Safety: Default to caution when unsure; flag uncertainty explicitly rather than guessing.
 

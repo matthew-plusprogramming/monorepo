@@ -5,8 +5,7 @@ Before modifying code, load required context with `node agents/scripts/load-cont
 - Memory Bank overview: `agents/memory-bank.md`
 - Workflows overview: `agents/workflows.md`
 - Tool catalog: `agents/tools.md`
-- One-pass context: Run the context loaders once, capture file:line notes locally, and only re-read a file when it actually changed; repeated pulls waste time and violate workflow policy now that every helper prints numbered lines by default.
-- File discovery & search: prefer `node agents/scripts/list-files-recursively.mjs` for enumeration, `node agents/scripts/smart-file-query.mjs` for scoped searches, and `node agents/scripts/read-files.mjs` (default numbered text, `--json` for automation) when you need ordered contents from multiple files instead of ad-hoc shell commands.
+- Retrieval policy: `agents/memory-bank.md#retrieval-policy` is the canonical source for discovery tooling, one-pass note taking, and context tiers. Quick start: `node agents/scripts/list-files-recursively.mjs --root apps` (pattern defaults to match everything; add `--pattern handler` to filter results).
 
 ## 🔑 Memory Bank
 
@@ -21,13 +20,11 @@ Update Requirements (per task)
 - Use `node agents/scripts/update-memory-stamp.mjs` to automatically apply the stamp once updates are ready.
 - Validate and check drift:
   - `npm run agent:finalize` - verify referenced paths exist across all memory files, check stamped SHA matches
-- Retrieval helpers: when you need to inspect files, use `node agents/scripts/list-files-recursively.mjs` for structured file listings, `node agents/scripts/smart-file-query.mjs` for scoped content searches, and `node agents/scripts/read-files.mjs` to stream multiple file contents while avoiding noisy default tooling.
-- Numbered outputs: These helpers now print line numbers by default so you can cite `path:line` without re-reading; reserve the `--json` flag for automation or downstream tooling that truly needs raw payloads.
+- Retrieval helpers: follow the Retrieval Policy in `agents/memory-bank.md` for the authoritative list of discovery commands (`list-files-recursively.mjs`, `smart-file-query.mjs`, `read-files.mjs`), numbered output expectations, and when `--json` is appropriate.
 
 Convenience helpers
 
-- `node agents/scripts/append-memory-entry.mjs --target active --plan "..." --build "..." --verify "..."` appends a reflection block to `active.context.md`.
-- `node agents/scripts/append-memory-entry.mjs --target progress --message "..."` appends a line to `progress.log.md`.
+- `node agents/scripts/append-memory-entry.mjs --plan "..." --build "..." --verify "..."` appends a reflection block to `active.context.md`.
 
 ## 🧭 Workflow Process List
 

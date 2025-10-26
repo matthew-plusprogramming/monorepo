@@ -3,7 +3,7 @@ import { promises as fs } from 'node:fs';
 import { resolve, relative, join, extname } from 'node:path';
 import process from 'node:process';
 
-const USAGE = `Usage: node agents/scripts/list-files-recursively.mjs --root <path> --pattern <pattern>
+const USAGE = `Usage: node agents/scripts/list-files-recursively.mjs --root <path> [--pattern <pattern>]
        [--types ts|md|all] [--regex] [--case-sensitive]
 
 Recursively scans the provided root directory, filters files whose relative paths
@@ -11,7 +11,7 @@ match the supplied pattern, and prints a CSV with path,size,modifiedAt columns.
 
 Options
   -r, --root <path>          Root directory to start the scan (required)
-  -p, --pattern <pattern>    Pattern to match against repo-relative paths (required)
+  -p, --pattern <pattern>    Pattern to match against repo-relative paths (default: match all)
   -t, --types <types>        Comma-separated filter for file groups: ts, md, all (default: all)
       --regex                Treat the pattern as a JavaScript regular expression
       --case-sensitive       Match pattern using case-sensitive comparisons (default: case-insensitive)
@@ -91,8 +91,8 @@ if (options.showHelp) {
   process.exit(0);
 }
 
-if (!options.root || !options.pattern) {
-  console.error('❌ Both --root and --pattern are required.');
+if (!options.root) {
+  console.error('❌ --root is required.');
   console.error(USAGE.trimEnd());
   process.exit(1);
 }
@@ -100,6 +100,10 @@ if (!options.root || !options.pattern) {
 const toPosix = (value) => value.replace(/\\/g, '/');
 
 const makePatternPredicate = (pattern, { useRegex, caseSensitive }) => {
+  if (!pattern) {
+    return () => true;
+  }
+
   if (useRegex) {
     try {
       const flags = caseSensitive ? undefined : 'i';
@@ -188,7 +192,7 @@ const main = async () => {
     process.exit(1);
   }
 
-  const predicate = makePatternPredicate(options.pattern, {
+  const predicate = makePatternPredicate(options.pattern ?? '', {
     useRegex: options.useRegex,
     caseSensitive: options.caseSensitive,
   });

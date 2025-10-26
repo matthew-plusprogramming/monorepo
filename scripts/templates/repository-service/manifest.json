@@ -75,7 +75,7 @@
         "- [ ] Run `npm run lint` at the repo root.",
         "- [ ] Run `npm run test` (or the targeted suites touched).",
         "- [ ] Execute `npm run memory:validate` and `npm run memory:drift`.",
-        "- [ ] Append Memory Bank reflection/progress log entries and stamp `agents/memory-bank.md`.",
+        "- [ ] Append Memory Bank reflection entries and stamp `agents/memory-bank.md`.",
         "- [ ] Finish with `npm run phase:check`."
       ]
     },

@@ -19,10 +19,9 @@ Desired Outcome
 
 Global Prompts
 
-- Follow Memory Bank retrieval policy before starting.
-- Use `node agents/scripts/list-files-recursively.mjs` and `node agents/scripts/smart-file-query.mjs`/`node agents/scripts/read-files.mjs` for file discovery and content inspection; rely on the default line-numbered output to take notes once and avoid rerunning unless files change.
+- Follow the Retrieval Policy in `agents/memory-bank.md` for discovery tooling, numbered outputs, and single-pass context gathering before starting.
 - Coordinate infra/app/schema changes in the same PR; avoid leaving intermediate states that break boot.
-- Update the Memory Bank (reflection + progress log) after each phase; the CLI helper `node agents/scripts/append-memory-entry.mjs` keeps entries consistent; rerun validation/drift scripts in verify.
+- Update the Memory Bank (reflection) after each phase; the CLI helper `node agents/scripts/append-memory-entry.mjs` keeps entries consistent; rerun validation/drift scripts in verify.
 
 Phase: plan
 
@@ -85,7 +84,7 @@ Phase: verify
   - Map each Given/When/Then acceptance criterion to a completed test or manual verification.
   - Run `npm run lint`, `npm run test`, and targeted CDK/handler suites; capture results.
   - Confirm infra outputs compile by running `npm -w @cdk/backend-server-cdk run cdk:synth:dev`.
-  - Update `agents/memory-bank` entries (plan summary, new invariants, system patterns if the workflow evolves); leverage `node agents/scripts/append-memory-entry.mjs` for reflections and progress entries.
+  - Update `agents/memory-bank` entries (plan summary, new invariants, system patterns if the workflow evolves); leverage `node agents/scripts/append-memory-entry.mjs` for reflections.
   - Stamp `agents/memory-bank.md` via `node agents/scripts/update-memory-stamp.mjs`
   - Ensure documentation references (READMEs, ADRs) are updated if contracts changed.
 - Outputs: Test logs, Memory Bank updates, ready-to-merge diff.
