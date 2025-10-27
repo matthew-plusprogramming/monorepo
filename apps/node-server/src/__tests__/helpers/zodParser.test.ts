@@ -53,7 +53,7 @@ describe('parseInput', () => {
     expect(outcome._tag).toBe('Left');
     if (outcome._tag === 'Left') {
       expect(outcome.left).toBeInstanceOf(InternalServerError);
-      expect(outcome.left.message).toBe('unexpected failure');
+      expect(outcome.left.message).toBe('Failed to parse input');
     }
   });
 

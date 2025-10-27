@@ -2,6 +2,7 @@ import { Data } from 'effect';
 
 export type GenericErrorPayload = {
   message: string;
+  cause: unknown;
 };
 
 export class ParseError extends Data.TaggedError(

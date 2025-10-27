@@ -36,6 +36,7 @@ const ipRateLimitingMiddlewareHandler = (
       return yield* Effect.fail(
         new RateLimitExceededError({
           message: 'IP address is required for rate limiting',
+          cause: undefined,
         }),
       );
     }
@@ -68,11 +69,11 @@ const ipRateLimitingMiddlewareHandler = (
         ReturnValues: 'ALL_NEW',
       })
       .pipe(
-        Effect.catchAll((e) =>
+        Effect.catchAll((error) =>
           Effect.gen(function* () {
-            yield* loggerService.logError(e);
+            yield* loggerService.logError(error);
             return yield* Effect.fail(
-              new InternalServerError({ message: e.message }),
+              new InternalServerError({ message: error.message, cause: error }),
             );
           }),
         ),
@@ -90,6 +91,7 @@ const ipRateLimitingMiddlewareHandler = (
       return yield* Effect.fail(
         new RateLimitExceededError({
           message: 'Rate limit exceeded',
+          cause: undefined,
         }),
       );
     }

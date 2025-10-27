@@ -75,6 +75,7 @@ const publishHeartbeatEvent = (
           return yield* Effect.fail(
             new InternalServerError({
               message: 'Failed to publish heartbeat analytics event',
+              cause: analyticsError,
             }),
           );
         }),
@@ -116,6 +117,7 @@ const ensureSuccessfulPublish = (
     return yield* Effect.fail(
       new InternalServerError({
         message: 'Failed to publish heartbeat analytics event',
+        cause: failureError,
       }),
     );
   });
@@ -139,6 +141,7 @@ const heartbeatHandler = (
       );
       return yield* new InternalServerError({
         message: 'Failed to resolve authenticated user for heartbeat request',
+        cause: null,
       });
     }
 

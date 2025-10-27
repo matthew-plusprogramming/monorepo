@@ -42,6 +42,7 @@ const ensureUserDoesNotExist = (
     if (maybeExisting._tag === 'Some') {
       return yield* new ConflictError({
         message: 'User with email already exists',
+        cause: undefined,
       });
     }
   });
@@ -60,6 +61,7 @@ const hashPassword = (
           error instanceof Error
             ? `Failed to hash password: ${error.message}`
             : 'Failed to hash password',
+        cause: error,
       }),
   });
 
@@ -119,6 +121,7 @@ const signToken = (
           error instanceof Error
             ? `Failed to sign JWT: ${error.message}`
             : 'Failed to sign JWT',
+        cause: error,
       }),
   });
 

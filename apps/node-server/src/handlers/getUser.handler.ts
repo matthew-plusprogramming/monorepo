@@ -34,6 +34,7 @@ const getUserHandler = (
     if (maybeUser._tag === 'None') {
       return yield* new NotFoundError({
         message: `User not found for identifier: ${parsedInput}`,
+        cause: undefined,
       });
     }
 

@@ -42,6 +42,7 @@ const dequeue = <T>(
     return Effect.fail(
       new InternalServerError({
         message: `No response queued for UserRepo.${op}`,
+        cause: undefined,
       }),
     );
   }

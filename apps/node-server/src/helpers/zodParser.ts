@@ -13,10 +13,14 @@ export const parseInput = <T extends ZodType>(
         if (error instanceof ZodError) {
           return error;
         }
-        return new InternalServerError(error);
+        return new InternalServerError({
+          message: 'Failed to parse input',
+          cause: error,
+        });
       }
       return new InternalServerError({
         message: 'An unknown error occurred',
+        cause: error,
       });
     },
   });

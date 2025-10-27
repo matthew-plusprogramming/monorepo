@@ -182,7 +182,7 @@ async function propagatesRepoCreateFailure(): Promise<void> {
   const repoFake = resetUserRepoFake();
   repoFake.queueFindNone();
   repoFake.queueCreateFailure(
-    new InternalServerError({ message: 'ddb put failed' }),
+    new InternalServerError({ message: 'ddb put failed', cause: undefined }),
   );
 
   // Act

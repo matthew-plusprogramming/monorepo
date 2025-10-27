@@ -26,6 +26,7 @@ const isAuthenticatedMiddlewareHandler = (
     if (!auth) {
       return yield* new UserNotAuthenticatedError({
         message: 'Authorization header not provided',
+        cause: undefined,
       });
     } else {
       const token = auth.split(' ')[1];
@@ -33,6 +34,7 @@ const isAuthenticatedMiddlewareHandler = (
       if (!token || z.jwt().safeParse(token).success === false) {
         return yield* new UserTokenInvalidError({
           message: 'Authorization token invalid',
+          cause: undefined,
         });
       } else {
         const decodedJWT = yield* Effect.try({
@@ -40,6 +42,7 @@ const isAuthenticatedMiddlewareHandler = (
           catch: () =>
             new UserNotAuthenticatedError({
               message: 'Error validating token',
+              cause: undefined,
             }),
         });
 
@@ -48,6 +51,7 @@ const isAuthenticatedMiddlewareHandler = (
           catch: () =>
             new UserTokenInvalidError({
               message: 'Authorization token invalid',
+              cause: undefined,
             }),
         });
 

@@ -59,7 +59,11 @@ const validateUserCreate = (
   }).pipe(
     Effect.tapError((error) => deps.logger.logError(error)),
     Effect.mapError(
-      () => new InternalServerError({ message: 'Invalid user payload' }),
+      () =>
+        new InternalServerError({
+          message: 'Invalid user payload',
+          cause: undefined,
+        }),
     ),
   );
 
@@ -83,7 +87,8 @@ const findByEmail = (
       Effect.map((res) => unmarshallUser(res.Items?.[0])),
       Effect.tapError((error) => deps.logger.logError(error)),
       Effect.mapError(
-        (error) => new InternalServerError({ message: error.message }),
+        (error) =>
+          new InternalServerError({ message: error.message, cause: error }),
       ),
     );
 
@@ -105,7 +110,8 @@ const findById = (
       Effect.map((res) => unmarshallUser(res.Item)),
       Effect.tapError((error) => deps.logger.logError(error)),
       Effect.mapError(
-        (error) => new InternalServerError({ message: error.message }),
+        (error) =>
+          new InternalServerError({ message: error.message, cause: error }),
       ),
     );
 
@@ -134,7 +140,11 @@ const buildCreate =
           .pipe(
             Effect.tapError((error) => deps.logger.logError(error)),
             Effect.mapError(
-              (error) => new InternalServerError({ message: error.message }),
+              (error) =>
+                new InternalServerError({
+                  message: error.message,
+                  cause: error,
+                }),
             ),
             Effect.flatMap(() => Effect.succeed(true)),
           ),
