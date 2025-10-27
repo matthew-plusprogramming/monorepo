@@ -18,7 +18,7 @@ Open Decisions
 
 - Define the long-term ADR indexing cadence as the system matures.
 
-reflection
+Reflection
 
 - 2025-10-25 — Plan phase: Scoped doc + script updates to enforce one-pass context and default line-numbered outputs
   Build phase: Updated AGENTS/workflows/memory policy plus load-context/read-files/smart-file-query to emit numbered text with optional --json fallback
