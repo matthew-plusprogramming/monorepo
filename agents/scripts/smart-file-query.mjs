@@ -169,7 +169,9 @@ const parseArgs = () => {
   }
 
   if (options.contextLines < 0 || options.contextLines > MAX_CONTEXT_LINES) {
-    console.error(`❌ --contextLines must be between 0 and ${MAX_CONTEXT_LINES}.`);
+    console.error(
+      `❌ --contextLines must be between 0 and ${MAX_CONTEXT_LINES}.`,
+    );
     process.exit(1);
   }
 
@@ -250,7 +252,9 @@ const walkDirectory = async (rootPath, shouldIgnore) => {
     try {
       entries = await fs.readdir(current, { withFileTypes: true });
     } catch (error) {
-      console.warn(`⚠️  Failed to read directory: ${current} (${error.code ?? error.message})`);
+      console.warn(
+        `⚠️  Failed to read directory: ${current} (${error.code ?? error.message})`,
+      );
       continue;
     }
 
@@ -322,7 +326,8 @@ const findLineIndex = (lineStarts, position) => {
   while (low <= high) {
     const mid = Math.floor((low + high) / 2);
     const start = lineStarts[mid];
-    const nextStart = mid + 1 < lineStarts.length ? lineStarts[mid + 1] : Infinity;
+    const nextStart =
+      mid + 1 < lineStarts.length ? lineStarts[mid + 1] : Infinity;
 
     if (position >= start && position < nextStart) {
       return mid;
@@ -423,7 +428,8 @@ const summarizeSkipped = (skipped) => {
   console.error(`⚠️  Skipped ${skipped.length} file(s): ${details}`);
 };
 
-const normalizeNewlines = (text) => text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+const normalizeNewlines = (text) =>
+  text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
 
 const buildNumberedLines = (text, lineCountHint) => {
   const normalized = normalizeNewlines(text);
@@ -431,9 +437,7 @@ const buildNumberedLines = (text, lineCountHint) => {
   const width = String(lineCountHint ?? lines.length).length;
 
   return lines
-    .map(
-      (line, index) => `${String(index + 1).padStart(width, ' ')} | ${line}`,
-    )
+    .map((line, index) => `${String(index + 1).padStart(width, ' ')} | ${line}`)
     .join('\n');
 };
 
@@ -549,7 +553,9 @@ const main = async () => {
     new Set(
       candidateFiles
         .map((filePath) => toPosix(filePath))
-        .filter((filePath) => includeMatcher(filePath) && !ignoreMatcher(filePath)),
+        .filter(
+          (filePath) => includeMatcher(filePath) && !ignoreMatcher(filePath),
+        ),
     ),
   ).sort((a, b) => a.localeCompare(b));
 

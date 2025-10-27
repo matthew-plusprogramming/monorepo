@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-import { readFile, writeFile } from "node:fs/promises";
-import { resolve } from "node:path";
+import { readFile, writeFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
 
 const USAGE = `Usage: node agents/scripts/append-memory-entry.mjs [options]
 
@@ -17,7 +17,7 @@ Options
 const args = process.argv.slice(2);
 
 const toKeyValue = (arg, next) => {
-  const [flag, value] = arg.split("=");
+  const [flag, value] = arg.split('=');
   if (value !== undefined) {
     return { flag, value };
   }
@@ -38,31 +38,31 @@ const options = {
 for (let index = 0; index < args.length; index += 1) {
   const arg = args[index];
 
-  if (arg === "-h" || arg === "--help") {
+  if (arg === '-h' || arg === '--help') {
     console.log(USAGE.trimEnd());
     process.exit(0);
   }
 
-  if (arg === "--dry-run") {
+  if (arg === '--dry-run') {
     options.dryRun = true;
     continue;
   }
 
-  if (arg.startsWith("--")) {
+  if (arg.startsWith('--')) {
     const { flag, value } = toKeyValue(arg, args[index + 1]);
 
     switch (flag) {
-      case "--plan":
+      case '--plan':
         options.plan = value;
-        index += arg.includes("=") ? 0 : 1;
+        index += arg.includes('=') ? 0 : 1;
         break;
-      case "--build":
+      case '--build':
         options.build = value;
-        index += arg.includes("=") ? 0 : 1;
+        index += arg.includes('=') ? 0 : 1;
         break;
-      case "--verify":
+      case '--verify':
         options.verify = value;
-        index += arg.includes("=") ? 0 : 1;
+        index += arg.includes('=') ? 0 : 1;
         break;
       default:
         console.error(`❌ Unknown option: ${flag}`);
@@ -77,41 +77,41 @@ for (let index = 0; index < args.length; index += 1) {
 
 const normalize = (value) =>
   value
-    .replace(/\s*\n\s*/g, " ")
-    .replace(/\s+/g, " ")
+    .replace(/\s*\n\s*/g, ' ')
+    .replace(/\s+/g, ' ')
     .trim();
 
 const formatDate = (date) =>
-  new Intl.DateTimeFormat("en-CA", { timeZone: "UTC" }).format(date);
+  new Intl.DateTimeFormat('en-CA', { timeZone: 'UTC' }).format(date);
 
 const ensureEndsWithNewline = (text) =>
-  text.endsWith("\n") ? text : `${text}\n`;
+  text.endsWith('\n') ? text : `${text}\n`;
 
 const appendEntry = async (filePath, entry, dryRun) => {
   const absolutePath = resolve(process.cwd(), filePath);
-  const originalContent = await readFile(absolutePath, "utf8");
+  const originalContent = await readFile(absolutePath, 'utf8');
   const contentWithNewline = ensureEndsWithNewline(originalContent);
   const updatedContent = `${contentWithNewline}${entry}\n`;
 
   if (dryRun) {
-    console.log("ℹ️  Dry run: entry preview");
+    console.log('ℹ️  Dry run: entry preview');
     console.log(entry);
     return;
   }
 
-  await writeFile(absolutePath, updatedContent, "utf8");
+  await writeFile(absolutePath, updatedContent, 'utf8');
   console.log(`✅ Appended entry to ${filePath}`);
 };
 
 const buildActiveEntry = (date, { plan, build, verify }) => {
   const segments = [];
-  if (plan) segments.push({ label: "Plan", text: normalize(plan) });
-  if (build) segments.push({ label: "Build", text: normalize(build) });
-  if (verify) segments.push({ label: "Verify", text: normalize(verify) });
+  if (plan) segments.push({ label: 'Plan', text: normalize(plan) });
+  if (build) segments.push({ label: 'Build', text: normalize(build) });
+  if (verify) segments.push({ label: 'Verify', text: normalize(verify) });
 
   if (segments.length === 0) {
     console.error(
-      "❌ At least one of --plan, --build, or --verify is required for the active context.",
+      '❌ At least one of --plan, --build, or --verify is required for the active context.',
     );
     process.exit(1);
   }
@@ -132,14 +132,14 @@ const main = async () => {
 
   const entry = buildActiveEntry(date, options);
   await appendEntry(
-    "agents/memory-bank/active.context.md",
+    'agents/memory-bank/active.context.md',
     entry,
     options.dryRun,
   );
 };
 
 main().catch((error) => {
-  console.error("❌ Unexpected error while appending memory entry.");
+  console.error('❌ Unexpected error while appending memory entry.');
   console.error(error);
   process.exit(1);
 });

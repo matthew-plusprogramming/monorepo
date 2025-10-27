@@ -263,9 +263,7 @@ const buildNumberedText = (path, content) => {
   const divider = '='.repeat(path.length + 8);
 
   const numbered = lines
-    .map(
-      (line, index) => `${String(index + 1).padStart(width, ' ')} | ${line}`,
-    )
+    .map((line, index) => `${String(index + 1).padStart(width, ' ')} | ${line}`)
     .join('\n');
 
   return `${divider}\n=== ${path} ===\n${divider}\n${numbered}`;
