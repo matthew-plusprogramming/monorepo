@@ -11,6 +11,7 @@ export const EnvironmentSchema = z.object({
   JWT_SECRET: z.string({ error: 'JWT_SECRET is required' }),
   APP_ENV: z.string().default('development'),
   APP_VERSION: z.string().default('0.0.0'),
+  DEBUG: z.string().optional(),
 });
 
 export type Environment = z.infer<typeof EnvironmentSchema>;

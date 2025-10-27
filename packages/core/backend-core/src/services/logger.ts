@@ -8,6 +8,10 @@ export type LoggerServiceSchema = {
   readonly logError: (
     ...input: ReadonlyArray<unknown>
   ) => Effect.Effect<void, never>;
+
+  readonly logDebug: (
+    ...input: ReadonlyArray<unknown>
+  ) => Effect.Effect<void, never>;
 };
 
 export class LoggerService extends Context.Tag('LoggerService')<

@@ -6,6 +6,7 @@ import {
   afterAll,
   afterEach,
   beforeAll,
+  beforeEach,
   describe,
   expect,
   it,
@@ -16,6 +17,7 @@ type LoggerLayer = Layer.Layer<LoggerService, never, never>;
 
 let ApplicationLoggerService: LoggerLayer;
 let SecurityLoggerService: LoggerLayer;
+let originalDebugValue: string | undefined;
 
 beforeAll(async () => {
   ({ ApplicationLoggerService, SecurityLoggerService } = await import(
@@ -27,8 +29,18 @@ afterAll(() => {
   vi.restoreAllMocks();
 });
 
+beforeEach(() => {
+  originalDebugValue = process.env.DEBUG;
+  delete process.env.DEBUG;
+});
+
 afterEach(() => {
   vi.clearAllMocks();
+  if (originalDebugValue === undefined) {
+    delete process.env.DEBUG;
+  } else {
+    process.env.DEBUG = originalDebugValue;
+  }
 });
 
 const runWithLayer = <R>(
@@ -76,5 +88,42 @@ describe('ConsoleLoggerService', () => {
     // Assert
     await expect(action).resolves.toBeUndefined();
     expect(consoleError).toHaveBeenCalledWith(error, 'during heartbeat');
+  });
+
+  it('logs debug messages via console.info when DEBUG flag is enabled', async () => {
+    // Arrange
+    process.env.DEBUG = 'true';
+    const consoleInfo = vi
+      .spyOn(console, 'info')
+      .mockImplementation(() => undefined);
+
+    // Act
+    const action = runWithLayer(
+      ApplicationLoggerService,
+      (service): Effect.Effect<void, never> =>
+        service.logDebug('diagnostic context', { id: 42 }),
+    );
+
+    // Assert
+    await expect(action).resolves.toBeUndefined();
+    expect(consoleInfo).toHaveBeenCalledWith('diagnostic context', { id: 42 });
+  });
+
+  it('does not log debug messages when DEBUG flag is disabled', async () => {
+    // Arrange
+    const consoleInfo = vi
+      .spyOn(console, 'info')
+      .mockImplementation(() => undefined);
+
+    // Act
+    const action = runWithLayer(
+      SecurityLoggerService,
+      (service): Effect.Effect<void, never> =>
+        service.logDebug('should not emit'),
+    );
+
+    // Assert
+    await expect(action).resolves.toBeUndefined();
+    expect(consoleInfo).not.toHaveBeenCalled();
   });
 });

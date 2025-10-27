@@ -5,6 +5,7 @@ import { LoggerService, type LoggerServiceSchema } from '@/services/logger.js';
 export type CapturedLoggerEntries = {
   readonly logs: Array<ReadonlyArray<unknown>>;
   readonly errors: Array<ReadonlyArray<unknown>>;
+  readonly debugs: Array<ReadonlyArray<unknown>>;
 };
 
 export type LoggerServiceFake = {
@@ -18,6 +19,7 @@ export const createLoggerServiceFake = (): LoggerServiceFake => {
   const entries: CapturedLoggerEntries = {
     logs: [],
     errors: [],
+    debugs: [],
   };
 
   const service: LoggerServiceSchema = {
@@ -29,6 +31,10 @@ export const createLoggerServiceFake = (): LoggerServiceFake => {
       Effect.sync(() => {
         entries.errors.push(input);
       }),
+    logDebug: (...input) =>
+      Effect.sync(() => {
+        entries.debugs.push(input);
+      }),
   };
 
   return {
@@ -38,6 +44,7 @@ export const createLoggerServiceFake = (): LoggerServiceFake => {
     reset: (): void => {
       entries.logs.length = 0;
       entries.errors.length = 0;
+      entries.debugs.length = 0;
     },
   };
 };

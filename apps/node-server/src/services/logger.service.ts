@@ -13,6 +13,12 @@ const ConsoleLoggerService: LoggerServiceSchema = {
     Effect.sync(() => {
       console.error(...input);
     }),
+  logDebug: (...input: ReadonlyArray<unknown>): Effect.Effect<void, never> =>
+    Effect.sync(() => {
+      if (process.env.DEBUG?.toLowerCase() === 'true') {
+        console.info(...input);
+      }
+    }),
 };
 
 export const ApplicationLoggerService = Layer.succeed(

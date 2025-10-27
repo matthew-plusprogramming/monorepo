@@ -26,3 +26,6 @@ Reflection
 - 2025-10-26 — Plan phase: Scoping doc + workflow updates to improve list-files-recursively UX and consolidate retrieval guidance into memory-bank canonical reference.
 - 2025-10-26 — Build phase: Updated list-files-recursively CLI to allow default match-all pattern, refreshed AGENTS/tools docs with concrete usage, and retargeted workflows to cite the memory-bank retrieval policy.
 - 2025-10-26 — Verify phase: Re-ran npm run phase:check plus git-diff-with-lines after doc/workflow updates and confirmed retrieval guidance now points to the canonical memory-bank policy.
+- 2025-10-27 — Plan phase: Planned DEBUG-gated log channel covering service schema, app layer, and testing surfaces.
+  Build phase: Implemented logDebug across backend-core + console layer, added DEBUG env schema, rebuilt package.
+  Verify phase: Extended logger service tests for DEBUG enabled/disabled and reran npm run phase:check.
