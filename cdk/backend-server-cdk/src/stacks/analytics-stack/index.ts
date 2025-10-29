@@ -21,8 +21,8 @@ export class AnalyticsStack extends TerraformStack {
       eventBridgeDeadLetterQueue,
       dedupeTable,
       metricsAggregateTable,
-      eventIngestionLogGroup,
-      processorLogGroup,
+      processorLambdaFunction,
+      processorRule,
     } = generateAnalyticsResources(this, region);
 
     new TerraformOutput(this, 'analyticsEventBusArn', {
@@ -49,13 +49,22 @@ export class AnalyticsStack extends TerraformStack {
       value: metricsAggregateTable.name,
       description: 'Name of the DAU/MAU aggregate DynamoDB table',
     });
-    new TerraformOutput(this, 'analyticsEventIngestionLogGroupName', {
-      value: eventIngestionLogGroup.name,
-      description: 'CloudWatch log group for analytics event ingestion',
+    new TerraformOutput(this, 'analyticsProcessorLambdaFunctionArn', {
+      value: processorLambdaFunction.arn,
+      description: 'ARN of the analytics EventBridge processor Lambda function',
     });
-    new TerraformOutput(this, 'analyticsProcessorLogGroupName', {
-      value: processorLogGroup.name,
-      description: 'CloudWatch log group for analytics processing Lambda',
+    new TerraformOutput(this, 'analyticsProcessorLambdaFunctionName', {
+      value: processorLambdaFunction.functionName,
+      description:
+        'Name of the analytics EventBridge processor Lambda function',
+    });
+    new TerraformOutput(this, 'analyticsProcessorRuleArn', {
+      value: processorRule.arn,
+      description: 'ARN of the EventBridge rule routing analytics events',
+    });
+    new TerraformOutput(this, 'analyticsProcessorRuleName', {
+      value: processorRule.name,
+      description: 'Name of the EventBridge rule routing analytics events',
     });
   }
 }

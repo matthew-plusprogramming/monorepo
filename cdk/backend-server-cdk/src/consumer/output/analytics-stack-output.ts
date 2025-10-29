@@ -10,7 +10,9 @@ export const AnalyticsStackOutputSchema = z.object({
     analyticsEventBusDeadLetterQueueUrl: z.string(),
     analyticsEventDedupeTableName: z.string(),
     analyticsMetricsAggregateTableName: z.string(),
-    analyticsEventIngestionLogGroupName: z.string(),
-    analyticsProcessorLogGroupName: z.string(),
+    analyticsProcessorLambdaFunctionArn: z.string(),
+    analyticsProcessorLambdaFunctionName: z.string(),
+    analyticsProcessorRuleArn: z.string(),
+    analyticsProcessorRuleName: z.string(),
   }),
 });
