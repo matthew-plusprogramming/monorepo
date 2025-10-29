@@ -29,3 +29,9 @@ Reflection
 - 2025-10-27 — Plan phase: Planned DEBUG-gated log channel covering service schema, app layer, and testing surfaces.
   Build phase: Implemented logDebug across backend-core + console layer, added DEBUG env schema, rebuilt package.
   Verify phase: Extended logger service tests for DEBUG enabled/disabled and reran npm run phase:check.
+- 2025-10-29 — Plan phase: Scoped lambda artifact manifest + skip strategy to avoid dist collisions during synth
+  Build phase: Added shared lambda artifact definitions, rewrote copy script with per-stack staging/manifest, and wired stacks to new asset paths with synth skip guard
+  Verify phase: npm run phase:check and git-diff-with-lines.mjs to confirm lint/tests clean and new logic gated missing artifacts
+- 2025-10-29 — Plan phase: Scoped stack typing fix to restore optional property access in CDK entrypoint.
+  Build phase: Widened stack definitions via AnyStack export and updated index consumers; phase:check passed.
+  Verify phase: Diff captured; agent:finalize fails on pre-existing memory validation referencing system.patterns.md.

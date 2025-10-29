@@ -3,6 +3,8 @@ import type { TerraformStack } from 'cdktf';
 import type { Construct } from 'constructs';
 import type z from 'zod';
 
+import type { ArtifactRequirement } from '../lambda/artifacts';
+
 export interface UniversalStackProps {
   region: string;
 }
@@ -17,6 +19,7 @@ export interface Stack<
   props: Omit<TProps, keyof UniversalStackProps>;
   outputSchema: TOutputSchema;
   stages?: string[];
+  requiredArtifacts?: ArtifactRequirement[];
 }
 
 export type AnyStack = Prettify<Stack<UniversalStackProps>>;
