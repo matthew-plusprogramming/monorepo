@@ -165,7 +165,7 @@ const createProcessorRule = (
     name: ANALYTICS_PROCESSOR_RULE_NAME,
     description: 'Routes analytics ingestion events to the processor Lambda',
     eventBusName: ANALYTICS_EVENT_BUS_NAME,
-    eventPattern: JSON.stringify({}),
+    eventPattern: JSON.stringify({ source: [{ exists: true }] }),
     isEnabled: true,
     region,
   });
