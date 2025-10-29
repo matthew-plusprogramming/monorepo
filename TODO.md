@@ -24,6 +24,11 @@ Auth Package (Integrated into node server)
   - [ ] Cuts reserved concurrency to 0 or 1 depending on the condition
   - [ ] Triggers an alert to be sent to the administrator
 
+Analytics Lambda
+
+- [ ] Testing
+- [ ] Local server (adapter express)
+
 Node Server (Lambda)
 
 - [x] Integrate Effect library

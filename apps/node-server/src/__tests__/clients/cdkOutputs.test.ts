@@ -1,4 +1,8 @@
-import { ANALYTICS_STACK_NAME, API_STACK_NAME } from '@cdk/backend-server-cdk';
+import {
+  ANALYTICS_LAMBDA_STACK_NAME,
+  ANALYTICS_STACK_NAME,
+  API_STACK_NAME,
+} from '@cdk/backend-server-cdk';
 import {
   clearBundledRuntime,
   setBundledRuntime,
@@ -17,10 +21,15 @@ const outputsByStack = {
     analyticsEventBusName: 'analytics-bus',
     analyticsEventBusDeadLetterQueueArn: 'analytics-dlq-arn',
     analyticsEventBusDeadLetterQueueUrl: 'https://example.com/dlq',
+    analyticsDedupeTableName: 'analytics-dedupe-table',
     analyticsEventDedupeTableName: 'analytics-dedupe-table',
     analyticsMetricsAggregateTableName: 'analytics-aggregate-table',
-    analyticsEventIngestionLogGroupName: 'analytics-event-log-group',
-    analyticsProcessorLogGroupName: 'analytics-processor-log-group',
+  },
+  [ANALYTICS_LAMBDA_STACK_NAME]: {
+    analyticsProcessorLambdaFunctionArn: 'analytics-processor-lambda-arn',
+    analyticsProcessorLambdaFunctionName: 'analytics-processor-lambda',
+    analyticsProcessorRuleArn: 'analytics-processor-rule-arn',
+    analyticsProcessorRuleName: 'analytics-processor-rule',
   },
 } as const;
 
@@ -92,6 +101,7 @@ describe('clients/cdkOutputs', () => {
     expect(loadCalls).toEqual([
       { stack: API_STACK_NAME, basePath: undefined },
       { stack: ANALYTICS_STACK_NAME, basePath: undefined },
+      { stack: ANALYTICS_LAMBDA_STACK_NAME, basePath: undefined },
     ]);
     expect(module.usersTableName).toBe('users-table');
     expect(module.rateLimitTableName).toBe('rate-limit-table');
@@ -104,10 +114,16 @@ describe('clients/cdkOutputs', () => {
     expect(module.analyticsAggregateTableName).toBe(
       'analytics-aggregate-table',
     );
-    expect(module.analyticsEventLogGroupName).toBe('analytics-event-log-group');
-    expect(module.analyticsProcessorLogGroupName).toBe(
-      'analytics-processor-log-group',
+    expect(module.analyticsProcessorLambdaFunctionArn).toBe(
+      'analytics-processor-lambda-arn',
     );
+    expect(module.analyticsProcessorLambdaFunctionName).toBe(
+      'analytics-processor-lambda',
+    );
+    expect(module.analyticsProcessorRuleArn).toBe(
+      'analytics-processor-rule-arn',
+    );
+    expect(module.analyticsProcessorRuleName).toBe('analytics-processor-rule');
   });
 
   it('uses bundled base path when __BUNDLED__ is true', async () => {
@@ -122,6 +138,7 @@ describe('clients/cdkOutputs', () => {
     expect(loadCalls).toEqual([
       { stack: API_STACK_NAME, basePath: '.' },
       { stack: ANALYTICS_STACK_NAME, basePath: '.' },
+      { stack: ANALYTICS_LAMBDA_STACK_NAME, basePath: '.' },
     ]);
     expect(module.usersTableName).toBe('users-table');
     expect(module.rateLimitTableName).toBe('rate-limit-table');
@@ -134,9 +151,15 @@ describe('clients/cdkOutputs', () => {
     expect(module.analyticsAggregateTableName).toBe(
       'analytics-aggregate-table',
     );
-    expect(module.analyticsEventLogGroupName).toBe('analytics-event-log-group');
-    expect(module.analyticsProcessorLogGroupName).toBe(
-      'analytics-processor-log-group',
+    expect(module.analyticsProcessorLambdaFunctionArn).toBe(
+      'analytics-processor-lambda-arn',
     );
+    expect(module.analyticsProcessorLambdaFunctionName).toBe(
+      'analytics-processor-lambda',
+    );
+    expect(module.analyticsProcessorRuleArn).toBe(
+      'analytics-processor-rule-arn',
+    );
+    expect(module.analyticsProcessorRuleName).toBe('analytics-processor-rule');
   });
 });

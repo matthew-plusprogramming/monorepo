@@ -1,14 +1,17 @@
 import z from 'zod';
 
 import {
+  AnalyticsLambdaStackOutputSchema,
   AnalyticsStackOutputSchema,
   ApiStackOutputSchema,
 } from './consumer/output';
+import { AnalyticsLambdaStack } from './stacks/analytics-lambda-stack';
 import { AnalyticsStack } from './stacks/analytics-stack';
 import { ApiLambdaStack } from './stacks/api-lambda-stack';
 import { ApiStack, type ApiStackProps } from './stacks/api-stack';
 import { BootstrapStack, type BootstrapStackProps } from './stacks/bootstrap';
 import {
+  ANALYTICS_LAMBDA_STACK_NAME,
   ANALYTICS_STACK_NAME,
   API_LAMBDA_STACK_NAME,
   API_STACK_NAME,
@@ -32,7 +35,6 @@ export const stacks = [
     Stack: ApiStack,
     props: {},
     outputSchema: ApiStackOutputSchema,
-    stages: ['dev', 'prod'],
   } as const satisfies Stack<ApiStackProps>,
   {
     name: API_LAMBDA_STACK_NAME,
@@ -40,7 +42,13 @@ export const stacks = [
     Stack: ApiLambdaStack,
     props: {},
     outputSchema: z.object(),
-    stages: ['dev', 'prod'],
+  },
+  {
+    name: ANALYTICS_LAMBDA_STACK_NAME,
+    description: 'Analytics processor lambda stack',
+    Stack: AnalyticsLambdaStack,
+    props: {},
+    outputSchema: AnalyticsLambdaStackOutputSchema,
   },
   {
     name: ANALYTICS_STACK_NAME,
@@ -48,6 +56,5 @@ export const stacks = [
     Stack: AnalyticsStack,
     props: {},
     outputSchema: AnalyticsStackOutputSchema,
-    stages: ['dev', 'prod'],
   },
 ] as const satisfies Stack<UniversalStackProps>[];

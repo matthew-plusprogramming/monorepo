@@ -1,0 +1,10 @@
+{
+  "extends": "@configs/ts-config/tsconfig.build.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"]
+    }
+  },
+  "include": ["src", "scripts"]
+}
