@@ -1,8 +1,26 @@
+import { existsSync } from 'node:fs';
+
 import '@dotenvx/dotenvx/config';
 
 import { App } from 'cdktf';
 
+import type { ArtifactRequirement } from './lambda/artifacts';
+import type { AnyStack } from './types/stack';
 import { stacks } from './stacks';
+
+const isArtifactRequirement = (
+  value: unknown,
+): value is ArtifactRequirement => {
+  if (!value || typeof value !== 'object') {
+    return false;
+  }
+
+  const candidate = value as Record<string, unknown>;
+  return (
+    typeof candidate.path === 'string' &&
+    typeof candidate.description === 'string'
+  );
+};
 
 const region = process.env.AWS_REGION;
 
@@ -63,27 +81,78 @@ if (!region) {
 
 const app = new App();
 
-stacks.forEach((stack) => {
-  // Only one stack to be processed at a time
-  if (selectedStackNames && !selectedStackNames.has(stack.name)) {
-    return;
+const collectMissingArtifacts = (
+  artifacts: AnyStack['requiredArtifacts'],
+): ArtifactRequirement[] => {
+  if (!Array.isArray(artifacts)) {
+    return [];
   }
 
+  const missing: ArtifactRequirement[] = [];
+
+  for (const artifact of artifacts) {
+    if (!isArtifactRequirement(artifact)) {
+      continue;
+    }
+
+    if (!existsSync(artifact.path)) {
+      missing.push(artifact);
+    }
+  }
+
+  return missing;
+};
+
+const instantiateStack = (
+  stack: AnyStack,
+  appContext: App,
+  stackRegion: string,
+): void => {
   const { Stack } = stack;
 
-  if (stack.name !== 'myapp-bootstrap-stack' && stack?.stages) {
-    stack.stages.forEach((stage) => {
-      new Stack(app, `${stack.name}-${stage}`, {
-        region,
+  if (stack.name !== 'myapp-bootstrap-stack' && Array.isArray(stack.stages)) {
+    let hasValidStage = false;
+
+    for (const stage of stack.stages) {
+      if (typeof stage !== 'string') {
+        continue;
+      }
+
+      hasValidStage = true;
+      new Stack(appContext, `${stack.name}-${stage}`, {
+        region: stackRegion,
         ...stack.props,
       });
-    });
-  } else {
-    new Stack(app, stack.name, {
-      region,
-      ...stack.props,
-    });
+    }
+
+    if (hasValidStage) {
+      return;
+    }
   }
-});
+
+  new Stack(appContext, stack.name, {
+    region: stackRegion,
+    ...stack.props,
+  });
+};
+
+for (const stack of stacks) {
+  if (selectedStackNames && !selectedStackNames.has(stack.name)) {
+    continue;
+  }
+
+  const missingArtifacts = collectMissingArtifacts(stack.requiredArtifacts);
+  if (missingArtifacts.length > 0) {
+    console.warn(
+      `⚠️  Skipping stack "${stack.name}" because required artifacts were not found:`,
+    );
+    for (const artifact of missingArtifacts) {
+      console.warn(`  - ${artifact.description} (${artifact.path})`);
+    }
+    continue;
+  }
+
+  instantiateStack(stack, app, region);
+}
 
 app.synth();

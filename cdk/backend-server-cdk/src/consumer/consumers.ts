@@ -5,6 +5,7 @@ import type { output } from 'zod';
 
 import { packageRootDir } from '../location';
 import { stacks } from '../stacks';
+import { API_LAMBDA_STACK_NAME } from '../stacks/names';
 
 type StackConfig = (typeof stacks)[number];
 
@@ -17,38 +18,53 @@ type StackOutputSchema<Name extends ConsumableStack> = Extract<
   { name: Name }
 >['outputSchema'];
 
-type StackOutput<Name extends ConsumableStack> = output<
+type StackSchemaOutput<Name extends ConsumableStack> = output<
   StackOutputSchema<Name>
 >;
 
-type StackOutputKey<Name extends ConsumableStack> = Extract<
-  Name,
-  keyof StackOutput<Name>
->;
+type NamespacedStackOutput<Name extends ConsumableStack> =
+  StackSchemaOutput<Name> extends Record<Name, infer Output>
+    ? StackSchemaOutput<Name> & Record<Name, Output>
+    : never;
 
 type StackOutputValue<Name extends ConsumableStack> =
-  StackOutput<Name>[StackOutputKey<Name>];
+  StackSchemaOutput<Name> extends Record<Name, infer Output>
+    ? Output
+    : StackSchemaOutput<Name>;
 
-const parseStackOutput = <TName extends ConsumableStack>(
-  config: Extract<ConsumableStackConfig, { name: TName }>,
-  stackName: TName,
+const isNamespacedStackOutput = <Name extends ConsumableStack>(
+  stackName: Name,
+  output: unknown,
+): output is NamespacedStackOutput<Name> => {
+  return typeof output === 'object' && output !== null && stackName in output;
+};
+
+const parseStackOutput = <Name extends ConsumableStack>(
+  config: Extract<ConsumableStackConfig, { name: Name }>,
+  stackName: Name,
   rawOutput: unknown,
-): StackOutput<TName> => {
+): StackOutputValue<Name> => {
   const parsed = config.outputSchema.safeParse(rawOutput);
   if (!parsed.success) {
     throw new Error(`Failed to parse output for stack: ${stackName}`, {
       cause: parsed.error,
     });
   }
-  return parsed.data as StackOutput<TName>;
-};
 
-const hasStackOutput = <Name extends ConsumableStack>(
-  record: StackOutput<Name>,
-  stackName: Name,
-): record is StackOutput<Name> & {
-  [K in StackOutputKey<Name>]-?: StackOutputValue<K>;
-} => stackName in record;
+  if (stackName === API_LAMBDA_STACK_NAME) {
+    return parsed.data as StackOutputValue<Name>;
+  }
+
+  if (!isNamespacedStackOutput(stackName, parsed.data)) {
+    throw new Error(`Missing output for stack: ${stackName}`);
+  }
+
+  const stackOutput = parsed.data[stackName] as StackOutputValue<Name>;
+  if (!stackOutput) {
+    throw new Error(`Missing output for stack: ${stackName}`);
+  }
+  return stackOutput;
+};
 
 const generateOutputPath = (
   stack: ConsumableStack,
@@ -58,6 +74,19 @@ const generateOutputPath = (
     return resolve(outputsPath, `cdktf-outputs/stacks/${stack}/outputs.json`);
   }
   return resolve(packageRootDir, `cdktf-outputs/stacks/${stack}/outputs.json`);
+};
+
+const getStackConfig = <Name extends ConsumableStack>(
+  stackName: Name,
+): Extract<ConsumableStackConfig, { name: Name }> => {
+  const stackConfig = stacks.find(
+    (candidate): candidate is Extract<ConsumableStackConfig, { name: Name }> =>
+      candidate.name === stackName,
+  );
+  if (!stackConfig) {
+    throw new Error(`Unknown stack: ${stackName}`);
+  }
+  return stackConfig;
 };
 
 const loadOutput = <T extends ConsumableStack>(
@@ -70,25 +99,16 @@ const loadOutput = <T extends ConsumableStack>(
   const stackOutputData = readFileSync(stackOutputPath, 'utf-8');
   const stackOutput: unknown = JSON.parse(stackOutputData);
 
-  const stackConfig = stacks.find(
-    (s): s is ConsumableStackConfig => s.name === stack,
-  );
-  if (!stackConfig) {
-    throw new Error(`Unknown stack: ${stack}`);
-  }
-  const typedConfig = stackConfig as Extract<
-    ConsumableStackConfig,
-    { name: T }
-  >;
+  const stackConfig = getStackConfig(stack);
 
-  const parsedOutput = parseStackOutput(typedConfig, stack, stackOutput);
-  if (!hasStackOutput(parsedOutput, stack)) {
-    throw new Error(`Missing output for stack: ${stack}`);
-  }
-  return parsedOutput[stack as StackOutputKey<T>];
+  return parseStackOutput(stackConfig, stackConfig.name, stackOutput);
 };
 
-const loadedOutputs: { [K in ConsumableStack]?: StackOutputValue<K> } = {};
+type StackOutputsMap = {
+  [Name in ConsumableStack]: StackOutputValue<Name>;
+};
+
+const loadedOutputs: Partial<StackOutputsMap> = {};
 
 export const loadCDKOutput = <T extends ConsumableStack>(
   stack: T,
@@ -99,6 +119,6 @@ export const loadCDKOutput = <T extends ConsumableStack>(
     return existing;
   }
   const output = loadOutput(stack, generateOutputPath(stack, outputsPath));
-  loadedOutputs[stack] = output;
+  loadedOutputs[stack] = output as StackOutputsMap[T];
   return output;
 };

@@ -1,5 +1,3 @@
-import { resolve } from 'node:path';
-
 import { CloudwatchLogGroup } from '@cdktf/provider-aws/lib/cloudwatch-log-group';
 import { DataAwsCallerIdentity } from '@cdktf/provider-aws/lib/data-aws-caller-identity';
 import { DataAwsIamPolicyDocument } from '@cdktf/provider-aws/lib/data-aws-iam-policy-document';
@@ -11,7 +9,10 @@ import { LambdaFunctionUrl } from '@cdktf/provider-aws/lib/lambda-function-url';
 import { AssetType, TerraformAsset, TerraformOutput, Token } from 'cdktf';
 import type { Construct } from 'constructs';
 
-import { packageRootDir } from '../../location';
+import {
+  getLambdaArtifactDefinition,
+  resolveZipPath,
+} from '../../lambda/artifacts';
 import { ANALYTICS_EVENT_BUS_NAME } from '../analytics-stack/constants';
 
 import { API_LAMBDA_FUNCTION_NAME } from './constants';
@@ -98,8 +99,11 @@ const createLambdaResources = (
   region: string,
   iamRole: IamRole,
 ): { lambdaFunction: LambdaFunction; lambdaUrl: LambdaFunctionUrl } => {
+  const lambdaAssetPath = resolveZipPath(
+    getLambdaArtifactDefinition('apiLambda'),
+  );
   const asset = new TerraformAsset(scope, `${API_LAMBDA_FUNCTION_NAME}-asset`, {
-    path: resolve(packageRootDir, 'dist/lambda.zip'),
+    path: lambdaAssetPath,
     type: AssetType.FILE,
   });
 

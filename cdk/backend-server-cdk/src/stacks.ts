@@ -3,8 +3,13 @@ import z from 'zod';
 import {
   AnalyticsLambdaStackOutputSchema,
   AnalyticsStackOutputSchema,
+  ApiLambdaStackOutputSchema,
   ApiStackOutputSchema,
 } from './consumer/output';
+import {
+  buildArtifactRequirement,
+  getLambdaArtifactDefinition,
+} from './lambda/artifacts';
 import { AnalyticsLambdaStack } from './stacks/analytics-lambda-stack';
 import { AnalyticsStack } from './stacks/analytics-stack';
 import { ApiLambdaStack } from './stacks/api-lambda-stack';
@@ -19,7 +24,7 @@ import {
 } from './stacks/names';
 import type { Stack, UniversalStackProps } from './types/stack';
 
-export const stacks = [
+const stackDefinitions = [
   {
     name: BOOTSTRAP_STACK_NAME,
     description: 'Bootstrap stack for CdkTF projects',
@@ -41,7 +46,10 @@ export const stacks = [
     description: 'Lambdas for API stack',
     Stack: ApiLambdaStack,
     props: {},
-    outputSchema: z.object(),
+    outputSchema: ApiLambdaStackOutputSchema,
+    requiredArtifacts: [
+      buildArtifactRequirement(getLambdaArtifactDefinition('apiLambda')),
+    ],
   },
   {
     name: ANALYTICS_LAMBDA_STACK_NAME,
@@ -49,6 +57,11 @@ export const stacks = [
     Stack: AnalyticsLambdaStack,
     props: {},
     outputSchema: AnalyticsLambdaStackOutputSchema,
+    requiredArtifacts: [
+      buildArtifactRequirement(
+        getLambdaArtifactDefinition('analyticsProcessor'),
+      ),
+    ],
   },
   {
     name: ANALYTICS_STACK_NAME,
@@ -57,4 +70,6 @@ export const stacks = [
     props: {},
     outputSchema: AnalyticsStackOutputSchema,
   },
-] as const satisfies Stack<UniversalStackProps>[];
+] as const satisfies ReadonlyArray<Stack<UniversalStackProps>>;
+
+export const stacks = stackDefinitions;

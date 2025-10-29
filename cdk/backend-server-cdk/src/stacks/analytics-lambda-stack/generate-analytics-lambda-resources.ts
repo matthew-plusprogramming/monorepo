@@ -1,5 +1,3 @@
-import { resolve } from 'node:path';
-
 import { CloudwatchEventRule } from '@cdktf/provider-aws/lib/cloudwatch-event-rule';
 import { CloudwatchEventTarget } from '@cdktf/provider-aws/lib/cloudwatch-event-target';
 import { DataAwsCallerIdentity } from '@cdktf/provider-aws/lib/data-aws-caller-identity';
@@ -12,7 +10,10 @@ import { LambdaPermission } from '@cdktf/provider-aws/lib/lambda-permission';
 import { AssetType, TerraformAsset, Token } from 'cdktf';
 import type { Construct } from 'constructs';
 
-import { packageRootDir } from '../../location';
+import {
+  getLambdaArtifactDefinition,
+  resolveZipPath,
+} from '../../lambda/artifacts';
 import {
   ANALYTICS_AGGREGATE_TABLE_NAME,
   ANALYTICS_DEDUPE_TABLE_NAME,
@@ -131,11 +132,14 @@ const createProcessorLambda = (
   region: string,
   iamRole: IamRole,
 ): LambdaFunction => {
+  const artifactPath = resolveZipPath(
+    getLambdaArtifactDefinition('analyticsProcessor'),
+  );
   const asset = new TerraformAsset(
     scope,
     `${ANALYTICS_PROCESSOR_FUNCTION_NAME}-asset`,
     {
-      path: resolve(packageRootDir, 'dist/analytics-processor-lambda.zip'),
+      path: artifactPath,
       type: AssetType.FILE,
     },
   );

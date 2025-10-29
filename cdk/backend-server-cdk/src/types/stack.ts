@@ -1,15 +1,19 @@
 import type { Prettify } from '@utils/type-utils';
 import type { TerraformStack } from 'cdktf';
 import type { Construct } from 'constructs';
-import type z from 'zod';
+import type { ZodObject, ZodType } from 'zod';
+
+import type { ArtifactRequirement } from '../lambda/artifacts';
 
 export interface UniversalStackProps {
   region: string;
 }
 
+type AnyZodObject = ZodObject<Record<string, ZodType>>;
+
 export interface Stack<
   TProps extends UniversalStackProps,
-  TOutputSchema extends z.ZodType = z.ZodType,
+  TOutputSchema extends AnyZodObject = AnyZodObject,
 > {
   name: string;
   description?: string;
@@ -17,6 +21,7 @@ export interface Stack<
   props: Omit<TProps, keyof UniversalStackProps>;
   outputSchema: TOutputSchema;
   stages?: string[];
+  requiredArtifacts?: ArtifactRequirement[];
 }
 
 export type AnyStack = Prettify<Stack<UniversalStackProps>>;
