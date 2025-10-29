@@ -147,7 +147,7 @@ const createProcessorLambda = (
   return new LambdaFunction(scope, ANALYTICS_PROCESSOR_FUNCTION_NAME, {
     functionName: ANALYTICS_PROCESSOR_FUNCTION_NAME,
     filename: asset.path,
-    handler: 'lambda.handler',
+    handler: 'index.handler',
     runtime: 'nodejs22.x',
     memorySize: 256,
     timeout: 10,
