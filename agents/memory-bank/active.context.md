@@ -39,3 +39,4 @@ Reflection
 - 2025-10-29 — Plan phase: Scoped removal of 'as unknown as' cast in stack output consumer
   Build phase: Simplified stack output typing via helper guard, dropped the double cast, and revalidated with npm run phase:check plus npm run build.
   Verify phase: Captured git-diff-with-lines; npm run agent:finalize remains blocked by existing system.patterns.md validation error.
+- 2025-10-29 — Plan phase: Scoped repo-wide TS quality heuristics change to scan tracked+untracked sources while preserving allowlists.
