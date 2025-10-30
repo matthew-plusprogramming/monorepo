@@ -144,6 +144,7 @@ const createProcessorLambda = (
     },
   );
 
+  // TODO: Implement cloudwatch log group with retention policy
   return new LambdaFunction(scope, ANALYTICS_PROCESSOR_FUNCTION_NAME, {
     functionName: ANALYTICS_PROCESSOR_FUNCTION_NAME,
     filename: asset.path,
