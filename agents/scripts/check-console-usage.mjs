@@ -33,7 +33,6 @@ Options
 
 const trackedFiles = listGitTrackedFiles().filter(
   (file) =>
-    file.startsWith('apps/node-server/src/') &&
     isTsFile(file) &&
     !isTestFile(file),
 );

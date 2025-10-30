@@ -40,3 +40,5 @@ Reflection
   Build phase: Simplified stack output typing via helper guard, dropped the double cast, and revalidated with npm run phase:check plus npm run build.
   Verify phase: Captured git-diff-with-lines; npm run agent:finalize remains blocked by existing system.patterns.md validation error.
 - 2025-10-29 — Plan phase: Scoped repo-wide TS quality heuristics change to scan tracked+untracked sources while preserving allowlists.
+- 2025-10-29 — Build phase: Expanded git file enumeration to include unstaged TS sources and revalidated via npm run phase:check.
+- 2025-10-30 — Verify phase: Replayed git-diff-with-lines, smoke-tested untracked Effect.promise detection, agent:finalize still blocked by pre-existing system.patterns.md reference.

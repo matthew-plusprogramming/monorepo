@@ -6,7 +6,10 @@ export const root = process.cwd();
 
 export const listGitTrackedFiles = () => {
   try {
-    return execSync('git ls-files', { cwd: root })
+    // Include tracked files plus unstaged additions (respects .gitignore) so heuristics catch new sources.
+    return execSync('git ls-files --cached --others --exclude-standard', {
+      cwd: root,
+    })
       .toString()
       .split('\n')
       .map((line) => line.trim())
