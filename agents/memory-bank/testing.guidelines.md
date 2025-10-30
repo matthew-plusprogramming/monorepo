@@ -24,6 +24,9 @@ last_reviewed: 2025-10-21
 - Shared test utilities (service fakes, Express request context builder, and runtime helpers) live under `@packages/backend-core/testing`; import from there instead of cloning per app.
 - For CDK output dependencies, prefer `apps/node-server/src/__tests__/stubs/cdkOutputs.ts`'s `makeCdkOutputsStub()` and override only the keys a suite needs.
 - Manipulate the `__BUNDLED__` runtime flag via `@packages/backend-core/testing` exports (e.g., `setBundledRuntime`, `clearBundledRuntime`, `hoistUnbundledRuntime`) instead of inlining `Reflect` access.
+- When identical Arrange or helper logic appears across suites, extract it into a shared `test-helpers.ts` (local) or shared package utility so tests stay focused on the behavior under scrutiny.
+- Reach for table-driven tests when scenarios differ only by data; prefer looping over a cases array that produces distinct `it` blocks to eliminate copy/paste without masking failures.
+- Factor repeated assertion clusters (e.g., status/message pairs) into small helper functions to keep expectations DRY and intention-revealing.
 
 ## What to Test by Unit Type
 
