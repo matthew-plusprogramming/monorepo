@@ -1,7 +1,9 @@
 import {
+  type DynamoDbServiceSchema,
   type handlerInput,
   HTTP_RESPONSE,
   InternalServerError,
+  type LoggerServiceSchema,
   RateLimitExceededError,
 } from '@packages/backend-core';
 import { RATE_LIMITING_SCHEMA_CONSTANTS } from '@packages/schemas/security';
@@ -21,27 +23,16 @@ import {
 const WINDOW_SECONDS = 60;
 const RATE_LIMIT_CALLS = 5;
 
-// TODO: refactor out to backend-core with deps
-const ipRateLimitingMiddlewareHandler = (
-  input: handlerInput,
-): Effect.Effect<void, InternalServerError | RateLimitExceededError> =>
+const enforceRateLimitForIp = ({
+  databaseService,
+  loggerService,
+  ip,
+}: {
+  databaseService: DynamoDbServiceSchema;
+  loggerService: LoggerServiceSchema;
+  ip: string;
+}): Effect.Effect<void, InternalServerError | RateLimitExceededError> =>
   Effect.gen(function* () {
-    const loggerService = yield* LoggerService;
-    const databaseService = yield* DynamoDbService;
-    const req = yield* input;
-
-    const ip = req.ip;
-
-    if (!ip) {
-      return yield* Effect.fail(
-        new RateLimitExceededError({
-          message: 'IP address is required for rate limiting',
-          cause: undefined,
-        }),
-      );
-    }
-
-    // Single-UpdateItem approach using a fixed 60s window bucket in the key
     const nowSec = Math.floor(Date.now() / 1000);
     const windowStart = Math.floor(nowSec / WINDOW_SECONDS) * WINDOW_SECONDS;
     const windowEndTtl = windowStart + WINDOW_SECONDS;
@@ -79,7 +70,6 @@ const ipRateLimitingMiddlewareHandler = (
         ),
       );
 
-    // Parse the updated call count
     const callsN = updated.Attributes?.calls?.N ?? '0';
     const newNumCalls = parseInt(callsN);
 
@@ -95,6 +85,29 @@ const ipRateLimitingMiddlewareHandler = (
         }),
       );
     }
+  });
+
+// TODO: refactor out to backend-core with deps
+const ipRateLimitingMiddlewareHandler = (
+  input: handlerInput,
+): Effect.Effect<void, InternalServerError | RateLimitExceededError> =>
+  Effect.gen(function* () {
+    const loggerService = yield* LoggerService;
+    const databaseService = yield* DynamoDbService;
+    const req = yield* input;
+
+    const ip = req.ip;
+
+    if (!ip) {
+      return yield* Effect.fail(
+        new RateLimitExceededError({
+          message: 'IP address is required for rate limiting',
+          cause: undefined,
+        }),
+      );
+    }
+
+    yield* enforceRateLimitForIp({ databaseService, loggerService, ip });
   })
     .pipe(Effect.provide(SecurityLoggerService))
     .pipe(Effect.provide(LiveDynamoDbService));

@@ -14,6 +14,8 @@ const baseRegisterInput = {
   password: 'supersecret',
 } as const;
 
+// Disabled for test file due to length
+/* eslint-disable max-lines-per-function */
 describe('user schemas', () => {
   it('accepts valid register input and rejects short passwords', () => {
     // Arrange

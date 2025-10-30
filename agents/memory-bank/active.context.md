@@ -42,3 +42,6 @@ Reflection
 - 2025-10-29 — Plan phase: Scoped repo-wide TS quality heuristics change to scan tracked+untracked sources while preserving allowlists.
 - 2025-10-29 — Build phase: Expanded git file enumeration to include unstaged TS sources and revalidated via npm run phase:check.
 - 2025-10-30 — Verify phase: Replayed git-diff-with-lines, smoke-tested untracked Effect.promise detection, agent:finalize still blocked by pre-existing system.patterns.md reference.
+- 2025-10-30 — Plan phase: Planned ip middleware refactor to isolate rate limit selection logic.
+  Build phase: Extracted Effect-based rate limit window update into enforceRateLimitForIp helper.
+  Verify phase: Ran npm run phase:check; existing coverage sufficient for refactor.
