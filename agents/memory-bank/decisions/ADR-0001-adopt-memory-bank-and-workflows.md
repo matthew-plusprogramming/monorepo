@@ -25,4 +25,4 @@ Context:
 - Positive: Improves continuity, clarity, and traceability; enables handoffs; enforces governance.
 - Positive: Easier onboarding for new contributors/agents; predictable execution via phases.
 - Negative: Adds process overhead; requires discipline to maintain logs/ADRs; may slow trivial tasks.
-  Related: AGENTS.md; agents/workflows/default.workflow.md; agents/memory-bank/system.patterns.md; agents/memory-bank.md
+  Related: AGENTS.md; agents/workflows/default.workflow.md; agents/memory-bank.md

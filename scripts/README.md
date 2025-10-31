@@ -41,6 +41,7 @@ node scripts/create-repository-service.mjs <entity-slug> [--with handler] [--dry
 - Bundle templates live under `scripts/templates/repository-service/bundles/<bundle-name>/`.
 - Keep placeholders (e.g., `__ENTITY_PASCAL__`) intact; the CLI replaces them automatically.
 - If you add a new bundle, declare it in `scripts/templates/repository-service/manifest.json` so the CLI can discover it.
+- CLI behaviour (flags, hook order, token resolvers) is driven by `scripts/scaffolds/repository-service.config.json`; reusable utilities live under `scripts/utils/**`.
 
 ### Rerunning safely
 

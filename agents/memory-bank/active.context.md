@@ -45,3 +45,12 @@ Reflection
 - 2025-10-30 — Plan phase: Planned ip middleware refactor to isolate rate limit selection logic.
   Build phase: Extracted Effect-based rate limit window update into enforceRateLimitForIp helper.
   Verify phase: Ran npm run phase:check; existing coverage sufficient for refactor.
+- 2025-10-31 — Plan phase: Scoped hook lifecycle + config-driven scaffold plan.
+  Build phase: Pending
+  Verify phase: Pending
+- 2025-10-31 — Plan phase: Scoped hook lifecycle + config-driven scaffold plan.
+  Build phase: Extracted scaffold utilities + hook registry; repository-service now config-driven.
+  Verify phase: Pending
+- 2025-10-31 — Plan phase: Scoped hook lifecycle + config-driven scaffold plan.
+  Build phase: Extracted scaffold utilities + hook registry; repository-service now config-driven.
+  Verify phase: Ran node --test on scripts/utils, npm run phase:check, and git-diff-with-lines.mjs to confirm hook/config rollout.

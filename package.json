@@ -27,6 +27,7 @@
     "test:coverage": "turbo run test:coverage",
     "// -- 🤖 Agent Scripts": "--",
     "format:markdown": "prettier --write \"agents/**/*.md\"",
+    "test:scripts": "node --test \"scripts/utils/__tests__/*.mjs\"",
     "memory:validate": "node agents/scripts/validate-memory-bank.mjs",
     "memory:drift": "node agents/scripts/check-memory-drift.mjs",
     "phase:check": "npm run lint:fix && node agents/scripts/check-code-quality.mjs",
