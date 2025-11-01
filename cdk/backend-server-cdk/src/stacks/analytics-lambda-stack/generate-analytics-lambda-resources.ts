@@ -109,9 +109,16 @@ const createExecutionRole = (
     {
       name: `${ANALYTICS_PROCESSOR_FUNCTION_NAME}-role`,
       assumeRolePolicy: Token.asString(assumeRole.json),
-      managedPolicyArns: [
+    },
+  );
+
+  new IamRolePolicyAttachment(
+    scope,
+    `${ANALYTICS_PROCESSOR_FUNCTION_NAME}-attach-execution-policy`,
+    {
+      policyArn:
         'arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole',
-      ],
+      role: iamRole.name,
     },
   );
 

@@ -76,11 +76,26 @@ const createExecutionRole = (
   const iamRole = new IamRole(scope, `${API_LAMBDA_FUNCTION_NAME}-role`, {
     name: `${API_LAMBDA_FUNCTION_NAME}-role`,
     assumeRolePolicy: Token.asString(assumeRole.json),
-    managedPolicyArns: [
-      'arn:aws:iam::aws:policy/AmazonDynamoDBFullAccess_v2',
-      'arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole',
-    ],
   });
+
+  new IamRolePolicyAttachment(
+    scope,
+    `${API_LAMBDA_FUNCTION_NAME}-attach-execution-policy`,
+    {
+      policyArn:
+        'arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole',
+      role: iamRole.name,
+    },
+  );
+
+  new IamRolePolicyAttachment(
+    scope,
+    `${API_LAMBDA_FUNCTION_NAME}-attach-dynamodb-policy`,
+    {
+      policyArn: 'arn:aws:iam::aws:policy/AmazonDynamoDBFullAccess_v2',
+      role: iamRole.name,
+    },
+  );
 
   new IamRolePolicyAttachment(
     scope,
