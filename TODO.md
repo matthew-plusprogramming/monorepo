@@ -3,9 +3,10 @@ Monorepo Infra:
 - [ ] Docs generation
   - [ ] OpenAPI
 - [x] Integrate IaC (OpenTofu)
+- [ ] Integrate linting into all packages
 - [ ] CI pipeline of some kind
-- [ ] Prettier formatting via config.ts and cli
-  - [ ] Part of CI?
+- [x] Prettier formatting via config.ts and cli
+  - [x] Part of CI?
 
 Backend:
 
