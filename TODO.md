@@ -3,7 +3,7 @@ Monorepo Infra:
 - [ ] Docs generation
   - [ ] OpenAPI
 - [x] Integrate IaC (OpenTofu)
-- [ ] Integrate linting into all packages
+- [x] Integrate linting into all packages
 - [ ] CI pipeline of some kind
 - [x] Prettier formatting via config.ts and cli
   - [x] Part of CI?
@@ -17,8 +17,9 @@ Auth Package (Integrated into node server)
 - [x] Set low concurrency (10)
 - [x] Coarse rate limiting
   - [ ] Global config
+- [ ] Other rate limiting types (token bucket)
 - [ ] Implement repo services for specific data access
-- [ ] Authenticates user
+- [x] Authenticates user
 - [ ] Deny-list check
 - [ ] Integrate authzed (spiceDB)
 - [ ] Configurable kill switch based on conditions or manual action
@@ -27,7 +28,7 @@ Auth Package (Integrated into node server)
 
 Analytics Lambda
 
-- [ ] Testing
+- [x] Testing
 - [ ] Local server (adapter express)
 
 Node Server (Lambda)
@@ -62,6 +63,9 @@ Frontend:
   - [ ] Footer
   - [ ] Sidebar
   - [ ] Sidenav
+- [ ] Barebones admin dashboard
+- [ ] Barebones user-facing application
+- [ ] Barebones landing page
 
 Chores:
 
