@@ -37,8 +37,8 @@
   "devDependencies": {
     "@configs/eslint-config": "*",
     "@configs/ts-config": "*",
-    "eslint": "^9.38.0",
-    "vitest": "^4.0.1"
+    "eslint": "^9.39.1",
+    "vitest": "^4.0.7"
   },
   "peerDependencies": {
   }
