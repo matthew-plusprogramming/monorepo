@@ -235,6 +235,10 @@ async function logsGetItemFailures(): Promise<void> {
 
 async function writesNewUsersSuccessfully(): Promise<void> {
   // Arrange
+  vi.useFakeTimers();
+  const fixedDate = new Date('2024-05-01T12:34:56.000Z');
+  vi.setSystemTime(fixedDate);
+
   const user = buildUserCreate({
     id: '11111111-1111-4111-8111-111111111111',
   });
@@ -246,15 +250,22 @@ async function writesNewUsersSuccessfully(): Promise<void> {
   // Act
   const result = await withRepo((repo) => repo.create(user));
 
-  // Assert
-  expect(result).toBe(true);
-  expect(dynamoFake.calls.putItem).toHaveLength(1);
-  expect(dynamoFake.calls.putItem[0]).toMatchObject({
-    TableName: 'test-users-table',
-  });
+  try {
+    // Assert
+    expect(result).toBe(true);
+    expect(dynamoFake.calls.putItem).toHaveLength(1);
+    expect(dynamoFake.calls.putItem[0]).toMatchObject({
+      TableName: 'test-users-table',
+    });
 
-  const marshalled = dynamoFake.calls.putItem[0]?.Item;
-  expect(marshalled).toStrictEqual(marshall(user));
+    const marshalled = dynamoFake.calls.putItem[0]?.Item;
+    expect(marshalled).toStrictEqual({
+      ...marshall(user),
+      createdAt: { S: fixedDate.toISOString() },
+    });
+  } finally {
+    vi.useRealTimers();
+  }
 }
 
 async function logsPutItemFailures(): Promise<void> {

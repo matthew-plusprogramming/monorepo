@@ -57,3 +57,6 @@ Reflection
 - 2025-11-07 — Plan phase: Investigated node-server build failure traced to register handler test using loose Argon hash mock type.
   Build phase: Introduced explicit Argon hash Mock alias, updated hoisted state + getter to use it, reran phase:check.
   Verify phase: npm run build now passes; captured git-diff-with-lines for register handler test change.
+- 2025-11-07 — Plan phase: Scoped time-aware update for userRepo create test covering createdAt injection.
+  Build phase: Injected fake timers + deterministic createdAt assertion; reran npm run phase:check.
+  Verify phase: Vitest node-server service suite green; git-diff-with-lines captured; agent:finalize blocked by existing memory drift list.

@@ -135,7 +135,10 @@ const buildCreate =
         deps.db
           .putItem({
             TableName: usersTableName,
-            Item: marshall(validatedUser),
+            Item: {
+              ...marshall(validatedUser),
+              createdAt: { S: new Date().toISOString() },
+            },
           })
           .pipe(
             Effect.tapError((error) => deps.logger.logError(error)),
