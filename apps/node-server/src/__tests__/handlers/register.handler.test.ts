@@ -19,9 +19,12 @@ import {
   prepareSuccessfulRegistration,
 } from './register/register.test-helpers.js';
 
+type ArgonHashFn = (password: string, salt?: string) => Promise<string>;
+type ArgonHashMock = Mock<ArgonHashFn>;
+
 // Hoisted state to capture the fake exposed by the AppLayer mock
 const userRepoModule = vi.hoisted((): { fake?: UserRepoFake } => ({}));
-const argonModule = vi.hoisted((): { hash?: ReturnType<typeof vi.fn> } => ({}));
+const argonModule = vi.hoisted((): { hash?: ArgonHashMock } => ({}));
 const jwtModule = vi.hoisted((): { sign?: Mock<JwtSignMock> } => ({}));
 
 vi.mock('@/clients/cdkOutputs', () => makeCdkOutputsStub());
@@ -34,7 +37,7 @@ vi.mock('@/layers/app.layer', async () => {
 });
 
 vi.mock('@node-rs/argon2', () => {
-  const hash = vi.fn<(password: string, salt?: string) => Promise<string>>();
+  const hash = vi.fn<ArgonHashFn>();
   argonModule.hash = hash;
   return { default: { hash } };
 });
@@ -52,7 +55,7 @@ const getUserRepoFake = (): UserRepoFake => {
   return userRepoModule.fake;
 };
 
-const getHashMock = (): ReturnType<typeof vi.fn> => {
+const getHashMock = (): ArgonHashMock => {
   if (!argonModule.hash) {
     throw new Error('argon2 hash mock was not initialized');
   }
@@ -100,7 +103,7 @@ async function returns201ForNewUser(): Promise<void> {
   });
 
   // Act
-  let hashMock: ReturnType<typeof getHashMock>;
+  let hashMock: ArgonHashMock;
   let signMock: Mock<JwtSignMock> | undefined;
   let userRepoFake: UserRepoFake | undefined;
 

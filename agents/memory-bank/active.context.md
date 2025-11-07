@@ -54,3 +54,6 @@ Reflection
 - 2025-10-31 — Plan phase: Scoped hook lifecycle + config-driven scaffold plan.
   Build phase: Extracted scaffold utilities + hook registry; repository-service now config-driven.
   Verify phase: Ran node --test on scripts/utils, npm run phase:check, and git-diff-with-lines.mjs to confirm hook/config rollout.
+- 2025-11-07 — Plan phase: Investigated node-server build failure traced to register handler test using loose Argon hash mock type.
+  Build phase: Introduced explicit Argon hash Mock alias, updated hoisted state + getter to use it, reran phase:check.
+  Verify phase: npm run build now passes; captured git-diff-with-lines for register handler test change.
