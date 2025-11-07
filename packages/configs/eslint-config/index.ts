@@ -123,6 +123,8 @@ export const baseConfig = (
       '@stylistic/js/new-parens': 'error',
       '@stylistic/ts/no-extra-semi': 'error',
       '@stylistic/ts/space-before-blocks': 'error',
+      'prefer-arrow-callback': ['error', { allowNamedFunctions: false }],
+      'func-style': ['error', 'expression'],
 
       // Strictest rules
       '@typescript-eslint/no-misused-promises': [

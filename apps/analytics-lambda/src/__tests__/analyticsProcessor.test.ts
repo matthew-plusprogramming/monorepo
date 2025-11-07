@@ -30,24 +30,27 @@ const isPutItemCommand = (command: Command): command is PutItemCommand =>
 const isUpdateItemCommand = (command: Command): command is UpdateItemCommand =>
   command instanceof UpdateItemCommand;
 
-function ensurePutItemCommand(command: Command, label: string): PutItemCommand {
+const ensurePutItemCommand = (
+  command: Command,
+  label: string,
+): PutItemCommand => {
   if (!isPutItemCommand(command)) {
     throw new Error(`Expected PutItemCommand for ${label}`);
   }
   return command;
-}
+};
 
-function ensureUpdateItemCommand(
+const ensureUpdateItemCommand = (
   command: Command,
   label: string,
-): UpdateItemCommand {
+): UpdateItemCommand => {
   if (!isUpdateItemCommand(command)) {
     throw new Error(`Expected UpdateItemCommand for ${label}`);
   }
   return command;
-}
+};
 
-function assertUniqueCommandSequence(commands: Command[]): void {
+const assertUniqueCommandSequence = (commands: Command[]): void => {
   if (commands.length !== 4) {
     throw new Error(`Expected 4 commands, received ${commands.length}`);
   }
@@ -78,9 +81,9 @@ function assertUniqueCommandSequence(commands: Command[]): void {
     'dedupe#monthly#user-123#2025-10',
   );
   expect(monthlyAggregate.input.Key?.pk?.S).toBe('mau#2025-10');
-}
+};
 
-function assertMonthlyAggregateOnly(commands: Command[]): void {
+const assertMonthlyAggregateOnly = (commands: Command[]): void => {
   expect(commands).toHaveLength(3);
   expect(
     commands.some((command) => {
@@ -95,7 +98,7 @@ function assertMonthlyAggregateOnly(commands: Command[]): void {
       .filter(isUpdateItemCommand)
       .filter((command) => command.input.Key?.pk?.S === 'mau#2025-10'),
   ).toHaveLength(1);
-}
+};
 
 describe('AnalyticsProcessor handle', () => {
   it('records daily and monthly uniques when dedupe succeeds', async () => {
