@@ -66,3 +66,6 @@ Reflection
 - 2025-11-07 — Plan phase: Scoped shared ensureDefined helper under node-server **tests**/utils; target entry/index and lambda tests to import helper without altering other suites.
 - 2025-11-07 — Build phase: Extracted ensureDefined helper into **tests**/utils and updated entry/lambda suites to import it so codemode can skip hoist-bound definitions.
   Verify phase: npm run test --workspace apps/node-server -- src/**tests**/entry/index.test.ts src/**tests**/entry/lambda.test.ts (fails during pretest tsc on existing dynamodb.service arrows).
+- 2025-11-07 — Plan phase: Scoped npm run test failure in apps/node-server due to hoisted vi.mock referencing const helper; need to hoist guard.
+  Build phase: Pending
+  Verify phase: Pending

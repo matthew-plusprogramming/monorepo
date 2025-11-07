@@ -49,19 +49,6 @@ type BackendServerCdkModule = Record<string, unknown> & {
   loadCDKOutput: (stack: string, basePath?: string) => unknown;
 };
 
-const isBackendServerCdkModule = (
-  value: unknown,
-): value is BackendServerCdkModule => {
-  if (typeof value !== 'object' || value === null) {
-    return false;
-  }
-  if (!('loadCDKOutput' in value)) {
-    return false;
-  }
-  const { loadCDKOutput } = value as { loadCDKOutput: unknown };
-  return typeof loadCDKOutput === 'function';
-};
-
 vi.mock('@cdk/backend-server-cdk', async () => {
   const actual = await vi.importActual('@cdk/backend-server-cdk');
   if (!isBackendServerCdkModule(actual)) {
@@ -78,6 +65,21 @@ vi.mock('@cdk/backend-server-cdk', async () => {
     loadCDKOutput: loadCDKOutputMock,
   };
 });
+
+// Required to hoist before the mock factory runs
+// eslint-disable-next-line func-style
+function isBackendServerCdkModule(
+  value: unknown,
+): value is BackendServerCdkModule {
+  if (typeof value !== 'object' || value === null) {
+    return false;
+  }
+  if (!('loadCDKOutput' in value)) {
+    return false;
+  }
+  const { loadCDKOutput } = value as { loadCDKOutput: unknown };
+  return typeof loadCDKOutput === 'function';
+}
 
 // Disable for test file due to length
 /* eslint-disable max-lines-per-function */
