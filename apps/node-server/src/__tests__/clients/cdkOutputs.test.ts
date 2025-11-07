@@ -49,9 +49,9 @@ type BackendServerCdkModule = Record<string, unknown> & {
   loadCDKOutput: (stack: string, basePath?: string) => unknown;
 };
 
-function isBackendServerCdkModule(
+const isBackendServerCdkModule = (
   value: unknown,
-): value is BackendServerCdkModule {
+): value is BackendServerCdkModule => {
   if (typeof value !== 'object' || value === null) {
     return false;
   }
@@ -60,7 +60,7 @@ function isBackendServerCdkModule(
   }
   const { loadCDKOutput } = value as { loadCDKOutput: unknown };
   return typeof loadCDKOutput === 'function';
-}
+};
 
 vi.mock('@cdk/backend-server-cdk', async () => {
   const actual = await vi.importActual('@cdk/backend-server-cdk');

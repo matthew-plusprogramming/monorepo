@@ -60,3 +60,9 @@ Reflection
 - 2025-11-07 — Plan phase: Scoped time-aware update for userRepo create test covering createdAt injection.
   Build phase: Injected fake timers + deterministic createdAt assertion; reran npm run phase:check.
   Verify phase: Vitest node-server service suite green; git-diff-with-lines captured; agent:finalize blocked by existing memory drift list.
+- 2025-11-07 — Plan phase: Scoped convert-to-arrows codemode integration, outlined heuristics for safe rewrites, and mapped runner/dependency updates for check-code-quality.
+- 2025-11-07 — Build phase: Added tsx/globby/ts-morph deps, wired convert-to-arrows codemode + tsx runner into check-code-quality, and self-tested script execution locally.
+- 2025-11-07 — Verify phase: phase:check still fails on baseline due to existing func-style violations across node-server test suites; see lint output for file/line breakdown.
+- 2025-11-07 — Plan phase: Scoped shared ensureDefined helper under node-server **tests**/utils; target entry/index and lambda tests to import helper without altering other suites.
+- 2025-11-07 — Build phase: Extracted ensureDefined helper into **tests**/utils and updated entry/lambda suites to import it so codemode can skip hoist-bound definitions.
+  Verify phase: npm run test --workspace apps/node-server -- src/**tests**/entry/index.test.ts src/**tests**/entry/lambda.test.ts (fails during pretest tsc on existing dynamodb.service arrows).

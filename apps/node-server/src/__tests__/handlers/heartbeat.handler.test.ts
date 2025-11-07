@@ -58,62 +58,156 @@ vi.mock('@/layers/app.layer', async () => {
   return { AppLayer };
 });
 
-describe('heartbeatRequestHandler', () => {
-  beforeEach(initializeHeartbeatContext);
-  afterEach(cleanupHeartbeatContext);
-
-  it('publishes a heartbeat event and returns 200', publishesHeartbeatEvent);
-  it(
-    'obfuscates failures when EventBridge reports failed entries',
-    obfuscatesFailedEntries,
-  );
-  it(
-    'obfuscates failures when publishing heartbeat event errors',
-    obfuscatesPublishErrors,
-  );
-});
-
-function getDynamoFake(): DynamoDbServiceFake {
+const getDynamoFake = (): DynamoDbServiceFake => {
   if (!dynamoModule.fake) {
     throw new Error('Dynamo fake was not initialized');
   }
   return dynamoModule.fake;
-}
+};
 
-function getEventBridgeFake(): EventBridgeServiceFake {
+const getEventBridgeFake = (): EventBridgeServiceFake => {
   if (!eventBridgeModule.fake) {
     throw new Error('EventBridge fake was not initialized');
   }
   return eventBridgeModule.fake;
-}
+};
 
-function getLoggerFake(): LoggerServiceFake {
+const getLoggerFake = (): LoggerServiceFake => {
   if (!loggerModule.fake) {
     throw new Error('Logger fake was not initialized');
   }
   return loggerModule.fake;
-}
+};
 
-function getUserRepoFake(): UserRepoFake {
+const getUserRepoFake = (): UserRepoFake => {
   if (!userRepoModule.fake) {
     throw new Error('User repo fake was not initialized');
   }
   return userRepoModule.fake;
-}
+};
 
-function initializeHeartbeatContext(): void {
+const resetHeartbeatFakes = (
+  eventBridgeFake: EventBridgeServiceFake,
+  loggerFake: LoggerServiceFake,
+): void => {
+  eventBridgeFake.reset();
+  loggerFake.reset();
+  getDynamoFake().reset();
+  getUserRepoFake().reset();
+};
+
+const attachUser = (user: { sub: string; jti: string }) => {
+  return (req: Request, _res: ExpressResponse, next: NextFunction): void => {
+    Object.assign(req, { user });
+    next();
+  };
+};
+
+const runHeartbeatScenario = async ({
+  user,
+  platform,
+  configureEventBridge,
+}: HeartbeatScenarioOptions): Promise<HeartbeatScenarioResult> => {
+  const { heartbeatRequestHandler } = await import(
+    '@/handlers/heartbeat.handler'
+  );
+  const eventBridgeFake = getEventBridgeFake();
+  const loggerFake = getLoggerFake();
+
+  resetHeartbeatFakes(eventBridgeFake, loggerFake);
+  configureEventBridge(eventBridgeFake);
+
+  const app = express();
+  app.get('/heartbeat', attachUser(user), heartbeatRequestHandler);
+
+  const httpRequest = request(app).get('/heartbeat');
+  if (platform) {
+    httpRequest.set('X-Platform', platform);
+  }
+
+  const response = await httpRequest;
+
+  return { response, eventBridgeFake, loggerFake };
+};
+
+type HeartbeatScenarioOptions = {
+  user: { sub: string; jti: string };
+  platform?: string;
+  configureEventBridge: (fake: EventBridgeServiceFake) => void;
+};
+
+type HeartbeatScenarioResult = {
+  response: Response;
+  eventBridgeFake: EventBridgeServiceFake;
+  loggerFake: LoggerServiceFake;
+};
+
+const obfuscatesFailedEntries = async (): Promise<void> => {
+  // Arrange
+  const scenario: HeartbeatScenarioOptions = {
+    user: { sub: 'user-3', jti: 'token-3' },
+    configureEventBridge: (fake) => {
+      fake.queueSuccess({
+        $metadata: { httpStatusCode: 200 },
+        FailedEntryCount: 1,
+        Entries: [
+          {
+            ErrorCode: 'InternalFailure',
+            ErrorMessage: 'Bus throttled',
+          },
+        ],
+      });
+    },
+  };
+
+  // Act
+  const { response, eventBridgeFake, loggerFake } =
+    await runHeartbeatScenario(scenario);
+
+  // Assert
+  expect(response.status).toBe(HTTP_RESPONSE.BAD_GATEWAY);
+  expect(response.text).toBe('Bad Gateway');
+  expect(eventBridgeFake.calls).toHaveLength(1);
+  expect(loggerFake.entries.logs).toHaveLength(0);
+  const errorArgs = loggerFake.entries.errors[0] ?? [];
+  const firstError = errorArgs[0];
+  expect(firstError).toBeInstanceOf(Error);
+  if (firstError instanceof Error) {
+    expect(firstError.message).toContain('InternalFailure');
+  }
+};
+
+const obfuscatesPublishErrors = async (): Promise<void> => {
+  // Arrange
+  const scenario: HeartbeatScenarioOptions = {
+    user: { sub: 'user-2', jti: 'token-2' },
+    configureEventBridge: (fake) => {
+      fake.queueFailure(new Error('boom'));
+    },
+  };
+
+  // Act
+  const { response, loggerFake } = await runHeartbeatScenario(scenario);
+
+  // Assert
+  expect(response.status).toBe(HTTP_RESPONSE.BAD_GATEWAY);
+  expect(response.text).toBe('Bad Gateway');
+  expect(loggerFake.entries.errors).toHaveLength(1);
+};
+
+const initializeHeartbeatContext = (): void => {
   vi.resetModules();
   vi.stubEnv('APP_ENV', 'test-env');
   vi.stubEnv('APP_VERSION', '2.0.0');
   setBundledRuntime(false);
-}
+};
 
-function cleanupHeartbeatContext(): void {
+const cleanupHeartbeatContext = (): void => {
   vi.unstubAllEnvs();
   clearBundledRuntime();
-}
+};
 
-async function publishesHeartbeatEvent(): Promise<void> {
+const publishesHeartbeatEvent = async (): Promise<void> => {
   // Arrange
   const scenario: HeartbeatScenarioOptions = {
     user: { sub: 'user-1', jti: 'token-1' },
@@ -151,113 +245,19 @@ async function publishesHeartbeatEvent(): Promise<void> {
     'Heartbeat event recorded for user user-1',
   ]);
   expect(loggerFake.entries.errors).toHaveLength(0);
-}
-
-async function obfuscatesFailedEntries(): Promise<void> {
-  // Arrange
-  const scenario: HeartbeatScenarioOptions = {
-    user: { sub: 'user-3', jti: 'token-3' },
-    configureEventBridge: (fake) => {
-      fake.queueSuccess({
-        $metadata: { httpStatusCode: 200 },
-        FailedEntryCount: 1,
-        Entries: [
-          {
-            ErrorCode: 'InternalFailure',
-            ErrorMessage: 'Bus throttled',
-          },
-        ],
-      });
-    },
-  };
-
-  // Act
-  const { response, eventBridgeFake, loggerFake } =
-    await runHeartbeatScenario(scenario);
-
-  // Assert
-  expect(response.status).toBe(HTTP_RESPONSE.BAD_GATEWAY);
-  expect(response.text).toBe('Bad Gateway');
-  expect(eventBridgeFake.calls).toHaveLength(1);
-  expect(loggerFake.entries.logs).toHaveLength(0);
-  const errorArgs = loggerFake.entries.errors[0] ?? [];
-  const firstError = errorArgs[0];
-  expect(firstError).toBeInstanceOf(Error);
-  if (firstError instanceof Error) {
-    expect(firstError.message).toContain('InternalFailure');
-  }
-}
-
-async function obfuscatesPublishErrors(): Promise<void> {
-  // Arrange
-  const scenario: HeartbeatScenarioOptions = {
-    user: { sub: 'user-2', jti: 'token-2' },
-    configureEventBridge: (fake) => {
-      fake.queueFailure(new Error('boom'));
-    },
-  };
-
-  // Act
-  const { response, loggerFake } = await runHeartbeatScenario(scenario);
-
-  // Assert
-  expect(response.status).toBe(HTTP_RESPONSE.BAD_GATEWAY);
-  expect(response.text).toBe('Bad Gateway');
-  expect(loggerFake.entries.errors).toHaveLength(1);
-}
-
-type HeartbeatScenarioOptions = {
-  user: { sub: string; jti: string };
-  platform?: string;
-  configureEventBridge: (fake: EventBridgeServiceFake) => void;
 };
 
-type HeartbeatScenarioResult = {
-  response: Response;
-  eventBridgeFake: EventBridgeServiceFake;
-  loggerFake: LoggerServiceFake;
-};
+describe('heartbeatRequestHandler', () => {
+  beforeEach(initializeHeartbeatContext);
+  afterEach(cleanupHeartbeatContext);
 
-async function runHeartbeatScenario({
-  user,
-  platform,
-  configureEventBridge,
-}: HeartbeatScenarioOptions): Promise<HeartbeatScenarioResult> {
-  const { heartbeatRequestHandler } = await import(
-    '@/handlers/heartbeat.handler'
+  it('publishes a heartbeat event and returns 200', publishesHeartbeatEvent);
+  it(
+    'obfuscates failures when EventBridge reports failed entries',
+    obfuscatesFailedEntries,
   );
-  const eventBridgeFake = getEventBridgeFake();
-  const loggerFake = getLoggerFake();
-
-  resetHeartbeatFakes(eventBridgeFake, loggerFake);
-  configureEventBridge(eventBridgeFake);
-
-  const app = express();
-  app.get('/heartbeat', attachUser(user), heartbeatRequestHandler);
-
-  const httpRequest = request(app).get('/heartbeat');
-  if (platform) {
-    httpRequest.set('X-Platform', platform);
-  }
-
-  const response = await httpRequest;
-
-  return { response, eventBridgeFake, loggerFake };
-}
-
-function resetHeartbeatFakes(
-  eventBridgeFake: EventBridgeServiceFake,
-  loggerFake: LoggerServiceFake,
-): void {
-  eventBridgeFake.reset();
-  loggerFake.reset();
-  getDynamoFake().reset();
-  getUserRepoFake().reset();
-}
-
-function attachUser(user: { sub: string; jti: string }) {
-  return (req: Request, _res: ExpressResponse, next: NextFunction): void => {
-    Object.assign(req, { user });
-    next();
-  };
-}
+  it(
+    'obfuscates failures when publishing heartbeat event errors',
+    obfuscatesPublishErrors,
+  );
+});

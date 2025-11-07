@@ -73,37 +73,13 @@ const expectPartitionKey = (
   expect(input.Key?.pk?.S).toBe(`ip#${ip}#${windowStart}`);
 };
 
-describe('ipRateLimitingMiddlewareRequestHandler', () => {
-  beforeEach(resetFakes);
-  afterEach(() => {
-    vi.useRealTimers();
-  });
-
-  it(
-    'passes through when the IP is under the allowed threshold',
-    passesThroughWhenUnderThreshold,
-  );
-
-  it(
-    'returns 429 and logs when the rate limit is exceeded',
-    returns429WhenExceeded,
-  );
-
-  it(
-    'propagates an internal error when DynamoDB update fails',
-    propagatesWhenUpdateFails,
-  );
-
-  it('returns 429 when the request has no resolved ip', rejectsWhenIpMissing);
-});
-
-function resetFakes(): void {
+const resetFakes = (): void => {
   setBundledRuntime(false);
   getLoggerFake().reset();
   getDynamoFake().reset();
-}
+};
 
-async function passesThroughWhenUnderThreshold(): Promise<void> {
+const passesThroughWhenUnderThreshold = async (): Promise<void> => {
   // Arrange
   vi.useFakeTimers();
   const now = new Date('2024-01-01T00:00:05Z');
@@ -140,9 +116,9 @@ async function passesThroughWhenUnderThreshold(): Promise<void> {
     throw new Error('Expected request ip to be defined');
   }
   expectPartitionKey(updateCall, ip, now);
-}
+};
 
-async function returns429WhenExceeded(): Promise<void> {
+const returns429WhenExceeded = async (): Promise<void> => {
   // Arrange
   vi.useFakeTimers();
   const now = new Date('2024-01-01T00:00:30Z');
@@ -175,9 +151,9 @@ async function returns429WhenExceeded(): Promise<void> {
   expect(getLoggerFake().entries.logs).toContainEqual([
     `[RATE_LIMIT_EXCEEDED] ${ip} - 6 calls`,
   ]);
-}
+};
 
-async function propagatesWhenUpdateFails(): Promise<void> {
+const propagatesWhenUpdateFails = async (): Promise<void> => {
   // Arrange
   vi.useFakeTimers();
   const now = new Date('2024-01-01T00:00:45Z');
@@ -203,9 +179,9 @@ async function propagatesWhenUpdateFails(): Promise<void> {
   if (firstError instanceof Error) {
     expect(firstError.message).toBe('ddb down');
   }
-}
+};
 
-async function rejectsWhenIpMissing(): Promise<void> {
+const rejectsWhenIpMissing = async (): Promise<void> => {
   // Arrange
   const { req, res, next, captured } = makeRequestContext();
 
@@ -219,4 +195,28 @@ async function rejectsWhenIpMissing(): Promise<void> {
   expect(captured.statusCode).toBe(HTTP_RESPONSE.THROTTLED);
   expect(dynamoFake.calls.updateItem).toHaveLength(0);
   expect(next).not.toHaveBeenCalled();
-}
+};
+
+describe('ipRateLimitingMiddlewareRequestHandler', () => {
+  beforeEach(resetFakes);
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it(
+    'passes through when the IP is under the allowed threshold',
+    passesThroughWhenUnderThreshold,
+  );
+
+  it(
+    'returns 429 and logs when the rate limit is exceeded',
+    returns429WhenExceeded,
+  );
+
+  it(
+    'propagates an internal error when DynamoDB update fails',
+    propagatesWhenUpdateFails,
+  );
+
+  it('returns 429 when the request has no resolved ip', rejectsWhenIpMissing);
+});

@@ -41,37 +41,18 @@ const getLoggerFake = (): LoggerServiceFake => {
 };
 const getVerifyMock = (): typeof verifyMock.fn => verifyMock.fn;
 
-describe('isAuthenticatedMiddlewareRequestHandler', () => {
-  beforeEach(initializeAuthContext);
-  afterEach(cleanupAuthContext);
-
-  it(
-    'responds with 401 when the authorization header is missing',
-    rejectsWhenHeaderMissing,
-  );
-  it(
-    'responds with 400 when the token fails JWT validation',
-    rejectsWhenTokenMalformed,
-  );
-  it(
-    'responds with 401 when token verification fails',
-    rejectsWhenVerificationFails,
-  );
-  it('attaches the user and logs on success', attachesUserAndLogs);
-});
-
-function initializeAuthContext(): void {
+const initializeAuthContext = (): void => {
   setBundledRuntime(false);
   getLoggerFake().reset();
   getVerifyMock().mockReset();
   vi.stubEnv('JWT_SECRET', 'test-secret');
-}
+};
 
-function cleanupAuthContext(): void {
+const cleanupAuthContext = (): void => {
   vi.unstubAllEnvs();
-}
+};
 
-async function rejectsWhenHeaderMissing(): Promise<void> {
+const rejectsWhenHeaderMissing = async (): Promise<void> => {
   // Arrange
   const { req, res, next, captured } = makeRequestContext();
 
@@ -84,9 +65,9 @@ async function rejectsWhenHeaderMissing(): Promise<void> {
   expect(next).not.toHaveBeenCalled();
   expect(getVerifyMock()).not.toHaveBeenCalled();
   expect(getLoggerFake().entries.logs).toHaveLength(0);
-}
+};
 
-async function rejectsWhenTokenMalformed(): Promise<void> {
+const rejectsWhenTokenMalformed = async (): Promise<void> => {
   // Arrange
   const { req, res, next, captured } = makeRequestContext({
     headers: { authorization: 'Bearer not-a-jwt' },
@@ -100,9 +81,9 @@ async function rejectsWhenTokenMalformed(): Promise<void> {
   expect(captured.statusCode).toBe(HTTP_RESPONSE.BAD_REQUEST);
   expect(next).not.toHaveBeenCalled();
   expect(getVerifyMock()).not.toHaveBeenCalled();
-}
+};
 
-async function rejectsWhenVerificationFails(): Promise<void> {
+const rejectsWhenVerificationFails = async (): Promise<void> => {
   // Arrange
   const token = 'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.signature';
   const { req, res, next, captured } = makeRequestContext({
@@ -121,9 +102,9 @@ async function rejectsWhenVerificationFails(): Promise<void> {
   expect(verify).toHaveBeenCalledWith(token, 'test-secret');
   expect(captured.statusCode).toBe(HTTP_RESPONSE.UNAUTHORIZED);
   expect(next).not.toHaveBeenCalled();
-}
+};
 
-async function attachesUserAndLogs(): Promise<void> {
+const attachesUserAndLogs = async (): Promise<void> => {
   // Arrange
   const token = 'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.signature';
   const { req, res, next, captured } = makeRequestContext({
@@ -153,4 +134,23 @@ async function attachesUserAndLogs(): Promise<void> {
   expect(getLoggerFake().entries.logs).toContainEqual([
     `User: ${decodedToken.sub}, Role: ${decodedToken.role} Authenticated`,
   ]);
-}
+};
+
+describe('isAuthenticatedMiddlewareRequestHandler', () => {
+  beforeEach(initializeAuthContext);
+  afterEach(cleanupAuthContext);
+
+  it(
+    'responds with 401 when the authorization header is missing',
+    rejectsWhenHeaderMissing,
+  );
+  it(
+    'responds with 400 when the token fails JWT validation',
+    rejectsWhenTokenMalformed,
+  );
+  it(
+    'responds with 401 when token verification fails',
+    rejectsWhenVerificationFails,
+  );
+  it('attaches the user and logs on success', attachesUserAndLogs);
+});

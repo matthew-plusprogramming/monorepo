@@ -71,12 +71,12 @@ const getSignMock = (): Mock<JwtSignMock> => {
 
 type RegisterHandler = RequestHandler;
 
-async function importRegisterHandler(): Promise<RegisterHandler> {
+const importRegisterHandler = async (): Promise<RegisterHandler> => {
   const module = await import('@/handlers/register.handler');
   return module.registerRequestHandler;
-}
+};
 
-function initializeRegisterContext(): void {
+const initializeRegisterContext = (): void => {
   vi.resetModules();
   setBundledRuntime(false);
   restoreRandomUUID();
@@ -84,13 +84,13 @@ function initializeRegisterContext(): void {
   vi.stubEnv('JWT_SECRET', 'shh-its-a-secret');
   argonModule.hash?.mockReset();
   jwtModule.sign?.mockReset();
-}
+};
 
 afterEach(() => {
   vi.unstubAllEnvs();
 });
 
-async function returns201ForNewUser(): Promise<void> {
+const returns201ForNewUser = async (): Promise<void> => {
   // Arrange
   const body = createRegisterBody({
     username: 'new-user',
@@ -141,9 +141,15 @@ async function returns201ForNewUser(): Promise<void> {
     signMock,
     userRepoFake,
   });
-}
+};
 
-async function obfuscatesConflictAs502(): Promise<void> {
+const resetUserRepoFake = (): UserRepoFake => {
+  const fake = getUserRepoFake();
+  fake.reset();
+  return fake;
+};
+
+const obfuscatesConflictAs502 = async (): Promise<void> => {
   // Arrange
   const body = createRegisterBody({
     username: 'dup',
@@ -169,9 +175,9 @@ async function obfuscatesConflictAs502(): Promise<void> {
   // Assert
   expect(captured.statusCode).toBe(HTTP_RESPONSE.BAD_GATEWAY);
   expect(captured.sendBody).toBe('Bad Gateway');
-}
+};
 
-async function propagatesRepoCreateFailure(): Promise<void> {
+const propagatesRepoCreateFailure = async (): Promise<void> => {
   // Arrange
   const handler = await importRegisterHandler();
   getHashMock().mockResolvedValueOnce('hashed-password');
@@ -194,9 +200,9 @@ async function propagatesRepoCreateFailure(): Promise<void> {
   // Assert
   expect(captured.statusCode).toBe(HTTP_RESPONSE.INTERNAL_SERVER_ERROR);
   expect(captured.sendBody).toBe('ddb put failed');
-}
+};
 
-async function propagatesHashingFailure(): Promise<void> {
+const propagatesHashingFailure = async (): Promise<void> => {
   // Arrange
   getHashMock().mockRejectedValueOnce(new Error('argon2 failed'));
 
@@ -216,9 +222,9 @@ async function propagatesHashingFailure(): Promise<void> {
   // Assert
   expect(captured.statusCode).toBe(HTTP_RESPONSE.BAD_GATEWAY);
   expect(captured.sendBody).toBe('Bad Gateway');
-}
+};
 
-async function propagatesJwtFailure(): Promise<void> {
+const propagatesJwtFailure = async (): Promise<void> => {
   // Arrange
   const handler = await importRegisterHandler();
   getHashMock().mockResolvedValueOnce('hashed-password');
@@ -245,13 +251,8 @@ async function propagatesJwtFailure(): Promise<void> {
   // Assert
   expect(captured.statusCode).toBe(HTTP_RESPONSE.BAD_GATEWAY);
   expect(captured.sendBody).toBe('Bad Gateway');
-}
+};
 
-function resetUserRepoFake(): UserRepoFake {
-  const fake = getUserRepoFake();
-  fake.reset();
-  return fake;
-}
 describe('registerRequestHandler', () => {
   beforeEach(initializeRegisterContext);
 

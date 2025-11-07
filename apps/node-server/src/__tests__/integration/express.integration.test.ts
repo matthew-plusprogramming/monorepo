@@ -32,6 +32,35 @@ vi.mock('@/services/eventBridge.service', async (importOriginal) => {
   } satisfies typeof actual;
 });
 
+const buildHeartbeatApp = async (): Promise<Express> => {
+  const { heartbeatRequestHandler } = await import(
+    '@/handlers/heartbeat.handler'
+  );
+
+  const app = express();
+  app.get(
+    '/heartbeat',
+    (req, _res, next) => {
+      Object.assign(req, {
+        user: {
+          sub: 'user-1',
+          jti: 'token-1',
+        },
+      });
+      next();
+    },
+    heartbeatRequestHandler,
+  );
+  return app;
+};
+
+const getEventBridgeFake = (): EventBridgeServiceFake => {
+  if (!eventBridgeModule.fake) {
+    throw new Error('EventBridge fake was not initialized');
+  }
+  return eventBridgeModule.fake;
+};
+
 describe('heartbeat integration', () => {
   beforeEach(() => {
     vi.resetModules();
@@ -104,32 +133,3 @@ describe('heartbeat integration', () => {
     expect(eventBridgeFake.calls).toHaveLength(1);
   });
 });
-
-async function buildHeartbeatApp(): Promise<Express> {
-  const { heartbeatRequestHandler } = await import(
-    '@/handlers/heartbeat.handler'
-  );
-
-  const app = express();
-  app.get(
-    '/heartbeat',
-    (req, _res, next) => {
-      Object.assign(req, {
-        user: {
-          sub: 'user-1',
-          jti: 'token-1',
-        },
-      });
-      next();
-    },
-    heartbeatRequestHandler,
-  );
-  return app;
-}
-
-function getEventBridgeFake(): EventBridgeServiceFake {
-  if (!eventBridgeModule.fake) {
-    throw new Error('EventBridge fake was not initialized');
-  }
-  return eventBridgeModule.fake;
-}

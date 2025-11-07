@@ -61,20 +61,6 @@ vi.mock('@smithy/node-http-handler', () => ({
   }),
 }));
 
-describe('DynamoDbService adapter', () => {
-  beforeEach(initializeDynamoContext);
-  afterEach(cleanupDynamoContext);
-
-  it(
-    'sends GetItemCommand via AWS client and returns the response',
-    sendsGetItemCommand,
-  );
-  it('wraps AWS rejections into Error instances', wrapsRejectionsAsErrors);
-  it('allows updating items through the adapter', allowsUpdateItem);
-  it('writes items with putItem', writesItemsWithPutItem);
-  it('propagates putItem failures as Errors', propagatesPutItemFailures);
-});
-
 const useService = <R>(
   run: (service: DynamoDbServiceSchema) => Effect.Effect<R, Error>,
 ): Promise<R> =>
@@ -85,17 +71,17 @@ const useService = <R>(
     }).pipe(Effect.provide(LiveDynamoDbService)),
   );
 
-function initializeDynamoContext(): void {
+const initializeDynamoContext = (): void => {
   sendMock.mockReset();
   mocks.lastClientConfig = undefined;
   vi.stubEnv('AWS_REGION', 'us-east-1');
-}
+};
 
-function cleanupDynamoContext(): void {
+const cleanupDynamoContext = (): void => {
   vi.unstubAllEnvs();
-}
+};
 
-async function sendsGetItemCommand(): Promise<void> {
+const sendsGetItemCommand = async (): Promise<void> => {
   // Arrange
   const output = { $metadata: { httpStatusCode: 200 } };
   sendMock.mockResolvedValueOnce(output);
@@ -129,9 +115,9 @@ async function sendsGetItemCommand(): Promise<void> {
     socketTimeout: 1000,
     requestTimeout: 1500,
   });
-}
+};
 
-async function wrapsRejectionsAsErrors(): Promise<void> {
+const wrapsRejectionsAsErrors = async (): Promise<void> => {
   // Arrange
   sendMock.mockRejectedValueOnce('network unavailable');
 
@@ -142,9 +128,9 @@ async function wrapsRejectionsAsErrors(): Promise<void> {
   await expect(action).rejects.toMatchObject({
     message: 'network unavailable',
   });
-}
+};
 
-async function allowsUpdateItem(): Promise<void> {
+const allowsUpdateItem = async (): Promise<void> => {
   // Arrange
   const output = { $metadata: { httpStatusCode: 200 }, Attributes: {} };
   sendMock.mockResolvedValueOnce(output);
@@ -164,9 +150,9 @@ async function allowsUpdateItem(): Promise<void> {
     TableName: 'users',
     Key: { id: { S: '123' } },
   });
-}
+};
 
-async function writesItemsWithPutItem(): Promise<void> {
+const writesItemsWithPutItem = async (): Promise<void> => {
   // Arrange
   const output = { $metadata: { httpStatusCode: 200 } };
   sendMock.mockResolvedValueOnce(output);
@@ -190,9 +176,9 @@ async function writesItemsWithPutItem(): Promise<void> {
     TableName: 'users',
     Item: { id: { S: 'new-user' } },
   });
-}
+};
 
-async function propagatesPutItemFailures(): Promise<void> {
+const propagatesPutItemFailures = async (): Promise<void> => {
   // Arrange
   sendMock.mockRejectedValueOnce('write failed');
 
@@ -206,4 +192,18 @@ async function propagatesPutItemFailures(): Promise<void> {
 
   // Assert
   await expect(action).rejects.toMatchObject({ message: 'write failed' });
-}
+};
+
+describe('DynamoDbService adapter', () => {
+  beforeEach(initializeDynamoContext);
+  afterEach(cleanupDynamoContext);
+
+  it(
+    'sends GetItemCommand via AWS client and returns the response',
+    sendsGetItemCommand,
+  );
+  it('wraps AWS rejections into Error instances', wrapsRejectionsAsErrors);
+  it('allows updating items through the adapter', allowsUpdateItem);
+  it('writes items with putItem', writesItemsWithPutItem);
+  it('propagates putItem failures as Errors', propagatesPutItemFailures);
+});

@@ -81,6 +81,34 @@ vi.mock('@/services/userRepo.service', async (importOriginal) => {
   } satisfies typeof actual;
 });
 
+const getDynamoFake = (): DynamoDbServiceFake => {
+  if (!dynamoModule.fake) {
+    throw new Error('Dynamo fake was not initialized');
+  }
+  return dynamoModule.fake;
+};
+
+const getLoggerFake = (): LoggerServiceFake => {
+  if (!loggerModule.fake) {
+    throw new Error('Logger fake was not initialized');
+  }
+  return loggerModule.fake;
+};
+
+const getEventBridgeFake = (): EventBridgeServiceFake => {
+  if (!eventBridgeModule.fake) {
+    throw new Error('EventBridge fake was not initialized');
+  }
+  return eventBridgeModule.fake;
+};
+
+const getUserRepoService = (): UserRepoSchema => {
+  if (!userRepoModule.service) {
+    throw new Error('User repo service was not initialized');
+  }
+  return userRepoModule.service;
+};
+
 describe('AppLayer', () => {
   beforeEach(() => {
     vi.resetModules();
@@ -110,31 +138,3 @@ describe('AppLayer', () => {
     expect(result.repo).toBe(getUserRepoService());
   });
 });
-
-function getDynamoFake(): DynamoDbServiceFake {
-  if (!dynamoModule.fake) {
-    throw new Error('Dynamo fake was not initialized');
-  }
-  return dynamoModule.fake;
-}
-
-function getLoggerFake(): LoggerServiceFake {
-  if (!loggerModule.fake) {
-    throw new Error('Logger fake was not initialized');
-  }
-  return loggerModule.fake;
-}
-
-function getEventBridgeFake(): EventBridgeServiceFake {
-  if (!eventBridgeModule.fake) {
-    throw new Error('EventBridge fake was not initialized');
-  }
-  return eventBridgeModule.fake;
-}
-
-function getUserRepoService(): UserRepoSchema {
-  if (!userRepoModule.service) {
-    throw new Error('User repo service was not initialized');
-  }
-  return userRepoModule.service;
-}

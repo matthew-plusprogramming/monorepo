@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ZodError } from 'zod';
 
 import { makeCdkOutputsStub } from '@/__tests__/stubs/cdkOutputs';
+import { ensureDefined } from '@/__tests__/utils/ensureDefined';
 
 type ExpressAppStub = {
   use: ReturnType<typeof vi.fn>;
@@ -114,6 +115,86 @@ vi.mock('@/types/environment', () => {
   return { EnvironmentSchema: { parse } };
 });
 
+const requireExpressApp = (): ExpressAppStub => {
+  return ensureDefined(expressModule.app, 'express app');
+};
+
+const requireEnvironmentParse = (): ReturnType<typeof vi.fn> => {
+  return ensureDefined(environmentModule.parse, 'EnvironmentSchema.parse mock');
+};
+
+const requireExpressJsonMiddleware = (): ReturnType<typeof vi.fn> => {
+  return ensureDefined(expressModule.jsonMiddleware, 'express.json middleware');
+};
+
+const requireIpRateLimitMiddleware = (): ReturnType<typeof vi.fn> => {
+  return ensureDefined(ipRateLimitModule.handler, 'ipRateLimiting middleware');
+};
+
+const requireJsonErrorMiddleware = (): ReturnType<typeof vi.fn> => {
+  return ensureDefined(jsonErrorModule.handler, 'jsonError middleware');
+};
+
+const requireRegisterHandler = (): ReturnType<typeof vi.fn> => {
+  return ensureDefined(registerModule.handler, 'register handler');
+};
+
+const requireGetUserHandler = (): ReturnType<typeof vi.fn> => {
+  return ensureDefined(getUserModule.handler, 'getUser handler');
+};
+
+const assertBootstrapSuccess = ({
+  module,
+  exitSpy,
+}: {
+  module: { app?: unknown };
+  exitSpy: MockInstance<typeof process.exit>;
+}): void => {
+  const expressApp = requireExpressApp();
+  const parse = requireEnvironmentParse();
+  const jsonMiddleware = requireExpressJsonMiddleware();
+
+  expect(expressModule.factory).toHaveBeenCalledTimes(1);
+  expect(parse).toHaveBeenCalledWith(process.env);
+  expect(expressApp.use).toHaveBeenNthCalledWith(
+    1,
+    requireIpRateLimitMiddleware(),
+  );
+  expect(expressModule.json).toHaveBeenCalledTimes(1);
+  expect(expressApp.use).toHaveBeenNthCalledWith(2, jsonMiddleware);
+  expect(expressApp.use).toHaveBeenNthCalledWith(
+    3,
+    requireJsonErrorMiddleware(),
+  );
+  expect(expressApp.post).toHaveBeenCalledWith(
+    '/register',
+    requireRegisterHandler(),
+  );
+  expect(expressApp.get).toHaveBeenCalledWith(
+    '/user/:identifier',
+    requireGetUserHandler(),
+  );
+  expect(expressApp.listen).toHaveBeenCalledWith(process.env.PORT);
+  const moduleApp = module.app;
+  expect(moduleApp).toBe(expressApp);
+  expect(exitSpy).not.toHaveBeenCalled();
+};
+
+const assertBootstrapFailure = ({
+  consoleErrorSpy,
+  exitSpy,
+}: {
+  consoleErrorSpy: MockInstance<typeof console.error>;
+  exitSpy: MockInstance<typeof process.exit>;
+}): void => {
+  expect(consoleErrorSpy).toHaveBeenNthCalledWith(
+    1,
+    'Environment variables validation failed',
+  );
+  expect(consoleErrorSpy).toHaveBeenCalledTimes(2);
+  expect(exitSpy).toHaveBeenCalledWith(1);
+};
+
 describe('node-server index entrypoint', () => {
   let exitSpy: MockInstance<typeof process.exit>;
   let consoleErrorSpy: MockInstance<typeof console.error>;
@@ -184,90 +265,3 @@ describe('node-server index entrypoint', () => {
     assertBootstrapFailure({ consoleErrorSpy, exitSpy });
   });
 });
-
-function requireExpressApp(): ExpressAppStub {
-  return ensureDefined(expressModule.app, 'express app');
-}
-
-function requireEnvironmentParse(): ReturnType<typeof vi.fn> {
-  return ensureDefined(environmentModule.parse, 'EnvironmentSchema.parse mock');
-}
-
-function requireExpressJsonMiddleware(): ReturnType<typeof vi.fn> {
-  return ensureDefined(expressModule.jsonMiddleware, 'express.json middleware');
-}
-
-function requireIpRateLimitMiddleware(): ReturnType<typeof vi.fn> {
-  return ensureDefined(ipRateLimitModule.handler, 'ipRateLimiting middleware');
-}
-
-function requireJsonErrorMiddleware(): ReturnType<typeof vi.fn> {
-  return ensureDefined(jsonErrorModule.handler, 'jsonError middleware');
-}
-
-function requireRegisterHandler(): ReturnType<typeof vi.fn> {
-  return ensureDefined(registerModule.handler, 'register handler');
-}
-
-function requireGetUserHandler(): ReturnType<typeof vi.fn> {
-  return ensureDefined(getUserModule.handler, 'getUser handler');
-}
-
-function ensureDefined<T>(value: T | undefined, name: string): T {
-  if (value === undefined) {
-    throw new Error(`${name} was not initialized`);
-  }
-  return value;
-}
-
-function assertBootstrapSuccess({
-  module,
-  exitSpy,
-}: {
-  module: { app?: unknown };
-  exitSpy: MockInstance<typeof process.exit>;
-}): void {
-  const expressApp = requireExpressApp();
-  const parse = requireEnvironmentParse();
-  const jsonMiddleware = requireExpressJsonMiddleware();
-
-  expect(expressModule.factory).toHaveBeenCalledTimes(1);
-  expect(parse).toHaveBeenCalledWith(process.env);
-  expect(expressApp.use).toHaveBeenNthCalledWith(
-    1,
-    requireIpRateLimitMiddleware(),
-  );
-  expect(expressModule.json).toHaveBeenCalledTimes(1);
-  expect(expressApp.use).toHaveBeenNthCalledWith(2, jsonMiddleware);
-  expect(expressApp.use).toHaveBeenNthCalledWith(
-    3,
-    requireJsonErrorMiddleware(),
-  );
-  expect(expressApp.post).toHaveBeenCalledWith(
-    '/register',
-    requireRegisterHandler(),
-  );
-  expect(expressApp.get).toHaveBeenCalledWith(
-    '/user/:identifier',
-    requireGetUserHandler(),
-  );
-  expect(expressApp.listen).toHaveBeenCalledWith(process.env.PORT);
-  const moduleApp = module.app;
-  expect(moduleApp).toBe(expressApp);
-  expect(exitSpy).not.toHaveBeenCalled();
-}
-
-function assertBootstrapFailure({
-  consoleErrorSpy,
-  exitSpy,
-}: {
-  consoleErrorSpy: MockInstance<typeof console.error>;
-  exitSpy: MockInstance<typeof process.exit>;
-}): void {
-  expect(consoleErrorSpy).toHaveBeenNthCalledWith(
-    1,
-    'Environment variables validation failed',
-  );
-  expect(consoleErrorSpy).toHaveBeenCalledTimes(2);
-  expect(exitSpy).toHaveBeenCalledWith(1);
-}

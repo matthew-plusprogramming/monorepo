@@ -1,6 +1,8 @@
 import { setBundledRuntime } from '@packages/backend-core/testing';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { ensureDefined } from '@/__tests__/utils/ensureDefined';
+
 type ExpressAppStub = {
   use: ReturnType<typeof vi.fn>;
   post: ReturnType<typeof vi.fn>;
@@ -144,6 +146,49 @@ vi.mock('@/middleware/isAuthenticated.middleware', () => {
   return { isAuthenticatedMiddlewareRequestHandler: handler };
 });
 
+const requireExpressApp = (): ExpressAppStub => {
+  return ensureDefined(expressModule.app, 'express app');
+};
+
+const requireServerless = (): MockFn => {
+  return ensureDefined(serverlessModule.factory, 'serverless-http mock');
+};
+
+const requireEnvironmentParse = (): MockFn => {
+  return ensureDefined(environmentModule.parse, 'EnvironmentSchema.parse mock');
+};
+
+const requireIpRateLimitMiddleware = (): MockFn => {
+  return ensureDefined(ipRateLimitModule.handler, 'ipRateLimiting middleware');
+};
+
+const requireJsonErrorMiddleware = (): MockFn => {
+  return ensureDefined(jsonErrorModule.handler, 'jsonError middleware');
+};
+
+const requireRegisterHandler = (): MockFn => {
+  return ensureDefined(registerModule.handler, 'register handler');
+};
+
+const requireHeartbeatHandler = (): MockFn => {
+  return ensureDefined(heartbeatModule.handler, 'heartbeat handler');
+};
+
+const requireGetUserHandler = (): MockFn => {
+  return ensureDefined(getUserModule.handler, 'getUser handler');
+};
+
+const requireJsonMiddleware = (): MockFn => {
+  return ensureDefined(expressModule.jsonMiddleware, 'express.json middleware');
+};
+
+const requireIsAuthenticatedMiddleware = (): MockFn => {
+  return ensureDefined(
+    isAuthenticatedModule.handler,
+    'isAuthenticated middleware',
+  );
+};
+
 describe('lambda entrypoint', () => {
   beforeEach(() => {
     vi.resetModules();
@@ -197,53 +242,3 @@ describe('lambda entrypoint', () => {
     expect(module.handler).toBe(handlerStub);
   });
 });
-
-function requireExpressApp(): ExpressAppStub {
-  return ensureDefined(expressModule.app, 'express app');
-}
-
-function requireServerless(): MockFn {
-  return ensureDefined(serverlessModule.factory, 'serverless-http mock');
-}
-
-function requireEnvironmentParse(): MockFn {
-  return ensureDefined(environmentModule.parse, 'EnvironmentSchema.parse mock');
-}
-
-function requireIpRateLimitMiddleware(): MockFn {
-  return ensureDefined(ipRateLimitModule.handler, 'ipRateLimiting middleware');
-}
-
-function requireJsonErrorMiddleware(): MockFn {
-  return ensureDefined(jsonErrorModule.handler, 'jsonError middleware');
-}
-
-function requireRegisterHandler(): MockFn {
-  return ensureDefined(registerModule.handler, 'register handler');
-}
-
-function requireHeartbeatHandler(): MockFn {
-  return ensureDefined(heartbeatModule.handler, 'heartbeat handler');
-}
-
-function requireGetUserHandler(): MockFn {
-  return ensureDefined(getUserModule.handler, 'getUser handler');
-}
-
-function requireJsonMiddleware(): MockFn {
-  return ensureDefined(expressModule.jsonMiddleware, 'express.json middleware');
-}
-
-function requireIsAuthenticatedMiddleware(): MockFn {
-  return ensureDefined(
-    isAuthenticatedModule.handler,
-    'isAuthenticated middleware',
-  );
-}
-
-function ensureDefined<T>(value: T | undefined, name: string): T {
-  if (value === undefined) {
-    throw new Error(`${name} was not initialized`);
-  }
-  return value;
-}

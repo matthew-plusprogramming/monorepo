@@ -5,8 +5,11 @@
   "packageManager": "npm@11.6.2",
   "type": "module",
   "devDependencies": {
+    "globby": "^15.0.0",
     "picomatch": "^4.0.3",
     "prettier": "^3.6.2",
+    "ts-morph": "^27.0.2",
+    "tsx": "^4.20.6",
     "turbo": "^2.6.0"
   },
   "workspaces": [
