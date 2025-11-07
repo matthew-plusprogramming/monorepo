@@ -36,6 +36,8 @@ const withRepo = <R, E>(
     }),
   );
 
+// Disabled for test file due to length
+/* eslint-disable max-lines */
 describe('UserRepo', () => {
   beforeEach(resetRepoFakes);
 
