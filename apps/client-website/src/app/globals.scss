@@ -18,6 +18,13 @@ $breakpoints: (
   }
 }
 
+@mixin flex-row($gap, $justify: flex-start) {
+  display: flex;
+  gap: $gap;
+  align-items: center;
+  justify-content: $justify;
+}
+
 :root {
   // Colors
   --primary-color: #7a5db8;

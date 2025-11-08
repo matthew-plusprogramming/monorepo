@@ -36,3 +36,6 @@ Reflection
 - 2025-11-08 — Plan phase: Diagnosed Navbar media queries using CSS vars that don’t work; will swap to Sass breakpoint constants so responsive wrap behaves without touching tokens.
 - 2025-11-08 — Build phase: Added Sass breakpoint constant to Navbar styles and replaced var-based media queries; ran npm run phase:check to ensure the fix passes lint + stylelint.
 - 2025-11-08 — Verify phase: Captured diff via git-diff helper and confirmed npm run phase:check already exercised lint/stylelint, so responsive change stays scoped to Navbar styles.
+- 2025-11-08 — Plan phase: Scoped Navbar SCSS cleanup: consolidate shared button/link styles via mixins, retain layout + responsive behavior, and keep color tokens as the single source.
+  Build phase: Refactored Navbar.module.scss with shared mixins/placeholders, button variant helpers, and responsive utilities while keeping the rendered layout stable.
+  Verify phase: Captured the git diff with line numbers and reran npm run phase:check to confirm lint/stylelint coverage; manual review kept Navbar layout + responsiveness unchanged.

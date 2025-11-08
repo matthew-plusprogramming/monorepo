@@ -1,20 +1,111 @@
 @use './globals.scss' as *;
 
-.navbar {
-  display: flex;
-  gap: clamp(0.75rem, 2vw, 1.75rem);
-  align-items: center;
+$navbar-max-width: 980px;
+$navbar-padding-block: 0.85rem;
+$navbar-padding-inline: clamp(1.25rem, 3vw, 2.5rem);
+$navbar-gap: clamp(0.75rem, 2vw, 1.75rem);
+$navbar-radius: 1.5rem;
+$brand-gap: 0.75rem;
+$logo-size: 2rem;
+$actions-gap: 0.75rem;
+$button-padding: 0.55rem 1.5rem;
+$button-radius: 0.5rem;
+$button-transition:
+  transform 150ms ease,
+  background 150ms ease,
+  color 150ms ease,
+  box-shadow 150ms ease;
 
-  width: min(980px, 100%);
-  margin: 0 auto;
-  padding: 0.85rem clamp(1.25rem, 3vw, 2.5rem);
-  border-radius: 1.5rem;
+@mixin list-reset {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
 
-  color: var(--text-color);
-
+@mixin surface-panel {
+  border-radius: $navbar-radius;
   background: var(--background-color);
   box-shadow: 0 18px 48px
     color-mix(in oklch, var(--secondary-color) 10%, transparent);
+}
+
+@mixin center-square($size) {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  width: $size;
+  height: $size;
+}
+
+@mixin nav-link {
+  font-weight: 500;
+  color: inherit;
+  text-decoration: none;
+  transition:
+    color 150ms ease,
+    opacity 150ms ease;
+
+  &:hover,
+  &:focus-visible {
+    color: color-mix(in oklch, var(--text-color) 80%, var(--background-color));
+  }
+}
+
+@mixin nav-button-base {
+  cursor: pointer;
+
+  padding: $button-padding;
+  border: none;
+  border-radius: $button-radius;
+
+  font-family: inherit;
+  font-weight: 600;
+
+  transition: $button-transition;
+
+  @include respond(laptop) {
+    flex: 1;
+  }
+}
+
+@mixin nav-button-primary {
+  color: var(--text-color);
+  background: var(--primary-color);
+  box-shadow: 0 12px 32px
+    color-mix(in oklch, var(--primary-color) 30%, transparent);
+
+  &:hover,
+  &:focus-visible {
+    transform: translateY(-1.5px);
+  }
+
+  &:active {
+    transform: translateY(0);
+  }
+}
+
+@mixin nav-button-secondary {
+  color: var(--background-color);
+  background: color-mix(in oklch, var(--text-color) 80%, var(--muted-color));
+
+  &:hover,
+  &:focus-visible {
+    background: color-mix(in oklch, var(--text-color) 50%, var(--muted-color));
+  }
+}
+
+.navbar {
+  @include flex-row($navbar-gap);
+
+  box-sizing: border-box;
+  width: min($navbar-max-width, 100%);
+  margin: 0 auto;
+  padding: $navbar-padding-block $navbar-padding-inline;
+
+  color: var(--text-color);
+
+  @include surface-panel;
 
   & .brandLink {
     font-weight: 700;
@@ -22,17 +113,10 @@
     text-decoration: none;
 
     & .brand {
-      display: flex;
-      gap: 0.75rem;
-      align-items: center;
+      @include flex-row($brand-gap);
 
       & .logo {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-
-        width: 2rem;
-        height: 2rem;
+        @include center-square($logo-size);
       }
 
       @include respond(laptop) {
@@ -43,33 +127,14 @@
   }
 
   & .links {
-    display: flex;
+    @include flex-row(clamp(1rem, 3vw, 2rem), center);
+
     flex: 1;
-    gap: clamp(1rem, 3vw, 2rem);
-    align-items: center;
-    justify-content: center;
 
-    margin: 0;
-    padding: 0;
-
-    list-style: none;
+    @include list-reset;
 
     & a {
-      font-weight: 500;
-      color: inherit;
-      text-decoration: none;
-      transition:
-        color 150ms ease,
-        opacity 150ms ease;
-    }
-
-    & a:hover,
-    & a:focus-visible {
-      color: color-mix(
-        in oklch,
-        var(--text-color) 80%,
-        var(--background-color)
-      );
+      @include nav-link;
     }
 
     @include respond(laptop) {
@@ -80,75 +145,33 @@
   }
 
   & .actions {
-    display: flex;
-    gap: 0.75rem;
-    align-items: center;
+    @include flex-row($actions-gap);
 
     & .secondaryButton,
     & .primaryButton {
-      cursor: pointer;
-
-      padding: 0.55rem 1.5rem;
-      border: none;
-      border-radius: 0.5rem;
-
-      font-family: inherit;
-      font-weight: 600;
-
-      transition:
-        transform 150ms ease,
-        background 150ms ease,
-        color 150ms ease,
-        box-shadow 150ms ease;
-
-      @include respond(laptop) {
-        flex: 1;
-      }
+      @include nav-button-base;
     }
 
     & .primaryButton {
-      color: var(--text-color);
-      background: var(--primary-color);
-      box-shadow: 0 12px 32px
-        color-mix(in oklch, var(--primary-color) 30%, transparent);
+      @include nav-button-primary;
 
       @media (prefers-color-scheme: light) {
         color: var(--background-color);
       }
     }
 
-    & .primaryButton:hover,
-    & .primaryButton:focus-visible {
-      transform: translateY(-1.5px);
-    }
-
-    & .primaryButton:active {
-      transform: translateY(0);
-    }
-
     & .secondaryButton {
-      color: var(--background-color);
-      background: color-mix(
-        in oklch,
-        var(--text-color) 80%,
-        var(--muted-color)
-      );
-    }
-
-    & .secondaryButton:hover,
-    & .secondaryButton:focus-visible {
-      background: color-mix(
-        in oklch,
-        var(--text-color) 50%,
-        var(--muted-color)
-      );
+      @include nav-button-secondary;
 
       @media (prefers-color-scheme: light) {
-        background: color-mix(
-          in oklch,
-          var(--text-color) 70%,
-          var(--muted-color)
-        );
+        &:hover,
+        &:focus-visible {
+          background: color-mix(
+            in oklch,
+            var(--text-color) 70%,
+            var(--muted-color)
+          );
+        }
       }
     }
 
