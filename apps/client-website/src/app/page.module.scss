@@ -7,20 +7,18 @@
   background:
     radial-gradient(
       circle at 10% 0%,
-      color-mix(in srgb, var(--primary-color) 45%, white) 0%,
+      color-mix(in oklch, var(--primary-color) 55%, var(--background-color)) 0%,
       transparent 65%
     ),
     radial-gradient(
-      circle at 90% 0%,
-      color-mix(in srgb, var(--accent-color) 60%, white) 0%,
-      transparent 70%
+      circle at 110% -10%,
+      color-mix(in oklch, var(--accent-color) 65%, var(--background-color)) 0%,
+      transparent 50%
     ),
     linear-gradient(
-      180deg,
-      color-mix(in srgb, var(--text-color) 5%, white) 0%,
-      color-mix(in srgb, var(--accent-color) 15%, var(--background-color)) 55%,
-      color-mix(in srgb, var(--secondary-color) 35%, var(--background-color))
-        100%
+      135deg,
+      color-mix(in oklch, var(--primary-color) 70%, var(--secondary-color)) 0%,
+      color-mix(in oklch, var(--secondary-color) 70%, var(--accent-color)) 100%
     );
 }
 
