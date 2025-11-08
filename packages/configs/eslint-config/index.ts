@@ -201,25 +201,3 @@ export const testConfig = (
     },
   },
 ];
-
-export const reactConfig = (
-  tsconfigDirectory: string,
-  projectOverride?: string[],
-  files?: string[],
-): Array<ConfigWithExtends> => [
-  ...baseConfig(tsconfigDirectory, projectOverride, files),
-  {
-    plugins: {
-      react: reactPlugin,
-      'react-hooks': reactHooksPlugin,
-      'jsx-a11y': jsxA11yPlugin,
-    },
-    rules: {
-      'react/jsx-boolean-value': ['error', 'never'],
-      'react/jsx-no-useless-fragment': 'error',
-      'react-hooks/rules-of-hooks': 'error',
-      'react-hooks/exhaustive-deps': 'warn',
-      'jsx-a11y/no-autofocus': 'warn',
-    },
-  },
-];

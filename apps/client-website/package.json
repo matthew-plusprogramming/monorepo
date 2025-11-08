@@ -14,9 +14,9 @@
     "// -- 🧪 Testing": "--",
     "test": "echo \"TODO: Implement tests\" && exit 0",
     "// -- 🧹 Linting & Formatting": "--",
-    "lint": "eslint src --cache",
-    "lint:fix": "eslint src --fix --cache",
-    "lint:no-cache": "eslint src",
+    "lint": "eslint src --cache && stylelint 'src/**/*.{css,scss}' --cache --config ./stylelint.config.ts",
+    "lint:fix": "eslint src --fix --cache && stylelint 'src/**/*.{css,scss}' --fix --cache --config ./stylelint.config.ts",
+    "lint:no-cache": "eslint src && stylelint 'src/**/*.{css,scss}' --config ./stylelint.config.ts",
     "// -- ✅ Verification & CI": "--",
     "// -- 🔧 Miscellaneous": "--"
   },
@@ -40,6 +40,11 @@
     "globals": "^14.0.0",
     "postcss": "^8.5.6",
     "sass": "^1.93.3",
+    "stylelint": "^16.25.0",
+    "stylelint-config-clean-order": "^7.0.0",
+    "stylelint-config-standard": "^39.0.1",
+    "stylelint-config-standard-scss": "^16.0.0",
+    "stylelint-scss": "^6.12.1",
     "typed-scss-modules": "^8.1.1",
     "typescript": "^5.9.3"
   }

@@ -5,27 +5,27 @@
   --text-color: #2b2b2b;
   --background-color: #f7f5fa;
 
-  font-family: 'Inter', sans-serif;
+  font-family: Inter, sans-serif;
   font-optical-sizing: auto;
-  line-height: 1.5;
   font-weight: 400;
   font-style: normal;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  line-height: 1.5;
+  color: var(--text-color);
+  text-rendering: optimizelegibility;
 
   color-scheme: light dark;
-  color: var(--text-color);
   background-color: var(--background-color);
 
   font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
 }
 
 html,
 body {
+  height: 100%;
   margin: 0;
   padding: 0;
-  height: 100%;
 }
 
 @media (prefers-color-scheme: dark) {
