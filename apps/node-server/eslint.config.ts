@@ -1,3 +1,6 @@
-import { baseConfig } from '@configs/eslint-config';
+import { baseConfig, testConfig } from '@configs/eslint-config';
 
-export default [...baseConfig(__dirname, ['tsconfig.lint.json'])];
+export default [
+  ...baseConfig(__dirname, ['tsconfig.lint.json']),
+  ...testConfig(__dirname, ['tsconfig.test.json'], ['src/__tests__/**/*.ts']),
+];

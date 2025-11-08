@@ -35,10 +35,9 @@ const gitignorePath = fileURLToPath(
 export const baseConfig = (
   tsconfigDirectory: string,
   projectOverride?: string[],
-): Array<ConfigWithExtends> => [
-  js.configs.recommended,
-  ...tseslint.configs.recommended,
-  {
+  files?: string[],
+): Array<ConfigWithExtends> => {
+  const settings: ConfigWithExtends = {
     languageOptions: {
       parser: tseslint.parser,
       parserOptions: {
@@ -173,17 +172,42 @@ export const baseConfig = (
         },
       },
     },
+  };
+
+  if (files && files.length > 0) {
+    settings.files = files;
+  }
+
+  return [
+    js.configs.recommended,
+    ...tseslint.configs.recommended,
+    settings,
+    prettier,
+    includeIgnoreFile(gitignorePath),
+    globalIgnores(eslintIgnorePatterns),
+  ];
+};
+
+export const testConfig = (
+  tsconfigDirectory: string,
+  projectOverride?: string[],
+  files?: string[],
+): Array<ConfigWithExtends> => [
+  ...baseConfig(tsconfigDirectory, projectOverride, files),
+  {
+    rules: {
+      'max-lines': ['warn', 500],
+      'max-lines-per-function': ['warn', 150],
+    },
   },
-  prettier,
-  includeIgnoreFile(gitignorePath),
-  globalIgnores(eslintIgnorePatterns),
 ];
 
 export const reactConfig = (
   tsconfigDirectory: string,
   projectOverride?: string[],
+  files?: string[],
 ): Array<ConfigWithExtends> => [
-  ...baseConfig(tsconfigDirectory, projectOverride),
+  ...baseConfig(tsconfigDirectory, projectOverride, files),
   {
     plugins: {
       react: reactPlugin,

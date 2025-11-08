@@ -81,8 +81,6 @@ function isBackendServerCdkModule(
   return typeof loadCDKOutput === 'function';
 }
 
-// Disable for test file due to length
-/* eslint-disable max-lines-per-function */
 describe('clients/cdkOutputs', () => {
   beforeEach(() => {
     loadCalls.length = 0;
@@ -167,4 +165,3 @@ describe('clients/cdkOutputs', () => {
     expect(module.analyticsProcessorRuleName).toBe('analytics-processor-rule');
   });
 });
-/* eslint-enable max-lines-per-function */

@@ -12,9 +12,6 @@ import { makeCdkOutputsStub } from '@/__tests__/stubs/cdkOutputs';
 import type { UserRepoSchema } from '@/services/userRepo.service';
 import { LiveUserRepo, UserRepo } from '@/services/userRepo.service';
 
-// Disabled for test file due to length
-/* eslint-disable max-lines */
-
 vi.mock('@/clients/cdkOutputs', () =>
   makeCdkOutputsStub({ usersTableName: 'test-users-table' }),
 );
