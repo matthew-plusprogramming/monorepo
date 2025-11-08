@@ -51,9 +51,14 @@ Node Server (Lambda)
 
 Frontend:
 
-- [ ] Integrate basic react setup w/ zustand, react query
-- [ ] Scss
-  - [ ] Classnames
+- [x] React
+- [x] NextJS
+- [x] Scss
+  - [x] Classnames
+- [ ] Zustand
+- [ ] React query
+- [ ] React hookform?
+- [ ] UI Tests
 - [ ] Integrate single-spa (why not)
   - [ ] Maybe later? (too cumbersome for now)
 - [ ] React hookform
