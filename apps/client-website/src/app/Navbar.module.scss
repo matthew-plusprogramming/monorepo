@@ -1,0 +1,128 @@
+.navbar {
+  width: min(980px, 100%);
+  margin: 0 auto;
+  padding: 0.85rem clamp(1.25rem, 3vw, 2.5rem);
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  gap: clamp(0.75rem, 2vw, 1.75rem);
+  background: color-mix(in srgb, var(--text-color) 80%, var(--accent-color));
+  color: color-mix(in srgb, var(--background-color) 80%, var(--secondary-color));
+  box-shadow: 0 18px 48px color-mix(in srgb, var(--secondary-color) 20%, transparent);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.logo {
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  display: grid;
+  place-items: center;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  background: color-mix(in srgb, var(--primary-color) 55%, var(--background-color));
+  color: color-mix(in srgb, var(--background-color) 65%, var(--text-color));
+}
+
+.brandName {
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: color-mix(in srgb, var(--background-color) 75%, var(--secondary-color));
+}
+
+.links {
+  flex: 1;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(1rem, 3vw, 2rem);
+  margin: 0;
+  padding: 0;
+}
+
+.links a {
+  text-decoration: none;
+  font-weight: 500;
+  color: color-mix(in srgb, var(--background-color) 65%, var(--text-color));
+  transition: color 150ms ease, opacity 150ms ease;
+}
+
+.links a:hover,
+.links a:focus-visible {
+  color: var(--background-color);
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.secondaryButton,
+.primaryButton {
+  border-radius: 999px;
+  padding: 0.55rem 1.5rem;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  transition: transform 150ms ease, background 150ms ease, color 150ms ease,
+    box-shadow 150ms ease;
+  font-family: inherit;
+}
+
+.secondaryButton {
+  background: transparent;
+  border: 1px solid color-mix(in srgb, var(--background-color) 35%, var(--text-color));
+  color: color-mix(in srgb, var(--background-color) 80%, var(--text-color));
+}
+
+.secondaryButton:hover,
+.secondaryButton:focus-visible {
+  background: color-mix(in srgb, var(--background-color) 70%, var(--text-color));
+}
+
+.primaryButton {
+  background: color-mix(in srgb, var(--secondary-color) 65%, var(--accent-color));
+  color: var(--background-color);
+  box-shadow: 0 12px 32px color-mix(in srgb, var(--secondary-color) 30%, transparent);
+}
+
+.primaryButton:hover,
+.primaryButton:focus-visible {
+  transform: translateY(-1px);
+}
+
+@media (max-width: 720px) {
+  .navbar {
+    flex-wrap: wrap;
+    border-radius: 1.5rem;
+  }
+
+  .brand {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .links {
+    order: 3;
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .actions {
+    width: 100%;
+  }
+
+  .secondaryButton,
+  .primaryButton {
+    flex: 1;
+  }
+}

@@ -1,7 +1,9 @@
 .heroBackground {
   box-sizing: border-box;
   height: 100dvh;
+  width: 100%;
   padding: clamp(3rem, 8vw, 6rem) clamp(1.5rem, 6vw, 4rem);
+
   background:
     radial-gradient(
       circle at 10% 0%,
@@ -20,4 +22,14 @@
       color-mix(in srgb, var(--secondary-color) 35%, var(--background-color))
         100%
     );
+}
+
+.heroSection {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  align-items: center;
+  gap: clamp(2rem, 4vw, 3rem);
+  text-align: center;
+  color: var(--text-color);
 }
