@@ -1,6 +1,9 @@
 :root {
-  --primary-color: #ffffff;
-  --background-color: #000000;
+  --primary-color: #8cdb7a;
+  --secondary-color: #337a39;
+  --accent-color: #ffc642;
+  --text-color: #f7f5fa;
+  --background-color: #2b2b2b;
 
   font-family: 'Inter', sans-serif;
   font-optical-sizing: auto;
@@ -24,7 +27,7 @@ body {
 
 @media (prefers-color-scheme: light) {
   :root {
-    --primary-color: #000000;
-    --background-color: #ffffff;
+    --text-color: #2b2b2b;
+    --background-color: #f7f5fa;
   }
 }
