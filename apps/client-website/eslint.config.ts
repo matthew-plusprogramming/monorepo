@@ -1,29 +1,31 @@
+import { globalIgnores } from 'eslint/config';
+import nextVitals from 'eslint-config-next/core-web-vitals';
+import nextTs from 'eslint-config-next/typescript';
+
 import globals from 'globals';
 import reactHooks from 'eslint-plugin-react-hooks';
-import reactRefresh from 'eslint-plugin-react-refresh';
 import { baseConfig } from '@configs/eslint-config';
-import reactX from 'eslint-plugin-react-x';
-import reactDom from 'eslint-plugin-react-dom';
+
+import { fileURLToPath } from 'url';
+import path from 'path';
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 export default [
   ...baseConfig(__dirname, ['tsconfig.json']),
+  ...nextVitals,
+  ...nextTs,
   {
     files: ['**/*.{ts,tsx}'],
     plugins: {
       'react-hooks': reactHooks,
-      'react-refresh': reactRefresh,
-      'react-x': reactX,
-      'react-dom': reactDom,
     },
     rules: {
       ...reactHooks.configs['recommended-latest'].rules,
-      ...reactRefresh.configs.vite.rules,
-      ...reactX.configs['recommended-typescript'].rules,
-      ...reactDom.configs.recommended.rules,
     },
     languageOptions: {
       ecmaVersion: 2022,
       globals: globals.browser,
     },
   },
+  globalIgnores(['.next/**', 'out/**', 'build/**', 'next-env.d.ts']),
 ];
