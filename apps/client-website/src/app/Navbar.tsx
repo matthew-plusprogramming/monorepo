@@ -1,3 +1,5 @@
+import Image from 'next/image';
+import Link from 'next/link';
 import type { JSX } from 'react';
 
 import styles from './Navbar.module.scss';
@@ -5,12 +7,20 @@ import styles from './Navbar.module.scss';
 const Navbar = (): JSX.Element => {
   return (
     <nav className={styles.navbar} aria-label="Primary navigation">
-      <div className={styles.brand}>
-        <div className={styles.logo} aria-hidden="true">
-          Logo
+      <Link className={styles.brandLink} href="/">
+        <div className={styles.brand}>
+          <div className={styles.logo} aria-hidden="true">
+            {/* TODO: Add light mode support */}
+            <Image
+              src="/logo-dark.png"
+              alt="Brand Logo"
+              width={32}
+              height={32}
+            />
+          </div>
+          <span>Brand Name</span>
         </div>
-        <span className={styles.brandName}>Brand Name</span>
-      </div>
+      </Link>
 
       <ul className={styles.links}>
         <li>

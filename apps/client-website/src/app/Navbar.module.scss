@@ -13,96 +13,127 @@
   background: var(--background-color);
   box-shadow: 0 18px 48px
     color-mix(in oklch, var(--secondary-color) 10%, transparent);
-}
 
-.brand {
-  display: flex;
-  gap: 0.75rem;
-  align-items: center;
-}
+  & .brandLink {
+    font-weight: 700;
+    color: inherit;
+    text-decoration: none;
 
-.links {
-  display: flex;
-  flex: 1;
-  gap: clamp(1rem, 3vw, 2rem);
-  align-items: center;
-  justify-content: center;
+    & .brand {
+      display: flex;
+      gap: 0.75rem;
+      align-items: center;
 
-  margin: 0;
-  padding: 0;
+      & .logo {
+        display: flex;
+        align-items: center;
+        justify-content: center;
 
-  list-style: none;
-}
-
-.links a {
-  font-weight: 500;
-  color: inherit;
-  text-decoration: none;
-  transition:
-    color 150ms ease,
-    opacity 150ms ease;
-}
-
-.links a:hover,
-.links a:focus-visible {
-  filter: brightness(2);
-}
-
-.actions {
-  display: flex;
-  gap: 0.75rem;
-  align-items: center;
-}
-
-.secondaryButton,
-.primaryButton {
-  cursor: pointer;
-
-  padding: 0.55rem 1.5rem;
-  border: none;
-  border-radius: 0.5rem;
-
-  font-family: inherit;
-  font-weight: 600;
-
-  transition:
-    transform 150ms ease,
-    background 150ms ease,
-    color 150ms ease,
-    box-shadow 150ms ease;
-}
-
-.primaryButton {
-  color: var(--text-color);
-  background: var(--primary-color);
-  box-shadow: 0 12px 32px
-    color-mix(in oklch, var(--primary-color) 30%, transparent);
-
-  @media (prefers-color-scheme: light) {
-    color: var(--background-color);
+        width: 2rem;
+        height: 2rem;
+      }
+    }
   }
-}
 
-.primaryButton:hover,
-.primaryButton:focus-visible {
-  transform: translateY(-1.5px);
-}
+  & .links {
+    display: flex;
+    flex: 1;
+    gap: clamp(1rem, 3vw, 2rem);
+    align-items: center;
+    justify-content: center;
 
-.primaryButton:active {
-  transform: translateY(0);
-}
+    margin: 0;
+    padding: 0;
 
-.secondaryButton {
-  color: var(--background-color);
-  background: color-mix(in oklch, var(--text-color) 80%, var(--muted-color));
-}
+    list-style: none;
 
-.secondaryButton:hover,
-.secondaryButton:focus-visible {
-  background: color-mix(in oklch, var(--text-color) 50%, var(--muted-color));
+    & a {
+      font-weight: 500;
+      color: inherit;
+      text-decoration: none;
+      transition:
+        color 150ms ease,
+        opacity 150ms ease;
+    }
 
-  @media (prefers-color-scheme: light) {
-    background: color-mix(in oklch, var(--text-color) 70%, var(--muted-color));
+    & a:hover,
+    & a:focus-visible {
+      color: color-mix(
+        in oklch,
+        var(--text-color) 80%,
+        var(--background-color)
+      );
+    }
+  }
+
+  & .actions {
+    display: flex;
+    gap: 0.75rem;
+    align-items: center;
+
+    & .secondaryButton,
+    & .primaryButton {
+      cursor: pointer;
+
+      padding: 0.55rem 1.5rem;
+      border: none;
+      border-radius: 0.5rem;
+
+      font-family: inherit;
+      font-weight: 600;
+
+      transition:
+        transform 150ms ease,
+        background 150ms ease,
+        color 150ms ease,
+        box-shadow 150ms ease;
+    }
+
+    & .primaryButton {
+      color: var(--text-color);
+      background: var(--primary-color);
+      box-shadow: 0 12px 32px
+        color-mix(in oklch, var(--primary-color) 30%, transparent);
+
+      @media (prefers-color-scheme: light) {
+        color: var(--background-color);
+      }
+    }
+
+    & .primaryButton:hover,
+    & .primaryButton:focus-visible {
+      transform: translateY(-1.5px);
+    }
+
+    & .primaryButton:active {
+      transform: translateY(0);
+    }
+
+    & .secondaryButton {
+      color: var(--background-color);
+      background: color-mix(
+        in oklch,
+        var(--text-color) 80%,
+        var(--muted-color)
+      );
+    }
+
+    & .secondaryButton:hover,
+    & .secondaryButton:focus-visible {
+      background: color-mix(
+        in oklch,
+        var(--text-color) 50%,
+        var(--muted-color)
+      );
+
+      @media (prefers-color-scheme: light) {
+        background: color-mix(
+          in oklch,
+          var(--text-color) 70%,
+          var(--muted-color)
+        );
+      }
+    }
   }
 }
 
