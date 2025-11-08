@@ -1,4 +1,5 @@
 :root {
+  // Colors
   --primary-color: #7a5db8;
   --secondary-color: #0042ac;
   --accent-color: #80d169;
@@ -6,6 +7,12 @@
   --text-color: #2b2b2b;
   --background-color: #f7f5fa;
 
+  // Sizing
+  --min-width-laptop: 1024px;
+  --min-width-tablet: 720px;
+  --min-width-mobile: 375px;
+
+  // Typography
   font-family: Inter, sans-serif;
   font-optical-sizing: auto;
   font-weight: 400;
@@ -16,6 +23,7 @@
   color: var(--text-color);
   text-rendering: optimizelegibility;
 
+  // Layout
   color-scheme: light dark;
   background-color: var(--background-color);
 
