@@ -1,3 +1,5 @@
+@use './globals.scss' as *;
+
 .navbar {
   display: flex;
   gap: clamp(0.75rem, 2vw, 1.75rem);
@@ -32,6 +34,11 @@
         width: 2rem;
         height: 2rem;
       }
+
+      @include respond(laptop) {
+        justify-content: center;
+        width: 100%;
+      }
     }
   }
 
@@ -64,6 +71,12 @@
         var(--background-color)
       );
     }
+
+    @include respond(laptop) {
+      flex-wrap: wrap;
+      order: 3;
+      width: 100%;
+    }
   }
 
   & .actions {
@@ -87,6 +100,10 @@
         background 150ms ease,
         color 150ms ease,
         box-shadow 150ms ease;
+
+      @include respond(laptop) {
+        flex: 1;
+      }
     }
 
     & .primaryButton {
@@ -134,32 +151,13 @@
         );
       }
     }
-  }
-}
 
-@media (width <= 720px) {
-  .navbar {
+    @include respond(laptop) {
+      width: 100%;
+    }
+  }
+
+  @include respond(laptop) {
     flex-wrap: wrap;
-    border-radius: 1.5rem;
-  }
-
-  .brand {
-    justify-content: center;
-    width: 100%;
-  }
-
-  .links {
-    flex-wrap: wrap;
-    order: 3;
-    width: 100%;
-  }
-
-  .actions {
-    width: 100%;
-  }
-
-  .secondaryButton,
-  .primaryButton {
-    flex: 1;
   }
 }

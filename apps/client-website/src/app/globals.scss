@@ -1,3 +1,23 @@
+@use 'sass:map';
+
+$breakpoints: (
+  laptop: 1024px,
+  tablet: 720px,
+  mobile: 375px,
+);
+
+@mixin respond($key) {
+  $size: map.get($breakpoints, $key);
+
+  @if not $size {
+    @error "Unknown breakpoint `#{$key}`";
+  }
+
+  @media (width <= $size) {
+    @content;
+  }
+}
+
 :root {
   // Colors
   --primary-color: #7a5db8;
@@ -6,11 +26,6 @@
   --muted-color: #bbb;
   --text-color: #2b2b2b;
   --background-color: #f7f5fa;
-
-  // Sizing
-  --min-width-laptop: 1024px;
-  --min-width-tablet: 720px;
-  --min-width-mobile: 375px;
 
   // Typography
   font-family: Inter, sans-serif;
