@@ -1,0 +1,23 @@
+.heroBackground {
+  box-sizing: border-box;
+  height: 100dvh;
+  padding: clamp(3rem, 8vw, 6rem) clamp(1.5rem, 6vw, 4rem);
+  background:
+    radial-gradient(
+      circle at 10% 0%,
+      color-mix(in srgb, var(--primary-color) 45%, white) 0%,
+      transparent 65%
+    ),
+    radial-gradient(
+      circle at 90% 0%,
+      color-mix(in srgb, var(--accent-color) 60%, white) 0%,
+      transparent 70%
+    ),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--text-color) 5%, white) 0%,
+      color-mix(in srgb, var(--accent-color) 15%, var(--background-color)) 55%,
+      color-mix(in srgb, var(--secondary-color) 35%, var(--background-color))
+        100%
+    );
+}

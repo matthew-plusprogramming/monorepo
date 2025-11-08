@@ -2,8 +2,8 @@
   --primary-color: #8cdb7a;
   --secondary-color: #337a39;
   --accent-color: #ffc642;
-  --text-color: #f7f5fa;
-  --background-color: #2b2b2b;
+  --text-color: #2b2b2b;
+  --background-color: #f7f5fa;
 
   font-family: 'Inter', sans-serif;
   font-optical-sizing: auto;
@@ -21,13 +21,16 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
+html,
 body {
   margin: 0;
+  padding: 0;
+  height: 100%;
 }
 
-@media (prefers-color-scheme: light) {
+@media (prefers-color-scheme: dark) {
   :root {
-    --text-color: #2b2b2b;
-    --background-color: #f7f5fa;
+    --text-color: #f7f5fa;
+    --background-color: #2b2b2b;
   }
 }
