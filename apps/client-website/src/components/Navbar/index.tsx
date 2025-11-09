@@ -46,4 +46,4 @@ const Navbar = (): JSX.Element => {
   );
 };
 
-export default Navbar;
+export { Navbar };

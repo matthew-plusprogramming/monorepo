@@ -1,7 +1,7 @@
 import classnames from 'classnames';
 import type { JSX } from 'react';
 
-import Navbar from './Navbar';
+import { Navbar } from '../components/Navbar';
 
 import styles from './page.module.scss';
 
