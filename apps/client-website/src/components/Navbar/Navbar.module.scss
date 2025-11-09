@@ -1,7 +1,7 @@
 @use '@/app/globals.scss' as *;
 
 $navbar-max-width: max(980px, 60vw);
-$navbar-padding-block: 0.85rem;
+$navbar-padding-block: 1rem;
 $navbar-padding-inline: clamp(1.25rem, 3vw, 2.5rem);
 $navbar-gap: clamp(0.75rem, 2vw, 1.75rem);
 $navbar-radius: 1.5rem;
