@@ -18,7 +18,7 @@ const Navbar = (): JSX.Element => {
               height={32}
             />
           </div>
-          <span>Brand Name</span>
+          <span>The Monorepo</span>
         </div>
       </Link>
 
@@ -35,6 +35,7 @@ const Navbar = (): JSX.Element => {
       </ul>
 
       <div className={styles.actions}>
+        {/* TODO: Make a button class */}
         <button className={styles.secondaryButton} type="button">
           Log in
         </button>
