@@ -1,0 +1,126 @@
+@use '@/app/globals.scss' as *;
+
+$button-padding: 0.55rem 1.5rem;
+$button-radius: 0.5rem;
+$button-transition:
+  transform 150ms ease,
+  background 150ms ease,
+  color 150ms ease,
+  box-shadow 150ms ease;
+
+.button {
+  --button-shadow-color: color-mix(
+    in oklch,
+    var(--text-color) 25%,
+    transparent
+  );
+
+  cursor: pointer;
+
+  display: inline-flex;
+  gap: 0.5rem;
+  align-items: center;
+  justify-content: center;
+
+  padding: $button-padding;
+  border: none;
+  border-radius: $button-radius;
+
+  font-family: inherit;
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1.1;
+  color: inherit;
+  text-decoration: none;
+
+  background: transparent;
+
+  transition: $button-transition;
+
+  &:focus-visible {
+    outline: 2px solid color-mix(in oklch, var(--text-color) 40%, transparent);
+    outline-offset: 2px;
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+    box-shadow: none;
+  }
+}
+
+.displayCta {
+  --button-shadow-color: color-mix(
+    in oklch,
+    var(--primary-color) 30%,
+    transparent
+  );
+
+  color: var(--text-color);
+  background: var(--primary-color);
+
+  &:hover,
+  &:focus-visible {
+    background: color-mix(
+      in oklch,
+      var(--primary-color) 85%,
+      var(--secondary-color)
+    );
+  }
+
+  @media (prefers-color-scheme: light) {
+    color: var(--background-color);
+  }
+}
+
+.displaySecondary {
+  --button-shadow-color: color-mix(
+    in oklch,
+    var(--text-color) 25%,
+    transparent
+  );
+
+  color: var(--background-color);
+  background: color-mix(in oklch, var(--text-color) 90%, var(--muted-color));
+
+  &:hover,
+  &:focus-visible {
+    background: color-mix(in oklch, var(--text-color) 85%, var(--muted-color));
+  }
+}
+
+.clickThreeD {
+  box-shadow: 0 12px 32px var(--button-shadow-color);
+
+  &:hover,
+  &:focus-visible {
+    transform: translateY(-1.5px);
+  }
+
+  &:active {
+    transform: translateY(0);
+    box-shadow: 0 8px 24px var(--button-shadow-color);
+  }
+}
+
+.clickFlat {
+  box-shadow: none;
+
+  &:active {
+    transform: scale(0.98);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .button,
+  .clickThreeD,
+  .clickFlat {
+    transition: none;
+
+    &:hover,
+    &:focus-visible,
+    &:active {
+      transform: none;
+    }
+  }
+}

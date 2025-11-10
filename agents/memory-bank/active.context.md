@@ -39,3 +39,6 @@ Reflection
 - 2025-11-08 — Plan phase: Scoped Navbar SCSS cleanup: consolidate shared button/link styles via mixins, retain layout + responsive behavior, and keep color tokens as the single source.
   Build phase: Refactored Navbar.module.scss with shared mixins/placeholders, button variant helpers, and responsive utilities while keeping the rendered layout stable.
   Verify phase: Captured the git diff with line numbers and reran npm run phase:check to confirm lint/stylelint coverage; manual review kept Navbar layout + responsiveness unchanged.
+- 2025-11-10 — Plan phase: Outlined shared Button component for Navbar/Hero with CTA & secondary displays plus flat/raised click styles; default typography matches Navbar while allowing overrides via className.
+- 2025-11-10 — Build phase: Implemented reusable Button component with CTA/secondary displays plus flat/3d click styles, wired it into Navbar + Hero CTA, updated SCSS + generated module typings, and added jiti devDependency for eslint TS config loading.
+  Verify phase: Ran npm run phase:check (eslint+stylelint+code quality) and captured node agents/scripts/git-diff-with-lines.mjs for verification; UI diff stays scoped to Navbar/Hero buttons.

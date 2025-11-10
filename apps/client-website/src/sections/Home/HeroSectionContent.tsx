@@ -1,5 +1,7 @@
 import type { JSX } from 'react';
 
+import { Button } from '@/components/Button';
+
 import styles from './HeroSectionContent.module.scss';
 
 const HeroSectionContent = (): JSX.Element => {
@@ -13,8 +15,14 @@ const HeroSectionContent = (): JSX.Element => {
         something amazing. What are you waiting for?
       </p>
 
-      {/* TODO: use button component */}
-      <button type="button">Get started now</button>
+      <Button
+        className={styles.heroCtaButton}
+        displayStyle="cta"
+        clickStyle="3d"
+        type="button"
+      >
+        Get started now
+      </Button>
     </div>
   );
 };

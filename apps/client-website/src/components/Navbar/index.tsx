@@ -2,6 +2,8 @@ import Image from 'next/image';
 import Link from 'next/link';
 import type { JSX } from 'react';
 
+import { Button } from '@/components/Button';
+
 import styles from './Navbar.module.scss';
 
 const Navbar = (): JSX.Element => {
@@ -35,13 +37,22 @@ const Navbar = (): JSX.Element => {
       </ul>
 
       <div className={styles.actions}>
-        {/* TODO: Make a button class */}
-        <button className={styles.secondaryButton} type="button">
+        <Button
+          className={styles.navButton}
+          displayStyle="secondary"
+          clickStyle="flat"
+          type="button"
+        >
           Log in
-        </button>
-        <button className={styles.primaryButton} type="button">
+        </Button>
+        <Button
+          className={styles.navButton}
+          displayStyle="cta"
+          clickStyle="3d"
+          type="button"
+        >
           Get started
-        </button>
+        </Button>
       </div>
     </nav>
   );

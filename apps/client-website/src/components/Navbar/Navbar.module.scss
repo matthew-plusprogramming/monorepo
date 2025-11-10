@@ -8,13 +8,6 @@ $navbar-radius: 1.5rem;
 $brand-gap: 0.75rem;
 $logo-size: 2rem;
 $actions-gap: 0.75rem;
-$button-padding: 0.55rem 1.5rem;
-$button-radius: 0.5rem;
-$button-transition:
-  transform 150ms ease,
-  background 150ms ease,
-  color 150ms ease,
-  box-shadow 150ms ease;
 
 @mixin list-reset {
   margin: 0;
@@ -49,49 +42,6 @@ $button-transition:
   &:hover,
   &:focus-visible {
     color: color-mix(in oklch, var(--text-color) 80%, var(--background-color));
-  }
-}
-
-@mixin nav-button-base {
-  cursor: pointer;
-
-  padding: $button-padding;
-  border: none;
-  border-radius: $button-radius;
-
-  font-family: inherit;
-  font-weight: 600;
-
-  transition: $button-transition;
-
-  @include respond(laptop) {
-    flex: 1;
-  }
-}
-
-@mixin nav-button-primary {
-  color: var(--text-color);
-  background: var(--primary-color);
-  box-shadow: 0 12px 32px
-    color-mix(in oklch, var(--primary-color) 30%, transparent);
-
-  &:hover,
-  &:focus-visible {
-    transform: translateY(-1.5px);
-  }
-
-  &:active {
-    transform: translateY(0);
-  }
-}
-
-@mixin nav-button-secondary {
-  color: var(--background-color);
-  background: color-mix(in oklch, var(--text-color) 80%, var(--muted-color));
-
-  &:hover,
-  &:focus-visible {
-    background: color-mix(in oklch, var(--text-color) 50%, var(--muted-color));
   }
 }
 
@@ -147,36 +97,14 @@ $button-transition:
   & .actions {
     @include flex-row($actions-gap);
 
-    & .secondaryButton,
-    & .primaryButton {
-      @include nav-button-base;
-    }
-
-    & .primaryButton {
-      @include nav-button-primary;
-
-      @media (prefers-color-scheme: light) {
-        color: var(--background-color);
-      }
-    }
-
-    & .secondaryButton {
-      @include nav-button-secondary;
-
-      @media (prefers-color-scheme: light) {
-        &:hover,
-        &:focus-visible {
-          background: color-mix(
-            in oklch,
-            var(--text-color) 70%,
-            var(--muted-color)
-          );
-        }
-      }
-    }
-
     @include respond(laptop) {
       width: 100%;
+    }
+
+    & .navButton {
+      @include respond(laptop) {
+        flex: 1;
+      }
     }
   }
 
