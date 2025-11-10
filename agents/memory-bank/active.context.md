@@ -45,3 +45,6 @@ Reflection
 - 2025-11-10 — Plan phase: Scaffold login page with Hook Form, gradient background, and Button component while deferring real auth wiring.
 - 2025-11-10 — Build phase: Implemented Login page Hook Form with themed card styles and satisfied lint/code-quality via npm run phase:check.
 - 2025-11-10 — Verify phase: Verified login scaffold via node agents/scripts/git-diff-with-lines.mjs and npm run phase:check to ensure lint/stylelint/code-quality gates.
+- 2025-11-10 — Plan phase: Scoped Button typing fix: use href discriminant to narrow anchor vs button, keep styles/behavior intact, no extra variants.
+- 2025-11-10 — Build phase: Refined Button union types: anchor path uses AnchorHTMLAttributes, single forwardRef handles both modes, and default type handling stays scoped to buttons.
+- 2025-11-10 — Verify phase: Validated Button typing change via npm run agent:finalize (includes lint/stylelint/code-quality) and captured git-diff-with-lines for review.
