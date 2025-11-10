@@ -19,7 +19,7 @@ const HeroSectionContent = (): JSX.Element => {
         className={styles.heroCtaButton}
         displayStyle="cta"
         clickStyle="3d"
-        type="button"
+        href="login"
       >
         Get started now
       </Button>

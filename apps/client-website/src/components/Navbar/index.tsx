@@ -41,7 +41,7 @@ const Navbar = (): JSX.Element => {
           className={styles.navButton}
           displayStyle="secondary"
           clickStyle="flat"
-          type="button"
+          href="/login"
         >
           Log in
         </Button>
@@ -49,7 +49,7 @@ const Navbar = (): JSX.Element => {
           className={styles.navButton}
           displayStyle="cta"
           clickStyle="3d"
-          type="button"
+          href="/login"
         >
           Get started
         </Button>
