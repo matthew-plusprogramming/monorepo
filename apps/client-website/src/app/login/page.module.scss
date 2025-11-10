@@ -1,0 +1,153 @@
+@use '@/app/globals.scss' as *;
+
+$card-max-width: 420px;
+$card-padding: clamp(2rem, 5vw, 3rem);
+$field-gap: 0.35rem;
+$stack-gap: 1.25rem;
+
+.page {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  min-height: 100dvh;
+  margin: 0;
+  padding: clamp(2rem, 2vw, 4rem) clamp(1rem, 8vw, 12vw);
+
+  background:
+    radial-gradient(
+      circle at 8% 5%,
+      color-mix(in oklch, var(--primary-color) 60%, var(--background-color)) 0%,
+      transparent 60%
+    ),
+    radial-gradient(
+      circle at 90% 0%,
+      color-mix(in oklch, var(--accent-color) 65%, var(--background-color)) 0%,
+      transparent 55%
+    ),
+    linear-gradient(
+      140deg,
+      color-mix(in oklch, var(--primary-color) 70%, var(--secondary-color)) 0%,
+      color-mix(in oklch, var(--secondary-color) 70%, var(--accent-color)) 100%
+    );
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: $stack-gap;
+
+  width: min($card-max-width, 100%);
+  padding: $card-padding;
+  border-radius: 1.5rem;
+
+  color: var(--text-color);
+
+  background: var(--background-color);
+  box-shadow: 0 30px 80px
+    color-mix(in oklch, var(--secondary-color) 15%, transparent);
+}
+
+.header {
+  text-align: center;
+
+  & h1 {
+    margin-bottom: 0.35rem;
+    font-size: clamp(1.75rem, 3vw, 2.1rem);
+  }
+
+  & p {
+    margin: 0;
+    font-size: 1rem;
+    color: color-mix(in oklch, var(--text-color) 80%, var(--muted-color));
+  }
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: $stack-gap;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: $field-gap;
+}
+
+.fieldLabel {
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.input {
+  padding: 0.85rem 0.95rem;
+  border: 1px solid color-mix(in oklch, var(--text-color) 30%, transparent);
+  border-radius: 0.75rem;
+
+  font-size: 1rem;
+  color: inherit;
+
+  background: color-mix(in oklch, var(--background-color) 92%, transparent);
+
+  transition:
+    border-color 150ms ease,
+    box-shadow 150ms ease;
+
+  &::placeholder {
+    color: color-mix(in oklch, var(--text-color) 65%, var(--muted-color));
+  }
+
+  &:focus-visible {
+    border-color: color-mix(in oklch, var(--primary-color) 70%, transparent);
+    outline: none;
+    box-shadow: 0 0 0 3px
+      color-mix(in oklch, var(--primary-color) 35%, transparent);
+  }
+
+  &:invalid:focus-visible {
+    border-color: color-mix(in oklch, var(--secondary-color) 35%, #b00020);
+  }
+}
+
+.error {
+  font-size: 0.85rem;
+  color: color-mix(in oklch, var(--secondary-color) 35%, #b00020);
+}
+
+.supportText {
+  margin: 0;
+  font-size: 0.9rem;
+  color: color-mix(in oklch, var(--text-color) 80%, var(--muted-color));
+}
+
+.actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+
+  & .submitButton {
+    width: 100%;
+  }
+}
+
+.utilityLink {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: color-mix(in oklch, var(--text-color) 90%, var(--background-color));
+  text-align: center;
+  text-decoration: none;
+
+  transition: opacity 120ms ease;
+
+  &:hover,
+  &:focus-visible {
+    opacity: 0.8;
+  }
+}
+
+@include respond(mobile) {
+  .card {
+    padding: clamp(1.5rem, 8vw, 2rem);
+  }
+}
