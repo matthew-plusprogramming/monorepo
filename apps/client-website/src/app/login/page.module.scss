@@ -16,17 +16,17 @@ $stack-gap: 1.25rem;
 
   background:
     radial-gradient(
-      circle at 8% 5%,
-      color-mix(in oklch, var(--primary-color) 60%, var(--background-color)) 0%,
-      transparent 60%
+      circle at 10% 0%,
+      color-mix(in oklch, var(--primary-color) 55%, var(--background-color)) 0%,
+      transparent 65%
     ),
     radial-gradient(
-      circle at 90% 0%,
+      circle at 110% -10%,
       color-mix(in oklch, var(--accent-color) 65%, var(--background-color)) 0%,
-      transparent 55%
+      transparent 50%
     ),
     linear-gradient(
-      140deg,
+      135deg,
       color-mix(in oklch, var(--primary-color) 70%, var(--secondary-color)) 0%,
       color-mix(in oklch, var(--secondary-color) 70%, var(--accent-color)) 100%
     );
