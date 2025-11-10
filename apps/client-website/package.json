@@ -10,7 +10,7 @@
     "prebuild": "tsc -b",
     "build": "next build",
     "clean": "rm -rf .next && rm -rf node_modules && rm -rf .turbo",
-    "gen:css-types": "typed-scss-modules src --exportType default --watch --outputFolder __generated__",
+    "gen:css-types": "typed-scss-modules src --aliasPrefixes.@ src --exportType default --watch --outputFolder __generated__",
     "// -- 🧪 Testing": "--",
     "test": "echo \"TODO: Implement tests\" && exit 0",
     "// -- 🧹 Linting & Formatting": "--",
