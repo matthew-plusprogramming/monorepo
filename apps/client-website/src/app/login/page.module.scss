@@ -14,22 +14,7 @@ $stack-gap: 1.25rem;
   margin: 0;
   padding: 0 clamp(1rem, 8vw, 12vw);
 
-  background:
-    radial-gradient(
-      circle at 10% 0%,
-      color-mix(in oklch, var(--primary-color) 55%, var(--background-color)) 0%,
-      transparent 65%
-    ),
-    radial-gradient(
-      circle at 110% -10%,
-      color-mix(in oklch, var(--accent-color) 65%, var(--background-color)) 0%,
-      transparent 50%
-    ),
-    linear-gradient(
-      135deg,
-      color-mix(in oklch, var(--primary-color) 70%, var(--secondary-color)) 0%,
-      color-mix(in oklch, var(--secondary-color) 70%, var(--accent-color)) 100%
-    );
+  @include fancy-gradient-background;
 }
 
 .card {

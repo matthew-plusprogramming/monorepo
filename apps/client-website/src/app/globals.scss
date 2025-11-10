@@ -18,6 +18,26 @@ $breakpoints: (
   }
 }
 
+// Shared layered gradient for hero/login backgrounds.
+@mixin fancy-gradient-background {
+  background:
+    radial-gradient(
+      circle at 10% 0%,
+      color-mix(in oklch, var(--primary-color) 55%, var(--background-color)) 0%,
+      transparent 65%
+    ),
+    radial-gradient(
+      circle at 110% -10%,
+      color-mix(in oklch, var(--accent-color) 65%, var(--background-color)) 0%,
+      transparent 50%
+    ),
+    linear-gradient(
+      135deg,
+      color-mix(in oklch, var(--primary-color) 70%, var(--secondary-color)) 0%,
+      color-mix(in oklch, var(--secondary-color) 70%, var(--accent-color)) 100%
+    );
+}
+
 @mixin flex-row($gap, $justify: flex-start) {
   display: flex;
   gap: $gap;

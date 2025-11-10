@@ -48,3 +48,6 @@ Reflection
 - 2025-11-10 — Plan phase: Scoped Button typing fix: use href discriminant to narrow anchor vs button, keep styles/behavior intact, no extra variants.
 - 2025-11-10 — Build phase: Refined Button union types: anchor path uses AnchorHTMLAttributes, single forwardRef handles both modes, and default type handling stays scoped to buttons.
 - 2025-11-10 — Verify phase: Validated Button typing change via npm run agent:finalize (includes lint/stylelint/code-quality) and captured git-diff-with-lines for review.
+- 2025-11-10 — Plan phase: Scoped gradient mixin extraction for login + hero backgrounds so palette tweaks stay centralized.
+  Build phase: Added fancy-gradient-background mixin in globals.scss and switched login + hero modules to include it.
+  Verify phase: Relied on npm run phase:check (user-run) plus git-diff-with-lines.mjs to confirm only gradient refactor changes.
