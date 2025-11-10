@@ -12,7 +12,7 @@ $stack-gap: 1.25rem;
 
   min-height: 100dvh;
   margin: 0;
-  padding: clamp(2rem, 2vw, 4rem) clamp(1rem, 8vw, 12vw);
+  padding: 0 clamp(1rem, 8vw, 12vw);
 
   background:
     radial-gradient(
