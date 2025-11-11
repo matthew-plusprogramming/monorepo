@@ -51,3 +51,6 @@ Reflection
 - 2025-11-10 — Plan phase: Scoped gradient mixin extraction for login + hero backgrounds so palette tweaks stay centralized.
   Build phase: Added fancy-gradient-background mixin in globals.scss and switched login + hero modules to include it.
   Verify phase: Relied on npm run phase:check (user-run) plus git-diff-with-lines.mjs to confirm only gradient refactor changes.
+- 2025-11-10 — Plan phase: Centralizing our color-mix usage by defining descriptive CSS custom properties in globals.scss for surfaces, inputs, and buttons, then updating login/page, Button, and Navbar modules to consume those tokens before running npm run phase:check.
+- 2025-11-11 — Build phase: Defined derived color custom properties (surface, input, button, nav) inside globals.scss and refactored the login, Button, and Navbar modules to consume the shared tokens so color-mix usage now lives in one place.
+- 2025-11-11 — Verify phase: Captured git diff context for the SCSS refactor, ran npm run phase:check/agent:finalize, and both runs failed because stylelint insists on apps/client-website/stylelint.config.mjs even though only stylelint.config.ts exists.

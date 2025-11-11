@@ -9,11 +9,7 @@ $button-transition:
   box-shadow 150ms ease;
 
 .button {
-  --button-shadow-color: color-mix(
-    in oklch,
-    var(--text-color) 25%,
-    transparent
-  );
+  --button-shadow-color: var(--button-shadow-default);
 
   cursor: pointer;
 
@@ -38,7 +34,7 @@ $button-transition:
   transition: $button-transition;
 
   &:focus-visible {
-    outline: 2px solid color-mix(in oklch, var(--text-color) 40%, transparent);
+    outline: 2px solid var(--button-focus-outline-color);
     outline-offset: 2px;
   }
 
@@ -50,22 +46,14 @@ $button-transition:
 }
 
 .displayCta {
-  --button-shadow-color: color-mix(
-    in oklch,
-    var(--primary-color) 30%,
-    transparent
-  );
+  --button-shadow-color: var(--button-shadow-cta);
 
   color: var(--text-color);
   background: var(--primary-color);
 
   &:hover,
   &:focus-visible {
-    background: color-mix(
-      in oklch,
-      var(--primary-color) 85%,
-      var(--secondary-color)
-    );
+    background: var(--button-cta-hover-background);
   }
 
   @media (prefers-color-scheme: light) {
@@ -74,18 +62,14 @@ $button-transition:
 }
 
 .displaySecondary {
-  --button-shadow-color: color-mix(
-    in oklch,
-    var(--text-color) 25%,
-    transparent
-  );
+  --button-shadow-color: var(--button-shadow-default);
 
   color: var(--background-color);
-  background: color-mix(in oklch, var(--text-color) 90%, var(--muted-color));
+  background: var(--button-secondary-background);
 
   &:hover,
   &:focus-visible {
-    background: color-mix(in oklch, var(--text-color) 85%, var(--muted-color));
+    background: var(--button-secondary-hover-background);
   }
 }
 

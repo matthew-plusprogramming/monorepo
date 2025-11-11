@@ -29,8 +29,7 @@ $stack-gap: 1.25rem;
   color: var(--text-color);
 
   background: var(--background-color);
-  box-shadow: 0 30px 80px
-    color-mix(in oklch, var(--secondary-color) 15%, transparent);
+  box-shadow: 0 30px 80px var(--surface-card-shadow);
 }
 
 .header {
@@ -44,7 +43,7 @@ $stack-gap: 1.25rem;
   & p {
     margin: 0;
     font-size: 1rem;
-    color: color-mix(in oklch, var(--text-color) 80%, var(--muted-color));
+    color: var(--text-muted-strong);
   }
 }
 
@@ -67,43 +66,42 @@ $stack-gap: 1.25rem;
 
 .input {
   padding: 0.85rem 0.95rem;
-  border: 1px solid color-mix(in oklch, var(--text-color) 30%, transparent);
+  border: 1px solid var(--input-border-color);
   border-radius: 0.75rem;
 
   font-size: 1rem;
   color: inherit;
 
-  background: color-mix(in oklch, var(--background-color) 92%, transparent);
+  background: var(--input-background-color);
 
   transition:
     border-color 150ms ease,
     box-shadow 150ms ease;
 
   &::placeholder {
-    color: color-mix(in oklch, var(--text-color) 65%, var(--muted-color));
+    color: var(--input-placeholder-color);
   }
 
   &:focus-visible {
-    border-color: color-mix(in oklch, var(--primary-color) 70%, transparent);
+    border-color: var(--input-focus-border-color);
     outline: none;
-    box-shadow: 0 0 0 3px
-      color-mix(in oklch, var(--primary-color) 35%, transparent);
+    box-shadow: 0 0 0 3px var(--input-focus-ring-color);
   }
 
   &:invalid:focus-visible {
-    border-color: color-mix(in oklch, var(--secondary-color) 35%, #b00020);
+    border-color: var(--input-error-border-color);
   }
 }
 
 .error {
   font-size: 0.85rem;
-  color: color-mix(in oklch, var(--secondary-color) 35%, #b00020);
+  color: var(--input-error-border-color);
 }
 
 .supportText {
   margin: 0;
   font-size: 0.9rem;
-  color: color-mix(in oklch, var(--text-color) 80%, var(--muted-color));
+  color: var(--text-muted-strong);
 }
 
 .actions {
@@ -119,7 +117,7 @@ $stack-gap: 1.25rem;
 .utilityLink {
   font-size: 0.95rem;
   font-weight: 600;
-  color: color-mix(in oklch, var(--text-color) 90%, var(--background-color));
+  color: var(--utility-link-color);
   text-align: center;
   text-decoration: none;
 

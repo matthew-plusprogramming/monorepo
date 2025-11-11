@@ -18,8 +18,7 @@ $actions-gap: 0.75rem;
 @mixin surface-panel {
   border-radius: $navbar-radius;
   background: var(--background-color);
-  box-shadow: 0 18px 48px
-    color-mix(in oklch, var(--secondary-color) 10%, transparent);
+  box-shadow: 0 18px 48px var(--surface-navbar-shadow);
 }
 
 @mixin center-square($size) {
@@ -41,7 +40,7 @@ $actions-gap: 0.75rem;
 
   &:hover,
   &:focus-visible {
-    color: color-mix(in oklch, var(--text-color) 80%, var(--background-color));
+    color: var(--nav-link-hover-color);
   }
 }
 
