@@ -1,5 +1,16 @@
 @use '@/app/globals.scss' as *;
+@use '@/styles/form-colors.scss' as formColors;
 
+$text-muted-strong: color-mix(
+  in oklch,
+  var(--text-color) 80%,
+  var(--muted-color)
+);
+$utility-link-color: color-mix(
+  in oklch,
+  var(--text-color) 90%,
+  var(--background-color)
+);
 $card-max-width: 420px;
 $card-padding: clamp(2rem, 5vw, 3rem);
 $field-gap: 0.35rem;
@@ -29,7 +40,7 @@ $stack-gap: 1.25rem;
   color: var(--text-color);
 
   background: var(--background-color);
-  box-shadow: 0 30px 80px var(--surface-card-shadow);
+  box-shadow: 0 30px 80px formColors.$surface-card-shadow;
 }
 
 .header {
@@ -43,7 +54,7 @@ $stack-gap: 1.25rem;
   & p {
     margin: 0;
     font-size: 1rem;
-    color: var(--text-muted-strong);
+    color: $text-muted-strong;
   }
 }
 
@@ -66,42 +77,42 @@ $stack-gap: 1.25rem;
 
 .input {
   padding: 0.85rem 0.95rem;
-  border: 1px solid var(--input-border-color);
+  border: 1px solid formColors.$input-border-color;
   border-radius: 0.75rem;
 
   font-size: 1rem;
   color: inherit;
 
-  background: var(--input-background-color);
+  background: formColors.$input-background-color;
 
   transition:
     border-color 150ms ease,
     box-shadow 150ms ease;
 
   &::placeholder {
-    color: var(--input-placeholder-color);
+    color: formColors.$input-placeholder-color;
   }
 
   &:focus-visible {
-    border-color: var(--input-focus-border-color);
+    border-color: formColors.$input-focus-border-color;
     outline: none;
-    box-shadow: 0 0 0 3px var(--input-focus-ring-color);
+    box-shadow: 0 0 0 3px formColors.$input-focus-ring-color;
   }
 
   &:invalid:focus-visible {
-    border-color: var(--input-error-border-color);
+    border-color: formColors.$input-error-border-color;
   }
 }
 
 .error {
   font-size: 0.85rem;
-  color: var(--input-error-border-color);
+  color: formColors.$input-error-border-color;
 }
 
 .supportText {
   margin: 0;
   font-size: 0.9rem;
-  color: var(--text-muted-strong);
+  color: $text-muted-strong;
 }
 
 .actions {
@@ -117,7 +128,7 @@ $stack-gap: 1.25rem;
 .utilityLink {
   font-size: 0.95rem;
   font-weight: 600;
-  color: var(--utility-link-color);
+  color: $utility-link-color;
   text-align: center;
   text-decoration: none;
 

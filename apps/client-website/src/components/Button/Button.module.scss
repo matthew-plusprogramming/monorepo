@@ -1,4 +1,5 @@
 @use '@/app/globals.scss' as *;
+@use '@/styles/form-colors.scss' as formColors;
 
 $button-padding: 0.55rem 1.5rem;
 $button-radius: 0.5rem;
@@ -9,7 +10,7 @@ $button-transition:
   box-shadow 150ms ease;
 
 .button {
-  --button-shadow-color: var(--button-shadow-default);
+  --button-shadow-color: formColors.$button-shadow-default;
 
   cursor: pointer;
 
@@ -34,7 +35,7 @@ $button-transition:
   transition: $button-transition;
 
   &:focus-visible {
-    outline: 2px solid var(--button-focus-outline-color);
+    outline: 2px solid formColors.$button-focus-outline-color;
     outline-offset: 2px;
   }
 
@@ -46,14 +47,14 @@ $button-transition:
 }
 
 .displayCta {
-  --button-shadow-color: var(--button-shadow-cta);
+  --button-shadow-color: formColors.$button-shadow-cta;
 
   color: var(--text-color);
   background: var(--primary-color);
 
   &:hover,
   &:focus-visible {
-    background: var(--button-cta-hover-background);
+    background: formColors.$button-cta-hover-background;
   }
 
   @media (prefers-color-scheme: light) {
@@ -62,14 +63,14 @@ $button-transition:
 }
 
 .displaySecondary {
-  --button-shadow-color: var(--button-shadow-default);
+  --button-shadow-color: formColors.$button-shadow-default;
 
   color: var(--background-color);
-  background: var(--button-secondary-background);
+  background: formColors.$button-secondary-background;
 
   &:hover,
   &:focus-visible {
-    background: var(--button-secondary-hover-background);
+    background: formColors.$button-secondary-hover-background;
   }
 }
 
