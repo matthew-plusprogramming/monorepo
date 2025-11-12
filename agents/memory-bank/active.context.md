@@ -57,3 +57,4 @@ Reflection
 - 2025-11-11 — Plan phase: Relocating the derived color mixes out of globals.scss into component-scoped SCSS modules (new shared form-controls partial for inputs/buttons plus inline Nav variables), ensuring each consumer re-imports the right tokens and globals only holds base palette + mixins.
 - 2025-11-11 — Build phase: Refactored derived color mixes into a scoped form-colors partial plus nav-local variables, updated login inputs and Button modules to import those helpers, and trimmed globals.scss back to base palette/mixins.
   Verify phase: Captured git diff context and reran npm run phase:check (successful this time including stylelint) to confirm the localized color tokens behave identically.
+- 2025-11-11 — Plan phase: Implement signup page mirroring login patterns: reuse form layout/styles, add name + confirm password fields with react-hook-form validation, and wire CTA/buttons plus support copy with placeholder submit handler.

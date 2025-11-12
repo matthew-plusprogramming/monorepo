@@ -49,7 +49,7 @@ const Navbar = (): JSX.Element => {
           className={styles.navButton}
           displayStyle="cta"
           clickStyle="3d"
-          href="/login"
+          href="/signup"
         >
           Get started
         </Button>
