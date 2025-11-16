@@ -11,9 +11,6 @@ import tseslint, { type ConfigWithExtends } from 'typescript-eslint';
 import { globalIgnores } from 'eslint/config';
 import { includeIgnoreFile } from '@eslint/compat';
 import { fileURLToPath } from 'node:url';
-import reactPlugin from 'eslint-plugin-react';
-import reactHooksPlugin from 'eslint-plugin-react-hooks';
-import jsxA11yPlugin from 'eslint-plugin-jsx-a11y';
 
 const eslintIgnorePatterns = [
   '**/.git',
