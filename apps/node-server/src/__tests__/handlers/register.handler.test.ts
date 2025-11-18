@@ -149,7 +149,13 @@ const resetUserRepoFake = (): UserRepoFake => {
   return fake;
 };
 
-const obfuscatesConflictAs502 = async (): Promise<void> => {
+const EMAIL_CONFLICT_MESSAGE = 'User with email already exists';
+const USERNAME_CONFLICT_MESSAGE = 'User with username already exists';
+const HASH_FAILURE_MESSAGE = 'Failed to hash password: argon2 failed';
+const JWT_SIGN_FAILURE_MESSAGE =
+  'Failed to sign JWT: JWT sign error: jwt sign failed';
+
+const returns409WhenEmailAlreadyExists = async (): Promise<void> => {
   // Arrange
   const body = createRegisterBody({
     username: 'dup',
@@ -173,11 +179,11 @@ const obfuscatesConflictAs502 = async (): Promise<void> => {
   await handler(req, res, vi.fn());
 
   // Assert
-  expect(captured.statusCode).toBe(HTTP_RESPONSE.BAD_GATEWAY);
-  expect(captured.sendBody).toBe('Bad Gateway');
+  expect(captured.statusCode).toBe(HTTP_RESPONSE.CONFLICT);
+  expect(captured.sendBody).toBe(EMAIL_CONFLICT_MESSAGE);
 };
 
-const obfuscatesUsernameConflictAs502 = async (): Promise<void> => {
+const returns409WhenUsernameAlreadyExists = async (): Promise<void> => {
   // Arrange
   const body = createRegisterBody({
     username: 'duplicate-user',
@@ -202,12 +208,9 @@ const obfuscatesUsernameConflictAs502 = async (): Promise<void> => {
   await handler(req, res, vi.fn());
 
   // Assert
-  expect(repoFake.calls.findByIdentifier).toEqual([
-    body.email,
-    body.username,
-  ]);
-  expect(captured.statusCode).toBe(HTTP_RESPONSE.BAD_GATEWAY);
-  expect(captured.sendBody).toBe('Bad Gateway');
+  expect(repoFake.calls.findByIdentifier).toEqual([body.email, body.username]);
+  expect(captured.statusCode).toBe(HTTP_RESPONSE.CONFLICT);
+  expect(captured.sendBody).toBe(USERNAME_CONFLICT_MESSAGE);
 };
 
 const propagatesRepoCreateFailure = async (): Promise<void> => {
@@ -233,8 +236,8 @@ const propagatesRepoCreateFailure = async (): Promise<void> => {
   await handler(req, res, vi.fn());
 
   // Assert
-  expect(captured.statusCode).toBe(HTTP_RESPONSE.BAD_GATEWAY);
-  expect(captured.sendBody).toBe('Bad Gateway');
+  expect(captured.statusCode).toBe(HTTP_RESPONSE.INTERNAL_SERVER_ERROR);
+  expect(captured.sendBody).toBe('ddb put failed');
 };
 
 const propagatesHashingFailure = async (): Promise<void> => {
@@ -256,8 +259,8 @@ const propagatesHashingFailure = async (): Promise<void> => {
   await handler(req, res, vi.fn());
 
   // Assert
-  expect(captured.statusCode).toBe(HTTP_RESPONSE.BAD_GATEWAY);
-  expect(captured.sendBody).toBe('Bad Gateway');
+  expect(captured.statusCode).toBe(HTTP_RESPONSE.INTERNAL_SERVER_ERROR);
+  expect(captured.sendBody).toBe(HASH_FAILURE_MESSAGE);
 };
 
 const propagatesJwtFailure = async (): Promise<void> => {
@@ -286,8 +289,8 @@ const propagatesJwtFailure = async (): Promise<void> => {
   });
 
   // Assert
-  expect(captured.statusCode).toBe(HTTP_RESPONSE.BAD_GATEWAY);
-  expect(captured.sendBody).toBe('Bad Gateway');
+  expect(captured.statusCode).toBe(HTTP_RESPONSE.INTERNAL_SERVER_ERROR);
+  expect(captured.sendBody).toBe(JWT_SIGN_FAILURE_MESSAGE);
 };
 
 describe('registerRequestHandler', () => {
@@ -295,23 +298,23 @@ describe('registerRequestHandler', () => {
 
   it('returns 201 and a token for a new user', returns201ForNewUser);
   it(
-    'obfuscates conflict as 502 when user already exists',
-    obfuscatesConflictAs502,
+    'returns 409 when a user with the email already exists',
+    returns409WhenEmailAlreadyExists,
   );
   it(
-    'obfuscates username conflicts as 502 when username already exists',
-    obfuscatesUsernameConflictAs502,
+    'returns 409 when a user with the username already exists',
+    returns409WhenUsernameAlreadyExists,
   );
   it(
-    'propagates repo create failure via InternalServerError (obfuscated 502)',
+    'propagates repo create failure via InternalServerError (500)',
     propagatesRepoCreateFailure,
   );
   it(
-    'propagates hashing failure via InternalServerError (obfuscated 502)',
+    'propagates hashing failure via InternalServerError (500)',
     propagatesHashingFailure,
   );
   it(
-    'propagates JWT signing failure via InternalServerError (obfuscated 502)',
+    'propagates JWT signing failure via InternalServerError (500)',
     propagatesJwtFailure,
   );
 });

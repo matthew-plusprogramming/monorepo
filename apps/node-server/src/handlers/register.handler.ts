@@ -105,7 +105,7 @@ export const registerRequestHandler = generateRequestHandler<
 >({
   effectfulHandler: (input) =>
     registerHandler(input).pipe(Effect.provide(AppLayer)),
-  shouldObfuscate: () => true,
+  shouldObfuscate: () => false,
   statusCodesToErrors: {
     [HTTP_RESPONSE.BAD_REQUEST]: {
       errorType: ZodError,

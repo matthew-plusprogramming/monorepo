@@ -65,6 +65,12 @@ const createLoginBody = ({
   password,
 });
 
+const INVALID_CREDENTIALS_MESSAGE = 'Invalid username/email or password';
+const PASSWORD_VERIFICATION_FAILURE = 'Failed to verify password';
+const PASSWORD_VERIFICATION_FAILURE_WITH_CAUSE = `${PASSWORD_VERIFICATION_FAILURE}: argon2 verify failed`;
+const JWT_SIGN_FAILURE_MESSAGE =
+  'Failed to sign JWT: JWT sign error: jwt sign failed';
+
 const getUserRepoFake = (): UserRepoFake => {
   if (!userRepoModule.fake) {
     throw new Error('UserRepo fake was not initialized');
@@ -219,7 +225,7 @@ const returns200ForValidCredentials = async (): Promise<void> => {
   expect(Buffer.isBuffer(secretArg)).toBe(true);
 };
 
-const obfuscatesMissingUserAs502 = async (): Promise<void> => {
+const returns401WhenUserIsMissing = async (): Promise<void> => {
   // Arrange
   const body = createLoginBody();
   const { req, res, captured } = makeRequestContext({
@@ -235,11 +241,11 @@ const obfuscatesMissingUserAs502 = async (): Promise<void> => {
   await handler(req, res, vi.fn());
 
   // Assert
-  expect(captured.statusCode).toBe(HTTP_RESPONSE.BAD_GATEWAY);
-  expect(captured.sendBody).toBe('Bad Gateway');
+  expect(captured.statusCode).toBe(HTTP_RESPONSE.UNAUTHORIZED);
+  expect(captured.sendBody).toBe(INVALID_CREDENTIALS_MESSAGE);
 };
 
-const obfuscatesInvalidPasswordAs502 = async (): Promise<void> => {
+const returns401WhenPasswordIsInvalid = async (): Promise<void> => {
   // Arrange
   const body = createLoginBody();
   const { req, res, captured } = makeRequestContext({
@@ -257,8 +263,8 @@ const obfuscatesInvalidPasswordAs502 = async (): Promise<void> => {
   await handler(req, res, vi.fn());
 
   // Assert
-  expect(captured.statusCode).toBe(HTTP_RESPONSE.BAD_GATEWAY);
-  expect(captured.sendBody).toBe('Bad Gateway');
+  expect(captured.statusCode).toBe(HTTP_RESPONSE.UNAUTHORIZED);
+  expect(captured.sendBody).toBe(INVALID_CREDENTIALS_MESSAGE);
 };
 
 const propagatesCredentialLookupFailure = async (): Promise<void> => {
@@ -280,8 +286,8 @@ const propagatesCredentialLookupFailure = async (): Promise<void> => {
   await handler(req, res, vi.fn());
 
   // Assert
-  expect(captured.statusCode).toBe(HTTP_RESPONSE.BAD_GATEWAY);
-  expect(captured.sendBody).toBe('Bad Gateway');
+  expect(captured.statusCode).toBe(HTTP_RESPONSE.INTERNAL_SERVER_ERROR);
+  expect(captured.sendBody).toBe('ddb failure');
 };
 
 const propagatesVerificationFailure = async (): Promise<void> => {
@@ -302,8 +308,8 @@ const propagatesVerificationFailure = async (): Promise<void> => {
   await handler(req, res, vi.fn());
 
   // Assert
-  expect(captured.statusCode).toBe(HTTP_RESPONSE.BAD_GATEWAY);
-  expect(captured.sendBody).toBe('Bad Gateway');
+  expect(captured.statusCode).toBe(HTTP_RESPONSE.INTERNAL_SERVER_ERROR);
+  expect(captured.sendBody).toBe(PASSWORD_VERIFICATION_FAILURE_WITH_CAUSE);
 };
 
 const propagatesVerificationFailureForNonError = async (): Promise<void> => {
@@ -324,8 +330,8 @@ const propagatesVerificationFailureForNonError = async (): Promise<void> => {
   await handler(req, res, vi.fn());
 
   // Assert
-  expect(captured.statusCode).toBe(HTTP_RESPONSE.BAD_GATEWAY);
-  expect(captured.sendBody).toBe('Bad Gateway');
+  expect(captured.statusCode).toBe(HTTP_RESPONSE.INTERNAL_SERVER_ERROR);
+  expect(captured.sendBody).toBe(PASSWORD_VERIFICATION_FAILURE);
 };
 
 const propagatesJwtFailure = async (): Promise<void> => {
@@ -350,8 +356,8 @@ const propagatesJwtFailure = async (): Promise<void> => {
   await handler(req, res, vi.fn());
 
   // Assert
-  expect(captured.statusCode).toBe(HTTP_RESPONSE.BAD_GATEWAY);
-  expect(captured.sendBody).toBe('Bad Gateway');
+  expect(captured.statusCode).toBe(HTTP_RESPONSE.INTERNAL_SERVER_ERROR);
+  expect(captured.sendBody).toBe(JWT_SIGN_FAILURE_MESSAGE);
 };
 
 describe('loginRequestHandler', () => {
@@ -361,25 +367,25 @@ describe('loginRequestHandler', () => {
     'returns 200 and a token for valid credentials',
     returns200ForValidCredentials,
   );
-  it('obfuscates missing users as 502 responses', obfuscatesMissingUserAs502);
   it(
-    'obfuscates invalid password attempts as 502 responses',
-    obfuscatesInvalidPasswordAs502,
+    'returns 401 when user credentials are missing',
+    returns401WhenUserIsMissing,
   );
   it(
-    'propagates credential lookup failures as obfuscated 502 errors',
+    'returns 401 when the supplied password is invalid',
+    returns401WhenPasswordIsInvalid,
+  );
+  it(
+    'propagates credential lookup failures as 500 responses',
     propagatesCredentialLookupFailure,
   );
   it(
-    'propagates password verification failures as obfuscated 502 errors',
+    'propagates password verification failures as 500 responses',
     propagatesVerificationFailure,
   );
   it(
-    'propagates non-Error password verification failures as obfuscated 502 errors',
+    'propagates non-Error password verification failures as 500 responses',
     propagatesVerificationFailureForNonError,
   );
-  it(
-    'propagates JWT signing failures as obfuscated 502 errors',
-    propagatesJwtFailure,
-  );
+  it('propagates JWT signing failures as 500 responses', propagatesJwtFailure);
 });

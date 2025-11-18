@@ -65,3 +65,6 @@ Reflection
 - 2025-11-18 — Plan phase: Track failing @packages/schemas + node-server suites after identifier expansion.
   Build phase: Updated GetUser schema test, userRepo username fixtures, handler/entry tests for new username+cors behavior.
   Verify phase: Re-ran npm -w @packages/schemas run test and npm -w node-server run test to confirm all suites pass.
+- 2025-11-18 — Plan phase: Scoped test updates so login/register handler suites expect 401/409/500 responses and real error text after disabling obfuscation; limited to node-server handler tests and preserving AAA conventions.
+- 2025-11-18 — Build phase: Updated login/register handler test suites to assert the actual 401/409/500 responses and mapper messages, added deterministic string constants, and reran node-server Vitest to keep coverage green.
+- 2025-11-18 — Verify phase: Captured git-diff-with-lines context, reran npm -w node-server run test successfully, and agent:finalize is currently blocked by existing memory-drift findings unrelated to this test change.

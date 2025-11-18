@@ -50,9 +50,11 @@ describe('token helpers', () => {
   it('rejects when JWT signing callback provides no token', async () => {
     // Arrange
     const payload = buildUserToken('user-456');
-    getSignMock().mockImplementation((_payload, _secret, _options, callback) => {
-      callback(null, undefined);
-    });
+    getSignMock().mockImplementation(
+      (_payload, _secret, _options, callback) => {
+        callback(null, undefined);
+      },
+    );
 
     // Act
     const action = Effect.runPromise(signToken(payload));

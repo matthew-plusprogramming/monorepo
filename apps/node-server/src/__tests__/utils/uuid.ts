@@ -16,7 +16,7 @@ const randomUuidState = vi.hoisted<RandomUuidState>(() => ({
 
 vi.mock('node:crypto', async () => {
   const actual =
-    (await vi.importActual<typeof import('node:crypto')>('node:crypto'));
+    await vi.importActual<typeof import('node:crypto')>('node:crypto');
 
   const randomUUID = vi.fn(() => {
     if (!randomUuidState.isMockActive) {

@@ -88,7 +88,7 @@ export const loginRequestHandler = generateRequestHandler<
 >({
   effectfulHandler: (input) =>
     loginHandler(input).pipe(Effect.provide(AppLayer)),
-  shouldObfuscate: () => true,
+  shouldObfuscate: () => false,
   statusCodesToErrors: {
     [HTTP_RESPONSE.BAD_REQUEST]: {
       errorType: ZodError,
