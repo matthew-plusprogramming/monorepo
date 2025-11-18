@@ -16,10 +16,10 @@
     "// -- 🔧 Miscellaneous": "--"
   },
   "dependencies": {
-    "@eslint/compat": "^1.4.1",
-    "@stylistic/eslint-plugin": "^5.5.0",
-    "@typescript-eslint/eslint-plugin": "^8.46.3",
-    "@typescript-eslint/parser": "^8.46.3",
+    "@eslint/compat": "^2.0.0",
+    "@stylistic/eslint-plugin": "^5.6.0",
+    "@typescript-eslint/eslint-plugin": "^8.47.0",
+    "@typescript-eslint/parser": "^8.47.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-import-resolver-typescript": "^4.4.4",
     "eslint-plugin-import": "^2.32.0",
@@ -28,14 +28,14 @@
     "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-react-hooks": "^7.0.1",
     "eslint-plugin-simple-import-sort": "^12.1.1",
-    "eslint-plugin-tsdoc": "^0.4.0",
+    "eslint-plugin-tsdoc": "^0.5.0",
     "eslint-plugin-unused-imports": "^4.3.0",
-    "typescript-eslint": "^8.46.3"
+    "typescript-eslint": "^8.47.0"
   },
   "devDependencies": {
     "@configs/ts-config": "*",
     "@types/eslint-plugin-jsx-a11y": "^6.10.1",
-    "@types/node": "^24.10.0"
+    "@types/node": "^24.10.1"
   },
   "peerDependencies": {
     "eslint": "^9.39.1",

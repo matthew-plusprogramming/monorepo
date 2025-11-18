@@ -30,8 +30,8 @@
     "decrypt-envs": "dotenvx decrypt -f .env.dev .env.production&& echo 'WARNING: DO NOT COMMIT decrypted .env files to the repository!'"
   },
   "dependencies": {
-    "@aws-sdk/client-dynamodb": "^3.926.0",
-    "@aws-sdk/util-dynamodb": "^3.926.0",
+    "@aws-sdk/client-dynamodb": "^3.934.0",
+    "@aws-sdk/util-dynamodb": "^3.934.0",
     "@cdk/backend-server-cdk": "*",
     "@dotenvx/dotenvx": "^1.51.1",
     "@packages/backend-core": "*",
@@ -43,10 +43,10 @@
     "@configs/ts-config": "*",
     "@configs/vite-config": "*",
     "@configs/vitest-config": "*",
-    "@types/aws-lambda": "^8.10.157",
+    "@types/aws-lambda": "^8.10.159",
     "@types/supertest": "^6.0.3",
     "@utils/ts-utils": "*",
-    "@vitest/coverage-v8": "^4.0.7",
+    "@vitest/coverage-v8": "^4.0.10",
     "concurrently": "^9.2.1",
     "cross-env": "^10.1.0",
     "eslint": "^9.39.1",
@@ -54,6 +54,6 @@
     "supertest": "^7.1.4",
     "typescript": "^5.9.3",
     "vite": "^7.2.2",
-    "vitest": "^4.0.7"
+    "vitest": "^4.0.10"
   }
 }
