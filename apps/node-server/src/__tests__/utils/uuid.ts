@@ -1,3 +1,5 @@
+import type * as CryptoNS from 'node:crypto';
+
 import { vi } from 'vitest';
 
 type RandomUuidState = {
@@ -15,8 +17,7 @@ const randomUuidState = vi.hoisted<RandomUuidState>(() => ({
 }));
 
 vi.mock('node:crypto', async () => {
-  const actual =
-    await vi.importActual<typeof import('node:crypto')>('node:crypto');
+  const actual = await vi.importActual<typeof CryptoNS>('node:crypto');
 
   const randomUUID = vi.fn(() => {
     if (!randomUuidState.isMockActive) {

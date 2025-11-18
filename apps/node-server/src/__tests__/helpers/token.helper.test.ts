@@ -1,16 +1,34 @@
 import { Effect } from 'effect';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { SignOptions } from 'jsonwebtoken';
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  type Mock,
+  vi,
+} from 'vitest';
 
 import { mockRandomUUID, restoreRandomUUID } from '@/__tests__/utils/uuid';
 import { buildUserToken, signToken } from '@/helpers/token';
 
 const jsonWebTokenModule = vi.hoisted(() => ({
-  sign: vi.fn(),
+  sign: vi.fn<JWTSignFunction>(),
 }));
 
 vi.mock('jsonwebtoken', () => jsonWebTokenModule);
 
-const getSignMock = () => {
+type SignCallback = (err: Error | null, encoded?: string) => void;
+type JWTSignFunction = (
+  payload: string | object | Buffer,
+  secret: string,
+  options?: SignOptions,
+  callback?: SignCallback,
+) => void;
+type JWTSignMock = Mock<JWTSignFunction>;
+
+const getSignMock = (): JWTSignMock => {
   const mock = jsonWebTokenModule.sign;
   if (!mock) {
     throw new Error('JWT sign mock was not initialized');
@@ -52,7 +70,7 @@ describe('token helpers', () => {
     const payload = buildUserToken('user-456');
     getSignMock().mockImplementation(
       (_payload, _secret, _options, callback) => {
-        callback(null, undefined);
+        if (callback) callback(null, undefined);
       },
     );
 
