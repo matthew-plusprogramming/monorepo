@@ -1,5 +1,6 @@
 import '@dotenvx/dotenvx/config';
 
+import cors from 'cors';
 import express from 'express';
 import { prettifyError, ZodError } from 'zod';
 
@@ -25,6 +26,7 @@ try {
 }
 
 const app = express();
+app.use(cors());
 app.use(ipRateLimitingMiddlewareRequestHandler);
 app.use(express.json());
 app.use(jsonErrorMiddleware);
