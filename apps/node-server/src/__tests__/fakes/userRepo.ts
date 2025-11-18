@@ -4,7 +4,10 @@ import { Effect, Layer, Option } from 'effect';
 
 import { UserRepo, type UserRepoSchema } from '@/services/userRepo.service';
 
-type OperationName = 'findByIdentifier' | 'create';
+type OperationName =
+  | 'findByIdentifier'
+  | 'findCredentialsByIdentifier'
+  | 'create';
 
 type ResponseEntry<T> =
   | { type: 'success'; value: T }
@@ -12,11 +15,15 @@ type ResponseEntry<T> =
 
 type Queues = {
   readonly findByIdentifier: Array<ResponseEntry<Option.Option<UserPublic>>>;
+  readonly findCredentialsByIdentifier: Array<
+    ResponseEntry<Option.Option<UserCreate>>
+  >;
   readonly create: Array<ResponseEntry<true>>;
 };
 
 type Calls = {
   readonly findByIdentifier: Array<string>;
+  readonly findCredentialsByIdentifier: Array<string>;
   readonly create: Array<UserCreate>;
 };
 
@@ -29,6 +36,9 @@ export type UserRepoFake = {
   readonly queueFindSome: (value: UserPublic) => void;
   readonly queueFindNone: () => void;
   readonly queueFindFailure: (error: InternalServerError) => void;
+  readonly queueFindCredentialsSome: (value: UserCreate) => void;
+  readonly queueFindCredentialsNone: () => void;
+  readonly queueFindCredentialsFailure: (error: InternalServerError) => void;
   readonly queueCreateSuccess: () => void;
   readonly queueCreateFailure: (error: InternalServerError) => void;
 };
@@ -54,11 +64,13 @@ const dequeue = <T>(
 export const createUserRepoFake = (): UserRepoFake => {
   const queues: Queues = {
     findByIdentifier: [],
+    findCredentialsByIdentifier: [],
     create: [],
   };
 
   const calls: Calls = {
     findByIdentifier: [],
+    findCredentialsByIdentifier: [],
     create: [],
   };
 
@@ -66,6 +78,22 @@ export const createUserRepoFake = (): UserRepoFake => {
     findByIdentifier: (idOrEmail: string) => {
       calls.findByIdentifier.push(idOrEmail);
       return dequeue(queues.findByIdentifier, 'findByIdentifier');
+    },
+    findCredentialsByIdentifier: (idOrEmail: string) => {
+      calls.findCredentialsByIdentifier.push(idOrEmail);
+      return dequeue(
+        queues.findCredentialsByIdentifier,
+        'findCredentialsByIdentifier',
+      ).pipe(
+        Effect.map((userCreate) =>
+          Option.map(userCreate, ({ id, username, email, passwordHash }) => ({
+            id,
+            username,
+            email,
+            passwordHash,
+          })),
+        ),
+      );
     },
     create: (user) => {
       calls.create.push(user);
@@ -79,8 +107,10 @@ export const createUserRepoFake = (): UserRepoFake => {
     calls,
     reset: (): void => {
       queues.findByIdentifier.length = 0;
+      queues.findCredentialsByIdentifier.length = 0;
       queues.create.length = 0;
       calls.findByIdentifier.length = 0;
+      calls.findCredentialsByIdentifier.length = 0;
       calls.create.length = 0;
     },
     queueFindSome: (value: UserPublic): void => {
@@ -94,6 +124,21 @@ export const createUserRepoFake = (): UserRepoFake => {
     },
     queueFindFailure: (error: InternalServerError): void => {
       queues.findByIdentifier.push({ type: 'error', error });
+    },
+    queueFindCredentialsSome: (value: UserCreate): void => {
+      queues.findCredentialsByIdentifier.push({
+        type: 'success',
+        value: Option.some(value),
+      });
+    },
+    queueFindCredentialsNone: (): void => {
+      queues.findCredentialsByIdentifier.push({
+        type: 'success',
+        value: Option.none(),
+      });
+    },
+    queueFindCredentialsFailure: (error: InternalServerError): void => {
+      queues.findCredentialsByIdentifier.push({ type: 'error', error });
     },
     queueCreateSuccess: (): void => {
       queues.create.push({ type: 'success', value: true });

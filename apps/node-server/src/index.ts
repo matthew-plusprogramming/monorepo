@@ -5,6 +5,7 @@ import { prettifyError, ZodError } from 'zod';
 
 import { getUserRequestHandler } from '@/handlers/getUser.handler';
 import { heartbeatRequestHandler } from '@/handlers/heartbeat.handler';
+import { loginRequestHandler } from '@/handlers/login.handler';
 import { registerRequestHandler } from '@/handlers/register.handler';
 import { ipRateLimitingMiddlewareRequestHandler } from '@/middleware/ipRateLimiting.middleware';
 import { isAuthenticatedMiddlewareRequestHandler } from '@/middleware/isAuthenticated.middleware';
@@ -34,6 +35,7 @@ app.get(
   heartbeatRequestHandler,
 );
 app.post('/register', registerRequestHandler);
+app.post('/login', loginRequestHandler);
 app.get('/user/:identifier', getUserRequestHandler);
 
 app.listen(process.env.PORT);

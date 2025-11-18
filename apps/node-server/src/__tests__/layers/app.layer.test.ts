@@ -72,6 +72,7 @@ vi.mock('@/services/userRepo.service', async (importOriginal) => {
   const actual: typeof UserRepoModule = await importOriginal();
   const service: UserRepoSchema = {
     findByIdentifier: vi.fn(() => Effect.succeed(Option.none())),
+    findCredentialsByIdentifier: vi.fn(() => Effect.succeed(Option.none())),
     create: vi.fn(() => Effect.succeed(true as const)),
   };
   userRepoModule.service = service;

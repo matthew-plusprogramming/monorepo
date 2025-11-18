@@ -8,6 +8,7 @@ export const USER_SCHEMA_CONSTANTS = {
   },
   projection: {
     userPublic: 'id, username, email',
+    userCredentials: 'id, username, email, passwordHash',
   },
   username: {
     minLength: 1,

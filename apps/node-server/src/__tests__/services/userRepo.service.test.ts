@@ -194,6 +194,88 @@ const logsGetItemFailures = async (): Promise<void> => {
   expect(loggerFake.entries.errors).toContainEqual([error]);
 };
 
+const returnsCredentialsWhenEmailMatches = async (): Promise<void> => {
+  // Arrange
+  const user = buildUserCreate({
+    id: '44444444-4444-4444-8444-444444444444',
+  });
+
+  dynamoFake.queueSuccess('query', {
+    $metadata: { httpStatusCode: 200 },
+    Count: 1,
+    Items: [marshall(user)],
+  });
+
+  // Act
+  const result = await withRepo((repo) =>
+    repo.findCredentialsByIdentifier(user.email),
+  );
+
+  // Assert
+  expect(Option.isSome(result)).toBe(true);
+  expect(result).toEqual(
+    Option.some({
+      id: user.id,
+      username: user.username,
+      email: user.email,
+      passwordHash: user.passwordHash,
+    }),
+  );
+
+  expect(dynamoFake.calls.query).toHaveLength(1);
+  expect(dynamoFake.calls.query[0]).toMatchObject({
+    ProjectionExpression: USER_SCHEMA_CONSTANTS.projection.userCredentials,
+  });
+};
+
+const returnsCredentialsWhenIdMatches = async (): Promise<void> => {
+  // Arrange
+  const user = buildUserCreate({
+    id: '55555555-5555-4555-8555-555555555555',
+  });
+
+  dynamoFake.queueSuccess('getItem', {
+    $metadata: { httpStatusCode: 200 },
+    Item: marshall(user),
+  });
+
+  // Act
+  const result = await withRepo((repo) =>
+    repo.findCredentialsByIdentifier(user.id),
+  );
+
+  // Assert
+  expect(Option.isSome(result)).toBe(true);
+  expect(result).toEqual(
+    Option.some({
+      id: user.id,
+      username: user.username,
+      email: user.email,
+      passwordHash: user.passwordHash,
+    }),
+  );
+
+  expect(dynamoFake.calls.getItem).toHaveLength(1);
+  expect(dynamoFake.calls.getItem[0]).toMatchObject({
+    ProjectionExpression: USER_SCHEMA_CONSTANTS.projection.userCredentials,
+  });
+};
+
+const returnsNoCredentialsWhenIdentifierInvalid = async (): Promise<void> => {
+  // Arrange
+  const invalidIdentifier = 'clearly-invalid';
+
+  // Act
+  const result = await withRepo((repo) =>
+    repo.findCredentialsByIdentifier(invalidIdentifier),
+  );
+
+  // Assert
+  expect(Option.isNone(result)).toBe(true);
+  expect(dynamoFake.calls.query).toHaveLength(0);
+  expect(dynamoFake.calls.getItem).toHaveLength(0);
+};
+
 const writesNewUsersSuccessfully = async (): Promise<void> => {
   // Arrange
   vi.useFakeTimers();
@@ -292,6 +374,18 @@ describe('UserRepo', () => {
   it(
     'logs getItem failures and maps to InternalServerError',
     logsGetItemFailures,
+  );
+  it(
+    'returns credential record when email identifier matches',
+    returnsCredentialsWhenEmailMatches,
+  );
+  it(
+    'returns credential record when id identifier matches',
+    returnsCredentialsWhenIdMatches,
+  );
+  it(
+    'returns Option.none for credential lookups when identifier is invalid',
+    returnsNoCredentialsWhenIdentifierInvalid,
   );
   it(
     'writes new users with marshalling and returns true',

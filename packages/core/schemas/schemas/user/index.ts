@@ -7,6 +7,7 @@ export * from './verification.js';
 
 // Commands
 export * from './commands/getUser.js';
+export * from './commands/login.js';
 export * from './commands/register.js';
 
 // Constants

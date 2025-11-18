@@ -10,12 +10,15 @@ import {
   USER_SCHEMA_CONSTANTS,
   type UserCreate,
   UserCreateSchema,
+  type UserCredentials,
+  UserCredentialsSchema,
   UserEmailSchema,
   UserIdSchema,
   type UserPublic,
   UserPublicSchema,
 } from '@packages/schemas/user';
 import { Context, Effect, Layer, Option } from 'effect';
+import type { z } from 'zod';
 
 import { usersTableName } from '@/clients/cdkOutputs';
 import { DynamoDbService } from '@/services/dynamodb.service';
@@ -24,6 +27,9 @@ export type UserRepoSchema = {
   readonly findByIdentifier: (
     idOrEmail: string,
   ) => Effect.Effect<Option.Option<UserPublic>, InternalServerError>;
+  readonly findCredentialsByIdentifier: (
+    idOrEmail: string,
+  ) => Effect.Effect<Option.Option<UserCredentials>, InternalServerError>;
   readonly create: (
     user: UserCreate,
   ) => Effect.Effect<true, InternalServerError>;
@@ -34,12 +40,13 @@ export class UserRepo extends Context.Tag('UserRepo')<
   UserRepoSchema
 >() {}
 
-const unmarshallUser = (
+const unmarshallUser = <T>(
+  schema: z.ZodType<T>,
   item?: Record<string, AttributeValue>,
-): Option.Option<UserPublic> => {
+): Option.Option<T> => {
   if (!item) return Option.none();
   const obj = unmarshall(item);
-  const parsed = UserPublicSchema.safeParse(obj);
+  const parsed = schema.safeParse(obj);
   if (!parsed.success) return Option.none();
   return Option.some(parsed.data);
 };
@@ -84,12 +91,20 @@ const findByEmail = (
       ProjectionExpression: USER_SCHEMA_CONSTANTS.projection.userPublic,
     })
     .pipe(
-      Effect.map((res) => unmarshallUser(res.Items?.[0])),
-      Effect.tapError((error) => deps.logger.logError(error)),
-      Effect.mapError(
-        (error) =>
-          new InternalServerError({ message: error.message, cause: error }),
+      Effect.map((res) => unmarshallUser(UserPublicSchema, res.Items?.[0])),
+      Effect.tapError((error) =>
+        deps.logger.logError(
+          error instanceof Error ? error : new Error(String(error)),
+        ),
       ),
+      Effect.mapError((error) => {
+        const normalizedError =
+          error instanceof Error ? error : new Error(String(error));
+        return new InternalServerError({
+          message: normalizedError.message,
+          cause: normalizedError,
+        });
+      }),
     );
 
 const findById = (
@@ -107,12 +122,20 @@ const findById = (
       ProjectionExpression: USER_SCHEMA_CONSTANTS.projection.userPublic,
     })
     .pipe(
-      Effect.map((res) => unmarshallUser(res.Item)),
-      Effect.tapError((error) => deps.logger.logError(error)),
-      Effect.mapError(
-        (error) =>
-          new InternalServerError({ message: error.message, cause: error }),
+      Effect.map((res) => unmarshallUser(UserPublicSchema, res.Item)),
+      Effect.tapError((error) =>
+        deps.logger.logError(
+          error instanceof Error ? error : new Error(String(error)),
+        ),
       ),
+      Effect.mapError((error) => {
+        const normalizedError =
+          error instanceof Error ? error : new Error(String(error));
+        return new InternalServerError({
+          message: normalizedError.message,
+          cause: normalizedError,
+        });
+      }),
     );
 
 const buildFindByIdentifier =
@@ -124,6 +147,84 @@ const buildFindByIdentifier =
         Effect.if(UserIdSchema.safeParse(idOrEmail).success, {
           onTrue: () => findById(deps, idOrEmail),
           onFalse: () => Effect.succeed(Option.none<UserPublic>()),
+        }),
+    });
+
+const findCredentialsByEmail = (
+  deps: UserRepoDeps,
+  email: string,
+): Effect.Effect<Option.Option<UserCredentials>, InternalServerError> =>
+  deps.db
+    .query({
+      TableName: usersTableName,
+      IndexName: USER_SCHEMA_CONSTANTS.gsi.email,
+      KeyConditionExpression: '#email = :email',
+      ExpressionAttributeNames: {
+        '#email': USER_SCHEMA_CONSTANTS.key.email,
+      },
+      ExpressionAttributeValues: { ':email': { S: email } },
+      Limit: 1,
+      ProjectionExpression: USER_SCHEMA_CONSTANTS.projection.userCredentials,
+    })
+    .pipe(
+      Effect.map((res) =>
+        unmarshallUser(UserCredentialsSchema, res.Items?.[0]),
+      ),
+      Effect.tapError((error) =>
+        deps.logger.logError(
+          error instanceof Error ? error : new Error(String(error)),
+        ),
+      ),
+      Effect.mapError((error) => {
+        const normalizedError =
+          error instanceof Error ? error : new Error(String(error));
+        return new InternalServerError({
+          message: normalizedError.message,
+          cause: normalizedError,
+        });
+      }),
+    );
+
+const findCredentialsById = (
+  deps: UserRepoDeps,
+  id: string,
+): Effect.Effect<Option.Option<UserCredentials>, InternalServerError> =>
+  deps.db
+    .getItem({
+      TableName: usersTableName,
+      Key: {
+        [USER_SCHEMA_CONSTANTS.key.id]: {
+          S: id,
+        },
+      },
+      ProjectionExpression: USER_SCHEMA_CONSTANTS.projection.userCredentials,
+    })
+    .pipe(
+      Effect.map((res) => unmarshallUser(UserCredentialsSchema, res.Item)),
+      Effect.tapError((error) =>
+        deps.logger.logError(
+          error instanceof Error ? error : new Error(String(error)),
+        ),
+      ),
+      Effect.mapError((error) => {
+        const normalizedError =
+          error instanceof Error ? error : new Error(String(error));
+        return new InternalServerError({
+          message: normalizedError.message,
+          cause: normalizedError,
+        });
+      }),
+    );
+
+const buildFindCredentialsByIdentifier =
+  (deps: UserRepoDeps): UserRepoSchema['findCredentialsByIdentifier'] =>
+  (idOrEmail) =>
+    Effect.if(UserEmailSchema.safeParse(idOrEmail).success, {
+      onTrue: () => findCredentialsByEmail(deps, idOrEmail),
+      onFalse: () =>
+        Effect.if(UserIdSchema.safeParse(idOrEmail).success, {
+          onTrue: () => findCredentialsById(deps, idOrEmail),
+          onFalse: () => Effect.succeed(Option.none<UserCredentials>()),
         }),
     });
 
@@ -156,6 +257,7 @@ const buildCreate =
 
 const buildUserRepo = (deps: UserRepoDeps): UserRepoSchema => ({
   findByIdentifier: buildFindByIdentifier(deps),
+  findCredentialsByIdentifier: buildFindCredentialsByIdentifier(deps),
   create: buildCreate(deps),
 });
 
