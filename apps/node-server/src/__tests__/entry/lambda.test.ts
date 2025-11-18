@@ -46,6 +46,9 @@ const expressModule = vi.hoisted<ExpressModuleState>(() => ({
   listen: undefined,
 }));
 
+const corsModule = vi.hoisted<SingleMockState>(() => ({
+  handler: undefined,
+}));
 const ipRateLimitModule = vi.hoisted<SingleMockState>(() => ({
   handler: undefined,
 }));
@@ -104,6 +107,13 @@ vi.mock('serverless-http', () => {
   return { default: serverless };
 });
 
+vi.mock('cors', () => {
+  const handler = vi.fn();
+  const factory = vi.fn(() => handler);
+  corsModule.handler = handler;
+  return { default: factory };
+});
+
 vi.mock('@/middleware/ipRateLimiting.middleware', () => {
   const handler = vi.fn();
   ipRateLimitModule.handler = handler;
@@ -156,6 +166,10 @@ const requireServerless = (): MockFn => {
 
 const requireEnvironmentParse = (): MockFn => {
   return ensureDefined(environmentModule.parse, 'EnvironmentSchema.parse mock');
+};
+
+const requireCorsMiddleware = (): ReturnType<typeof vi.fn> => {
+  return ensureDefined(corsModule.handler, 'cors middleware');
 };
 
 const requireIpRateLimitMiddleware = (): MockFn => {
@@ -211,13 +225,14 @@ describe('lambda entrypoint', () => {
     expect(envParse).toHaveBeenCalledWith(process.env);
     expect(expressModule.json).toHaveBeenCalledTimes(1);
 
+    expect(expressApp.use).toHaveBeenNthCalledWith(1, requireCorsMiddleware());
     expect(expressApp.use).toHaveBeenNthCalledWith(
-      1,
+      2,
       requireIpRateLimitMiddleware(),
     );
-    expect(expressApp.use).toHaveBeenNthCalledWith(2, requireJsonMiddleware());
+    expect(expressApp.use).toHaveBeenNthCalledWith(3, requireJsonMiddleware());
     expect(expressApp.use).toHaveBeenNthCalledWith(
-      3,
+      4,
       requireJsonErrorMiddleware(),
     );
 

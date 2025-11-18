@@ -38,18 +38,20 @@ describe('user schemas', () => {
     }
   });
 
-  it('maps both user id and email via GetUserSchema', () => {
+  it('maps user id, email, and username via GetUserSchema', () => {
     // Arrange
     const id = '11111111-1111-4111-8111-111111111111';
 
     // Act
     const parsedId = GetUserSchema.parse(id);
     const parsedEmail = GetUserSchema.parse(baseRegisterInput.email);
-    const invalidIdentifier = GetUserSchema.safeParse('not-a-valid-identifier');
+    const parsedUsername = GetUserSchema.parse(baseRegisterInput.username);
+    const invalidIdentifier = GetUserSchema.safeParse('');
 
     // Assert
     expect(parsedId).toBe(id);
     expect(parsedEmail).toBe(baseRegisterInput.email);
+    expect(parsedUsername).toBe(baseRegisterInput.username);
     expect(invalidIdentifier.success).toBe(false);
     if (!invalidIdentifier.success) {
       expect(invalidIdentifier.error.issues.length).toBeGreaterThan(0);

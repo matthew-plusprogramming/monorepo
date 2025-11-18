@@ -37,6 +37,9 @@ const expressModule = vi.hoisted<ExpressModuleState>(() => ({
   jsonMiddleware: undefined,
 }));
 
+const corsModule = vi.hoisted<SingleMockState>(() => ({
+  handler: undefined,
+}));
 const ipRateLimitModule = vi.hoisted<SingleMockState>(() => ({
   handler: undefined,
 }));
@@ -78,6 +81,13 @@ vi.mock('express', () => {
   expressModule.json = json;
   expressModule.jsonMiddleware = jsonMiddleware;
 
+  return { default: factory };
+});
+
+vi.mock('cors', () => {
+  const handler = vi.fn();
+  const factory = vi.fn(() => handler);
+  corsModule.handler = handler;
   return { default: factory };
 });
 
@@ -127,6 +137,10 @@ const requireExpressJsonMiddleware = (): ReturnType<typeof vi.fn> => {
   return ensureDefined(expressModule.jsonMiddleware, 'express.json middleware');
 };
 
+const requireCorsMiddleware = (): ReturnType<typeof vi.fn> => {
+  return ensureDefined(corsModule.handler, 'cors middleware');
+};
+
 const requireIpRateLimitMiddleware = (): ReturnType<typeof vi.fn> => {
   return ensureDefined(ipRateLimitModule.handler, 'ipRateLimiting middleware');
 };
@@ -156,14 +170,15 @@ const assertBootstrapSuccess = ({
 
   expect(expressModule.factory).toHaveBeenCalledTimes(1);
   expect(parse).toHaveBeenCalledWith(process.env);
+  expect(expressApp.use).toHaveBeenNthCalledWith(1, requireCorsMiddleware());
   expect(expressApp.use).toHaveBeenNthCalledWith(
-    1,
+    2,
     requireIpRateLimitMiddleware(),
   );
   expect(expressModule.json).toHaveBeenCalledTimes(1);
-  expect(expressApp.use).toHaveBeenNthCalledWith(2, jsonMiddleware);
+  expect(expressApp.use).toHaveBeenNthCalledWith(3, jsonMiddleware);
   expect(expressApp.use).toHaveBeenNthCalledWith(
-    3,
+    4,
     requireJsonErrorMiddleware(),
   );
   expect(expressApp.post).toHaveBeenCalledWith(

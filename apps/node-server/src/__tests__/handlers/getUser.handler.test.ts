@@ -82,7 +82,7 @@ describe('getUserRequestHandler', () => {
     // Arrange
     // No repo call expected since input parsing fails first
     const { req, res, captured } = makeRequestContext({
-      params: { identifier: 'not-a-uuid-or-email' },
+      params: { identifier: '' },
     });
 
     const { getUserRequestHandler } = await import(

@@ -1,4 +1,4 @@
-import { HTTP_RESPONSE, InternalServerError } from '@packages/backend-core';
+import { HTTP_RESPONSE } from '@packages/backend-core';
 import {
   JWT_AUDIENCE,
   JWT_ISSUER,
@@ -270,6 +270,7 @@ const propagatesCredentialLookupFailure = async (): Promise<void> => {
     body,
   });
   const handler = await importLoginHandler();
+  const { InternalServerError } = await import('@packages/backend-core');
   const repoFake = getUserRepoFake();
   repoFake.queueFindCredentialsFailure(
     new InternalServerError({ message: 'ddb failure', cause: undefined }),

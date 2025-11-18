@@ -75,6 +75,7 @@ const returnsSomeWhenEmailMatches = async (): Promise<void> => {
 const returnsSomeWhenUsernameMatches = async (): Promise<void> => {
   // Arrange
   const user = buildUserPublic({
+    id: '11111111-1111-4111-8111-111111111111',
     username: 'find-by-username',
   });
 
@@ -265,6 +266,7 @@ const returnsCredentialsWhenEmailMatches = async (): Promise<void> => {
 const returnsCredentialsWhenUsernameMatches = async (): Promise<void> => {
   // Arrange
   const user = buildUserCreate({
+    id: '55555555-5555-4555-8555-555555555555',
     username: 'credentials-user',
   });
 

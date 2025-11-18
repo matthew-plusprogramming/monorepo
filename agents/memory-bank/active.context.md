@@ -62,3 +62,6 @@ Reflection
   Build phase: Added username GSI + Dynamo queries, renamed identifier plumbing, and enforced username/email uniqueness with refreshed tests.
   Verify phase: Captured git-diff-with-lines.mjs output and ran npm run phase:check to keep lint/tests green.
 - 2025-11-18 — Plan phase: Planned login auth wiring: add React Query provider, zustand userStore for token, login mutation hitting backend with env-driven base URL, update login form to run mutation+store token and expose errors.
+- 2025-11-18 — Plan phase: Track failing @packages/schemas + node-server suites after identifier expansion.
+  Build phase: Updated GetUser schema test, userRepo username fixtures, handler/entry tests for new username+cors behavior.
+  Verify phase: Re-ran npm -w @packages/schemas run test and npm -w node-server run test to confirm all suites pass.

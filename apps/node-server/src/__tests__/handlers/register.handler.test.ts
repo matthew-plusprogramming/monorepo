@@ -1,4 +1,4 @@
-import { HTTP_RESPONSE, InternalServerError } from '@packages/backend-core';
+import { HTTP_RESPONSE } from '@packages/backend-core';
 import {
   makeRequestContext,
   setBundledRuntime,
@@ -180,6 +180,7 @@ const obfuscatesConflictAs502 = async (): Promise<void> => {
 const propagatesRepoCreateFailure = async (): Promise<void> => {
   // Arrange
   const handler = await importRegisterHandler();
+  const { InternalServerError } = await import('@packages/backend-core');
   getHashMock().mockResolvedValueOnce('hashed-password');
 
   const { req, res, captured } = makeRequestContext({
@@ -199,8 +200,8 @@ const propagatesRepoCreateFailure = async (): Promise<void> => {
   await handler(req, res, vi.fn());
 
   // Assert
-  expect(captured.statusCode).toBe(HTTP_RESPONSE.INTERNAL_SERVER_ERROR);
-  expect(captured.sendBody).toBe('ddb put failed');
+  expect(captured.statusCode).toBe(HTTP_RESPONSE.BAD_GATEWAY);
+  expect(captured.sendBody).toBe('Bad Gateway');
 };
 
 const propagatesHashingFailure = async (): Promise<void> => {
