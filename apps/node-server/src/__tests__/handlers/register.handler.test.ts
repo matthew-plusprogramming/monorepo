@@ -190,6 +190,7 @@ const propagatesRepoCreateFailure = async (): Promise<void> => {
 
   const repoFake = resetUserRepoFake();
   repoFake.queueFindNone();
+  repoFake.queueFindNone();
   repoFake.queueCreateFailure(
     new InternalServerError({ message: 'ddb put failed', cause: undefined }),
   );
@@ -214,6 +215,7 @@ const propagatesHashingFailure = async (): Promise<void> => {
 
   const handler = await importRegisterHandler();
   const repoFake = resetUserRepoFake();
+  repoFake.queueFindNone();
   repoFake.queueFindNone();
 
   // Act
@@ -243,6 +245,7 @@ const propagatesJwtFailure = async (): Promise<void> => {
   // Act
   await withFixedTime('2024-01-01T00:00:00.000Z', async () => {
     const repoFake = resetUserRepoFake();
+    repoFake.queueFindNone();
     repoFake.queueFindNone();
     repoFake.queueCreateSuccess();
     await handler(req, res, vi.fn());

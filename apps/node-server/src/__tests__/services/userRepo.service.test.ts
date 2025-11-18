@@ -72,6 +72,40 @@ const returnsSomeWhenEmailMatches = async (): Promise<void> => {
   });
 };
 
+const returnsSomeWhenUsernameMatches = async (): Promise<void> => {
+  // Arrange
+  const user = buildUserPublic({
+    username: 'find-by-username',
+  });
+
+  dynamoFake.queueSuccess('query', {
+    $metadata: { httpStatusCode: 200 },
+    Count: 1,
+    Items: [marshall(user)],
+  });
+
+  // Act
+  const result = await withRepo((repo) => repo.findByIdentifier(user.username));
+
+  // Assert
+  expect(Option.isSome(result)).toBe(true);
+  expect(result).toEqual(Option.some(user));
+
+  expect(dynamoFake.calls.query).toHaveLength(1);
+  expect(dynamoFake.calls.query[0]).toMatchObject({
+    TableName: 'test-users-table',
+    IndexName: USER_SCHEMA_CONSTANTS.gsi.username,
+    ExpressionAttributeNames: {
+      '#username': USER_SCHEMA_CONSTANTS.key.username,
+    },
+    ExpressionAttributeValues: {
+      ':username': { S: user.username },
+    },
+    Limit: 1,
+    ProjectionExpression: USER_SCHEMA_CONSTANTS.projection.userPublic,
+  });
+};
+
 const returnsNoneWhenEmailParseFails = async (): Promise<void> => {
   // Arrange
   const invalidItem = marshall({ notAUser: true });
@@ -147,11 +181,11 @@ const returnsSomeWhenIdHits = async (): Promise<void> => {
 
 const returnsNoneWhenIdentifierInvalid = async (): Promise<void> => {
   // Arrange
-  // No additional setup required
+  const invalidIdentifier = '';
 
   // Act
   const result = await withRepo((repo) =>
-    repo.findByIdentifier('not-a-valid-email-or-uuid'),
+    repo.findByIdentifier(invalidIdentifier),
   );
 
   // Assert
@@ -228,6 +262,48 @@ const returnsCredentialsWhenEmailMatches = async (): Promise<void> => {
   });
 };
 
+const returnsCredentialsWhenUsernameMatches = async (): Promise<void> => {
+  // Arrange
+  const user = buildUserCreate({
+    username: 'credentials-user',
+  });
+
+  dynamoFake.queueSuccess('query', {
+    $metadata: { httpStatusCode: 200 },
+    Count: 1,
+    Items: [marshall(user)],
+  });
+
+  // Act
+  const result = await withRepo((repo) =>
+    repo.findCredentialsByIdentifier(user.username),
+  );
+
+  // Assert
+  expect(Option.isSome(result)).toBe(true);
+  expect(result).toEqual(
+    Option.some({
+      id: user.id,
+      username: user.username,
+      email: user.email,
+      passwordHash: user.passwordHash,
+    }),
+  );
+
+  expect(dynamoFake.calls.query).toHaveLength(1);
+  expect(dynamoFake.calls.query[0]).toMatchObject({
+    TableName: 'test-users-table',
+    IndexName: USER_SCHEMA_CONSTANTS.gsi.username,
+    ExpressionAttributeNames: {
+      '#username': USER_SCHEMA_CONSTANTS.key.username,
+    },
+    ExpressionAttributeValues: {
+      ':username': { S: user.username },
+    },
+    ProjectionExpression: USER_SCHEMA_CONSTANTS.projection.userCredentials,
+  });
+};
+
 const returnsCredentialsWhenIdMatches = async (): Promise<void> => {
   // Arrange
   const user = buildUserCreate({
@@ -263,7 +339,7 @@ const returnsCredentialsWhenIdMatches = async (): Promise<void> => {
 
 const returnsNoCredentialsWhenIdentifierInvalid = async (): Promise<void> => {
   // Arrange
-  const invalidIdentifier = 'clearly-invalid';
+  const invalidIdentifier = '';
 
   // Act
   const result = await withRepo((repo) =>
@@ -368,6 +444,10 @@ describe('UserRepo', () => {
   );
   it('returns Option.some when id lookup succeeds', returnsSomeWhenIdHits);
   it(
+    'returns Option.some when username lookup succeeds',
+    returnsSomeWhenUsernameMatches,
+  );
+  it(
     'logs and maps DynamoDB failures to InternalServerError',
     logsQueryFailures,
   );
@@ -378,6 +458,10 @@ describe('UserRepo', () => {
   it(
     'returns credential record when email identifier matches',
     returnsCredentialsWhenEmailMatches,
+  );
+  it(
+    'returns credential record when username identifier matches',
+    returnsCredentialsWhenUsernameMatches,
   );
   it(
     'returns credential record when id identifier matches',

@@ -58,3 +58,6 @@ Reflection
 - 2025-11-11 — Build phase: Refactored derived color mixes into a scoped form-colors partial plus nav-local variables, updated login inputs and Button modules to import those helpers, and trimmed globals.scss back to base palette/mixins.
   Verify phase: Captured git diff context and reran npm run phase:check (successful this time including stylelint) to confirm the localized color tokens behave identically.
 - 2025-11-11 — Plan phase: Implement signup page mirroring login patterns: reuse form layout/styles, add name + confirm password fields with react-hook-form validation, and wire CTA/buttons plus support copy with placeholder submit handler.
+- 2025-11-18 — Plan phase: Expand user identifiers to cover username by updating schemas, repo service, and infra.
+  Build phase: Added username GSI + Dynamo queries, renamed identifier plumbing, and enforced username/email uniqueness with refreshed tests.
+  Verify phase: Captured git-diff-with-lines.mjs output and ran npm run phase:check to keep lint/tests green.

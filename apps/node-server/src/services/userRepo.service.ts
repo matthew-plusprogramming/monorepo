@@ -16,6 +16,7 @@ import {
   UserIdSchema,
   type UserPublic,
   UserPublicSchema,
+  UserUsernameSchema,
 } from '@packages/schemas/user';
 import { Context, Effect, Layer, Option } from 'effect';
 import type { z } from 'zod';
@@ -25,10 +26,10 @@ import { DynamoDbService } from '@/services/dynamodb.service';
 
 export type UserRepoSchema = {
   readonly findByIdentifier: (
-    idOrEmail: string,
+    identifier: string,
   ) => Effect.Effect<Option.Option<UserPublic>, InternalServerError>;
   readonly findCredentialsByIdentifier: (
-    idOrEmail: string,
+    identifier: string,
   ) => Effect.Effect<Option.Option<UserCredentials>, InternalServerError>;
   readonly create: (
     user: UserCreate,
@@ -138,15 +139,52 @@ const findById = (
       }),
     );
 
+const findByUsername = (
+  deps: UserRepoDeps,
+  username: string,
+): Effect.Effect<Option.Option<UserPublic>, InternalServerError> =>
+  deps.db
+    .query({
+      TableName: usersTableName,
+      IndexName: USER_SCHEMA_CONSTANTS.gsi.username,
+      KeyConditionExpression: '#username = :username',
+      ExpressionAttributeNames: {
+        '#username': USER_SCHEMA_CONSTANTS.key.username,
+      },
+      ExpressionAttributeValues: { ':username': { S: username } },
+      Limit: 1,
+      ProjectionExpression: USER_SCHEMA_CONSTANTS.projection.userPublic,
+    })
+    .pipe(
+      Effect.map((res) => unmarshallUser(UserPublicSchema, res.Items?.[0])),
+      Effect.tapError((error) =>
+        deps.logger.logError(
+          error instanceof Error ? error : new Error(String(error)),
+        ),
+      ),
+      Effect.mapError((error) => {
+        const normalizedError =
+          error instanceof Error ? error : new Error(String(error));
+        return new InternalServerError({
+          message: normalizedError.message,
+          cause: normalizedError,
+        });
+      }),
+    );
+
 const buildFindByIdentifier =
   (deps: UserRepoDeps): UserRepoSchema['findByIdentifier'] =>
-  (idOrEmail) =>
-    Effect.if(UserEmailSchema.safeParse(idOrEmail).success, {
-      onTrue: () => findByEmail(deps, idOrEmail),
+  (identifier) =>
+    Effect.if(UserEmailSchema.safeParse(identifier).success, {
+      onTrue: () => findByEmail(deps, identifier),
       onFalse: () =>
-        Effect.if(UserIdSchema.safeParse(idOrEmail).success, {
-          onTrue: () => findById(deps, idOrEmail),
-          onFalse: () => Effect.succeed(Option.none<UserPublic>()),
+        Effect.if(UserIdSchema.safeParse(identifier).success, {
+          onTrue: () => findById(deps, identifier),
+          onFalse: () =>
+            Effect.if(UserUsernameSchema.safeParse(identifier).success, {
+              onTrue: () => findByUsername(deps, identifier),
+              onFalse: () => Effect.succeed(Option.none<UserPublic>()),
+            }),
         }),
     });
 
@@ -216,15 +254,54 @@ const findCredentialsById = (
       }),
     );
 
+const findCredentialsByUsername = (
+  deps: UserRepoDeps,
+  username: string,
+): Effect.Effect<Option.Option<UserCredentials>, InternalServerError> =>
+  deps.db
+    .query({
+      TableName: usersTableName,
+      IndexName: USER_SCHEMA_CONSTANTS.gsi.username,
+      KeyConditionExpression: '#username = :username',
+      ExpressionAttributeNames: {
+        '#username': USER_SCHEMA_CONSTANTS.key.username,
+      },
+      ExpressionAttributeValues: { ':username': { S: username } },
+      Limit: 1,
+      ProjectionExpression: USER_SCHEMA_CONSTANTS.projection.userCredentials,
+    })
+    .pipe(
+      Effect.map((res) =>
+        unmarshallUser(UserCredentialsSchema, res.Items?.[0]),
+      ),
+      Effect.tapError((error) =>
+        deps.logger.logError(
+          error instanceof Error ? error : new Error(String(error)),
+        ),
+      ),
+      Effect.mapError((error) => {
+        const normalizedError =
+          error instanceof Error ? error : new Error(String(error));
+        return new InternalServerError({
+          message: normalizedError.message,
+          cause: normalizedError,
+        });
+      }),
+    );
+
 const buildFindCredentialsByIdentifier =
   (deps: UserRepoDeps): UserRepoSchema['findCredentialsByIdentifier'] =>
-  (idOrEmail) =>
-    Effect.if(UserEmailSchema.safeParse(idOrEmail).success, {
-      onTrue: () => findCredentialsByEmail(deps, idOrEmail),
+  (identifier) =>
+    Effect.if(UserEmailSchema.safeParse(identifier).success, {
+      onTrue: () => findCredentialsByEmail(deps, identifier),
       onFalse: () =>
-        Effect.if(UserIdSchema.safeParse(idOrEmail).success, {
-          onTrue: () => findCredentialsById(deps, idOrEmail),
-          onFalse: () => Effect.succeed(Option.none<UserCredentials>()),
+        Effect.if(UserIdSchema.safeParse(identifier).success, {
+          onTrue: () => findCredentialsById(deps, identifier),
+          onFalse: () =>
+            Effect.if(UserUsernameSchema.safeParse(identifier).success, {
+              onTrue: () => findCredentialsByUsername(deps, identifier),
+              onFalse: () => Effect.succeed(Option.none<UserCredentials>()),
+            }),
         }),
     });
 

@@ -75,12 +75,12 @@ export const createUserRepoFake = (): UserRepoFake => {
   };
 
   const service: UserRepoSchema = {
-    findByIdentifier: (idOrEmail: string) => {
-      calls.findByIdentifier.push(idOrEmail);
+    findByIdentifier: (identifier: string) => {
+      calls.findByIdentifier.push(identifier);
       return dequeue(queues.findByIdentifier, 'findByIdentifier');
     },
-    findCredentialsByIdentifier: (idOrEmail: string) => {
-      calls.findCredentialsByIdentifier.push(idOrEmail);
+    findCredentialsByIdentifier: (identifier: string) => {
+      calls.findCredentialsByIdentifier.push(identifier);
       return dequeue(
         queues.findCredentialsByIdentifier,
         'findCredentialsByIdentifier',

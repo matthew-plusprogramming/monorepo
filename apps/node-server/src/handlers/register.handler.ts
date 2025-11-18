@@ -26,13 +26,22 @@ const parseRegistrationInput = (
 
 const ensureUserDoesNotExist = (
   userRepo: UserRepoSchema,
-  email: string,
+  identifiers: Pick<z.infer<typeof RegisterInputSchema>, 'email' | 'username'>,
 ): Effect.Effect<void, ConflictError | InternalServerError> =>
   Effect.gen(function* () {
-    const maybeExisting = yield* userRepo.findByIdentifier(email);
-    if (maybeExisting._tag === 'Some') {
+    const { email, username } = identifiers;
+    const maybeExistingByEmail = yield* userRepo.findByIdentifier(email);
+    if (maybeExistingByEmail._tag === 'Some') {
       return yield* new ConflictError({
         message: 'User with email already exists',
+        cause: undefined,
+      });
+    }
+
+    const maybeExistingByUsername = yield* userRepo.findByIdentifier(username);
+    if (maybeExistingByUsername._tag === 'Some') {
+      return yield* new ConflictError({
+        message: 'User with username already exists',
         cause: undefined,
       });
     }
@@ -80,7 +89,7 @@ const registerHandler = (
     const parsedInput = yield* parseRegistrationInput(req.body);
     const userRepo = yield* UserRepo;
     const userId = randomUUID();
-    yield* ensureUserDoesNotExist(userRepo, parsedInput.email);
+    yield* ensureUserDoesNotExist(userRepo, parsedInput);
     const hashedPassword = yield* hashPassword(parsedInput.password);
     yield* userRepo.create(
       createUserToPersist(userId, parsedInput, hashedPassword),

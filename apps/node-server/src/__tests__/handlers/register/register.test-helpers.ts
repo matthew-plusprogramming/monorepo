@@ -103,6 +103,7 @@ export const prepareSuccessfulRegistration = ({
     },
   );
   userRepoFake.queueFindNone();
+  userRepoFake.queueFindNone();
   userRepoFake.queueCreateSuccess();
 };
 

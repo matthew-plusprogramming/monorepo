@@ -25,11 +25,20 @@ export const generateUserAndVerificationTable = (
         name: USER_SCHEMA_CONSTANTS.key.email,
         type: 'S',
       },
+      {
+        name: USER_SCHEMA_CONSTANTS.key.username,
+        type: 'S',
+      },
     ],
     globalSecondaryIndex: [
       {
         name: USER_SCHEMA_CONSTANTS.gsi.email,
         hashKey: USER_SCHEMA_CONSTANTS.key.email,
+        projectionType: 'ALL',
+      },
+      {
+        name: USER_SCHEMA_CONSTANTS.gsi.username,
+        hashKey: USER_SCHEMA_CONSTANTS.key.username,
         projectionType: 'ALL',
       },
     ],
