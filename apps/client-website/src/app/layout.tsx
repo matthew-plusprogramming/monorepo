@@ -2,6 +2,8 @@ import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import type { JSX } from 'react';
 
+import { ReactQueryProvider } from '@/providers/QueryClientProvider';
+
 import './globals.scss';
 
 const inter = Inter({
@@ -23,7 +25,9 @@ const RootLayout = ({
 }>): JSX.Element => {
   return (
     <html lang="en" className={inter.variable}>
-      <body>{children}</body>
+      <body>
+        <ReactQueryProvider>{children}</ReactQueryProvider>
+      </body>
     </html>
   );
 };

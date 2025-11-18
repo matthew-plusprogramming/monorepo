@@ -109,6 +109,13 @@ $stack-gap: 1.25rem;
   color: formColors.$input-error-border-color;
 }
 
+.formError {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: formColors.$input-error-border-color;
+}
+
 .supportText {
   margin: 0;
   font-size: 0.9rem;

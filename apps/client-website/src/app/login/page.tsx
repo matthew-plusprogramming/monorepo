@@ -5,6 +5,7 @@ import type { SubmitHandler, UseFormRegisterReturn } from 'react-hook-form';
 import { useForm } from 'react-hook-form';
 
 import { Button } from '@/components/Button';
+import { useLoginMutation } from '@/hooks/useLoginMutation';
 
 import styles from './page.module.scss';
 
@@ -62,6 +63,35 @@ const FormField = ({
   );
 };
 
+type FormActionsProps = {
+  isSubmitting: boolean;
+  errorMessage?: string;
+};
+
+const FormActions = ({
+  isSubmitting,
+  errorMessage,
+}: FormActionsProps): JSX.Element => {
+  return (
+    <div className={styles.actions}>
+      {errorMessage && (
+        <p className={styles.formError} role="alert" aria-live="polite">
+          {errorMessage}
+        </p>
+      )}
+      <Button
+        className={styles.submitButton}
+        disabled={isSubmitting}
+        displayStyle="cta"
+        clickStyle="3d"
+        type="submit"
+      >
+        {isSubmitting ? 'Signing you in…' : 'Sign in'}
+      </Button>
+    </div>
+  );
+};
+
 const LoginForm = (): JSX.Element => {
   const {
     register,
@@ -74,10 +104,17 @@ const LoginForm = (): JSX.Element => {
     },
   });
 
+  const loginMutation = useLoginMutation();
+
   const onSubmit: SubmitHandler<LoginFormValues> = async (values) => {
-    // Placeholder – wire up to authentication API when available.
-    console.info('Login attempt', values);
-    await new Promise((resolve) => setTimeout(resolve, 400));
+    try {
+      await loginMutation.mutateAsync({
+        identifier: values.email,
+        password: values.password,
+      });
+    } catch {
+      // Error is handled via loginMutation.error for UI feedback.
+    }
   };
 
   return (
@@ -117,17 +154,10 @@ const LoginForm = (): JSX.Element => {
         connected.
       </p>
 
-      <div className={styles.actions}>
-        <Button
-          className={styles.submitButton}
-          disabled={isSubmitting}
-          displayStyle="cta"
-          clickStyle="3d"
-          type="submit"
-        >
-          {isSubmitting ? 'Signing you in…' : 'Sign in'}
-        </Button>
-      </div>
+      <FormActions
+        errorMessage={loginMutation.error?.message}
+        isSubmitting={isSubmitting || loginMutation.isPending}
+      />
     </form>
   );
 };

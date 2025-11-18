@@ -61,3 +61,4 @@ Reflection
 - 2025-11-18 — Plan phase: Expand user identifiers to cover username by updating schemas, repo service, and infra.
   Build phase: Added username GSI + Dynamo queries, renamed identifier plumbing, and enforced username/email uniqueness with refreshed tests.
   Verify phase: Captured git-diff-with-lines.mjs output and ran npm run phase:check to keep lint/tests green.
+- 2025-11-18 — Plan phase: Planned login auth wiring: add React Query provider, zustand userStore for token, login mutation hitting backend with env-driven base URL, update login form to run mutation+store token and expose errors.
