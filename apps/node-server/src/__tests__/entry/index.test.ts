@@ -279,4 +279,20 @@ describe('node-server index entrypoint', () => {
 
     assertBootstrapFailure({ consoleErrorSpy, exitSpy });
   });
+
+  it('rethrows non-Zod errors during environment validation', async () => {
+    // Arrange
+    const unexpected = new Error('unexpected failure');
+    environmentParseImpl.impl = (): never => {
+      throw unexpected;
+    };
+
+    // Act
+    const importPromise = import('@/index');
+
+    // Assert
+    await expect(importPromise).rejects.toBe(unexpected);
+    expect(exitSpy).not.toHaveBeenCalled();
+    expect(consoleErrorSpy).not.toHaveBeenCalled();
+  });
 });

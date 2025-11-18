@@ -118,7 +118,11 @@ const runHeartbeatScenario = async ({
   configureEventBridge(eventBridgeFake);
 
   const app = express();
-  app.get('/heartbeat', attachUser(user), heartbeatRequestHandler);
+  if (user) {
+    app.get('/heartbeat', attachUser(user), heartbeatRequestHandler);
+  } else {
+    app.get('/heartbeat', heartbeatRequestHandler);
+  }
 
   const httpRequest = request(app).get('/heartbeat');
   if (platform) {
@@ -131,9 +135,9 @@ const runHeartbeatScenario = async ({
 };
 
 type HeartbeatScenarioOptions = {
-  user: { sub: string; jti: string };
-  platform?: string;
-  configureEventBridge: (fake: EventBridgeServiceFake) => void;
+  readonly user?: { sub: string; jti: string };
+  readonly platform?: string;
+  readonly configureEventBridge: (fake: EventBridgeServiceFake) => void;
 };
 
 type HeartbeatScenarioResult = {

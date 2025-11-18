@@ -177,6 +177,39 @@ const obfuscatesConflictAs502 = async (): Promise<void> => {
   expect(captured.sendBody).toBe('Bad Gateway');
 };
 
+const obfuscatesUsernameConflictAs502 = async (): Promise<void> => {
+  // Arrange
+  const body = createRegisterBody({
+    username: 'duplicate-user',
+    email: 'unique@example.com',
+  });
+  const { req, res, captured } = makeRequestContext({
+    method: 'POST',
+    url: '/register',
+    body,
+  });
+  const handler = await importRegisterHandler();
+
+  const repoFake = resetUserRepoFake();
+  repoFake.queueFindNone();
+  repoFake.queueFindSome({
+    id: '22222222-2222-4222-8222-222222222222',
+    username: body.username,
+    email: 'different@example.com',
+  });
+
+  // Act
+  await handler(req, res, vi.fn());
+
+  // Assert
+  expect(repoFake.calls.findByIdentifier).toEqual([
+    body.email,
+    body.username,
+  ]);
+  expect(captured.statusCode).toBe(HTTP_RESPONSE.BAD_GATEWAY);
+  expect(captured.sendBody).toBe('Bad Gateway');
+};
+
 const propagatesRepoCreateFailure = async (): Promise<void> => {
   // Arrange
   const handler = await importRegisterHandler();
@@ -264,6 +297,10 @@ describe('registerRequestHandler', () => {
   it(
     'obfuscates conflict as 502 when user already exists',
     obfuscatesConflictAs502,
+  );
+  it(
+    'obfuscates username conflicts as 502 when username already exists',
+    obfuscatesUsernameConflictAs502,
   );
   it(
     'propagates repo create failure via InternalServerError (obfuscated 502)',

@@ -306,6 +306,28 @@ const propagatesVerificationFailure = async (): Promise<void> => {
   expect(captured.sendBody).toBe('Bad Gateway');
 };
 
+const propagatesVerificationFailureForNonError = async (): Promise<void> => {
+  // Arrange
+  const body = createLoginBody();
+  const { req, res, captured } = makeRequestContext({
+    method: 'POST',
+    url: '/login',
+    body,
+  });
+  const handler = await importLoginHandler();
+  const verifyMock = getVerifyMock();
+  const repoFake = getUserRepoFake();
+  queueCredentialLookup(repoFake, { email: body.identifier });
+  verifyMock.mockRejectedValueOnce('argon2 unreachable');
+
+  // Act
+  await handler(req, res, vi.fn());
+
+  // Assert
+  expect(captured.statusCode).toBe(HTTP_RESPONSE.BAD_GATEWAY);
+  expect(captured.sendBody).toBe('Bad Gateway');
+};
+
 const propagatesJwtFailure = async (): Promise<void> => {
   // Arrange
   const body = createLoginBody();
@@ -351,6 +373,10 @@ describe('loginRequestHandler', () => {
   it(
     'propagates password verification failures as obfuscated 502 errors',
     propagatesVerificationFailure,
+  );
+  it(
+    'propagates non-Error password verification failures as obfuscated 502 errors',
+    propagatesVerificationFailureForNonError,
   );
   it(
     'propagates JWT signing failures as obfuscated 502 errors',
