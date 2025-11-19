@@ -9,6 +9,7 @@ import {
   LoggerService,
   type LoggerServiceSchema,
 } from '@packages/backend-core';
+import { exists } from '@utils/ts-utils';
 import { Effect } from 'effect';
 import type { Request } from 'express';
 import z from 'zod';
@@ -170,7 +171,7 @@ export const heartbeatRequestHandler = generateRequestHandler<
 >({
   effectfulHandler: (input) =>
     heartbeatHandler(input).pipe(Effect.provide(AppLayer)),
-  shouldObfuscate: () => true,
+  shouldObfuscate: (req) => !exists(req?.user),
   statusCodesToErrors: {
     [HTTP_RESPONSE.INTERNAL_SERVER_ERROR]: {
       errorType: InternalServerError,

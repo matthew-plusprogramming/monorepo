@@ -146,7 +146,7 @@ type HeartbeatScenarioResult = {
   loggerFake: LoggerServiceFake;
 };
 
-const obfuscatesFailedEntries = async (): Promise<void> => {
+const surfacesFailedEntriesWhenAuthenticated = async (): Promise<void> => {
   // Arrange
   const scenario: HeartbeatScenarioOptions = {
     user: { sub: 'user-3', jti: 'token-3' },
@@ -169,8 +169,8 @@ const obfuscatesFailedEntries = async (): Promise<void> => {
     await runHeartbeatScenario(scenario);
 
   // Assert
-  expect(response.status).toBe(HTTP_RESPONSE.BAD_GATEWAY);
-  expect(response.text).toBe('Bad Gateway');
+  expect(response.status).toBe(HTTP_RESPONSE.INTERNAL_SERVER_ERROR);
+  expect(response.text).toBe('Failed to publish heartbeat analytics event');
   expect(eventBridgeFake.calls).toHaveLength(1);
   expect(loggerFake.entries.logs).toHaveLength(0);
   const errorArgs = loggerFake.entries.errors[0] ?? [];
@@ -181,7 +181,7 @@ const obfuscatesFailedEntries = async (): Promise<void> => {
   }
 };
 
-const obfuscatesPublishErrors = async (): Promise<void> => {
+const surfacesPublishErrorsWhenAuthenticated = async (): Promise<void> => {
   // Arrange
   const scenario: HeartbeatScenarioOptions = {
     user: { sub: 'user-2', jti: 'token-2' },
@@ -194,12 +194,12 @@ const obfuscatesPublishErrors = async (): Promise<void> => {
   const { response, loggerFake } = await runHeartbeatScenario(scenario);
 
   // Assert
-  expect(response.status).toBe(HTTP_RESPONSE.BAD_GATEWAY);
-  expect(response.text).toBe('Bad Gateway');
+  expect(response.status).toBe(HTTP_RESPONSE.INTERNAL_SERVER_ERROR);
+  expect(response.text).toBe('Failed to publish heartbeat analytics event');
   expect(loggerFake.entries.errors).toHaveLength(1);
 };
 
-const obfuscatesFailuresWithoutEntryDetails = async (): Promise<void> => {
+const surfacesFailuresWithoutEntryDetails = async (): Promise<void> => {
   // Arrange
   const scenario: HeartbeatScenarioOptions = {
     user: { sub: 'user-6', jti: 'token-6' },
@@ -216,8 +216,8 @@ const obfuscatesFailuresWithoutEntryDetails = async (): Promise<void> => {
   const { response, loggerFake } = await runHeartbeatScenario(scenario);
 
   // Assert
-  expect(response.status).toBe(HTTP_RESPONSE.BAD_GATEWAY);
-  expect(response.text).toBe('Bad Gateway');
+  expect(response.status).toBe(HTTP_RESPONSE.INTERNAL_SERVER_ERROR);
+  expect(response.text).toBe('Failed to publish heartbeat analytics event');
   const errorArgs = loggerFake.entries.errors[0] ?? [];
   const firstError = errorArgs[0];
   expect(firstError).toBeInstanceOf(Error);
@@ -226,7 +226,7 @@ const obfuscatesFailuresWithoutEntryDetails = async (): Promise<void> => {
   }
 };
 
-const obfuscatesFailuresWithFallbackDetails = async (): Promise<void> => {
+const surfacesFailuresWithFallbackDetails = async (): Promise<void> => {
   // Arrange
   const scenario: HeartbeatScenarioOptions = {
     user: { sub: 'user-7', jti: 'token-7' },
@@ -250,8 +250,8 @@ const obfuscatesFailuresWithFallbackDetails = async (): Promise<void> => {
   const { response, loggerFake } = await runHeartbeatScenario(scenario);
 
   // Assert
-  expect(response.status).toBe(HTTP_RESPONSE.BAD_GATEWAY);
-  expect(response.text).toBe('Bad Gateway');
+  expect(response.status).toBe(HTTP_RESPONSE.INTERNAL_SERVER_ERROR);
+  expect(response.text).toBe('Failed to publish heartbeat analytics event');
   const errorArgs = loggerFake.entries.errors[0] ?? [];
   const firstError = errorArgs[0];
   expect(firstError).toBeInstanceOf(Error);
@@ -265,7 +265,7 @@ const obfuscatesFailuresWithFallbackDetails = async (): Promise<void> => {
   }
 };
 
-const obfuscatesNonErrorPublishFailures = async (): Promise<void> => {
+const surfacesNonErrorPublishFailures = async (): Promise<void> => {
   // Arrange
   const scenario: HeartbeatScenarioOptions = {
     user: { sub: 'user-8', jti: 'token-8' },
@@ -278,8 +278,8 @@ const obfuscatesNonErrorPublishFailures = async (): Promise<void> => {
   const { response, loggerFake } = await runHeartbeatScenario(scenario);
 
   // Assert
-  expect(response.status).toBe(HTTP_RESPONSE.BAD_GATEWAY);
-  expect(response.text).toBe('Bad Gateway');
+  expect(response.status).toBe(HTTP_RESPONSE.INTERNAL_SERVER_ERROR);
+  expect(response.text).toBe('Failed to publish heartbeat analytics event');
   const errorArgs = loggerFake.entries.errors[0] ?? [];
   const firstError = errorArgs[0];
   expect(firstError).toBeInstanceOf(Error);
@@ -482,24 +482,24 @@ describe('heartbeatRequestHandler', () => {
     fallsBackToUnknownEnvAndVersion,
   );
   it(
-    'obfuscates failures when EventBridge reports failed entries',
-    obfuscatesFailedEntries,
+    'does not obfuscate when EventBridge reports failed entries',
+    surfacesFailedEntriesWhenAuthenticated,
   );
   it(
-    'obfuscates failures when publishing heartbeat event errors',
-    obfuscatesPublishErrors,
+    'does not obfuscate when publishing heartbeat event errors',
+    surfacesPublishErrorsWhenAuthenticated,
   );
   it(
-    'obfuscates failures when EventBridge reports failed entries with no detail',
-    obfuscatesFailuresWithoutEntryDetails,
+    'does not obfuscate when EventBridge reports failed entries with no detail',
+    surfacesFailuresWithoutEntryDetails,
   );
   it(
-    'obfuscates failures when EventBridge uses fallback code/message values',
-    obfuscatesFailuresWithFallbackDetails,
+    'does not obfuscate when EventBridge uses fallback code/message values',
+    surfacesFailuresWithFallbackDetails,
   );
   it(
-    'obfuscates failures when EventBridge rejects with a non-error cause',
-    obfuscatesNonErrorPublishFailures,
+    'does not obfuscate when EventBridge rejects with a non-error cause',
+    surfacesNonErrorPublishFailures,
   );
   it(
     'obfuscates requests that are missing authenticated user context',

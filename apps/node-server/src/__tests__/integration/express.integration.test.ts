@@ -32,25 +32,35 @@ vi.mock('@/services/eventBridge.service', async (importOriginal) => {
   } satisfies typeof actual;
 });
 
-const buildHeartbeatApp = async (): Promise<Express> => {
+type BuildHeartbeatAppOptions = {
+  readonly includeUser?: boolean;
+};
+
+const buildHeartbeatApp = async ({
+  includeUser = true,
+}: BuildHeartbeatAppOptions = {}): Promise<Express> => {
   const { heartbeatRequestHandler } = await import(
     '@/handlers/heartbeat.handler'
   );
 
   const app = express();
-  app.get(
-    '/heartbeat',
-    (req, _res, next) => {
-      Object.assign(req, {
-        user: {
-          sub: 'user-1',
-          jti: 'token-1',
-        },
-      });
-      next();
-    },
-    heartbeatRequestHandler,
-  );
+  if (includeUser) {
+    app.get(
+      '/heartbeat',
+      (req, _res, next) => {
+        Object.assign(req, {
+          user: {
+            sub: 'user-1',
+            jti: 'token-1',
+          },
+        });
+        next();
+      },
+      heartbeatRequestHandler,
+    );
+  } else {
+    app.get('/heartbeat', heartbeatRequestHandler);
+  }
   return app;
 };
 
@@ -108,7 +118,7 @@ describe('heartbeat integration', () => {
     });
   });
 
-  it('returns 502 when EventBridge reports failed entries', async () => {
+  it('surfaces EventBridge failures when user context is present', async () => {
     // Arrange
     const app = await buildHeartbeatApp();
     const eventBridgeFake = getEventBridgeFake();
@@ -128,8 +138,23 @@ describe('heartbeat integration', () => {
     const response = await request(app).get('/heartbeat');
 
     // Assert
+    expect(response.status).toBe(HTTP_RESPONSE.INTERNAL_SERVER_ERROR);
+    expect(response.text).toBe('Failed to publish heartbeat analytics event');
+    expect(eventBridgeFake.calls).toHaveLength(1);
+  });
+
+  it('obfuscates failures when user context is missing', async () => {
+    // Arrange
+    const app = await buildHeartbeatApp({ includeUser: false });
+    const eventBridgeFake = getEventBridgeFake();
+    eventBridgeFake.reset();
+
+    // Act
+    const response = await request(app).get('/heartbeat');
+
+    // Assert
     expect(response.status).toBe(HTTP_RESPONSE.BAD_GATEWAY);
     expect(response.text).toBe('Bad Gateway');
-    expect(eventBridgeFake.calls).toHaveLength(1);
+    expect(eventBridgeFake.calls).toHaveLength(0);
   });
 });
