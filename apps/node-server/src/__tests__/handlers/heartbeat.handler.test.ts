@@ -199,6 +199,122 @@ const obfuscatesPublishErrors = async (): Promise<void> => {
   expect(loggerFake.entries.errors).toHaveLength(1);
 };
 
+const obfuscatesFailuresWithoutEntryDetails = async (): Promise<void> => {
+  // Arrange
+  const scenario: HeartbeatScenarioOptions = {
+    user: { sub: 'user-6', jti: 'token-6' },
+    configureEventBridge: (fake) => {
+      fake.queueSuccess({
+        $metadata: { httpStatusCode: 200 },
+        FailedEntryCount: 1,
+        Entries: [{}],
+      });
+    },
+  };
+
+  // Act
+  const { response, loggerFake } = await runHeartbeatScenario(scenario);
+
+  // Assert
+  expect(response.status).toBe(HTTP_RESPONSE.BAD_GATEWAY);
+  expect(response.text).toBe('Bad Gateway');
+  const errorArgs = loggerFake.entries.errors[0] ?? [];
+  const firstError = errorArgs[0];
+  expect(firstError).toBeInstanceOf(Error);
+  if (firstError instanceof Error) {
+    expect(firstError.message).toContain('no details');
+  }
+};
+
+const obfuscatesFailuresWithFallbackDetails = async (): Promise<void> => {
+  // Arrange
+  const scenario: HeartbeatScenarioOptions = {
+    user: { sub: 'user-7', jti: 'token-7' },
+    configureEventBridge: (fake) => {
+      fake.queueSuccess({
+        $metadata: { httpStatusCode: 200 },
+        FailedEntryCount: 2,
+        Entries: [
+          {
+            ErrorMessage: 'Partial failure',
+          },
+          {
+            ErrorCode: 'Throttled',
+          },
+        ],
+      });
+    },
+  };
+
+  // Act
+  const { response, loggerFake } = await runHeartbeatScenario(scenario);
+
+  // Assert
+  expect(response.status).toBe(HTTP_RESPONSE.BAD_GATEWAY);
+  expect(response.text).toBe('Bad Gateway');
+  const errorArgs = loggerFake.entries.errors[0] ?? [];
+  const firstError = errorArgs[0];
+  expect(firstError).toBeInstanceOf(Error);
+  if (firstError instanceof Error) {
+    expect(firstError.message).toContain(
+      'Entry 0: UnknownError - Partial failure',
+    );
+    expect(firstError.message).toContain(
+      'Entry 1: Throttled - Unknown failure',
+    );
+  }
+};
+
+const obfuscatesNonErrorPublishFailures = async (): Promise<void> => {
+  // Arrange
+  const scenario: HeartbeatScenarioOptions = {
+    user: { sub: 'user-8', jti: 'token-8' },
+    configureEventBridge: (fake) => {
+      fake.queueFailure(new Error('catastrophic failure'));
+    },
+  };
+
+  // Act
+  const { response, loggerFake } = await runHeartbeatScenario(scenario);
+
+  // Assert
+  expect(response.status).toBe(HTTP_RESPONSE.BAD_GATEWAY);
+  expect(response.text).toBe('Bad Gateway');
+  const errorArgs = loggerFake.entries.errors[0] ?? [];
+  const firstError = errorArgs[0];
+  expect(firstError).toBeInstanceOf(Error);
+  if (firstError instanceof Error) {
+    expect(firstError.message).toBe('catastrophic failure');
+  }
+};
+
+const obfuscatesMissingUserContext = async (): Promise<void> => {
+  // Arrange
+  const scenario: HeartbeatScenarioOptions = {
+    configureEventBridge: (fake) => {
+      fake.queueSuccess({
+        $metadata: { httpStatusCode: 200 },
+        FailedEntryCount: 0,
+      });
+    },
+  };
+
+  // Act
+  const { response, eventBridgeFake, loggerFake } =
+    await runHeartbeatScenario(scenario);
+
+  // Assert
+  expect(response.status).toBe(HTTP_RESPONSE.BAD_GATEWAY);
+  expect(response.text).toBe('Bad Gateway');
+  expect(eventBridgeFake.calls).toHaveLength(0);
+  const errorArgs = loggerFake.entries.errors[0] ?? [];
+  const firstError = errorArgs[0];
+  expect(firstError).toBeInstanceOf(Error);
+  if (firstError instanceof Error) {
+    expect(firstError.message).toContain('missing user context');
+  }
+};
+
 const initializeHeartbeatContext = (): void => {
   vi.resetModules();
   vi.stubEnv('APP_ENV', 'test-env');
@@ -209,6 +325,34 @@ const initializeHeartbeatContext = (): void => {
 const cleanupHeartbeatContext = (): void => {
   vi.unstubAllEnvs();
   clearBundledRuntime();
+};
+
+const withEnvOverrides = async <T>(
+  overrides: Record<string, string | undefined>,
+  runScenario: () => Promise<T>,
+): Promise<T> => {
+  const previousEntries = Object.entries(overrides).map(
+    ([key]): [string, string | undefined] => [key, process.env[key]],
+  );
+  for (const [key, value] of Object.entries(overrides)) {
+    if (value === undefined) {
+      delete process.env[key];
+    } else {
+      process.env[key] = value;
+    }
+  }
+
+  try {
+    return await runScenario();
+  } finally {
+    for (const [key, value] of previousEntries) {
+      if (value === undefined) {
+        delete process.env[key];
+      } else {
+        process.env[key] = value;
+      }
+    }
+  }
 };
 
 const publishesHeartbeatEvent = async (): Promise<void> => {
@@ -251,11 +395,92 @@ const publishesHeartbeatEvent = async (): Promise<void> => {
   expect(loggerFake.entries.errors).toHaveLength(0);
 };
 
+const usesNodeEnvAndPackageVersion = async (): Promise<void> => {
+  // Arrange
+  const scenario: HeartbeatScenarioOptions = {
+    user: { sub: 'user-4', jti: 'token-4' },
+    configureEventBridge: (fake) => {
+      fake.queueSuccess({
+        $metadata: { httpStatusCode: 200 },
+        Entries: [],
+      });
+    },
+  };
+
+  // Act
+  const { response, eventBridgeFake, loggerFake } = await withEnvOverrides(
+    {
+      APP_ENV: undefined,
+      APP_VERSION: undefined,
+      NODE_ENV: 'node-env',
+      npm_package_version: '9.9.9',
+    },
+    () => runHeartbeatScenario(scenario),
+  );
+
+  // Assert
+  expect(response.status).toBe(HTTP_RESPONSE.OK);
+  expect(loggerFake.entries.errors).toHaveLength(0);
+  const [entry] = eventBridgeFake.calls[0]?.Entries ?? [];
+  const parsedDetail: unknown = JSON.parse(entry?.Detail ?? '{}');
+  if (!isRecord(parsedDetail)) {
+    throw new Error('Heartbeat detail payload missing');
+  }
+  expect(parsedDetail).toMatchObject({
+    env: 'node-env',
+    appVersion: '9.9.9',
+  });
+};
+
+const fallsBackToUnknownEnvAndVersion = async (): Promise<void> => {
+  // Arrange
+  const scenario: HeartbeatScenarioOptions = {
+    user: { sub: 'user-5', jti: 'token-5' },
+    configureEventBridge: (fake) => {
+      fake.queueSuccess({
+        $metadata: { httpStatusCode: 200 },
+        Entries: [],
+      });
+    },
+  };
+
+  // Act
+  const { response, eventBridgeFake } = await withEnvOverrides(
+    {
+      APP_ENV: undefined,
+      APP_VERSION: undefined,
+      NODE_ENV: undefined,
+      npm_package_version: undefined,
+    },
+    () => runHeartbeatScenario(scenario),
+  );
+
+  // Assert
+  expect(response.status).toBe(HTTP_RESPONSE.OK);
+  const [entry] = eventBridgeFake.calls[0]?.Entries ?? [];
+  const parsedDetail: unknown = JSON.parse(entry?.Detail ?? '{}');
+  if (!isRecord(parsedDetail)) {
+    throw new Error('Heartbeat detail payload missing');
+  }
+  expect(parsedDetail).toMatchObject({
+    env: 'unknown',
+    appVersion: 'unknown',
+  });
+};
+
 describe('heartbeatRequestHandler', () => {
   beforeEach(initializeHeartbeatContext);
   afterEach(cleanupHeartbeatContext);
 
   it('publishes a heartbeat event and returns 200', publishesHeartbeatEvent);
+  it(
+    'uses NODE_ENV and package version fallbacks when APP env vars are absent',
+    usesNodeEnvAndPackageVersion,
+  );
+  it(
+    'falls back to "unknown" env metadata when no env hints are available',
+    fallsBackToUnknownEnvAndVersion,
+  );
   it(
     'obfuscates failures when EventBridge reports failed entries',
     obfuscatesFailedEntries,
@@ -263,5 +488,21 @@ describe('heartbeatRequestHandler', () => {
   it(
     'obfuscates failures when publishing heartbeat event errors',
     obfuscatesPublishErrors,
+  );
+  it(
+    'obfuscates failures when EventBridge reports failed entries with no detail',
+    obfuscatesFailuresWithoutEntryDetails,
+  );
+  it(
+    'obfuscates failures when EventBridge uses fallback code/message values',
+    obfuscatesFailuresWithFallbackDetails,
+  );
+  it(
+    'obfuscates failures when EventBridge rejects with a non-error cause',
+    obfuscatesNonErrorPublishFailures,
+  );
+  it(
+    'obfuscates requests that are missing authenticated user context',
+    obfuscatesMissingUserContext,
   );
 });

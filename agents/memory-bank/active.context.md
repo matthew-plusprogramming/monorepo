@@ -77,3 +77,4 @@ Reflection
 - 2025-11-19 — Plan phase: Extend cdk deploy with the same interactive stack picker + multi-select sequencing already used by cdk output while retaining current CLI behavior when a stack is provided.
   Build phase: Updated usage/docs to note picker applies to deploy/output, wired handleCdkDeploy through the shared resolver with allowInteractive + sequential runs, and reused stage labels for clearer logging before running npm sequences.
   Verify phase: Ran npm run phase:check, captured git-diff-with-lines.mjs output, and reasoned through the prompt flow (manual TTY recommended for final validation).
+- 2025-11-19 — Plan phase: Plan: Expand heartbeat/register handler tests to cover env fallbacks plus EventBridge + argon error paths so both handlers reach 100% branch coverage via npm run test:coverage.

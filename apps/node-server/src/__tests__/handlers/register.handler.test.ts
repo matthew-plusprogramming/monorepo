@@ -152,6 +152,7 @@ const resetUserRepoFake = (): UserRepoFake => {
 const EMAIL_CONFLICT_MESSAGE = 'User with email already exists';
 const USERNAME_CONFLICT_MESSAGE = 'User with username already exists';
 const HASH_FAILURE_MESSAGE = 'Failed to hash password: argon2 failed';
+const GENERIC_HASH_FAILURE_MESSAGE = 'Failed to hash password';
 const JWT_SIGN_FAILURE_MESSAGE =
   'Failed to sign JWT: JWT sign error: jwt sign failed';
 
@@ -263,6 +264,29 @@ const propagatesHashingFailure = async (): Promise<void> => {
   expect(captured.sendBody).toBe(HASH_FAILURE_MESSAGE);
 };
 
+const propagatesHashingFailureWithoutErrorCause = async (): Promise<void> => {
+  // Arrange
+  getHashMock().mockRejectedValueOnce('argon2 blew up');
+
+  const { req, res, captured } = makeRequestContext({
+    method: 'POST',
+    url: '/register',
+    body: createRegisterBody({ username: 'user', email: 'user@example.com' }),
+  });
+
+  const handler = await importRegisterHandler();
+  const repoFake = resetUserRepoFake();
+  repoFake.queueFindNone();
+  repoFake.queueFindNone();
+
+  // Act
+  await handler(req, res, vi.fn());
+
+  // Assert
+  expect(captured.statusCode).toBe(HTTP_RESPONSE.INTERNAL_SERVER_ERROR);
+  expect(captured.sendBody).toBe(GENERIC_HASH_FAILURE_MESSAGE);
+};
+
 const propagatesJwtFailure = async (): Promise<void> => {
   // Arrange
   const handler = await importRegisterHandler();
@@ -312,6 +336,10 @@ describe('registerRequestHandler', () => {
   it(
     'propagates hashing failure via InternalServerError (500)',
     propagatesHashingFailure,
+  );
+  it(
+    'propagates hashing failure when the argon2 rejection is not an Error',
+    propagatesHashingFailureWithoutErrorCause,
   );
   it(
     'propagates JWT signing failure via InternalServerError (500)',
