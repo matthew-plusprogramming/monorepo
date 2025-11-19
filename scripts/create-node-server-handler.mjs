@@ -419,6 +419,10 @@ ${Object.entries(TEMPLATE_DEFINITIONS)
   .join('\n')}
 `.trim();
 
+const printUsage = () => {
+  console.log(USAGE);
+};
+
 const parseCliArguments = (argv) => {
   const args = [];
   const flags = {
@@ -489,14 +493,30 @@ const parseCliArguments = (argv) => {
 };
 
 const main = async () => {
+  let parsedArgs;
   try {
-    const { slug, flags } = parseCliArguments(process.argv.slice(2));
+    parsedArgs = parseCliArguments(process.argv.slice(2));
+  } catch (error) {
+    console.error(error?.message ?? error);
+    printUsage();
+    process.exitCode = 1;
+    return;
+  }
 
-    if (flags.help) {
-      console.log(USAGE);
-      return;
-    }
+  const { slug, flags } = parsedArgs;
 
+  if (flags.help) {
+    printUsage();
+    return;
+  }
+
+  if (!slug) {
+    printUsage();
+    process.exitCode = 1;
+    return;
+  }
+
+  try {
     await createNodeServerHandler({
       handlerSlug: slug,
       routePath: flags.route,
