@@ -102,3 +102,4 @@ node scripts/manage-cdktf-state.mjs bootstrap-backend
 - Run from the repository root with credentials configured for the target environment.
 - The script derives the stack name from `cdk/backend-server-cdk/src/constants.ts`, removes `cdk/backend-server-cdk/terraform.<stack>.tfstate` (plus the legacy `.terraform/terraform.tfstate` copy), and restores `migrateStateToBootstrappedBackend` to its original value even if a command fails.
 - Command output streams directly to your terminal; rerun once issues are resolved.
+- `node scripts/manage-cdktf-state.mjs cdk output <stack> [--prod]` writes CDK outputs for a specific stack. Omitting `<stack>` in an interactive terminal opens a picker so you can select and confirm one or more stacks; the script runs each output sequentially with the same flags. Append `--` before any extra CDK arguments (for example, `-- --context stage=dev`) to forward them to every selected stack.

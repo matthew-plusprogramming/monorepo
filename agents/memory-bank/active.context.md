@@ -71,3 +71,6 @@ Reflection
 - 2025-11-19 — Plan phase: Scoped a reusable node-server handler scaffolder CLI plus repo-service integration so handler/test/index wiring stays consistent.
   Build phase: Added templates + create-node-server-handler.mjs, documented usage, and swapped the repository-service handler bundle to invoke the new CLI.
   Verify phase: Exercised the CLI + repository-service scaffolder in dry-run mode and ran npm run test:scripts + npm run phase:check to validate the new automation.
+- 2025-11-19 — Plan phase: Scoped cdk output interactive picker so missing stack triggers multi-select sequential outputs while keeping deploy untouched.
+  Build phase: Implemented readline prompts plus stack argument parsing with passthrough support, ran outputs sequentially per stack, refreshed usage/docs, and npm run phase:check passed.
+  Verify phase: Captured git diff via agents/scripts/git-diff-with-lines.mjs and reasoned through the prompt flow since the interactive path is non-destructive.

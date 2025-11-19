@@ -3,6 +3,7 @@
 import { readFile, writeFile, rm } from 'node:fs/promises';
 import { dirname, join, relative, resolve } from 'node:path';
 import { spawn } from 'node:child_process';
+import readline from 'node:readline/promises';
 import { fileURLToPath } from 'node:url';
 import process from 'node:process';
 
@@ -34,6 +35,8 @@ const usage = () => {
       '  cdk list                  Lists available stacks with descriptions.',
       '  cdk deploy <stack> [--prod]  Deploys the specified stack (defaults to dev).',
       '  cdk output <stack> [--prod]  Writes CDK outputs for the specified stack (defaults to dev).',
+      '                              Omitting <stack> in a TTY launches an interactive picker for one or more stacks.',
+      '                              Append "--" to forward extra CDK args to every selected stack.',
       '',
       'Flags:',
       '  -h, --help                Show this help message.',
@@ -156,32 +159,183 @@ const readStackMetadata = async () => {
   return stacks;
 };
 
-const resolveStackArgs = async (args, subcommand) => {
+const ensureInteractiveTerminal = () => {
+  if (!process.stdin.isTTY || !process.stdout.isTTY) {
+    throw new Error(
+      'Interactive stack selection requires an interactive terminal. Provide a stack identifier when running non-interactively.',
+    );
+  }
+};
+
+const formatStackOptionLine = (stack, index) =>
+  `  ${String(index + 1).padStart(2, ' ')}. ${stack.stackName} (${stack.constName}) - ${stack.description}`;
+
+const findStackByIdentifier = (stacks, identifier) => {
+  const normalized = identifier.toLowerCase();
+  return stacks.find(
+    (entry) =>
+      entry.stackName.toLowerCase() === normalized ||
+      entry.constName.toLowerCase() === normalized,
+  );
+};
+
+const promptForStackSelection = async (stacks, { stageLabel, subcommand }) => {
+  ensureInteractiveTerminal();
+
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout,
+  });
+
+  try {
+    console.log(
+      `${LOG_PREFIX} Interactive cdk ${subcommand} mode (${stageLabel} stage). Select one or more stacks.`,
+    );
+    for (const [index, stack] of stacks.entries()) {
+      console.log(formatStackOptionLine(stack, index));
+    }
+
+    while (true) {
+      const rawAnswer = (
+        await rl.question(
+          'Enter stack numbers or names (comma-separated, "all" for every stack, or "q" to exit): ',
+        )
+      ).trim();
+
+      if (!rawAnswer) {
+        console.log(`${LOG_PREFIX} Please select at least one stack.`);
+        continue;
+      }
+
+      const normalized = rawAnswer.toLowerCase();
+      if (normalized === 'q' || normalized === 'quit') {
+        throw new Error('Stack selection aborted by user.');
+      }
+
+      let selectedStacks;
+      if (normalized === 'all') {
+        selectedStacks = [...stacks];
+      } else {
+        const tokens = rawAnswer.split(/[,\s]+/).filter(Boolean);
+        const deduped = [];
+        const seen = new Set();
+        let invalidToken = null;
+
+        for (const token of tokens) {
+          let stack;
+          if (/^\d+$/.test(token)) {
+            const index = Number(token);
+            stack = stacks[index - 1];
+          } else {
+            stack = findStackByIdentifier(stacks, token);
+          }
+
+          if (!stack) {
+            invalidToken = token;
+            break;
+          }
+
+          if (!seen.has(stack.stackName)) {
+            deduped.push(stack);
+            seen.add(stack.stackName);
+          }
+        }
+
+        if (invalidToken) {
+          console.log(
+            `${LOG_PREFIX} Unable to resolve stack "${invalidToken}". Use the stack name, constant, or number shown above.`,
+          );
+          continue;
+        }
+
+        selectedStacks = deduped;
+      }
+
+      if (selectedStacks.length === 0) {
+        console.log(`${LOG_PREFIX} Please select at least one stack.`);
+        continue;
+      }
+
+      const summary = selectedStacks.map((stack) => stack.stackName).join(', ');
+      const confirmation = (
+        await rl.question(
+          `Run cdk ${subcommand} for [${summary}] in ${stageLabel} stage? (y/N): `,
+        )
+      )
+        .trim()
+        .toLowerCase();
+
+      if (confirmation === 'q' || confirmation === 'quit') {
+        throw new Error('Stack selection aborted by user.');
+      }
+
+      if (confirmation === 'y' || confirmation === 'yes') {
+        return selectedStacks;
+      }
+
+      console.log(
+        `${LOG_PREFIX} Selection cancelled. Choose different stacks or press Ctrl+C to exit.`,
+      );
+    }
+  } finally {
+    rl.close();
+  }
+};
+
+const parseStackArguments = (args) => {
   let isProd = false;
   const positional = [];
+  const passthroughArgs = [];
+  let forwarding = false;
 
   for (const arg of args) {
-    if (arg === '--prod') {
+    if (!forwarding && arg === '--prod') {
       isProd = true;
       continue;
     }
+
+    if (!forwarding && arg === '--') {
+      forwarding = true;
+      continue;
+    }
+
+    if (forwarding) {
+      passthroughArgs.push(arg);
+      continue;
+    }
+
     positional.push(arg);
   }
 
+  return { positional, passthroughArgs, isProd };
+};
+
+const resolveStackArgs = async (args, subcommand, { allowInteractive = false } = {}) => {
+  const { positional, passthroughArgs, isProd } = parseStackArguments(args);
+  const stacks = await readStackMetadata();
+  const stageLabel = isProd ? 'production' : 'development';
+
   if (positional.length === 0) {
-    throw new Error(
-      `Missing stack identifier. Usage: node scripts/manage-cdktf-state.mjs cdk ${subcommand} <stack> [--prod]`,
-    );
+    if (!allowInteractive) {
+      throw new Error(
+        `Missing stack identifier. Usage: node scripts/manage-cdktf-state.mjs cdk ${subcommand} <stack> [--prod]`,
+      );
+    }
+
+    const selectedStacks = await promptForStackSelection(stacks, {
+      stageLabel,
+      subcommand,
+    });
+
+    return {
+      stacks: selectedStacks,
+      extraArgs: passthroughArgs,
+      isProd,
+    };
   }
 
-  const [stackIdentifier, ...extraArgs] = positional;
-  const stacks = await readStackMetadata();
-
-  const stack = stacks.find(
-    (entry) =>
-      entry.stackName === stackIdentifier ||
-      entry.constName === stackIdentifier,
-  );
+  const [stackIdentifier, ...rest] = positional;
+  const stack = findStackByIdentifier(stacks, stackIdentifier);
 
   if (!stack) {
     const available = stacks.map((entry) => entry.stackName).join(', ');
@@ -191,8 +345,8 @@ const resolveStackArgs = async (args, subcommand) => {
   }
 
   return {
-    stack,
-    extraArgs,
+    stacks: [stack],
+    extraArgs: [...rest, ...passthroughArgs],
     isProd,
   };
 };
@@ -351,7 +505,8 @@ const handleCdkList = async () => {
 };
 
 const handleCdkDeploy = async (args) => {
-  const { stack, extraArgs, isProd } = await resolveStackArgs(args, 'deploy');
+  const { stacks, extraArgs, isProd } = await resolveStackArgs(args, 'deploy');
+  const [stack] = stacks;
   const stage = isProd ? 'prod' : 'dev';
   const scriptName = `cdk:deploy:${stage}`;
   const npmArgs = [
@@ -370,22 +525,28 @@ const handleCdkDeploy = async (args) => {
 };
 
 const handleCdkOutput = async (args) => {
-  const { stack, extraArgs, isProd } = await resolveStackArgs(args, 'output');
-  const stage = isProd ? 'prod' : 'dev';
-  const scriptName = `cdk:output:${stage}`;
-  const npmArgs = [
-    '-w',
-    '@cdk/backend-server-cdk',
-    'run',
-    scriptName,
-    stack.stackName,
-    ...extraArgs,
-  ];
-
-  await runCommand('npm', npmArgs, {
-    env: { STACK: stack.stackName },
-    step: `Writing ${isProd ? 'production' : 'development'} outputs`,
+  const { stacks, extraArgs, isProd } = await resolveStackArgs(args, 'output', {
+    allowInteractive: true,
   });
+  const stage = isProd ? 'prod' : 'dev';
+  const stageLabel = isProd ? 'production' : 'development';
+  const scriptName = `cdk:output:${stage}`;
+
+  for (const stack of stacks) {
+    const npmArgs = [
+      '-w',
+      '@cdk/backend-server-cdk',
+      'run',
+      scriptName,
+      stack.stackName,
+      ...extraArgs,
+    ];
+
+    await runCommand('npm', npmArgs, {
+      env: { STACK: stack.stackName },
+      step: `Writing ${stageLabel} stage outputs for ${stack.stackName}`,
+    });
+  }
 };
 
 const handleCdkCommand = async (args) => {
