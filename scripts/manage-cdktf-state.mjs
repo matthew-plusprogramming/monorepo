@@ -30,6 +30,7 @@ const usage = () => {
       '',
       'Commands:',
       '  bootstrap-backend         Deploys the bootstrap stack, migrates state, and removes the local tfstate file.',
+      '  copy-assets-for-cdk       Runs the asset copy script for backend CDK stacks.',
       '  cdk list                  Lists available stacks with descriptions.',
       '  cdk deploy <stack> [--prod]  Deploys the specified stack (defaults to dev).',
       '  cdk output <stack> [--prod]  Writes CDK outputs for the specified stack (defaults to dev).',
@@ -411,6 +412,14 @@ const handleCdkCommand = async (args) => {
   }
 };
 
+const handleCopyAssetsForCdk = async () => {
+  await runCommand(
+    'npm',
+    ['-w', '@cdk/backend-server-cdk', 'run', 'copy-assets-for-cdk'],
+    { step: 'Copying assets for backend CDK stack' },
+  );
+};
+
 const main = async () => {
   const args = process.argv.slice(2);
 
@@ -427,6 +436,9 @@ const main = async () => {
   }
 
   switch (command) {
+    case 'copy-assets-for-cdk':
+      await handleCopyAssetsForCdk();
+      break;
     case 'bootstrap-backend':
       await bootstrapBackend();
       break;
