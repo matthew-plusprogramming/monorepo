@@ -7,6 +7,7 @@ import { App } from 'cdktf';
 import type { ArtifactRequirement } from './lambda/artifacts';
 import type { AnyStack } from './types/stack';
 import { stacks } from './stacks';
+import { STACK_PREFIX } from './constants';
 
 const isArtifactRequirement = (
   value: unknown,
@@ -110,7 +111,10 @@ const instantiateStack = (
 ): void => {
   const { Stack } = stack;
 
-  if (stack.name !== 'myapp-bootstrap-stack' && Array.isArray(stack.stages)) {
+  if (
+    stack.name !== `${STACK_PREFIX}-bootstrap-stack` &&
+    Array.isArray(stack.stages)
+  ) {
     let hasValidStage = false;
 
     for (const stage of stack.stages) {
@@ -141,7 +145,9 @@ for (const stack of stacks) {
     continue;
   }
 
-  const missingArtifacts = collectMissingArtifacts(stack.requiredArtifacts);
+  const missingArtifacts = collectMissingArtifacts(
+    'requiredArtifacts' in stack ? stack.requiredArtifacts : [],
+  );
   if (missingArtifacts.length > 0) {
     console.warn(
       `⚠️  Skipping stack "${stack.name}" because required artifacts were not found:`,
