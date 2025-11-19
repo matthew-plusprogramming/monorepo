@@ -9,7 +9,7 @@ Intent
 Global Prompts
 
 - Retrieval & context discipline: Follow the Retrieval Policy in `agents/memory-bank.md` for required discovery tooling, numbered text defaults, and the single-pass note-taking rule; treat that section as canonical for file inspection guidance.
-- reflection note: After each phase, add a 3-line reflection to `active.context.md`; doc-only or advisory tasks may batch these updates upon completion when no canonical files change.
+- reflection note: After each phase, add a 3-line reflection to `agents/ephemeral/active.context.md`; doc-only or advisory tasks may batch these updates upon completion when no canonical files change.
   - CLI helpers: `node agents/scripts/append-memory-entry.mjs ...` for reflections keep formatting consistent.
 - Markdown standards: See `AGENTS.md`.
 
@@ -38,7 +38,7 @@ Phase: plan
   - Explicitly out of scope: A, B
   ```
 
-- Outputs: Brief plan; acceptance criteria (Given/When/Then); Non-goals; context notes; file list; invariants list; design notes; ADR stub (if needed); updated `active.context.md` next steps.
+- Outputs: Brief plan; acceptance criteria (Given/When/Then); Non-goals; context notes; file list; invariants list; design notes; ADR stub (if needed); updated `agents/ephemeral/active.context.md` next steps.
 - Done_when: Scope and criteria are clear; context coverage is credible; approach addresses constraints.
 - Gates: Given/When/Then present, specific, and testable; Non-goals captured; invariants confirmed; risks mitigated; migration path identified. User approves plan.
 - Next: build

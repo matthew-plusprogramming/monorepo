@@ -24,13 +24,15 @@ const includeOptional =
   args.includes('-o') || args.includes('--include-optional');
 const listOnly = args.includes('-l') || args.includes('--list');
 
+const ACTIVE_CONTEXT_PATH = 'agents/ephemeral/active.context.md';
+
 const alwaysInclude = [
   'agents/memory-bank.md',
   'agents/workflows.md',
   'agents/tools.md',
   'agents/workflows/default.workflow.md',
   'agents/memory-bank/project.brief.md',
-  'agents/memory-bank/active.context.md',
+  ACTIVE_CONTEXT_PATH,
 ];
 
 const optional = ['agents/memory-bank/tech.context.md'];
@@ -62,7 +64,11 @@ const readFileSafely = (relativePath) => {
   const absolutePath = resolve(root, relativePath);
 
   if (!existsSync(absolutePath)) {
-    console.warn(`⚠️  Missing file: ${relativePath}`);
+    const missingMessage =
+      relativePath === ACTIVE_CONTEXT_PATH
+        ? `⚠️  Missing file: ${relativePath}. Run "node agents/scripts/reset-active-context.mjs" to create the template.`
+        : `⚠️  Missing file: ${relativePath}`;
+    console.warn(missingMessage);
     return null;
   }
 

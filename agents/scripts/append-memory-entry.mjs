@@ -2,6 +2,9 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
+const ACTIVE_CONTEXT_PATH = 'agents/ephemeral/active.context.md';
+const RESET_COMMAND = 'node agents/scripts/reset-active-context.mjs';
+
 const USAGE = `Usage: node agents/scripts/append-memory-entry.mjs [options]
 
 Append a formatted entry to the Memory Bank active context.
@@ -89,7 +92,21 @@ const ensureEndsWithNewline = (text) =>
 
 const appendEntry = async (filePath, entry, dryRun) => {
   const absolutePath = resolve(process.cwd(), filePath);
-  const originalContent = await readFile(absolutePath, 'utf8');
+  let originalContent;
+
+  try {
+    originalContent = await readFile(absolutePath, 'utf8');
+  } catch (error) {
+    if (error.code === 'ENOENT') {
+      console.error(
+        `❌ Missing active context at ${filePath}. Run "${RESET_COMMAND}" to regenerate it.`,
+      );
+      process.exit(1);
+    }
+
+    throw error;
+  }
+
   const contentWithNewline = ensureEndsWithNewline(originalContent);
   const updatedContent = `${contentWithNewline}${entry}\n`;
 
@@ -131,11 +148,7 @@ const main = async () => {
   const date = formatDate(new Date());
 
   const entry = buildActiveEntry(date, options);
-  await appendEntry(
-    'agents/memory-bank/active.context.md',
-    entry,
-    options.dryRun,
-  );
+  await appendEntry(ACTIVE_CONTEXT_PATH, entry, options.dryRun);
 };
 
 main().catch((error) => {

@@ -24,7 +24,8 @@ Update Requirements (per task)
 
 Convenience helpers
 
-- `node agents/scripts/append-memory-entry.mjs --plan "..." --build "..." --verify "..."` appends a reflection block to `active.context.md`.
+- `node agents/scripts/append-memory-entry.mjs --plan "..." --build "..." --verify "..."` appends a reflection block to `agents/ephemeral/active.context.md` (run `node agents/scripts/reset-active-context.mjs` if you need a fresh template).
+- `node agents/scripts/reset-active-context.mjs [--date YYYY-MM-DD]` restores the active context to the default template and updates the `last_reviewed` stamp.
 
 ## 🧭 Workflow Process List
 

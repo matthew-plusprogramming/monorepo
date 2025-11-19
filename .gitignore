@@ -199,4 +199,7 @@ $RECYCLE.BIN/
 # Dotenvx
 *.keys
 
+# Ephemeral agent state (active context and scratch files)
+agents/ephemeral/*
+
 # End of https://www.toptal.com/developers/gitignore/api/macos,windows,node
