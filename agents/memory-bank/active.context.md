@@ -74,3 +74,6 @@ Reflection
 - 2025-11-19 — Plan phase: Scoped cdk output interactive picker so missing stack triggers multi-select sequential outputs while keeping deploy untouched.
   Build phase: Implemented readline prompts plus stack argument parsing with passthrough support, ran outputs sequentially per stack, refreshed usage/docs, and npm run phase:check passed.
   Verify phase: Captured git diff via agents/scripts/git-diff-with-lines.mjs and reasoned through the prompt flow since the interactive path is non-destructive.
+- 2025-11-19 — Plan phase: Extend cdk deploy with the same interactive stack picker + multi-select sequencing already used by cdk output while retaining current CLI behavior when a stack is provided.
+  Build phase: Updated usage/docs to note picker applies to deploy/output, wired handleCdkDeploy through the shared resolver with allowInteractive + sequential runs, and reused stage labels for clearer logging before running npm sequences.
+  Verify phase: Ran npm run phase:check, captured git-diff-with-lines.mjs output, and reasoned through the prompt flow (manual TTY recommended for final validation).

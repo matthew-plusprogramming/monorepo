@@ -35,7 +35,7 @@ const usage = () => {
       '  cdk list                  Lists available stacks with descriptions.',
       '  cdk deploy <stack> [--prod]  Deploys the specified stack (defaults to dev).',
       '  cdk output <stack> [--prod]  Writes CDK outputs for the specified stack (defaults to dev).',
-      '                              Omitting <stack> in a TTY launches an interactive picker for one or more stacks.',
+      '                              Omitting <stack> in a TTY launches an interactive picker for cdk deploy/output.',
       '                              Append "--" to forward extra CDK args to every selected stack.',
       '',
       'Flags:',
@@ -505,23 +505,28 @@ const handleCdkList = async () => {
 };
 
 const handleCdkDeploy = async (args) => {
-  const { stacks, extraArgs, isProd } = await resolveStackArgs(args, 'deploy');
-  const [stack] = stacks;
-  const stage = isProd ? 'prod' : 'dev';
-  const scriptName = `cdk:deploy:${stage}`;
-  const npmArgs = [
-    '-w',
-    '@cdk/backend-server-cdk',
-    'run',
-    scriptName,
-    stack.stackName,
-    ...extraArgs,
-  ];
-
-  await runCommand('npm', npmArgs, {
-    env: { STACK: stack.stackName },
-    step: `Deploying ${isProd ? 'production' : 'development'} stack`,
+  const { stacks, extraArgs, isProd } = await resolveStackArgs(args, 'deploy', {
+    allowInteractive: true,
   });
+  const stage = isProd ? 'prod' : 'dev';
+  const stageLabel = isProd ? 'production' : 'development';
+  const scriptName = `cdk:deploy:${stage}`;
+
+  for (const stack of stacks) {
+    const npmArgs = [
+      '-w',
+      '@cdk/backend-server-cdk',
+      'run',
+      scriptName,
+      stack.stackName,
+      ...extraArgs,
+    ];
+
+    await runCommand('npm', npmArgs, {
+      env: { STACK: stack.stackName },
+      step: `Deploying ${stageLabel} stack ${stack.stackName}`,
+    });
+  }
 };
 
 const handleCdkOutput = async (args) => {
