@@ -50,6 +50,41 @@ node scripts/create-repository-service.mjs <entity-slug> [--with handler] [--dry
 
 ---
 
+## Node Server Handler Scaffolder
+
+```
+node scripts/create-node-server-handler.mjs <handler-slug> [options]
+```
+
+### What it does
+
+- Creates a handler under `apps/node-server/src/handlers/<name>.handler.ts` and a matching Vitest suite under `apps/node-server/src/__tests__/handlers`.
+- Registers the handler automatically in `apps/node-server/src/index.ts` (import + `app.<method>(route, handler)` call).
+- Powers the Repository Service workflow’s optional handler bundle so we only maintain handler boilerplate in one place.
+
+### Required arguments
+
+- `<handler-slug>` — Kebab-case identifier for the handler (for example, `get-user` => `getUser.handler.ts`).
+
+### Flags
+
+- `--route <path>` — Route to register. Defaults to `/<handler-slug>`.
+- `--method <verb>` — HTTP method (`get`, `post`, `put`, `patch`, `delete`). Default: `get`.
+- `--middlewares <list>` — Comma-separated middleware identifiers inserted before the handler.
+- `--template <name>` — Template to render (`basic` or `repo-get-by-id` today).
+- `--entity <slug>` — Entity slug required by templates that need repository/schema context.
+- `--dry-run` — Preview without writing files or touching `index.ts`.
+- `--force` — Overwrite existing handler/test files (refused otherwise).
+
+### Template catalog
+
+- `basic` — Minimal Effect handler with a placeholder payload.
+- `repo-get-by-id` — Repository-backed GET handler wired to `<Entity>Repo.getById`; mirrors the previous repository-service bundle template.
+
+The repository service scaffolder calls this CLI whenever the `handler` bundle is selected, passing along `--dry-run` and `--force` so the handler/test/index wiring stays in sync with schema/service scaffolding.
+
+---
+
 Have an idea for a new automation bundle? Add templates under `scripts/templates/repository-service/bundles/<bundle>` and register the bundle in the manifest—then document it in this file so other contributors can discover it.
 
 ## CDKTF State Manager

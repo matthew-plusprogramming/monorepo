@@ -8,7 +8,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { __ENTITY_PASCAL__RepoFake } from '@/__tests__/fakes/__ENTITY_CAMEL__Repo';
 import { makeCdkOutputsStub } from '@/__tests__/stubs/cdkOutputs';
 
-const repoModule = vi.hoisted((): { fake?: __ENTITY_PASCAL__RepoFake } => ({}));
+const repoModule = vi.hoisted(
+  (): { fake?: __ENTITY_PASCAL__RepoFake } => ({}),
+);
 
 vi.mock('@/clients/cdkOutputs', () => makeCdkOutputsStub());
 
@@ -28,13 +30,14 @@ const getRepoFake = (): __ENTITY_PASCAL__RepoFake => {
   return repoModule.fake;
 };
 
-describe('get__ENTITY_PASCAL__RequestHandler', () => {
+describe('__HANDLER_CAMEL__RequestHandler', () => {
   beforeEach(() => {
     vi.resetModules();
     setBundledRuntime(false);
   });
 
   it.skip('returns 200 when the entity is found', async () => {
+    // Arrange
     const { req, res, captured } = makeRequestContext({
       params: {
         /**
@@ -44,8 +47,8 @@ describe('get__ENTITY_PASCAL__RequestHandler', () => {
       },
     });
 
-    const { get__ENTITY_PASCAL__RequestHandler } = await import(
-      '@/handlers/get__ENTITY_PASCAL__.handler'
+    const { __HANDLER_CAMEL__RequestHandler } = await import(
+      '@/handlers/__HANDLER_CAMEL__.handler'
     );
 
     const repoFake = getRepoFake();
@@ -57,29 +60,35 @@ describe('get__ENTITY_PASCAL__RequestHandler', () => {
       id: 'placeholder-id',
     });
 
-    await get__ENTITY_PASCAL__RequestHandler(req, res, vi.fn());
+    // Act
+    await __HANDLER_CAMEL__RequestHandler(req, res, vi.fn());
 
+    // Assert
     expect(repoFake.calls.getById).toHaveLength(1);
     expect(captured.statusCode).toBe(HTTP_RESPONSE.OK);
   });
 
   it.skip('returns 502 when the entity is missing', async () => {
+    // Arrange
     const { req, res, captured } = makeRequestContext({
       params: {
         id: 'TODO: replace with a valid identifier',
       },
     });
 
-    const { get__ENTITY_PASCAL__RequestHandler } = await import(
-      '@/handlers/get__ENTITY_PASCAL__.handler'
+    const { __HANDLER_CAMEL__RequestHandler } = await import(
+      '@/handlers/__HANDLER_CAMEL__.handler'
     );
 
     const repoFake = getRepoFake();
     repoFake.reset();
     repoFake.queueGetNone();
 
-    await get__ENTITY_PASCAL__RequestHandler(req, res, vi.fn());
+    // Act
+    await __HANDLER_CAMEL__RequestHandler(req, res, vi.fn());
 
+    // Assert
     expect(captured.statusCode).toBe(HTTP_RESPONSE.BAD_GATEWAY);
   });
 });
+

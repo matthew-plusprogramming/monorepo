@@ -2,6 +2,7 @@ import { writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
 import { registerHook } from '../../utils/hooks.mjs';
+import { createNodeServerHandler } from '../../create-node-server-handler.mjs';
 
 const SCHEMAS_PACKAGE_JSON = [
   'packages',
@@ -239,6 +240,40 @@ export const registerRepositoryServiceHooks = () => {
 
   registerHook(
     'postScaffold',
+    'repositoryService.generateHandlerBundle',
+    async (context) => {
+      const { selectedBundles, slug, flags, addReportEntry } = context;
+      const handlerBundleSelected = selectedBundles.some(
+        (bundle) => bundle.name === 'handler',
+      );
+
+      if (!handlerBundleSelected) {
+        return { status: 'ok', notes: 'Handler bundle not selected.' };
+      }
+
+      await createNodeServerHandler({
+        handlerSlug: `get-${slug}`,
+        routePath: `/${slug}/:id`,
+        method: 'get',
+        template: 'repo-get-by-id',
+        entitySlug: slug,
+        dryRun: flags.dryRun,
+        force: flags.force,
+        onReport: (entry) =>
+          addReportEntry({
+            location: entry.location,
+            action: entry.action,
+            skipped: entry.skipped,
+            bundle: 'handler',
+          }),
+      });
+
+      return { status: 'ok' };
+    },
+  );
+
+  registerHook(
+    'postScaffold',
     'repositoryService.runLintFix',
     async (context) => {
       const { flags, helpers, addReportEntry } = context;
@@ -289,4 +324,3 @@ export const registerRepositoryServiceHooks = () => {
     },
   );
 };
-

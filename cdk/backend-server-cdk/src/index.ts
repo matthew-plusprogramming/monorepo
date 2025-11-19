@@ -6,8 +6,8 @@ import { App } from 'cdktf';
 
 import type { ArtifactRequirement } from './lambda/artifacts';
 import type { AnyStack } from './types/stack';
-import { stacks } from './stacks';
 import { STACK_PREFIX } from './constants';
+import { stacks } from './stacks';
 
 const isArtifactRequirement = (
   value: unknown,

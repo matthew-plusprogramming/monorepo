@@ -16,7 +16,7 @@ import { parseInput } from '@/helpers/zodParser';
 import { AppLayer } from '@/layers/app.layer';
 import { __ENTITY_PASCAL__Repo } from '@/services/__ENTITY_CAMEL__Repo.service';
 
-const get__ENTITY_PASCAL__Handler = (
+const __HANDLER_PASCAL__Handler = (
   input: handlerInput,
 ): Effect.Effect<
   __ENTITY_PASCAL__Public,
@@ -25,11 +25,10 @@ const get__ENTITY_PASCAL__Handler = (
 > =>
   Effect.gen(function* () {
     const req = yield* input;
-
     const entityId = yield* parseInput<typeof __ENTITY_PASCAL__IdSchema>(
       __ENTITY_PASCAL__IdSchema,
       /**
-       * TODO: align the param name with the router definition (e.g., `identifier`).
+       * TODO: align the parameter key with the router definition (e.g. `identifier`).
        */
       req.params?.id,
     );
@@ -46,12 +45,12 @@ const get__ENTITY_PASCAL__Handler = (
     return maybeEntity.value;
   });
 
-export const get__ENTITY_PASCAL__RequestHandler = generateRequestHandler<
+export const __HANDLER_CAMEL__RequestHandler = generateRequestHandler<
   __ENTITY_PASCAL__Public,
   InternalServerError | NotFoundError | ZodError
 >({
   effectfulHandler: (input) =>
-    get__ENTITY_PASCAL__Handler(input).pipe(Effect.provide(AppLayer)),
+    __HANDLER_PASCAL__Handler(input).pipe(Effect.provide(AppLayer)),
   shouldObfuscate: () => true,
   statusCodesToErrors: {
     [HTTP_RESPONSE.BAD_REQUEST]: {
@@ -69,3 +68,4 @@ export const get__ENTITY_PASCAL__RequestHandler = generateRequestHandler<
   },
   successCode: HTTP_RESPONSE.OK,
 });
+

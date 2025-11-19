@@ -61,6 +61,7 @@
     "postScaffold": [
       "repositoryService.updateSchemasPackageJson",
       "repositoryService.updateAppLayer",
+      "repositoryService.generateHandlerBundle",
       "repositoryService.runLintFix",
       "repositoryService.writeChecklist"
     ]

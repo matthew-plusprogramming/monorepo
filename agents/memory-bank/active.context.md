@@ -68,3 +68,6 @@ Reflection
 - 2025-11-18 — Plan phase: Scoped test updates so login/register handler suites expect 401/409/500 responses and real error text after disabling obfuscation; limited to node-server handler tests and preserving AAA conventions.
 - 2025-11-18 — Build phase: Updated login/register handler test suites to assert the actual 401/409/500 responses and mapper messages, added deterministic string constants, and reran node-server Vitest to keep coverage green.
 - 2025-11-18 — Verify phase: Captured git-diff-with-lines context, reran npm -w node-server run test successfully, and agent:finalize is currently blocked by existing memory-drift findings unrelated to this test change.
+- 2025-11-19 — Plan phase: Scoped a reusable node-server handler scaffolder CLI plus repo-service integration so handler/test/index wiring stays consistent.
+  Build phase: Added templates + create-node-server-handler.mjs, documented usage, and swapped the repository-service handler bundle to invoke the new CLI.
+  Verify phase: Exercised the CLI + repository-service scaffolder in dry-run mode and ran npm run test:scripts + npm run phase:check to validate the new automation.

@@ -83,16 +83,7 @@
       "name": "handler",
       "description": "Adds an HTTP handler skeleton and test stub wired to the new repository.",
       "required": false,
-      "templates": [
-        {
-          "source": "handlers/__ENTITY_CAMEL__.handler.ts.tpl",
-          "target": "apps/node-server/src/handlers/get__ENTITY_PASCAL__.handler.ts"
-        },
-        {
-          "source": "tests/__ENTITY_CAMEL__.handler.test.ts.tpl",
-          "target": "apps/node-server/src/__tests__/handlers/get__ENTITY_PASCAL__.handler.test.ts"
-        }
-      ],
+      "templates": [],
       "checklist": [
         "## Handler integration (optional bundle)",
         "- [ ] Define the request schema + repository interaction in `apps/node-server/src/handlers/get__ENTITY_PASCAL__.handler.ts`; ensure `npm -w apps/node-server run lint` stays green.",
