@@ -20,6 +20,7 @@
   "scripts": {
     "// -- 🚀 Turborepo": "--",
     "build": "turbo run build",
+    "build:no-cache": "turbo run build --force",
     "clean": "turbo run clean && rm -rf node_modules && rm -rf .turbo",
     "cache:clear": "rm -rf .turbo",
     "prelint": "npm run format:markdown",
