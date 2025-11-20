@@ -1,3 +1,4 @@
+import { HTTP_RESPONSE } from '@packages/backend-core';
 import type { ErrorRequestHandler } from 'express';
 
 export const jsonErrorMiddleware: ErrorRequestHandler = (
@@ -7,7 +8,7 @@ export const jsonErrorMiddleware: ErrorRequestHandler = (
   next,
 ) => {
   if (err instanceof SyntaxError && 'body' in err) {
-    res.status(400).json({ error: 'Invalid JSON' });
+    res.status(HTTP_RESPONSE.BAD_REQUEST).json({ error: 'Invalid JSON' });
     return;
   }
   next(err);
