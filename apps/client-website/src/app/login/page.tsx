@@ -2,6 +2,7 @@
 
 import { type JSX, useEffect, useState } from 'react';
 
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import type { SubmitHandler, UseFormRegisterReturn } from 'react-hook-form';
 import { useForm } from 'react-hook-form';
@@ -234,9 +235,9 @@ const LoginPage = (): JSX.Element => {
 
         <LoginForm />
 
-        <a className={styles.utilityLink} href="/signup">
+        <Link className={styles.utilityLink} href="/signup">
           Need an account? Start building
-        </a>
+        </Link>
       </div>
     </div>
   );

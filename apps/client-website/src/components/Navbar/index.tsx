@@ -26,13 +26,13 @@ const Navbar = (): JSX.Element => {
 
       <ul className={styles.links}>
         <li>
-          <a href="#features">Features</a>
+          <Link href="#features">Features</Link>
         </li>
         <li>
-          <a href="#pricing">Pricing</a>
+          <Link href="#pricing">Pricing</Link>
         </li>
         <li>
-          <a href="#blog">Blog</a>
+          <Link href="#blog">Blog</Link>
         </li>
       </ul>
 

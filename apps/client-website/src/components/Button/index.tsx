@@ -7,6 +7,7 @@ import {
 } from 'react';
 
 import classnames from 'classnames';
+import Link from 'next/link';
 
 import styles from './Button.module.scss';
 
@@ -67,7 +68,7 @@ const ButtonComponent = (
   if (isLinkProps(elementProps)) {
     const { href, ...anchorProps } = elementProps;
     return (
-      <a
+      <Link
         {...anchorProps}
         href={href}
         ref={ref as ForwardedRef<HTMLAnchorElement>}

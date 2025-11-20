@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import type { JSX } from 'react';
 import type {
   RegisterOptions,
@@ -200,9 +201,9 @@ const SignupPage = (): JSX.Element => {
 
         <SignupForm />
 
-        <a className={styles.utilityLink} href="/login">
+        <Link className={styles.utilityLink} href="/login">
           Already have an account? Sign in
-        </a>
+        </Link>
       </div>
     </div>
   );
