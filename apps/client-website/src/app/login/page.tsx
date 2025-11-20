@@ -1,17 +1,28 @@
 'use client';
 
-import type { JSX } from 'react';
+import { type JSX, useEffect, useState } from 'react';
+
+import { useRouter } from 'next/navigation';
 import type { SubmitHandler, UseFormRegisterReturn } from 'react-hook-form';
 import { useForm } from 'react-hook-form';
 
 import { Button } from '@/components/Button';
+import { Toast } from '@/components/Toast';
 import { useLoginMutation } from '@/hooks/useLoginMutation';
+import { useUserStore } from '@/stores/userStore';
 
 import styles from './page.module.scss';
 
 type LoginFormValues = {
   email: string;
   password: string;
+};
+
+type LoginFlowResult = {
+  dismissToast: () => void;
+  handleLogin: SubmitHandler<LoginFormValues>;
+  loginMutation: ReturnType<typeof useLoginMutation>;
+  toastMessage: string | null;
 };
 
 type FieldProps = {
@@ -92,6 +103,54 @@ const FormActions = ({
   );
 };
 
+const useLoginFlow = (): LoginFlowResult => {
+  const router = useRouter();
+  const setToken = useUserStore((state) => state.setToken);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [shouldRedirect, setShouldRedirect] = useState(false);
+  const loginMutation = useLoginMutation();
+
+  useEffect(() => {
+    if (!shouldRedirect) {
+      return undefined;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      router.push('/');
+    }, 900);
+
+    return (): void => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [router, shouldRedirect]);
+
+  const handleLogin: SubmitHandler<LoginFormValues> = async (values) => {
+    setShouldRedirect(false);
+    setToastMessage(null);
+
+    try {
+      const token = await loginMutation.mutateAsync({
+        identifier: values.email,
+        password: values.password,
+      });
+
+      setToken(token);
+      setToastMessage('Signed in. Redirecting you home.');
+      setShouldRedirect(true);
+    } catch {
+      setToastMessage(null);
+      setShouldRedirect(false);
+    }
+  };
+
+  const dismissToast = (): void => {
+    setToastMessage(null);
+    setShouldRedirect(false);
+  };
+
+  return { dismissToast, handleLogin, loginMutation, toastMessage };
+};
+
 const LoginForm = (): JSX.Element => {
   const {
     register,
@@ -104,61 +163,63 @@ const LoginForm = (): JSX.Element => {
     },
   });
 
-  const loginMutation = useLoginMutation();
+  const { dismissToast, handleLogin, loginMutation, toastMessage } =
+    useLoginFlow();
 
-  const onSubmit: SubmitHandler<LoginFormValues> = async (values) => {
-    try {
-      await loginMutation.mutateAsync({
-        identifier: values.email,
-        password: values.password,
-      });
-    } catch {
-      // Error is handled via loginMutation.error for UI feedback.
-    }
-  };
+  const isBusy = isSubmitting || loginMutation.isPending;
 
   return (
-    <form className={styles.form} noValidate onSubmit={handleSubmit(onSubmit)}>
-      <FormField
-        error={errors.email?.message}
-        id="email"
-        label="Email address"
-        placeholder="you@domain.com"
-        registration={register('email', {
-          required: 'Email is required',
-          pattern: {
-            value: emailPattern,
-            message: 'Enter a valid email address',
-          },
-        })}
-        type="email"
-      />
+    <>
+      <form
+        className={styles.form}
+        noValidate
+        onSubmit={handleSubmit(handleLogin)}
+      >
+        <FormField
+          error={errors.email?.message}
+          id="email"
+          label="Email address"
+          placeholder="you@domain.com"
+          registration={register('email', {
+            required: 'Email is required',
+            pattern: {
+              value: emailPattern,
+              message: 'Enter a valid email address',
+            },
+          })}
+          type="email"
+        />
 
-      <FormField
-        error={errors.password?.message}
-        id="password"
-        label="Password"
-        placeholder="••••••••"
-        registration={register('password', {
-          required: 'Password is required',
-          minLength: {
-            value: 8,
-            message: 'Use at least 8 characters',
-          },
-        })}
-        type="password"
-      />
+        <FormField
+          error={errors.password?.message}
+          id="password"
+          label="Password"
+          placeholder="••••••••"
+          registration={register('password', {
+            required: 'Password is required',
+            minLength: {
+              value: 8,
+              message: 'Use at least 8 characters',
+            },
+          })}
+          type="password"
+        />
 
-      <p className={styles.supportText}>
-        Forgot your password? Reset links are on the way once authentication is
-        connected.
-      </p>
+        <p className={styles.supportText}>
+          Forgot your password? Reset links are on the way once authentication
+          is connected.
+        </p>
 
-      <FormActions
-        errorMessage={loginMutation.error?.message}
-        isSubmitting={isSubmitting || loginMutation.isPending}
-      />
-    </form>
+        <FormActions
+          errorMessage={loginMutation.error?.message}
+          isSubmitting={isBusy}
+        />
+      </form>
+
+      {toastMessage ? (
+        <Toast message={toastMessage} onDismiss={dismissToast} />
+      ) : null}
+    </>
   );
 };
 
