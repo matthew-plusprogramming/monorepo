@@ -118,6 +118,33 @@ const passesThroughWhenUnderThreshold = async (): Promise<void> => {
   expectPartitionKey(updateCall, ip, now);
 };
 
+const defaultsCallsToZeroWhenAttributesMissing = async (): Promise<void> => {
+  // Arrange
+  vi.useFakeTimers();
+  const now = new Date('2024-01-01T00:00:10Z');
+  vi.setSystemTime(now);
+
+  const { req, res, next, captured } = makeRequestContext({
+    ip: '198.51.100.21',
+  });
+  const dynamoFake = getDynamoFake();
+  dynamoFake.queueSuccess('updateItem', { $metadata: {} });
+
+  // Act
+  const action = ipRateLimitingMiddlewareRequestHandler(req, res, next);
+
+  // Assert
+  await expect(action).resolves.toBeUndefined();
+  expect(next).toHaveBeenCalledTimes(1);
+  expect(captured.statusCode).toBeUndefined();
+  expect(
+    getLoggerFake().entries.logs.some((entry) => {
+      const [first] = entry as unknown[];
+      return typeof first === 'string' && first.includes('RATE_LIMIT_EXCEEDED');
+    }),
+  ).toBe(false);
+};
+
 const returns429WhenExceeded = async (): Promise<void> => {
   // Arrange
   vi.useFakeTimers();
@@ -206,6 +233,11 @@ describe('ipRateLimitingMiddlewareRequestHandler', () => {
   it(
     'passes through when the IP is under the allowed threshold',
     passesThroughWhenUnderThreshold,
+  );
+
+  it(
+    'defaults to zero calls when Dynamo does not return attributes',
+    defaultsCallsToZeroWhenAttributesMissing,
   );
 
   it(
