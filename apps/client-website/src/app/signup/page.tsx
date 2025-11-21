@@ -1,7 +1,9 @@
 'use client';
 
+import { type JSX, useEffect, useState } from 'react';
+
 import Link from 'next/link';
-import type { JSX } from 'react';
+import { useRouter } from 'next/navigation';
 import type {
   RegisterOptions,
   SubmitHandler,
@@ -11,6 +13,7 @@ import type {
 import { useForm } from 'react-hook-form';
 
 import { Button } from '@/components/Button';
+import { Toast } from '@/components/Toast';
 
 import styles from './page.module.scss';
 
@@ -133,6 +136,56 @@ const FormField = ({
   );
 };
 
+type SignupFlowResult = {
+  dismissToast: () => void;
+  handleSignup: SubmitHandler<SignupFormValues>;
+  toastMessage: string | null;
+};
+
+const useSignupFlow = (): SignupFlowResult => {
+  const router = useRouter();
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [shouldRedirect, setShouldRedirect] = useState(false);
+
+  useEffect(() => {
+    if (!shouldRedirect) {
+      return undefined;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      router.push('/login');
+    }, 900);
+
+    return (): void => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [router, shouldRedirect]);
+
+  const handleSignup: SubmitHandler<SignupFormValues> = async (values) => {
+    setToastMessage(null);
+    setShouldRedirect(false);
+
+    try {
+      // Placeholder – wire up to account creation API when available.
+      console.info('Signup attempt', values);
+      await new Promise((resolve) => setTimeout(resolve, 400));
+
+      setToastMessage('Account created. Redirecting you to sign in.');
+      setShouldRedirect(true);
+    } catch {
+      setToastMessage(null);
+      setShouldRedirect(false);
+    }
+  };
+
+  const dismissToast = (): void => {
+    setToastMessage(null);
+    setShouldRedirect(false);
+  };
+
+  return { dismissToast, handleSignup, toastMessage };
+};
+
 const SignupForm = (): JSX.Element => {
   const {
     register,
@@ -148,45 +201,51 @@ const SignupForm = (): JSX.Element => {
     },
   });
 
-  const onSubmit: SubmitHandler<SignupFormValues> = async (values) => {
-    // Placeholder – wire up to account creation API when available.
-    console.info('Signup attempt', values);
-    await new Promise((resolve) => setTimeout(resolve, 400));
-  };
+  const { dismissToast, handleSignup, toastMessage } = useSignupFlow();
 
   const fieldConfigs = buildFieldConfigs(getValues);
 
   return (
-    <form className={styles.form} noValidate onSubmit={handleSubmit(onSubmit)}>
-      {fieldConfigs.map(({ id, label, placeholder, type, rules }) => (
-        <FormField
-          key={id}
-          error={errors[id]?.message}
-          id={id}
-          label={label}
-          placeholder={placeholder}
-          registration={register(id, rules)}
-          type={type}
-        />
-      ))}
+    <>
+      <form
+        className={styles.form}
+        noValidate
+        onSubmit={handleSubmit(handleSignup)}
+      >
+        {fieldConfigs.map(({ id, label, placeholder, type, rules }) => (
+          <FormField
+            key={id}
+            error={errors[id]?.message}
+            id={id}
+            label={label}
+            placeholder={placeholder}
+            registration={register(id, rules)}
+            type={type}
+          />
+        ))}
 
-      <p className={styles.supportText}>
-        By creating an account, you agree to share basic profile information
-        once onboarding is connected.
-      </p>
+        <p className={styles.supportText}>
+          By creating an account, you agree to share basic profile information
+          once onboarding is connected.
+        </p>
 
-      <div className={styles.actions}>
-        <Button
-          className={styles.submitButton}
-          disabled={isSubmitting}
-          displayStyle="cta"
-          clickStyle="3d"
-          type="submit"
-        >
-          {isSubmitting ? 'Creating account…' : 'Create account'}
-        </Button>
-      </div>
-    </form>
+        <div className={styles.actions}>
+          <Button
+            className={styles.submitButton}
+            disabled={isSubmitting}
+            displayStyle="cta"
+            clickStyle="3d"
+            type="submit"
+          >
+            {isSubmitting ? 'Creating account…' : 'Create account'}
+          </Button>
+        </div>
+      </form>
+
+      {toastMessage ? (
+        <Toast message={toastMessage} onDismiss={dismissToast} />
+      ) : null}
+    </>
   );
 };
 
