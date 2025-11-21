@@ -8,7 +8,11 @@ import {
   HTTP_RESPONSE,
   InternalServerError,
 } from '@packages/backend-core';
-import { RegisterInputSchema, type UserCreate } from '@packages/schemas/user';
+import {
+  type RegisterInput,
+  RegisterInputSchema,
+  type UserCreate,
+} from '@packages/schemas/user';
 import { Effect } from 'effect';
 import z, { ZodError } from 'zod';
 
@@ -19,10 +23,8 @@ import { UserRepo, type UserRepoSchema } from '@/services/userRepo.service';
 
 const parseRegistrationInput = (
   body: unknown,
-): Effect.Effect<
-  z.infer<typeof RegisterInputSchema>,
-  InternalServerError | ZodError
-> => parseInput<typeof RegisterInputSchema>(RegisterInputSchema, body);
+): Effect.Effect<RegisterInput, InternalServerError | ZodError> =>
+  parseInput<typeof RegisterInputSchema>(RegisterInputSchema, body);
 
 const ensureUserDoesNotExist = (
   userRepo: UserRepoSchema,
@@ -55,24 +57,29 @@ const hashPassword = (
       argon2.hash(password, {
         secret: Buffer.from(process.env.PEPPER),
       }),
-    catch: (error) =>
-      new InternalServerError({
-        message:
-          error instanceof Error
-            ? `Failed to hash password: ${error.message}`
-            : 'Failed to hash password',
-        cause: error,
-      }),
+    catch: (error) => {
+      const normalizedError =
+        error instanceof Error ? error : new Error(String(error));
+      const message =
+        error instanceof Error
+          ? `Failed to hash password: ${error.message}`
+          : 'Failed to hash password';
+      return new InternalServerError({
+        message,
+        cause: normalizedError,
+      });
+    },
   });
 
 const createUserToPersist = (
   userId: string,
-  input: z.infer<typeof RegisterInputSchema>,
+  input: RegisterInput,
   passwordHash: string,
 ): UserCreate => ({
   id: userId,
-  username: input.username,
-  email: input.email,
+  name: String(input.name),
+  username: String(input.username),
+  email: String(input.email),
   passwordHash,
 });
 

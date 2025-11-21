@@ -168,6 +168,7 @@ const useSignupFlow = (): SignupFlowResult => {
 
     try {
       await registerMutation.mutateAsync({
+        name: values.fullName,
         username: values.fullName,
         email: values.email,
         password: values.password,

@@ -30,6 +30,7 @@ export type JwtSignMock = (
 ) => void;
 
 export type RegisterBody = {
+  readonly name: string;
   readonly username: string;
   readonly email: string;
   readonly password: string;
@@ -76,11 +77,13 @@ export const createRegisterBody = ({
   username,
   email,
   password = 'supersecret',
+  name = 'New User',
 }: {
+  readonly name?: string;
   readonly username: string;
   readonly email: string;
   readonly password?: string;
-}): RegisterBody => ({ username, email, password });
+}): RegisterBody => ({ name, username, email, password });
 
 export const prepareSuccessfulRegistration = ({
   hashMock,
@@ -162,6 +165,7 @@ export const assertSuccessfulRegistration = ({
     throw new Error('UserRepo create call missing');
   }
   expect(createCall).toMatchObject({
+    name: body.name,
     username: body.username,
     email: body.email,
     passwordHash: 'hashed-password',

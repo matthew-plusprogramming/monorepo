@@ -11,6 +11,11 @@ export const UserEmailSchema = z
   .email()
   .meta({ description: 'User email address' });
 
+export const UserNameSchema = z
+  .string()
+  .min(USER_SCHEMA_CONSTANTS.name.minLength)
+  .meta({ description: 'User display name' });
+
 export const UserPlaintextPasswordSchema = z
   .string()
   .min(USER_SCHEMA_CONSTANTS.password.minLength)

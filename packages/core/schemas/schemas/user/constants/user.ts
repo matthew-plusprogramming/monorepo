@@ -9,8 +9,11 @@ export const USER_SCHEMA_CONSTANTS = {
     username: 'username-index',
   },
   projection: {
-    userPublic: 'id, username, email',
-    userCredentials: 'id, username, email, passwordHash',
+    userPublic: 'id, name, username, email',
+    userCredentials: 'id, name, username, email, passwordHash',
+  },
+  name: {
+    minLength: 2,
   },
   username: {
     minLength: 1,

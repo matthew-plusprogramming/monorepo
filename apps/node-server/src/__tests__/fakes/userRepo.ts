@@ -86,12 +86,16 @@ export const createUserRepoFake = (): UserRepoFake => {
         'findCredentialsByIdentifier',
       ).pipe(
         Effect.map((userCreate) =>
-          Option.map(userCreate, ({ id, username, email, passwordHash }) => ({
-            id,
-            username,
-            email,
-            passwordHash,
-          })),
+          Option.map(
+            userCreate,
+            (value): UserCreate => ({
+              id: value.id,
+              name: String(value.name),
+              username: String(value.username),
+              email: String(value.email),
+              passwordHash: value.passwordHash,
+            }),
+          ),
         ),
       );
     },

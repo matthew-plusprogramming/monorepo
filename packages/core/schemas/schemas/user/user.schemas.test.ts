@@ -9,6 +9,7 @@ import {
 } from './index.js';
 
 const baseRegisterInput = {
+  name: 'New User',
   username: 'new-user',
   email: 'new-user@example.com',
   password: 'supersecret',
@@ -63,12 +64,14 @@ describe('user schemas', () => {
     // Arrange
     const createInput = {
       id: '11111111-1111-4111-8111-111111111111',
+      name: baseRegisterInput.name,
       username: baseRegisterInput.username,
       email: baseRegisterInput.email,
       passwordHash: 'hashed-password',
     } as const;
     const publicShape = {
       id: createInput.id,
+      name: createInput.name,
       username: createInput.username,
       email: createInput.email,
     } as const;
