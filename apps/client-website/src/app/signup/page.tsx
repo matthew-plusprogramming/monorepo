@@ -1,5 +1,4 @@
 'use client';
-
 import { type JSX, useEffect, useState } from 'react';
 
 import Link from 'next/link';
@@ -14,6 +13,7 @@ import { useForm } from 'react-hook-form';
 
 import { Button } from '@/components/Button';
 import { Toast } from '@/components/Toast';
+import { useRegisterMutation } from '@/hooks/useRegisterMutation';
 
 import styles from './page.module.scss';
 
@@ -36,7 +36,6 @@ type FieldProps = {
 type SignupFieldConfig = Omit<FieldProps, 'registration' | 'error'> & {
   rules: RegisterOptions<SignupFormValues, keyof SignupFormValues>;
 };
-
 const emailPattern =
   /^[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)*$/i;
 
@@ -81,7 +80,6 @@ const baseFieldConfigs: SignupFieldConfig[] = [
     },
   },
 ];
-
 const buildFieldConfigs = (
   getValues: UseFormGetValues<SignupFormValues>,
 ): SignupFieldConfig[] => [
@@ -98,7 +96,6 @@ const buildFieldConfigs = (
     },
   },
 ];
-
 const FormField = ({
   id,
   label,
@@ -135,15 +132,18 @@ const FormField = ({
     </div>
   );
 };
-
 type SignupFlowResult = {
   dismissToast: () => void;
+  formError: string | null;
   handleSignup: SubmitHandler<SignupFormValues>;
+  registerMutation: ReturnType<typeof useRegisterMutation>;
   toastMessage: string | null;
 };
 
 const useSignupFlow = (): SignupFlowResult => {
   const router = useRouter();
+  const registerMutation = useRegisterMutation();
+  const [formError, setFormError] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [shouldRedirect, setShouldRedirect] = useState(false);
 
@@ -163,18 +163,26 @@ const useSignupFlow = (): SignupFlowResult => {
 
   const handleSignup: SubmitHandler<SignupFormValues> = async (values) => {
     setToastMessage(null);
+    setFormError(null);
     setShouldRedirect(false);
 
     try {
-      // Placeholder – wire up to account creation API when available.
-      console.info('Signup attempt', values);
-      await new Promise((resolve) => setTimeout(resolve, 400));
+      await registerMutation.mutateAsync({
+        username: values.fullName,
+        email: values.email,
+        password: values.password,
+      });
 
       setToastMessage('Account created. Redirecting you to sign in.');
       setShouldRedirect(true);
-    } catch {
+    } catch (error) {
       setToastMessage(null);
       setShouldRedirect(false);
+      setFormError(
+        error instanceof Error
+          ? error.message
+          : 'Unable to create your account right now.',
+      );
     }
   };
 
@@ -183,9 +191,14 @@ const useSignupFlow = (): SignupFlowResult => {
     setShouldRedirect(false);
   };
 
-  return { dismissToast, handleSignup, toastMessage };
+  return {
+    dismissToast,
+    formError,
+    handleSignup,
+    registerMutation,
+    toastMessage,
+  };
 };
-
 const SignupForm = (): JSX.Element => {
   const {
     register,
@@ -201,9 +214,16 @@ const SignupForm = (): JSX.Element => {
     },
   });
 
-  const { dismissToast, handleSignup, toastMessage } = useSignupFlow();
+  const {
+    dismissToast,
+    formError,
+    handleSignup,
+    registerMutation,
+    toastMessage,
+  } = useSignupFlow();
 
   const fieldConfigs = buildFieldConfigs(getValues);
+  const isBusy = isSubmitting || registerMutation.isPending;
 
   return (
     <>
@@ -230,14 +250,19 @@ const SignupForm = (): JSX.Element => {
         </p>
 
         <div className={styles.actions}>
+          {formError ? (
+            <p className={styles.formError} role="alert" aria-live="polite">
+              {formError}
+            </p>
+          ) : null}
           <Button
             className={styles.submitButton}
-            disabled={isSubmitting}
+            disabled={isBusy}
             displayStyle="cta"
             clickStyle="3d"
             type="submit"
           >
-            {isSubmitting ? 'Creating account…' : 'Create account'}
+            {isBusy ? 'Creating account…' : 'Create account'}
           </Button>
         </div>
       </form>
@@ -248,7 +273,6 @@ const SignupForm = (): JSX.Element => {
     </>
   );
 };
-
 const SignupPage = (): JSX.Element => {
   return (
     <div className={styles.page}>
