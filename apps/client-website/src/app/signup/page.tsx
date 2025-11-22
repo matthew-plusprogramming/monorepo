@@ -1,5 +1,5 @@
 'use client';
-import { type JSX, useEffect, useState } from 'react';
+import { type JSX, useState } from 'react';
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -14,6 +14,7 @@ import { useForm } from 'react-hook-form';
 import { Button } from '@/components/Button';
 import { Toast } from '@/components/Toast';
 import { useRegisterMutation } from '@/hooks/useRegisterMutation';
+import { useUserStore } from '@/stores/userStore';
 
 import styles from './page.module.scss';
 
@@ -143,42 +144,27 @@ type SignupFlowResult = {
 const useSignupFlow = (): SignupFlowResult => {
   const router = useRouter();
   const registerMutation = useRegisterMutation();
+  const setToken = useUserStore((state) => state.setToken);
   const [formError, setFormError] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const [shouldRedirect, setShouldRedirect] = useState(false);
-
-  useEffect(() => {
-    if (!shouldRedirect) {
-      return undefined;
-    }
-
-    const timeoutId = window.setTimeout(() => {
-      router.push('/login');
-    }, 900);
-
-    return (): void => {
-      window.clearTimeout(timeoutId);
-    };
-  }, [router, shouldRedirect]);
 
   const handleSignup: SubmitHandler<SignupFormValues> = async (values) => {
     setToastMessage(null);
     setFormError(null);
-    setShouldRedirect(false);
 
     try {
-      await registerMutation.mutateAsync({
+      const token = await registerMutation.mutateAsync({
         name: values.fullName,
         username: values.fullName,
         email: values.email,
         password: values.password,
       });
 
-      setToastMessage('Account created. Redirecting you to sign in.');
-      setShouldRedirect(true);
+      setToken(token);
+      setToastMessage('Account created. Redirecting you home.');
+      router.push('/home');
     } catch (error) {
       setToastMessage(null);
-      setShouldRedirect(false);
       setFormError(
         error instanceof Error
           ? error.message
@@ -189,7 +175,6 @@ const useSignupFlow = (): SignupFlowResult => {
 
   const dismissToast = (): void => {
     setToastMessage(null);
-    setShouldRedirect(false);
   };
 
   return {

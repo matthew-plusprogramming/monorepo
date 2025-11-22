@@ -1,6 +1,6 @@
 'use client';
 
-import { type JSX, useEffect, useState } from 'react';
+import { type JSX, useState } from 'react';
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -108,25 +108,9 @@ const useLoginFlow = (): LoginFlowResult => {
   const router = useRouter();
   const setToken = useUserStore((state) => state.setToken);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const [shouldRedirect, setShouldRedirect] = useState(false);
   const loginMutation = useLoginMutation();
 
-  useEffect(() => {
-    if (!shouldRedirect) {
-      return undefined;
-    }
-
-    const timeoutId = window.setTimeout(() => {
-      router.push('/');
-    }, 900);
-
-    return (): void => {
-      window.clearTimeout(timeoutId);
-    };
-  }, [router, shouldRedirect]);
-
   const handleLogin: SubmitHandler<LoginFormValues> = async (values) => {
-    setShouldRedirect(false);
     setToastMessage(null);
 
     try {
@@ -137,16 +121,14 @@ const useLoginFlow = (): LoginFlowResult => {
 
       setToken(token);
       setToastMessage('Signed in. Redirecting you home.');
-      setShouldRedirect(true);
+      router.push('/home');
     } catch {
       setToastMessage(null);
-      setShouldRedirect(false);
     }
   };
 
   const dismissToast = (): void => {
     setToastMessage(null);
-    setShouldRedirect(false);
   };
 
   return { dismissToast, handleLogin, loginMutation, toastMessage };
