@@ -77,7 +77,7 @@ const createUserToPersist = (
   passwordHash: string,
 ): UserCreate => ({
   id: userId,
-  name: String(input.name),
+  fullName: String(input.fullName),
   username: String(input.username),
   email: String(input.email),
   passwordHash,

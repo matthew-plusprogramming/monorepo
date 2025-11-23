@@ -2,15 +2,15 @@ import { z } from 'zod';
 
 import {
   UserEmailSchema,
+  UserFullNameSchema,
   UserIdSchema,
-  UserNameSchema,
   UserPasswordHashSchema,
   UserUsernameSchema,
 } from './components/index.js';
 
 export const UserSchema = z.object({
   id: UserIdSchema,
-  name: UserNameSchema,
+  fullName: UserFullNameSchema,
   username: UserUsernameSchema,
   email: UserEmailSchema,
   passwordHash: UserPasswordHashSchema,
@@ -29,7 +29,7 @@ export type User = z.infer<typeof UserSchema>;
 
 export const UserPublicSchema = z.object({
   id: UserIdSchema,
-  name: UserNameSchema,
+  fullName: UserFullNameSchema,
   username: UserUsernameSchema,
   email: UserEmailSchema,
 });
@@ -38,7 +38,7 @@ export type UserPublic = z.infer<typeof UserPublicSchema>;
 
 export const UserCredentialsSchema = z.object({
   id: UserIdSchema,
-  name: UserNameSchema,
+  fullName: UserFullNameSchema,
   username: UserUsernameSchema,
   email: UserEmailSchema,
   passwordHash: UserPasswordHashSchema,

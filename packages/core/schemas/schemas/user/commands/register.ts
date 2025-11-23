@@ -2,13 +2,13 @@ import { z } from 'zod';
 
 import {
   UserEmailSchema,
-  UserNameSchema,
+  UserFullNameSchema,
   UserPlaintextPasswordSchema,
   UserUsernameSchema,
 } from '../components/index.js';
 
 export const RegisterInputSchema = z.object({
-  name: UserNameSchema,
+  fullName: UserFullNameSchema,
   username: UserUsernameSchema,
   email: UserEmailSchema,
   password: UserPlaintextPasswordSchema,

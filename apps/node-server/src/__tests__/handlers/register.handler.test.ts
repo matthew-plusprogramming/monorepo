@@ -172,7 +172,7 @@ const returns409WhenEmailAlreadyExists = async (): Promise<void> => {
   const repoFake = resetUserRepoFake();
   repoFake.queueFindSome({
     id: '11111111-1111-1111-1111-111111111111',
-    name: body.name,
+    fullName: body.fullName,
     username: 'dup',
     email: 'dup@example.com',
   });
@@ -202,7 +202,7 @@ const returns409WhenUsernameAlreadyExists = async (): Promise<void> => {
   repoFake.queueFindNone();
   repoFake.queueFindSome({
     id: '22222222-2222-4222-8222-222222222222',
-    name: body.name,
+    fullName: body.fullName,
     username: body.username,
     email: 'different@example.com',
   });

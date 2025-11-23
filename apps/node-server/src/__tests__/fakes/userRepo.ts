@@ -90,7 +90,7 @@ export const createUserRepoFake = (): UserRepoFake => {
             userCreate,
             (value): UserCreate => ({
               id: value.id,
-              name: String(value.name),
+              fullName: String(value.fullName),
               username: String(value.username),
               email: String(value.email),
               passwordHash: value.passwordHash,

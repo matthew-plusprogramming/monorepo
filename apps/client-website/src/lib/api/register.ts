@@ -1,7 +1,7 @@
 const DEFAULT_API_URL = 'http://localhost:3000';
 
 type RegisterPayload = {
-  name: string;
+  fullName: string;
   username: string;
   email: string;
   password: string;

@@ -1,7 +1,7 @@
 import type { UserCreate, UserPublic, UserToken } from '@packages/schemas/user';
 
 const DEFAULT_USER_ID = '11111111-1111-1111-1111-111111111111';
-const DEFAULT_NAME = 'Test User';
+const DEFAULT_FULL_NAME = 'Test User';
 const DEFAULT_USERNAME = 'test-user';
 const DEFAULT_EMAIL = 'test-user@example.com';
 const DEFAULT_PASSWORD_HASH =
@@ -10,14 +10,14 @@ const DEFAULT_TOKEN_TIME_SECONDS = 1_704_576_000; // 2024-01-01T00:00:00.000Z
 
 const createUserPublicDefaults = (): UserPublic => ({
   id: DEFAULT_USER_ID,
-  name: DEFAULT_NAME,
+  fullName: DEFAULT_FULL_NAME,
   username: DEFAULT_USERNAME,
   email: DEFAULT_EMAIL,
 });
 
 const createUserCreateDefaults = (): UserCreate => ({
   id: DEFAULT_USER_ID,
-  name: DEFAULT_NAME,
+  fullName: DEFAULT_FULL_NAME,
   username: DEFAULT_USERNAME,
   email: DEFAULT_EMAIL,
   passwordHash: DEFAULT_PASSWORD_HASH,
