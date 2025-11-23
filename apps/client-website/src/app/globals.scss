@@ -45,6 +45,10 @@ $breakpoints: (
   justify-content: $justify;
 }
 
+@mixin standard-page-padding() {
+  padding: clamp(2rem, 2vw, 4rem) clamp(1rem, 20vw, 25vw);
+}
+
 :root {
   // Colors
   --primary-color: #7a5db8;

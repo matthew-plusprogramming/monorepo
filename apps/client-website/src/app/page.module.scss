@@ -4,9 +4,9 @@
   box-sizing: border-box;
   width: 100%;
   height: 100dvh;
-  padding: clamp(2rem, 2vw, 4rem) clamp(1rem, 20vw, 25vw);
 
   @include fancy-gradient-background;
+  @include standard-page-padding;
 }
 
 .heroSection {
