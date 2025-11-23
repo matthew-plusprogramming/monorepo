@@ -5,14 +5,27 @@ import { describe, expect, it, vi } from 'vitest';
 const mockPush = vi.fn();
 const mockMutateAsync = vi.fn();
 
-vi.mock('next/navigation', () => ({
-  useRouter: () => ({
-    push: mockPush,
+type NavigationMock = {
+  useRouter: () => { push: typeof mockPush };
+};
+
+vi.mock(
+  'next/navigation',
+  (): NavigationMock => ({
+    useRouter: () => ({
+      push: mockPush,
+    }),
   }),
-}));
+);
+
+type RegisterMutationMock = {
+  mutateAsync: typeof mockMutateAsync;
+  isPending: boolean;
+  error: undefined;
+};
 
 vi.mock('@/hooks/useRegisterMutation', () => ({
-  useRegisterMutation: () => ({
+  useRegisterMutation: (): RegisterMutationMock => ({
     mutateAsync: mockMutateAsync,
     isPending: false,
     error: undefined,

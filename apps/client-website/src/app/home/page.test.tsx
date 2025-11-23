@@ -3,11 +3,18 @@ import { describe, expect, it, vi } from 'vitest';
 
 const mockReplace = vi.fn();
 
-vi.mock('next/navigation', () => ({
-  useRouter: () => ({
-    replace: mockReplace,
+type NavigationMock = {
+  useRouter: () => { replace: typeof mockReplace };
+};
+
+vi.mock(
+  'next/navigation',
+  (): NavigationMock => ({
+    useRouter: () => ({
+      replace: mockReplace,
+    }),
   }),
-}));
+);
 
 import { useUserStore } from '@/stores/userStore';
 
