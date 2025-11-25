@@ -20,8 +20,8 @@ vi.mock(
   }),
 );
 
-vi.mock('./hooks', async (): Promise<HooksModule> => {
-  const actual = (await vi.importActual('./hooks')) as HooksModule;
+vi.mock('./hooks', async (): Promise<typeof HooksModule> => {
+  const actual = await vi.importActual<typeof HooksModule>('./hooks');
 
   return {
     ...actual,
