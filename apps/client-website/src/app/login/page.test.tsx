@@ -1,11 +1,37 @@
+import type { UseMutationResult } from '@tanstack/react-query';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
+
+import type { LoginPayload } from '@/lib/api/login';
 
 import type * as HooksModule from './hooks';
 
 const mockPush = vi.fn();
 const mockMutateAsync = vi.fn();
+
+const createLoginMutationMock = (): UseMutationResult<
+  string,
+  Error,
+  LoginPayload
+> => ({
+  context: undefined,
+  data: undefined,
+  error: null,
+  failureCount: 0,
+  failureReason: null,
+  isPaused: false,
+  status: 'idle',
+  variables: undefined,
+  submittedAt: 0,
+  mutate: vi.fn(),
+  mutateAsync: mockMutateAsync,
+  reset: vi.fn(),
+  isError: false,
+  isIdle: true,
+  isPending: false,
+  isSuccess: false,
+});
 
 type NavigationMock = {
   useRouter: () => { push: typeof mockPush };
@@ -25,12 +51,7 @@ vi.mock('./hooks', async (): Promise<typeof HooksModule> => {
 
   return {
     ...actual,
-    useLoginFlow: () =>
-      actual.useLoginFlow(() => ({
-        mutateAsync: mockMutateAsync,
-        isPending: false,
-        error: undefined,
-      })),
+    useLoginFlow: () => actual.useLoginFlow(createLoginMutationMock),
   };
 });
 
