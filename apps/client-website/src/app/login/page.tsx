@@ -1,30 +1,17 @@
 'use client';
 
-import { type JSX, useState } from 'react';
+import { type JSX } from 'react';
 
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import type { SubmitHandler, UseFormRegisterReturn } from 'react-hook-form';
+import type { UseFormRegisterReturn } from 'react-hook-form';
 import { useForm } from 'react-hook-form';
 
 import { Button } from '@/components/Button';
 import { Toast } from '@/components/Toast';
-import { useLoginMutation } from '@/hooks/useLoginMutation';
-import { useUserStore } from '@/stores/userStore';
+
+import { loginFieldConfigs, type LoginFormValues, useLoginFlow } from './hooks';
 
 import styles from './page.module.scss';
-
-type LoginFormValues = {
-  email: string;
-  password: string;
-};
-
-type LoginFlowResult = {
-  dismissToast: () => void;
-  handleLogin: SubmitHandler<LoginFormValues>;
-  loginMutation: ReturnType<typeof useLoginMutation>;
-  toastMessage: string | null;
-};
 
 type FieldProps = {
   id: keyof LoginFormValues;
@@ -34,9 +21,6 @@ type FieldProps = {
   registration: UseFormRegisterReturn;
   error?: string;
 };
-
-const emailPattern =
-  /^[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)*$/i;
 
 const FormField = ({
   id,
@@ -104,36 +88,6 @@ const FormActions = ({
   );
 };
 
-const useLoginFlow = (): LoginFlowResult => {
-  const router = useRouter();
-  const setToken = useUserStore((state) => state.setToken);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const loginMutation = useLoginMutation();
-
-  const handleLogin: SubmitHandler<LoginFormValues> = async (values) => {
-    setToastMessage(null);
-
-    try {
-      const token = await loginMutation.mutateAsync({
-        identifier: values.email,
-        password: values.password,
-      });
-
-      setToken(token);
-      setToastMessage('Signed in. Redirecting you home.');
-      router.push('/home');
-    } catch {
-      setToastMessage(null);
-    }
-  };
-
-  const dismissToast = (): void => {
-    setToastMessage(null);
-  };
-
-  return { dismissToast, handleLogin, loginMutation, toastMessage };
-};
-
 const LoginForm = (): JSX.Element => {
   const {
     register,
@@ -158,35 +112,17 @@ const LoginForm = (): JSX.Element => {
         noValidate
         onSubmit={handleSubmit(handleLogin)}
       >
-        <FormField
-          error={errors.email?.message}
-          id="email"
-          label="Email address"
-          placeholder="you@domain.com"
-          registration={register('email', {
-            required: 'Email is required',
-            pattern: {
-              value: emailPattern,
-              message: 'Enter a valid email address',
-            },
-          })}
-          type="email"
-        />
-
-        <FormField
-          error={errors.password?.message}
-          id="password"
-          label="Password"
-          placeholder="••••••••"
-          registration={register('password', {
-            required: 'Password is required',
-            minLength: {
-              value: 8,
-              message: 'Use at least 8 characters',
-            },
-          })}
-          type="password"
-        />
+        {loginFieldConfigs.map(({ id, label, placeholder, type, rules }) => (
+          <FormField
+            key={id}
+            error={errors[id]?.message}
+            id={id}
+            label={label}
+            placeholder={placeholder}
+            registration={register(id, rules)}
+            type={type}
+          />
+        ))}
 
         <p className={styles.supportText}>
           Forgot your password? Reset links are on the way once authentication

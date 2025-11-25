@@ -1,29 +1,20 @@
 'use client';
-import { type JSX, useState } from 'react';
+import { type JSX } from 'react';
 
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import type {
-  RegisterOptions,
-  SubmitHandler,
-  UseFormGetValues,
-  UseFormRegisterReturn,
-} from 'react-hook-form';
+import type { UseFormRegisterReturn } from 'react-hook-form';
 import { useForm } from 'react-hook-form';
 
 import { Button } from '@/components/Button';
 import { Toast } from '@/components/Toast';
-import { useRegisterMutation } from '@/hooks/useRegisterMutation';
-import { useUserStore } from '@/stores/userStore';
+
+import {
+  buildFieldConfigs,
+  type SignupFormValues,
+  useSignupFlow,
+} from './hooks';
 
 import styles from './page.module.scss';
-
-type SignupFormValues = {
-  fullName: string;
-  email: string;
-  password: string;
-  confirmPassword: string;
-};
 
 type FieldProps = {
   id: keyof SignupFormValues;
@@ -33,70 +24,6 @@ type FieldProps = {
   registration: UseFormRegisterReturn;
   error?: string;
 };
-
-type SignupFieldConfig = Omit<FieldProps, 'registration' | 'error'> & {
-  rules: RegisterOptions<SignupFormValues, keyof SignupFormValues>;
-};
-const emailPattern =
-  /^[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)*$/i;
-
-const baseFieldConfigs: SignupFieldConfig[] = [
-  {
-    id: 'fullName',
-    label: 'Full name',
-    placeholder: 'Ada Lovelace',
-    type: 'text',
-    rules: {
-      required: 'Name is required',
-      minLength: {
-        value: 2,
-        message: 'Use at least 2 characters',
-      },
-    },
-  },
-  {
-    id: 'email',
-    label: 'Email address',
-    placeholder: 'you@domain.com',
-    type: 'email',
-    rules: {
-      required: 'Email is required',
-      pattern: {
-        value: emailPattern,
-        message: 'Enter a valid email address',
-      },
-    },
-  },
-  {
-    id: 'password',
-    label: 'Password',
-    placeholder: '••••••••',
-    type: 'password',
-    rules: {
-      required: 'Password is required',
-      minLength: {
-        value: 8,
-        message: 'Use at least 8 characters',
-      },
-    },
-  },
-];
-const buildFieldConfigs = (
-  getValues: UseFormGetValues<SignupFormValues>,
-): SignupFieldConfig[] => [
-  ...baseFieldConfigs,
-  {
-    id: 'confirmPassword',
-    label: 'Confirm password',
-    placeholder: '••••••••',
-    type: 'password',
-    rules: {
-      required: 'Please confirm your password',
-      validate: (value) =>
-        value === getValues('password') || 'Passwords must match',
-    },
-  },
-];
 const FormField = ({
   id,
   label,
@@ -132,58 +59,6 @@ const FormField = ({
       )}
     </div>
   );
-};
-type SignupFlowResult = {
-  dismissToast: () => void;
-  formError: string | null;
-  handleSignup: SubmitHandler<SignupFormValues>;
-  registerMutation: ReturnType<typeof useRegisterMutation>;
-  toastMessage: string | null;
-};
-
-const useSignupFlow = (): SignupFlowResult => {
-  const router = useRouter();
-  const registerMutation = useRegisterMutation();
-  const setToken = useUserStore((state) => state.setToken);
-  const [formError, setFormError] = useState<string | null>(null);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
-
-  const handleSignup: SubmitHandler<SignupFormValues> = async (values) => {
-    setToastMessage(null);
-    setFormError(null);
-
-    try {
-      const token = await registerMutation.mutateAsync({
-        fullName: values.fullName,
-        username: values.fullName,
-        email: values.email,
-        password: values.password,
-      });
-
-      setToken(token);
-      setToastMessage('Account created. Redirecting you home.');
-      router.push('/home');
-    } catch (error) {
-      setToastMessage(null);
-      setFormError(
-        error instanceof Error
-          ? error.message
-          : 'Unable to create your account right now.',
-      );
-    }
-  };
-
-  const dismissToast = (): void => {
-    setToastMessage(null);
-  };
-
-  return {
-    dismissToast,
-    formError,
-    handleSignup,
-    registerMutation,
-    toastMessage,
-  };
 };
 const SignupForm = (): JSX.Element => {
   const {

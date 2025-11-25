@@ -2,6 +2,8 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
+import type * as HooksModule from './hooks';
+
 const mockPush = vi.fn();
 const mockMutateAsync = vi.fn();
 
@@ -18,19 +20,19 @@ vi.mock(
   }),
 );
 
-type LoginMutationMock = {
-  mutateAsync: typeof mockMutateAsync;
-  isPending: boolean;
-  error: undefined;
-};
+vi.mock('./hooks', async (): Promise<HooksModule> => {
+  const actual = (await vi.importActual('./hooks')) as HooksModule;
 
-vi.mock('@/hooks/useLoginMutation', () => ({
-  useLoginMutation: (): LoginMutationMock => ({
-    mutateAsync: mockMutateAsync,
-    isPending: false,
-    error: undefined,
-  }),
-}));
+  return {
+    ...actual,
+    useLoginFlow: () =>
+      actual.useLoginFlow(() => ({
+        mutateAsync: mockMutateAsync,
+        isPending: false,
+        error: undefined,
+      })),
+  };
+});
 
 import { useUserStore } from '@/stores/userStore';
 
