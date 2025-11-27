@@ -9,73 +9,68 @@ Intent
 Global Prompts
 
 - Retrieval & context discipline: Follow the Retrieval Policy in `agents/memory-bank.md` for required discovery tooling, numbered text defaults, and the single-pass note-taking rule; treat that section as canonical for file inspection guidance.
-- reflection note: After each phase, add a 3-line reflection to `agents/ephemeral/active.context.md`; doc-only or advisory tasks may batch these updates upon completion when no canonical files change.
-  - CLI helpers: `node agents/scripts/append-memory-entry.mjs ...` for reflections keep formatting consistent.
+- Task specs: Each task gets its own spec under `agents/ephemeral/task-specs/` (Requirements, Design, Implementation Planning, Execution). Create one via `node agents/scripts/reset-active-context.mjs --slug <task-slug> [--title "..."]` and keep it updated.
+- Reflection note: After each phase, add a reflection to `agents/ephemeral/active.context.md` using `node agents/scripts/append-memory-entry.mjs`.
 - Markdown standards: See `AGENTS.md`.
 
-Phase: plan
+Phase: requirements
 
-- Goal: Clarify scope, gather context, and propose approach.
+- Goal: Clarify the problem and outcomes using EARS; ground the task spec.
 - Inputs: Issue/ask
 - Checklist:
-  - Run `node agents/scripts/load-context.mjs` (add `--include-optional` when optional tiers are relevant) to review required Memory Bank context.
-  - Define problem statement, desired outcome, and acceptance criteria using a short Given/When/Then block; add a Non-goals bullet.
-  - Identify constraints, risks, and assumptions.
-  - Map impacted components and critical paths.
-  - Identify interfaces, contracts, and invariants; list candidate files and tests to touch.
-  - Review `agents/memory-bank/testing.guidelines.md` to align planned tests with boundary strategies and utilities.
-  - Sketch design/options; choose and justify approach; note performance, security, and migration implications.
+  - Run `node agents/scripts/load-context.mjs` (add `--include-optional` when optional tiers are relevant).
+  - Create/refresh the task spec with the slug for this effort.
+  - Capture EARS user stories and acceptance criteria; list non-goals, constraints, risks, invariants.
+  - Map impacted components and critical paths; note retrieval sources consulted.
+  - Identify interfaces/contracts and candidate files/tests to touch.
   - If system-impacting, open ADR stub.
-- Example format:
+- Outputs: Task spec Requirements section filled (EARS + acceptance criteria, non-goals, constraints/risks, invariants, interfaces/files/tests to touch); updated `agents/ephemeral/active.context.md` reflection.
+- Done_when: Scope and criteria are clear; risks/constraints logged; invariants confirmed.
+- Gates: EARS stories + acceptance criteria are specific/testable; non-goals captured; risks noted; invariants stated.
+- Next: design
 
-  ```md
-  Acceptance Criteria (Given/When/Then)
+Phase: design
 
-  - Given X; When Y; Then measurable Z
-
-  Non-goals
-
-  - Explicitly out of scope: A, B
-  ```
-
-- Outputs: Brief plan; acceptance criteria (Given/When/Then); Non-goals; context notes; file list; invariants list; design notes; ADR stub (if needed); updated `agents/ephemeral/active.context.md` next steps.
-- Done_when: Scope and criteria are clear; context coverage is credible; approach addresses constraints.
-- Gates: Given/When/Then present, specific, and testable; Non-goals captured; invariants confirmed; risks mitigated; migration path identified. User approves plan.
-- Next: build
-
-Phase: build
-
-- Goal: Apply minimal, focused changes and self-review for clarity.
-- Inputs: Plan outputs; design notes; file list.
+- Goal: Design how to achieve the outcomes and document flows.
 - Checklist:
-  - Implement code and docs surgically; keep unrelated changes out; follow repo style.
-  - Update `agents/memory-bank` canonical files if required by the change.
-  - Self-review diff for clarity and minimalism.
-  - Run `npm run phase:check`
-  - Propose a clear, conventional commit message.
-- Outputs: Code changes; updated docs; migrations/scripts as needed; review notes and fixups.
-- Done_when: Changes compile and meet plan scope.
-- Gates: `npm run phase:check` passes.
-- Next: verify
+  - Produce architecture notes (logical/data/control flows) and at least one Mermaid sequence diagram for the primary path.
+  - Define interfaces/contracts, data shapes, and error/failure behaviors.
+  - Note performance, security, and migration implications; consider test strategy against acceptance criteria.
+  - Update the Design section of the task spec.
+  - Decide whether an ADR is needed; if yes, start from the template.
+- Outputs: Task spec Design section complete; diagrams added; ADR stub if required; reflection logged.
+- Done_when: Flows, interfaces, and edge behaviors are clear and trace to Requirements.
+- Gates: Primary path diagram present; interfaces and failure modes captured; tests mapped at a high level.
+- Next: implementation-planning
 
-Phase: verify
+Phase: implementation-planning
 
-- Goal: Validate behavior against criteria and finalize Memory Bank updates.
-- Inputs: Plan; acceptance criteria; test harness; diff.
+- Goal: Break down the work into trackable tasks with coverage mapping.
 - Checklist:
-  - Run `node agents/scripts/git-diff-with-lines.mjs` to capture line-numbered diff context for the verification report.
-  - Run targeted tests; add missing ones nearby if an adjacent pattern exists.
-  - Trace each Given/When/Then to a verification step; confirm Non-goals remain out of scope.
-  - Confirm implemented tests follow `agents/memory-bank/testing.guidelines.md` (boundaries, DI, fakes/mocks, flake-proofing).
-  - Validate error paths and edge cases; re-run build.
-  - Update Memory Bank: canonical files under `agents/memory-bank/`; add/update ADRs for accepted decisions; append reflection (use `node agents/scripts/append-memory-entry.mjs` helpers for consistent formatting).
-  - Stamp `agents/memory-bank.md` via `node agents/scripts/update-memory-stamp.mjs` once updates are recorded.
-  - Validate Memory Bank and drift:
-    - `npm run agent:finalize`
-- Outputs: Test results; fixes; updated Memory Bank; optional workflow updates.
-- Done_when: Criteria met; no regressions visible; memory validated and drift-free.
-- Gates: `npm run agent:finalize` passes
-- Next: done
+  - List discrete tasks with outcomes/owners (if relevant) and dependencies.
+  - Map tests to acceptance criteria (traceability back to EARS items).
+  - Note sequencing/blockers and checkpoints for progress updates.
+  - Update the Implementation Planning section of the task spec.
+- Outputs: Task list with outcomes/dependencies; test plan mapped to acceptance criteria; reflection logged.
+- Done_when: Tasks are actionable, ordered, and traceable to Requirements/Design.
+- Gates: Each acceptance criterion has at least one planned verification; dependencies/risks identified.
+- Next: execution
+
+Phase: execution
+
+- Goal: Deliver the change, keep the spec honest, and validate outcomes.
+- Checklist:
+  - Execute tasks, updating the Execution section with progress, adjustments, and evidence.
+  - Implement code/docs; keep changes focused; update canonicals when needed.
+  - Run `npm run phase:check` as changes evolve.
+  - Run targeted tests; gather outputs; tie evidence back to acceptance criteria.
+  - Update Memory Bank canonicals if needed; stamp via `node agents/scripts/update-memory-stamp.mjs` once stable.
+  - Capture line-numbered diff with `node agents/scripts/git-diff-with-lines.mjs` for verification reports.
+  - Run `npm run agent:finalize` before concluding.
+  - Propose a conventional commit message.
+- Outputs: Code/doc changes; updated task spec Execution log; tests/evidence; Memory Bank updates; commit message proposal; reflection logged.
+- Done_when: Acceptance criteria satisfied; risks addressed; quality checks pass; spec reflects what shipped.
+- Gates: `npm run agent:finalize` passes; evidence traces to acceptance criteria; memory stamp updated if canonicals changed.
 
 End
 

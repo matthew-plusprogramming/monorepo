@@ -10,9 +10,10 @@ const USAGE = `Usage: node agents/scripts/append-memory-entry.mjs [options]
 Append a formatted entry to the Memory Bank active context.
 
 Options
-  --plan "<text>"    Plan phase summary
-  --build "<text>"   Build phase summary
-  --verify "<text>"  Verify phase summary
+  --requirements "<text>"     Requirements phase summary
+  --design "<text>"           Design phase summary
+  --implementation "<text>"   Implementation Planning phase summary
+  --execution "<text>"        Execution phase summary
   --dry-run          Preview the entry without writing to disk
   -h, --help         Show this help message
 `;
@@ -32,9 +33,10 @@ const toKeyValue = (arg, next) => {
 };
 
 const options = {
-  plan: null,
-  build: null,
-  verify: null,
+  requirements: null,
+  design: null,
+  implementation: null,
+  execution: null,
   dryRun: false,
 };
 
@@ -55,16 +57,20 @@ for (let index = 0; index < args.length; index += 1) {
     const { flag, value } = toKeyValue(arg, args[index + 1]);
 
     switch (flag) {
-      case '--plan':
-        options.plan = value;
+      case '--requirements':
+        options.requirements = value;
         index += arg.includes('=') ? 0 : 1;
         break;
-      case '--build':
-        options.build = value;
+      case '--design':
+        options.design = value;
         index += arg.includes('=') ? 0 : 1;
         break;
-      case '--verify':
-        options.verify = value;
+      case '--implementation':
+        options.implementation = value;
+        index += arg.includes('=') ? 0 : 1;
+        break;
+      case '--execution':
+        options.execution = value;
         index += arg.includes('=') ? 0 : 1;
         break;
       default:
@@ -90,6 +96,22 @@ const formatDate = (date) =>
 const ensureEndsWithNewline = (text) =>
   text.endsWith('\n') ? text : `${text}\n`;
 
+const insertEntry = (content, entry) => {
+  const marker = '## Legacy Reflections';
+  const contentWithNewline = ensureEndsWithNewline(content);
+  const markerIndex = contentWithNewline.indexOf(marker);
+
+  if (markerIndex === -1) {
+    return `${contentWithNewline}${entry}\n`;
+  }
+
+  const before = contentWithNewline.slice(0, markerIndex).trimEnd();
+  const after = contentWithNewline.slice(markerIndex);
+
+  const beforeBlock = before ? `${before}\n` : '';
+  return `${beforeBlock}${entry}\n\n${after}`;
+};
+
 const appendEntry = async (filePath, entry, dryRun) => {
   const absolutePath = resolve(process.cwd(), filePath);
   let originalContent;
@@ -107,8 +129,7 @@ const appendEntry = async (filePath, entry, dryRun) => {
     throw error;
   }
 
-  const contentWithNewline = ensureEndsWithNewline(originalContent);
-  const updatedContent = `${contentWithNewline}${entry}\n`;
+  const updatedContent = insertEntry(originalContent, entry);
 
   if (dryRun) {
     console.log('ℹ️  Dry run: entry preview');
@@ -120,15 +141,21 @@ const appendEntry = async (filePath, entry, dryRun) => {
   console.log(`✅ Appended entry to ${filePath}`);
 };
 
-const buildActiveEntry = (date, { plan, build, verify }) => {
+const buildActiveEntry = (
+  date,
+  { requirements, design, implementation, execution },
+) => {
   const segments = [];
-  if (plan) segments.push({ label: 'Plan', text: normalize(plan) });
-  if (build) segments.push({ label: 'Build', text: normalize(build) });
-  if (verify) segments.push({ label: 'Verify', text: normalize(verify) });
+  if (requirements)
+    segments.push({ label: 'Requirements', text: normalize(requirements) });
+  if (design) segments.push({ label: 'Design', text: normalize(design) });
+  if (implementation)
+    segments.push({ label: 'Implementation Planning', text: normalize(implementation) });
+  if (execution) segments.push({ label: 'Execution', text: normalize(execution) });
 
   if (segments.length === 0) {
     console.error(
-      '❌ At least one of --plan, --build, or --verify is required for the active context.',
+      '❌ At least one of --requirements, --design, --implementation, or --execution is required for the active context.',
     );
     process.exit(1);
   }

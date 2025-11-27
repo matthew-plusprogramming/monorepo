@@ -3,7 +3,7 @@ Workflows
 It is very important you strictly follow the agent workflows.
 
 - Default workflow: `agents/workflows/default.workflow.md`
-- Purpose: drive three-phase execution (plan → build → verify) with explicit inputs/outputs and gates.
+- Purpose: drive the four-phase loop (Requirements → Design → Implementation Planning → Execution) with explicit inputs/outputs and gates.
 
 Usage
 
@@ -11,7 +11,7 @@ Usage
 - Follow the checklist, produce outputs, and update the phase state in the file.
 - After each phase, log a 3-line reflection to `agents/ephemeral/active.context.md`.
 - Reference `agents/tools.md` for script helpers that support each phase.
-  - Use `node agents/scripts/append-memory-entry.mjs --plan "..." --build "..." --verify "..."` to capture reflections.
+  - Use `node agents/scripts/append-memory-entry.mjs --requirements "..." --design "..." --implementation "..." --execution "..."` to capture reflections.
   - Retrieval tooling and single-pass rules live in `agents/memory-bank.md#retrieval-policy`; defer to that section for discovery commands and numbered output expectations.
 - For system-impacting changes, open an ADR stub using `agents/memory-bank/decisions/ADR-0000-template.md`.
 

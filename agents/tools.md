@@ -8,10 +8,10 @@ Prefer the purpose-built discovery scripts (`list-files-recursively.mjs`, `smart
 
 - `node agents/scripts/load-context.mjs [--include-optional] [--list]`
   Prints required Memory Bank + workflow files for the current task with numbered lines to encourage single-pass note taking. Add `--include-optional` to pull in supplemental context and `--list` to show paths without content.
-- `node agents/scripts/append-memory-entry.mjs --plan "<text>" [--build "<text>"] [--verify "<text>"] [--dry-run]`
-  Appends formatted reflections to `agents/ephemeral/active.context.md`; supply any combination of `--plan`, `--build`, or `--verify` (at least one is required).
-- `node agents/scripts/reset-active-context.mjs [--date YYYY-MM-DD]`
-  Resets `agents/ephemeral/active.context.md` to the default template and refreshes the `last_reviewed` stamp.
+- `node agents/scripts/append-memory-entry.mjs --requirements "<text>" [--design "<text>"] [--implementation "<text>"] [--execution "<text>"] [--dry-run]`
+  Appends formatted reflections (Requirements, Design, Implementation Planning, Execution) to `agents/ephemeral/active.context.md`; at least one flag is required.
+- `node agents/scripts/reset-active-context.mjs --slug "<task-slug>" [--title "<text>"] [--date "<YYYY-MM-DD>"]`
+  Creates a per-task spec under `agents/ephemeral/task-specs/` and refreshes the active context index (date defaults to today UTC).
 
 ## Search & Discovery
 
@@ -22,7 +22,7 @@ Prefer the purpose-built discovery scripts (`list-files-recursively.mjs`, `smart
 
 ## Reporting & Diff Utilities
 
-- `node agents/scripts/list-files-recursively.mjs --root <path> [--pattern <pattern>] [--types ...] [--regex] [--case-sensitive]`
-  Emits a CSV (`path,size,modifiedAt`) of files under the given root whose repo-relative paths match the pattern (defaults to “match everything”). Example: `node agents/scripts/list-files-recursively.mjs --root apps --pattern handler`.
+- `node agents/scripts/list-files-recursively.mjs --root <path> --pattern <pattern> [--types ...] [--regex] [--case-sensitive]`
+  Emits a CSV (`path,size,modifiedAt`) of files under the given root whose repo-relative paths match the pattern; supports substring or regex matching plus optional type filters (`ts`, `md`, `all`).
 - `node agents/scripts/git-diff-with-lines.mjs [--cached]`
   Emits the working tree (or staged) diff against `HEAD` with old/new line numbers for verification reports.

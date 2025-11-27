@@ -21,29 +21,37 @@ Global Prompts
 - Reference `agents/memory-bank.md#retrieval-policy` for discovery tooling, numbered output expectations, and single-pass context discipline.
 - Call out any workflow-specific safety, coordination, or communication rules.
 
-Phase: plan
+Phase: requirements
 
-- Goal: <What the plan phase must accomplish.>
+- Goal: <What the Requirements phase must accomplish.>
 - Inputs: <Key files, context, or systems to inspect before proposing work.>
 - Checklist:
-  - <Add bullet items that define planning steps and acceptance criteria.>
+  - <Add bullet items that define requirements steps and acceptance criteria.>
 - Outputs: <Artifacts required to exit the phase.>
-- Next: build
+- Next: design
 
-Phase: build
+Phase: design
 
-- Goal: <What implementation should deliver.>
+- Goal: <What the Design phase should deliver.>
 - Checklist:
-  - <Implementation tasks and verification steps.>
-- Outputs: <Code/doc changes, migrations, etc.>
-- Next: verify
+  - <Design tasks and decisions to capture.>
+- Outputs: <Design artifacts (diagrams, contracts, notes).>
+- Next: implementation-planning
 
-Phase: verify
+Phase: implementation-planning
 
-- Goal: <How to prove the change met expectations.>
+- Goal: <How to break down work into tasks with test mapping.>
 - Checklist:
-  - <Tests, validations, and Memory Bank updates.>
-- Outputs: <Evidence collected plus any follow-up actions.>
+  - <Tasks, dependencies, and test traceability steps.>
+- Outputs: <Task list and verification plan.>
+- Next: execution
+
+Phase: execution
+
+- Goal: <How to deliver and validate the change.>
+- Checklist:
+  - <Execution tasks, tests, and validation steps.>
+- Outputs: <Code/doc changes, evidence, reflections.>
 - Next: done
 
 End
