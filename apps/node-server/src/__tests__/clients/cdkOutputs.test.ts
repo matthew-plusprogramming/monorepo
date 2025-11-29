@@ -42,8 +42,7 @@ type LoadCall = {
 
 const loadCalls: Array<LoadCall> = [];
 
-// eslint-disable-next-line no-var
-var loadCDKOutputMock: ReturnType<typeof vi.fn> | undefined;
+let loadCDKOutputMock: ReturnType<typeof vi.fn> | undefined;
 
 type BackendServerCdkModule = Record<string, unknown> & {
   loadCDKOutput: (stack: string, basePath?: string) => unknown;
