@@ -9,40 +9,56 @@ import {
 } from '@packages/backend-core/testing';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const outputsByStack = {
+type OutputsByStack = {
   [API_STACK_NAME]: {
-    apiUserTableName: 'users-table',
-    apiUserVerificationTableName: 'verification-table',
-    apiRateLimitTableName: 'rate-limit-table',
-    apiDenyListTableName: 'deny-list-table',
-  },
+    apiUserTableName: string;
+    apiUserVerificationTableName: string;
+    apiRateLimitTableName: string;
+    apiDenyListTableName: string;
+  };
   [ANALYTICS_STACK_NAME]: {
-    analyticsEventBusArn: 'analytics-bus-arn',
-    analyticsEventBusName: 'analytics-bus',
-    analyticsEventBusDeadLetterQueueArn: 'analytics-dlq-arn',
-    analyticsEventBusDeadLetterQueueUrl: 'https://example.com/dlq',
-    analyticsDedupeTableName: 'analytics-dedupe-table',
-    analyticsEventDedupeTableName: 'analytics-dedupe-table',
-    analyticsMetricsAggregateTableName: 'analytics-aggregate-table',
-  },
+    analyticsEventBusArn: string;
+    analyticsEventBusName: string;
+    analyticsEventBusDeadLetterQueueArn: string;
+    analyticsEventBusDeadLetterQueueUrl: string;
+    analyticsDedupeTableName: string;
+    analyticsEventDedupeTableName: string;
+    analyticsMetricsAggregateTableName: string;
+  };
   [ANALYTICS_LAMBDA_STACK_NAME]: {
-    analyticsProcessorLambdaFunctionArn: 'analytics-processor-lambda-arn',
-    analyticsProcessorLambdaFunctionName: 'analytics-processor-lambda',
-    analyticsProcessorRuleArn: 'analytics-processor-rule-arn',
-    analyticsProcessorRuleName: 'analytics-processor-rule',
-  },
-} as const;
+    analyticsProcessorLambdaFunctionArn: string;
+    analyticsProcessorLambdaFunctionName: string;
+    analyticsProcessorRuleArn: string;
+    analyticsProcessorRuleName: string;
+  };
+};
 
-type StackName = keyof typeof outputsByStack;
+type StackName = keyof OutputsByStack;
 
 type LoadCall = {
   readonly stack: StackName;
   readonly basePath: string | undefined;
 };
 
-const loadCalls: Array<LoadCall> = [];
+const { outputsByStack, loadCalls, loadCDKOutputMock } = vi.hoisted(() => {
+  const outputsByStack = new Map<StackName, OutputsByStack[StackName]>();
+  const loadCalls: Array<LoadCall> = [];
 
-let loadCDKOutputMock: ReturnType<typeof vi.fn> | undefined;
+  const loadCDKOutputMock = vi.fn((stack: StackName, basePath?: string) => {
+    loadCalls.push({ stack, basePath });
+    const outputs = outputsByStack.get(stack);
+    if (!outputs) {
+      throw new Error(`Missing outputs for stack ${stack}`);
+    }
+    return outputs;
+  });
+
+  return {
+    outputsByStack,
+    loadCalls,
+    loadCDKOutputMock,
+  };
+});
 
 type BackendServerCdkModule = Record<string, unknown> & {
   loadCDKOutput: (stack: string, basePath?: string) => unknown;
@@ -54,9 +70,31 @@ vi.mock('@cdk/backend-server-cdk', async () => {
     throw new Error('Failed to load backend-server-cdk module');
   }
 
-  loadCDKOutputMock = vi.fn((stack: StackName, basePath?: string) => {
-    loadCalls.push({ stack, basePath });
-    return outputsByStack[stack];
+  const apiStackName = actual.API_STACK_NAME as StackName;
+  const analyticsStackName = actual.ANALYTICS_STACK_NAME as StackName;
+  const analyticsLambdaStackName =
+    actual.ANALYTICS_LAMBDA_STACK_NAME as StackName;
+
+  outputsByStack.set(apiStackName, {
+    apiUserTableName: 'users-table',
+    apiUserVerificationTableName: 'verification-table',
+    apiRateLimitTableName: 'rate-limit-table',
+    apiDenyListTableName: 'deny-list-table',
+  });
+  outputsByStack.set(analyticsStackName, {
+    analyticsEventBusArn: 'analytics-bus-arn',
+    analyticsEventBusName: 'analytics-bus',
+    analyticsEventBusDeadLetterQueueArn: 'analytics-dlq-arn',
+    analyticsEventBusDeadLetterQueueUrl: 'https://example.com/dlq',
+    analyticsDedupeTableName: 'analytics-dedupe-table',
+    analyticsEventDedupeTableName: 'analytics-dedupe-table',
+    analyticsMetricsAggregateTableName: 'analytics-aggregate-table',
+  });
+  outputsByStack.set(analyticsLambdaStackName, {
+    analyticsProcessorLambdaFunctionArn: 'analytics-processor-lambda-arn',
+    analyticsProcessorLambdaFunctionName: 'analytics-processor-lambda',
+    analyticsProcessorRuleArn: 'analytics-processor-rule-arn',
+    analyticsProcessorRuleName: 'analytics-processor-rule',
   });
 
   return {
@@ -83,7 +121,7 @@ function isBackendServerCdkModule(
 describe('clients/cdkOutputs', () => {
   beforeEach(() => {
     loadCalls.length = 0;
-    loadCDKOutputMock?.mockClear();
+    loadCDKOutputMock.mockClear();
   });
 
   afterEach(() => {
