@@ -35,6 +35,10 @@ export const generateRequestHandler = <R, E extends Error>({
     if (Either.isLeft(result)) {
       const error = result.left;
       let errorMatch = false;
+
+      // TODO: figure out a better way to do this
+      console.error(error.cause);
+
       for (const [
         statusCode,
         {
