@@ -20,9 +20,8 @@ let SecurityLoggerService: LoggerLayer;
 let originalDebugValue: string | undefined;
 
 beforeAll(async () => {
-  ({ ApplicationLoggerService, SecurityLoggerService } = await import(
-    '@/services/logger.service'
-  ));
+  ({ ApplicationLoggerService, SecurityLoggerService } =
+    await import('@/services/logger.service'));
 });
 
 afterAll(() => {

@@ -108,9 +108,8 @@ const runHeartbeatScenario = async ({
   platform,
   configureEventBridge,
 }: HeartbeatScenarioOptions): Promise<HeartbeatScenarioResult> => {
-  const { heartbeatRequestHandler } = await import(
-    '@/handlers/heartbeat.handler'
-  );
+  const { heartbeatRequestHandler } =
+    await import('@/handlers/heartbeat.handler');
   const eventBridgeFake = getEventBridgeFake();
   const loggerFake = getLoggerFake();
 

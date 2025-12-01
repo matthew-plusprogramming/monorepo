@@ -41,9 +41,8 @@ describe('getUserRequestHandler', () => {
       params: { identifier: buildUserPublic().email },
     });
 
-    const { getUserRequestHandler } = await import(
-      '@/handlers/getUser.handler'
-    );
+    const { getUserRequestHandler } =
+      await import('@/handlers/getUser.handler');
     const user: UserPublic = buildUserPublic();
     getUserRepoFake().reset();
     getUserRepoFake().queueFindSome(user);
@@ -64,9 +63,8 @@ describe('getUserRequestHandler', () => {
       params: { identifier: '11111111-1111-1111-1111-111111111111' },
     });
 
-    const { getUserRequestHandler } = await import(
-      '@/handlers/getUser.handler'
-    );
+    const { getUserRequestHandler } =
+      await import('@/handlers/getUser.handler');
     getUserRepoFake().reset();
     getUserRepoFake().queueFindNone();
 
@@ -85,9 +83,8 @@ describe('getUserRequestHandler', () => {
       params: { identifier: '' },
     });
 
-    const { getUserRequestHandler } = await import(
-      '@/handlers/getUser.handler'
-    );
+    const { getUserRequestHandler } =
+      await import('@/handlers/getUser.handler');
 
     // Act
     await getUserRequestHandler(req, res, vi.fn());

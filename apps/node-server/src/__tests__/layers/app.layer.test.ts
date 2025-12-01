@@ -30,9 +30,8 @@ vi.mock('@/clients/cdkOutputs', () => makeCdkOutputsStub());
 
 vi.mock('@/services/dynamodb.service', async (importOriginal) => {
   const actual: typeof DynamoServiceModule = await importOriginal();
-  const { createDynamoDbServiceFake } = await import(
-    '@packages/backend-core/testing'
-  );
+  const { createDynamoDbServiceFake } =
+    await import('@packages/backend-core/testing');
   const fake = createDynamoDbServiceFake();
   dynamoModule.fake = fake;
   return {
@@ -43,9 +42,8 @@ vi.mock('@/services/dynamodb.service', async (importOriginal) => {
 
 vi.mock('@/services/logger.service', async (importOriginal) => {
   const actual: typeof LoggerServiceModule = await importOriginal();
-  const { createLoggerServiceFake } = await import(
-    '@packages/backend-core/testing'
-  );
+  const { createLoggerServiceFake } =
+    await import('@packages/backend-core/testing');
   const fake = createLoggerServiceFake();
   loggerModule.fake = fake;
   return {
@@ -57,9 +55,8 @@ vi.mock('@/services/logger.service', async (importOriginal) => {
 
 vi.mock('@/services/eventBridge.service', async (importOriginal) => {
   const actual: typeof EventBridgeServiceModule = await importOriginal();
-  const { createEventBridgeServiceFake } = await import(
-    '@packages/backend-core/testing'
-  );
+  const { createEventBridgeServiceFake } =
+    await import('@packages/backend-core/testing');
   const fake = createEventBridgeServiceFake();
   eventBridgeModule.fake = fake;
   return {

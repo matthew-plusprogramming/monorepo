@@ -65,8 +65,7 @@ $breakpoints: (
   font-optical-sizing: auto;
   font-weight: 400;
   font-style: normal;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  font-synthesis: none;
   line-height: 1.5;
   color: var(--text-color);
   text-rendering: optimizelegibility;
@@ -75,7 +74,8 @@ $breakpoints: (
   color-scheme: light dark;
   background-color: var(--background-color);
 
-  font-synthesis: none;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 html,

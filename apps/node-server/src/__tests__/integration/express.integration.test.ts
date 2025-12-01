@@ -21,9 +21,8 @@ vi.mock('@/clients/cdkOutputs', () => makeCdkOutputsStub());
 
 vi.mock('@/services/eventBridge.service', async (importOriginal) => {
   const actual: typeof EventBridgeServiceModule = await importOriginal();
-  const { createEventBridgeServiceFake } = await import(
-    '@packages/backend-core/testing'
-  );
+  const { createEventBridgeServiceFake } =
+    await import('@packages/backend-core/testing');
   const fake = createEventBridgeServiceFake();
   eventBridgeModule.fake = fake;
   return {
@@ -39,9 +38,8 @@ type BuildHeartbeatAppOptions = {
 const buildHeartbeatApp = async ({
   includeUser = true,
 }: BuildHeartbeatAppOptions = {}): Promise<Express> => {
-  const { heartbeatRequestHandler } = await import(
-    '@/handlers/heartbeat.handler'
-  );
+  const { heartbeatRequestHandler } =
+    await import('@/handlers/heartbeat.handler');
 
   const app = express();
   if (includeUser) {

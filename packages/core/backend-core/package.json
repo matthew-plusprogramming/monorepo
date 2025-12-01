@@ -40,13 +40,13 @@
     "dist"
   ],
   "dependencies": {
-    "@aws-sdk/client-cloudwatch-logs": "^3.934.0",
-    "@aws-sdk/client-dynamodb": "^3.934.0",
-    "@aws-sdk/client-eventbridge": "^3.934.0",
-    "effect": "^3.19.4",
+    "@aws-sdk/client-cloudwatch-logs": "^3.940.0",
+    "@aws-sdk/client-dynamodb": "^3.940.0",
+    "@aws-sdk/client-eventbridge": "^3.940.0",
+    "effect": "^3.19.8",
     "express": "^5.1.0",
     "typescript": "^5.9.3",
-    "zod": "^4.1.12"
+    "zod": "^4.1.13"
   },
   "devDependencies": {
     "@configs/eslint-config": "*",

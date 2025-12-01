@@ -24,9 +24,8 @@ const loggerModule = vi.hoisted((): { fake?: LoggerServiceFake } => ({}));
 vi.mock('@/clients/cdkOutputs', () => makeCdkOutputsStub());
 
 vi.mock('@/services/logger.service', async () => {
-  const { createLoggerServiceFake } = await import(
-    '@packages/backend-core/testing'
-  );
+  const { createLoggerServiceFake } =
+    await import('@packages/backend-core/testing');
   const fake = createLoggerServiceFake();
   loggerModule.fake = fake;
   return {
@@ -37,9 +36,8 @@ vi.mock('@/services/logger.service', async () => {
 });
 
 vi.mock('@/services/dynamodb.service', async () => {
-  const { createDynamoDbServiceFake } = await import(
-    '@packages/backend-core/testing'
-  );
+  const { createDynamoDbServiceFake } =
+    await import('@packages/backend-core/testing');
   const fake = createDynamoDbServiceFake();
   dynamoModule.fake = fake;
   return {
