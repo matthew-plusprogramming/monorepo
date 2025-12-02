@@ -2,7 +2,9 @@
 @use '@/styles/form-colors.scss' as formColors;
 
 $button-padding: 0.55rem 1.5rem;
+$button-padding-sm: 0.45rem 0.95rem;
 $button-radius: 0.5rem;
+$button-radius-sm: 0.65rem;
 $button-transition:
   transform 150ms ease,
   background 150ms ease,
@@ -46,6 +48,17 @@ $button-transition:
   }
 }
 
+.sizeMd {
+  padding: $button-padding;
+  border-radius: $button-radius;
+}
+
+.sizeSm {
+  padding: $button-padding-sm;
+  border-radius: $button-radius-sm;
+  font-size: 0.95rem;
+}
+
 .displayCta {
   --button-shadow-color: formColors.$button-shadow-cta;
 
@@ -71,6 +84,54 @@ $button-transition:
   &:hover,
   &:focus-visible {
     background: formColors.$button-secondary-hover-background;
+  }
+}
+
+.displayGhost {
+  --button-shadow-color: formColors.$button-shadow-default;
+
+  border: 1px solid formColors.$input-border-color;
+  color: inherit;
+  background: color-mix(
+    in oklch,
+    var(--background-color) 96%,
+    var(--muted-color) 4%
+  );
+
+  &:hover,
+  &:focus-visible {
+    border-color: formColors.$input-focus-border-color;
+    background: color-mix(
+      in oklch,
+      var(--background-color) 90%,
+      var(--muted-color) 10%
+    );
+  }
+}
+
+.displayDangerGhost {
+  --button-shadow-color: formColors.$button-shadow-default;
+
+  border: 1px solid color-mix(
+    in oklch,
+    formColors.$input-border-color 70%,
+    var(--danger-color) 30%
+  );
+  color: var(--danger-color);
+  background: color-mix(
+    in oklch,
+    var(--background-color) 96%,
+    var(--muted-color) 4%
+  );
+
+  &:hover,
+  &:focus-visible {
+    border-color: color-mix(
+      in oklch,
+      formColors.$input-focus-border-color 60%,
+      var(--danger-color) 40%
+    );
+    color: color-mix(in oklch, var(--danger-color) 85%, #000 15%);
   }
 }
 
