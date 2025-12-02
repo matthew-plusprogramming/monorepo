@@ -1,0 +1,131 @@
+@use '@/app/globals.scss' as *;
+@use '@/styles/form-colors.scss' as formColors;
+
+$danger-color-strong: color-mix(
+  in oklch,
+  var(--danger-color) 85%,
+  #000 15%
+);
+
+.menuWrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.menuButton {
+  cursor: pointer;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  width: 2.4rem;
+  height: 2.4rem;
+  padding: 0.25rem 0.4rem;
+  border: 1px solid formColors.$input-border-color;
+  border-radius: 0.75rem;
+
+  font-weight: 800;
+  color: inherit;
+  letter-spacing: 0.12em;
+
+  background: color-mix(
+    in oklch,
+    var(--background-color) 92%,
+    var(--muted-color) 8%
+  );
+
+  transition:
+    background var(--transition-fast) ease,
+    border-color var(--transition-fast) ease,
+    box-shadow var(--transition-fast) ease,
+    transform var(--transition-fast) ease;
+}
+
+.menuButton:hover {
+  transform: translateY(-1px);
+  border-color: formColors.$input-focus-border-color;
+  background: color-mix(
+    in oklch,
+    var(--background-color) 88%,
+    var(--muted-color) 12%
+  );
+}
+
+.menuButton:focus-visible {
+  border-color: formColors.$input-focus-border-color;
+  outline: none;
+  box-shadow: 0 0 0 3px formColors.$input-focus-ring-color;
+}
+
+.menuPanel {
+  position: absolute;
+  z-index: 2;
+  top: calc(100% + 0.5rem);
+  right: 0;
+
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+
+  min-width: 12rem;
+  padding: 0.5rem;
+  border: 1px solid formColors.$input-border-color;
+  border-radius: 0.9rem;
+
+  background: var(--background-color);
+  box-shadow: 0 16px 32px rgb(0 0 0 / 0.14);
+}
+
+.menuItem {
+  cursor: pointer;
+
+  display: inline-flex;
+  gap: 0.35rem;
+  align-items: center;
+  justify-content: flex-start;
+
+  width: 100%;
+  padding: 0.5rem 0.65rem;
+  border: none;
+  border-radius: 0.65rem;
+
+  font-weight: 700;
+  color: inherit;
+
+  background: color-mix(
+    in oklch,
+    var(--background-color) 96%,
+    var(--muted-color) 4%
+  );
+
+  transition:
+    background var(--transition-fast) ease,
+    border-color var(--transition-fast) ease,
+    transform var(--transition-fast) ease,
+    color var(--transition-fast) ease;
+}
+
+.menuItem:disabled {
+  cursor: not-allowed;
+  transform: none;
+  opacity: 0.6;
+}
+
+.menuItem:not(:disabled):hover {
+  transform: translateY(-1px);
+  background: color-mix(
+    in oklch,
+    var(--background-color) 90%,
+    var(--muted-color) 10%
+  );
+}
+
+.deleteAction {
+  color: var(--danger-color);
+}
+
+.deleteAction:not(:disabled):hover {
+  color: $danger-color-strong;
+}
