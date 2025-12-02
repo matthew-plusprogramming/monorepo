@@ -1,7 +1,7 @@
 ---
 memory_bank: v1
-generated_at: 2025-11-29
-repo_git_sha: 44dd63ee26e8c1c599ca1e3daaaf59c6e1e31fb0
+generated_at: 2025-12-02
+repo_git_sha: 74302dee762d0dbdfc91ceb0996b15b25ff93b78
 ---
 
 Memory Bank
