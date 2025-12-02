@@ -81,8 +81,8 @@ $stack-gap: 1.25rem;
   background: formColors.$input-background-color;
 
   transition:
-    border-color 150ms ease,
-    box-shadow 150ms ease;
+    border-color var(--transition-medium) ease,
+    box-shadow var(--transition-medium) ease;
 
   &::placeholder {
     color: formColors.$input-placeholder-color;
@@ -134,7 +134,7 @@ $stack-gap: 1.25rem;
   text-align: center;
   text-decoration: none;
 
-  transition: opacity 120ms ease;
+  transition: opacity var(--transition-fast) ease;
 
   &:hover,
   &:focus-visible {

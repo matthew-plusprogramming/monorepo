@@ -21,7 +21,7 @@
   background: var(--background-color);
   box-shadow: 0 18px 42px var(--muted-color);
 
-  animation: toast-in 200ms ease-out;
+  animation: toast-in var(--transition-slow) ease-out;
 }
 
 .success {
@@ -89,9 +89,9 @@
   background: transparent;
 
   transition:
-    transform 120ms ease,
-    border-color 120ms ease,
-    background 120ms ease;
+    transform var(--transition-fast) ease,
+    border-color var(--transition-fast) ease,
+    background var(--transition-fast) ease;
 
   &:hover,
   &:focus-visible {

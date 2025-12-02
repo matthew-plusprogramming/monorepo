@@ -6,10 +6,10 @@ $button-padding-sm: 0.45rem 0.95rem;
 $button-radius: 0.5rem;
 $button-radius-sm: 0.65rem;
 $button-transition:
-  transform 150ms ease,
-  background 150ms ease,
-  color 150ms ease,
-  box-shadow 150ms ease;
+  transform var(--transition-medium) ease,
+  background var(--transition-medium) ease,
+  color var(--transition-medium) ease,
+  box-shadow var(--transition-medium) ease;
 
 .button {
   --button-shadow-color: formColors.$button-shadow-default;
