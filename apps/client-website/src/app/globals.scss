@@ -61,6 +61,11 @@ $breakpoints: (
   --error-color: #e11212;
   --danger-color: #c43232;
 
+  // Motion
+  --transition-fast: 120ms;
+  --transition-medium: 150ms;
+  --transition-slow: 200ms;
+
   // Typography
   font-family: Inter, sans-serif;
   font-optical-sizing: auto;
