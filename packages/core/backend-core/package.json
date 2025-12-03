@@ -44,7 +44,7 @@
     "@aws-sdk/client-dynamodb": "^3.943.0",
     "@aws-sdk/client-eventbridge": "^3.943.0",
     "effect": "^3.19.8",
-    "express": "^5.2.1",
+    "express": "^5.2.0",
     "typescript": "^5.9.3",
     "zod": "^4.1.13"
   },
