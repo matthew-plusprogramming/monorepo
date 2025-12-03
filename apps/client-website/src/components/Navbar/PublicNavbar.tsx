@@ -26,13 +26,7 @@ const PublicNavbar = (): JSX.Element => {
 
       <ul className={styles.links}>
         <li>
-          <Link href="#features">Features</Link>
-        </li>
-        <li>
-          <Link href="#pricing">Pricing</Link>
-        </li>
-        <li>
-          <Link href="#blog">Blog</Link>
+          <Link href="/features">Features</Link>
         </li>
       </ul>
 
