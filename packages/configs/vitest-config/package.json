@@ -20,6 +20,6 @@
     "@configs/ts-config": "*"
   },
   "peerDependencies": {
-    "vitest": "^4.0.14"
+    "vitest": "^4.0.15"
   }
 }

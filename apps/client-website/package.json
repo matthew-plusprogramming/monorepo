@@ -56,6 +56,6 @@
     "stylelint-scss": "^6.12.1",
     "typed-scss-modules": "^8.1.1",
     "typescript": "^5.9.3",
-    "vitest": "^4.0.14"
+    "vitest": "^4.0.15"
   }
 }
