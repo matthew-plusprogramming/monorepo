@@ -48,22 +48,13 @@ const FeaturesPage = (): JSX.Element => {
     <PageCardShell
       cardAriaLabel="Feature highlights"
       cardAriaLabelledBy="features-title"
-      cardClassName={styles.card}
       eyebrow="Features"
+      headingId="features-title"
       header={<PublicNavbar />}
       mainAriaLabel="Features page"
+      subtitle="Explore the guardrails and components that keep this stack cohesive. Everything is set up to help you move quickly without sacrificing clarity."
+      title="Ship faster with a collaborative monorepo"
     >
-      <header className={styles.header}>
-        <h1 className={styles.title} id="features-title">
-          Ship faster with a collaborative monorepo
-        </h1>
-        <p className={styles.lead}>
-          Explore the guardrails and components that keep this stack cohesive.
-          Everything is set up to help you move quickly without sacrificing
-          clarity.
-        </p>
-      </header>
-
       <ul aria-label="Key features" className={styles.featureList}>
         {features.map((feature) => (
           <li className={styles.featureItem} key={feature.title}>

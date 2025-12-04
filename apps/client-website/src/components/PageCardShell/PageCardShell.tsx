@@ -10,6 +10,9 @@ type PageCardShellProps = {
   eyebrow?: ReactNode;
   eyebrowClassName?: string;
   header?: ReactNode;
+  headingId?: string;
+  title?: string;
+  subtitle?: string;
   mainAriaLabel: string;
   cardAriaLabel?: string;
   cardAriaLabelledBy?: string;
@@ -21,6 +24,9 @@ const PageCardShell = ({
   eyebrow,
   eyebrowClassName,
   header,
+  headingId,
+  title,
+  subtitle,
   mainAriaLabel,
   cardAriaLabel,
   cardAriaLabelledBy,
@@ -28,6 +34,7 @@ const PageCardShell = ({
 }: PageCardShellProps): JSX.Element => {
   const cardClass = classNames(styles.card, cardClassName);
   const eyebrowClass = classNames(styles.eyebrow, eyebrowClassName);
+  const resolvedHeadingId = headingId ?? cardAriaLabelledBy;
 
   return (
     <div className={styles.page}>
@@ -39,6 +46,14 @@ const PageCardShell = ({
           className={cardClass}
         >
           {eyebrow ? <p className={eyebrowClass}>{eyebrow}</p> : null}
+          {title ? (
+            <header className={styles.cardHeader}>
+              <h1 className={styles.title} id={resolvedHeadingId}>
+                {title}
+              </h1>
+              {subtitle ? <p className={styles.subtitle}>{subtitle}</p> : null}
+            </header>
+          ) : null}
           {children}
         </section>
       </main>

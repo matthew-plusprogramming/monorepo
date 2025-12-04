@@ -43,22 +43,13 @@ const ComponentsPage = (): JSX.Element => {
     <PageCardShell
       cardAriaLabel="Component highlights"
       cardAriaLabelledBy="components-title"
-      cardClassName={styles.card}
       eyebrow="Components"
+      headingId="components-title"
       header={<PublicNavbar />}
       mainAriaLabel="Components page"
+      subtitle="Browse the components that ship with this monorepo. Each piece is typed, styled, and ready to drop into both marketing and product flows."
+      title="Build pages with reusable UI primitives"
     >
-      <header className={styles.header}>
-        <h1 className={styles.title} id="components-title">
-          Build pages with reusable UI primitives
-        </h1>
-        <p className={styles.lead}>
-          Browse the components that ship with this monorepo. Each piece is
-          typed, styled, and ready to drop into both marketing and product
-          flows.
-        </p>
-      </header>
-
       <ul aria-label="UI components" className={styles.componentList}>
         {componentCallouts.map((component) => (
           <li className={styles.componentItem} key={component.title}>
