@@ -12,7 +12,7 @@
     "copy-assets-for-cdk": "tsx scripts/copy-lambda-artifacts.ts",
     "// TODO: ": "Make the lambda go into a subfolder of dist",
     "postcopy-assets-for-cdk": "cd dist && zip -r ./lambda.zip . && cd ..",
-    "clean": "rm -rf node_modules && rm -rf cdktf.out && rm -rf .turbo && rm -rf dist && rm -rf cdktf-outputs",
+    "clean": "node ./scripts/clean.mjs",
     "// -- 🧪 Testing": "--",
     "// -- 🧹 Linting & Formatting": "--",
     "lint": "eslint src --cache",

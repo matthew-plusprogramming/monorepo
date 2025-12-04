@@ -21,7 +21,7 @@
     "// -- 🚀 Turborepo": "--",
     "build": "turbo run build",
     "build:no-cache": "turbo run build --force",
-    "clean": "turbo run clean && rm -rf node_modules && rm -rf .turbo",
+    "clean": "node scripts/clean.mjs",
     "cache:clear": "rm -rf .turbo",
     "prelint": "npm run format:markdown",
     "lint": "turbo run lint",
