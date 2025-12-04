@@ -7,6 +7,8 @@ Monorepo Infra:
 - [ ] CI pipeline of some kind
 - [x] Prettier formatting via config.ts and cli
   - [x] Part of CI?
+- [ ] Implement publishing website to CF for SSG
+- [ ] Implement publishing website to CF + API Gateway + EC2 for SSR
 
 Backend:
 
@@ -55,22 +57,21 @@ Frontend:
 - [x] NextJS
 - [x] Scss
   - [x] Classnames
-- [ ] Zustand
-- [ ] React query
-- [ ] React hookform?
+- [x] Zustand
+- [x] React query
+- [x] React hookform
 - [ ] UI Tests
 - [ ] Integrate single-spa (why not)
   - [ ] Maybe later? (too cumbersome for now)
-- [ ] React hookform
 - [ ] Create a barebones component suite for common usecases
-  - [ ] Button
-  - [ ] Navbar
+  - [x] Button
+  - [x] Navbar
   - [ ] Footer
   - [ ] Sidebar
   - [ ] Sidenav
 - [ ] Barebones admin dashboard
 - [ ] Barebones user-facing application
-- [ ] Barebones landing page
+- [x] Barebones landing page
 
 Chores:
 
