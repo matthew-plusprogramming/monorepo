@@ -103,3 +103,21 @@ node scripts/manage-cdktf-state.mjs bootstrap-backend
 - The script derives the stack name from `cdk/backend-server-cdk/src/constants.ts`, removes `cdk/backend-server-cdk/terraform.<stack>.tfstate` (plus the legacy `.terraform/terraform.tfstate` copy), and restores `migrateStateToBootstrappedBackend` to its original value even if a command fails.
 - Command output streams directly to your terminal; rerun once issues are resolved.
 - `node scripts/manage-cdktf-state.mjs cdk deploy <stack> [--prod]` and `node scripts/manage-cdktf-state.mjs cdk output <stack> [--prod]` target a specific stack. Omitting `<stack>` in an interactive terminal opens a picker so you can select and confirm one or more stacks; the script runs each deploy/output sequentially with the same flags. Append `--` before any extra CDK arguments (for example, `-- --context stage=dev`) to forward them to every selected stack.
+
+---
+
+## Convert Functions to Arrow Expressions
+
+```
+tsx scripts/convert-to-arrows.ts
+```
+
+### What it does
+
+- Scans TypeScript/TSX files and rewrites eligible function declarations/expressions into arrow functions.
+- Skips functions that rely on `this`, `super`, `arguments`, `new.target`, overloads, or hoisted references to avoid semantic changes.
+
+### Usage notes
+
+- Runs against the repo by default (honors `.gitignore` and skips `dist/`, `.next/`, etc.).
+- Save your work before running; the codemode writes changes in place and reports how many functions were converted.

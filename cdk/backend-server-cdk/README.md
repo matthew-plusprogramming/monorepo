@@ -8,6 +8,16 @@ Stacks ([src/stacks.ts](src/stacks.ts)):
 - `api-lambda-stack`: Lambda packaging, IAM role, and analytics permissions
 - `analytics-stack`: EventBridge bus, DLQ, DynamoDB tables, and log groups for analytics
 
+## Quick Start
+
+- Install deps at the repo root: `npm install`
+- Ensure envs are available (decrypt if you have the key, otherwise create your own `.env.dev` / `.env.production`)
+- Synthesize all stacks for dev: `npm -w @cdk/backend-server-cdk run cdk:synth:dev`
+- Deploy dev stacks: `npm -w @cdk/backend-server-cdk run cdk:deploy:dev`
+- Export outputs for app consumption:
+  - API stack: `npm -w @cdk/backend-server-cdk run cdk:output:dev api-stack`
+  - Analytics stack: `npm -w @cdk/backend-server-cdk run cdk:output:dev analytics-stack`
+
 ## Prerequisites
 
 - Node.js (repo uses workspaces)
