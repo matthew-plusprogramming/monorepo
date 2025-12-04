@@ -1,0 +1,58 @@
+@use '@/app/globals.scss' as *;
+
+$text-muted: color-mix(in oklch, var(--text-color) 78%, var(--muted-color));
+$section-gap: clamp(1rem, 3vw, 1.75rem);
+$action-border-color: color-mix(
+  in oklch,
+  var(--muted-color) 28%,
+  var(--background-color)
+);
+$action-background: color-mix(
+  in oklch,
+  var(--background-color) 96%,
+  var(--muted-color) 4%
+);
+
+.content {
+  display: flex;
+  flex-direction: column;
+  gap: $section-gap;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: center;
+  justify-content: space-between;
+
+  padding: 1rem clamp(1rem, 2vw, 1.5rem);
+  border: 1px solid $action-border-color;
+  border-radius: 1rem;
+
+  background: $action-background;
+}
+
+.actionCopy {
+  display: grid;
+  gap: 0.35rem;
+  max-width: 640px;
+}
+
+.actionTitle {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.actionHint {
+  margin: 0;
+  font-size: 0.95rem;
+  color: $text-muted;
+}
+
+.logoutButton {
+  @include respond(mobile) {
+    width: 100%;
+  }
+}
