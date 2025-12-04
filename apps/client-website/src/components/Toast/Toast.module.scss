@@ -30,6 +30,20 @@
   box-shadow: 0 2px 16px var(--accent-color);
 }
 
+.error {
+  border-color: var(--danger-color);
+  background: color-mix(
+    in oklch,
+    var(--background-color) 95%,
+    var(--danger-color) 5%
+  );
+  box-shadow: 0 2px 16px color-mix(
+      in oklch,
+      var(--danger-color) 55%,
+      #000 45%
+    );
+}
+
 .badge {
   display: inline-flex;
   align-items: center;
@@ -42,6 +56,10 @@
   color: var(--background-color);
 
   background: var(--accent-color);
+}
+
+.error .badge {
+  background: var(--danger-color);
 }
 
 .icon {

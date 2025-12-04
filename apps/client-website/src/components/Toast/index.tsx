@@ -3,7 +3,7 @@ import type { JSX } from 'react';
 
 import styles from './Toast.module.scss';
 
-type ToastVariant = 'success';
+type ToastVariant = 'success' | 'error';
 
 type ToastProps = {
   message: string;
@@ -13,6 +13,7 @@ type ToastProps = {
 
 const variantTitle: Record<ToastVariant, string> = {
   success: 'Success',
+  error: 'Error',
 };
 
 const Toast = ({
@@ -20,11 +21,14 @@ const Toast = ({
   onDismiss,
   variant = 'success',
 }: ToastProps): JSX.Element => {
+  const ariaRole = variant === 'error' ? 'alert' : 'status';
+  const ariaLive = variant === 'error' ? 'assertive' : 'polite';
+
   return (
     <div
-      aria-live="polite"
+      aria-live={ariaLive}
       className={classnames(styles.toast, styles[variant])}
-      role="status"
+      role={ariaRole}
     >
       <span aria-hidden="true" className={styles.badge}>
         <svg
