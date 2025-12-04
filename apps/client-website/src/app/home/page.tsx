@@ -1,36 +1,17 @@
 'use client';
 
-import { useEffect } from 'react';
-
-import { useRouter } from 'next/navigation';
 import type { JSX } from 'react';
 
 import { Navbar } from '@/components/Navbar';
 import { PageCardShell } from '@/components/PageCardShell';
-import { useUserStore } from '@/stores/userStore';
+import { useProtectedPage } from '@/hooks/useProtectedPage';
 
 import styles from './page.module.scss';
 
 const HomePage = (): JSX.Element | null => {
-  const router = useRouter();
-  const token = useUserStore((state) => state.token);
-  const hasHydrated = useUserStore((state) => state.hasHydrated);
+  const { canRender } = useProtectedPage();
 
-  useEffect(() => {
-    if (!hasHydrated) {
-      return;
-    }
-
-    if (!token) {
-      router.replace('/login');
-    }
-  }, [hasHydrated, token, router]);
-
-  if (!hasHydrated) {
-    return null;
-  }
-
-  if (!token) {
+  if (!canRender) {
     return null;
   }
 

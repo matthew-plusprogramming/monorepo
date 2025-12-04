@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 
 import { useRouter } from 'next/navigation';
 import type { JSX } from 'react';
@@ -8,6 +8,7 @@ import type { JSX } from 'react';
 import { Button } from '@/components/Button';
 import { Navbar } from '@/components/Navbar';
 import { PageCardShell } from '@/components/PageCardShell';
+import { useProtectedPage } from '@/hooks/useProtectedPage';
 import { useUserStore } from '@/stores/userStore';
 
 import styles from './page.module.scss';
@@ -45,27 +46,15 @@ const AccountContent = ({
 
 const AccountPage = (): JSX.Element | null => {
   const router = useRouter();
-  const token = useUserStore((state) => state.token);
-  const hasHydrated = useUserStore((state) => state.hasHydrated);
   const clearToken = useUserStore((state) => state.clearToken);
 
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
-  useEffect(() => {
-    if (!hasHydrated) {
-      return;
-    }
+  const { canRender } = useProtectedPage({
+    allowRenderWithoutToken: isLoggingOut,
+  });
 
-    if (!token) {
-      router.replace('/login');
-    }
-  }, [hasHydrated, token, router]);
-
-  if (!hasHydrated) {
-    return null;
-  }
-
-  if (!token && !isLoggingOut) {
+  if (!canRender) {
     return null;
   }
 
