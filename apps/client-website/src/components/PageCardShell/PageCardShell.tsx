@@ -7,6 +7,8 @@ import styles from './PageCardShell.module.scss';
 
 type PageCardShellProps = {
   children: ReactNode;
+  eyebrow?: ReactNode;
+  eyebrowClassName?: string;
   header?: ReactNode;
   mainAriaLabel: string;
   cardAriaLabel?: string;
@@ -16,6 +18,8 @@ type PageCardShellProps = {
 
 const PageCardShell = ({
   children,
+  eyebrow,
+  eyebrowClassName,
   header,
   mainAriaLabel,
   cardAriaLabel,
@@ -23,6 +27,7 @@ const PageCardShell = ({
   cardClassName,
 }: PageCardShellProps): JSX.Element => {
   const cardClass = classNames(styles.card, cardClassName);
+  const eyebrowClass = classNames(styles.eyebrow, eyebrowClassName);
 
   return (
     <div className={styles.page}>
@@ -33,6 +38,7 @@ const PageCardShell = ({
           aria-labelledby={cardAriaLabelledBy}
           className={cardClass}
         >
+          {eyebrow ? <p className={eyebrowClass}>{eyebrow}</p> : null}
           {children}
         </section>
       </main>

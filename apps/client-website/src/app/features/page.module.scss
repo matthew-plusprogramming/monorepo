@@ -25,16 +25,6 @@ $border-color: color-mix(
   text-align: left;
 }
 
-.eyebrow {
-  margin: 0;
-
-  font-size: 0.9rem;
-  font-weight: 700;
-  color: var(--secondary-color-light);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
 .title {
   margin: 0;
   font-size: clamp(2rem, 4vw, 2.6rem);

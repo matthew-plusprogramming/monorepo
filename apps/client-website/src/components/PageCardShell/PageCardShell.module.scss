@@ -40,3 +40,14 @@ $card-gap: 1.5rem;
   );
   box-shadow: 0 24px 60px formColors.$surface-card-shadow;
 }
+
+.eyebrow {
+  margin: 0;
+
+  font-size: 0.9rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+
+  color: var(--secondary-color-light);
+}

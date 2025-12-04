@@ -49,11 +49,11 @@ const FeaturesPage = (): JSX.Element => {
       cardAriaLabel="Feature highlights"
       cardAriaLabelledBy="features-title"
       cardClassName={styles.card}
+      eyebrow="Features"
       header={<PublicNavbar />}
       mainAriaLabel="Features page"
     >
       <header className={styles.header}>
-        <p className={styles.eyebrow}>Features</p>
         <h1 className={styles.title} id="features-title">
           Ship faster with a collaborative monorepo
         </h1>
