@@ -30,8 +30,8 @@
     "decrypt-envs": "dotenvx decrypt -f .env.dev .env.production&& echo 'WARNING: DO NOT COMMIT decrypted .env files to the repository!'"
   },
   "dependencies": {
-    "@aws-sdk/client-dynamodb": "^3.943.0",
-    "@aws-sdk/util-dynamodb": "^3.943.0",
+    "@aws-sdk/client-dynamodb": "^3.946.0",
+    "@aws-sdk/util-dynamodb": "^3.946.0",
     "@cdk/backend-server-cdk": "*",
     "@dotenvx/dotenvx": "^1.51.1",
     "@packages/backend-core": "*",
