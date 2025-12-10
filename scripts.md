@@ -2,7 +2,13 @@ Scripts that may help during development:
 
 > Looking for automation details? See [scripts/README.md](scripts/README.md) for bundle options and deeper guidance.
 
-Build and deploy lambda (node-server)
+Command sequences (configurable via `scripts/sequences.config.json`)
+
+- List available sequences: `npm run sequence -- list`
+- Run a sequence: `npm run sequence -- run <name> [--dry-run]`
+- Current names: `build-deploy-node-server`, `outputs-after-clean`, `full-clean-and-test`
+
+Build and deploy lambda (node-server) — `build-deploy-node-server`
 
 ```
 npm -w node-server run decrypt-envs
@@ -12,14 +18,14 @@ npm -w @cdk/backend-server-cdk run cdk:deploy:dev myapp-api-lambda-stack
 npm -w node-server run encrypt-envs
 ```
 
-Get outputs for myapp-api-stack after clean
+Get outputs for myapp-api-stack after clean — `outputs-after-clean`
 
 ```
 npm run build
 npm -w @cdk/backend-server-cdk run cdk:output:dev myapp-api-stack
 ```
 
-Full clean and test
+Full clean and test — `full-clean-and-test`
 
 ```
 npm run clean

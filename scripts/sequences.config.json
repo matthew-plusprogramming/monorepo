@@ -1,0 +1,40 @@
+{
+  "sequences": [
+    {
+      "name": "build-deploy-node-server",
+      "description": "Build and deploy the node-server lambda (decrypt/envs, build, copy assets, deploy, re-encrypt).",
+      "steps": [
+        "npm -w node-server run decrypt-envs",
+        "npm -w node-server run build",
+        "npm -w @cdk/backend-server-cdk run copy-assets-for-cdk",
+        "npm -w @cdk/backend-server-cdk run cdk:deploy:dev myapp-api-lambda-stack",
+        "npm -w node-server run encrypt-envs"
+      ]
+    },
+    {
+      "name": "outputs-after-clean",
+      "description": "Rebuild and fetch CDK outputs for myapp-api-stack after a clean.",
+      "steps": [
+        "npm run build",
+        "npm -w @cdk/backend-server-cdk run cdk:output:dev myapp-api-stack"
+      ]
+    },
+    {
+      "name": "full-clean-and-test",
+      "description": "Full clean + reinstall, rebuild, write CDK outputs, deploy lambda, and run tests.",
+      "steps": [
+        "npm run clean",
+        "npm i",
+        "npm run build",
+        "npm -w @cdk/backend-server-cdk run cdk:output:dev myapp-api-stack",
+        "npm -w @cdk/backend-server-cdk run cdk:output:dev myapp-analytics-stack",
+        "npm -w node-server run decrypt-envs",
+        "npm -w node-server run build",
+        "npm -w @cdk/backend-server-cdk run copy-assets-for-cdk",
+        "npm -w @cdk/backend-server-cdk run cdk:deploy:dev myapp-api-lambda-stack",
+        "npm -w node-server run encrypt-envs",
+        "npm run test"
+      ]
+    }
+  ]
+}

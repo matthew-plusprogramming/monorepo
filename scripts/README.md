@@ -2,6 +2,21 @@
 
 This repository ships a small collection of automation helpers that keep long-lived workflows consistent. Each script lives alongside its templates under `scripts/` and is safe to run from the repository root.
 
+## Command Sequence Runner
+
+Run named command chains defined in `scripts/sequences.config.json` without copying from docs.
+
+```
+node scripts/run-sequence.mjs list
+node scripts/run-sequence.mjs run <name> [--dry-run]
+npm run sequence -- list
+npm run sequence -- run <name> [--dry-run]
+```
+
+- Config shape: `{ sequences: [{ name, description, steps[] }] }`; steps run from the repo root and stop on the first failure.
+- Current names: `build-deploy-node-server`, `outputs-after-clean`, `full-clean-and-test` (mirrors scripts.md).
+- Add/edit sequences by updating `scripts/sequences.config.json`; keep names kebab-case and steps ordered as they should execute. Use `--dry-run` to verify new sequences without running commands.
+
 ## Repository Service Scaffolder
 
 ```
