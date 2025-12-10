@@ -7,9 +7,9 @@ Express 5 + Effect server written in TypeScript. Builds with Vite SSR to CommonJ
 - Install dependencies at the repo root: `npm install`
 - Ensure AWS credentials are available for DynamoDB/EventBridge access (environment variables or a configured profile)
 - Pull CDK outputs for dev (required for table/log names):
-  - `npm -w @cdk/backend-server-cdk run cdk:output:dev api-stack`
+  - `npm -w @cdk/platform-cdk run cdk:output:dev api-stack`
 - (Optional) Pull analytics outputs if you plan to emit heartbeat events locally:
-  - `npm -w @cdk/backend-server-cdk run cdk:output:dev analytics-stack`
+  - `npm -w @cdk/platform-cdk run cdk:output:dev analytics-stack`
 - Start the dev server: `npm -w node-server run dev`
 
 The `dev` script orchestrates a Vite SSR watch build and runs `node --watch dist/index.cjs`, copying env files and CDK outputs into `dist/` before booting.
@@ -56,7 +56,7 @@ Encrypted env workflow:
 ## Helpers
 
 - [scripts/copy-env.ts](scripts/copy-env.ts): merges environment files into `dist/.env`.
-- [scripts/copy-cdk-outputs.ts](scripts/copy-cdk-outputs.ts): copies outputs from [`../../cdk/backend-server-cdk/cdktf-outputs`](../../cdk/backend-server-cdk/cdktf-outputs) into `dist/cdktf-outputs`.
+- [scripts/copy-cdk-outputs.ts](scripts/copy-cdk-outputs.ts): copies outputs from [`../../cdk/platform-cdk/cdktf-outputs`](../../cdk/platform-cdk/cdktf-outputs) into `dist/cdktf-outputs`.
 - Tip: if `copy-cdk-outputs` fails, re-run the `cdk:output:dev` commands listed in the quick start section.
 
 ## Lambda Packaging
@@ -67,8 +67,8 @@ To produce Lambda-ready artifacts:
 
 1. Set `LAMBDA=true` (and any prod secrets) in `.env.production`.
 2. Build the app: `npm -w node-server run build`
-3. Copy and zip artifacts from the CDK package: `npm -w @cdk/backend-server-cdk run copy-assets-for-cdk`
-   - Produces [`../../cdk/backend-server-cdk/dist/lambda.zip`](../../cdk/backend-server-cdk/dist/lambda.zip)
+3. Copy and zip artifacts from the CDK package: `npm -w @cdk/platform-cdk run copy-assets-for-cdk`
+   - Produces [`../../cdk/platform-cdk/dist/lambda.zip`](../../cdk/platform-cdk/dist/lambda.zip)
 
 ## API Endpoints
 

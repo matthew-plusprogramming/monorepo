@@ -1,5 +1,5 @@
 {
-  "name": "@cdk/backend-server-cdk",
+  "name": "@cdk/platform-cdk",
   "version": "0.0.1",
   "license": "UNLICENSED",
   "type": "module",

@@ -1,4 +1,4 @@
-import { ANALYTICS_STACK_NAME, loadCDKOutput } from '@cdk/backend-server-cdk';
+import { ANALYTICS_STACK_NAME, loadCDKOutput } from '@cdk/platform-cdk';
 
 const baseCdkOutputsPath = __BUNDLED__ ? '.' : undefined;
 

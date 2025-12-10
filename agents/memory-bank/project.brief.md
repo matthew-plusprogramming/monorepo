@@ -33,5 +33,5 @@ Success Criteria
 - Clear entrypoints and invariants documented under `agents/memory-bank/*`.
 - Memory Bank and Workflows present, validated, and used for all changes.
 - App: `npm -w node-server run dev` runs with CDKTF outputs loaded; Lambda packaging path works end‑to‑end.
-- Infra: stacks synth/deploy; outputs written under `cdktf-outputs/**` and consumed via `@cdk/backend-server-cdk`.
+- Infra: stacks synth/deploy; outputs written under `cdktf-outputs/**` and consumed via `@cdk/platform-cdk`.
 - Memory: `npm run memory:validate` and `npm run memory:drift` pass in CI; recurring patterns captured in `system.patterns.md` and reflected in workflows when warranted.

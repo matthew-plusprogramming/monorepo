@@ -39,11 +39,11 @@
         },
         {
           "source": "cdk/__ENTITY_CAMEL__-table.constants.ts.tpl",
-          "target": "cdk/backend-server-cdk/src/stacks/api-stack/__ENTITY_CAMEL__-table.constants.ts"
+          "target": "cdk/platform-cdk/src/stacks/api-stack/__ENTITY_CAMEL__-table.constants.ts"
         },
         {
           "source": "cdk/generate-table.ts.tpl",
-          "target": "cdk/backend-server-cdk/src/stacks/api-stack/generate-__ENTITY_SLUG__-table.ts"
+          "target": "cdk/platform-cdk/src/stacks/api-stack/generate-__ENTITY_SLUG__-table.ts"
         }
       ],
       "checklist": [
@@ -55,9 +55,9 @@
         "- [ ] Replace skipped cases in `packages/core/schemas/schemas/__ENTITY_SLUG__/__ENTITY_CAMEL__.schemas.test.ts`, then execute `npm -w @packages/schemas run test -- --runTestsByPath schemas/__ENTITY_SLUG__/__ENTITY_CAMEL__.schemas.test.ts`.",
         "",
         "## Infrastructure — staged updates",
-        "- [ ] Describe the table and placeholder GSIs inside `cdk/backend-server-cdk/src/stacks/api-stack/__ENTITY_CAMEL__-table.constants.ts`; run `npm -w @cdk/backend-server-cdk run lint`.",
-        "- [ ] Flesh out `cdk/backend-server-cdk/src/stacks/api-stack/generate-__ENTITY_SLUG__-table.ts` (attributes, TTL, outputs) and re-run `npm -w @cdk/backend-server-cdk run lint`.",
-        "- [ ] Wire `generate__ENTITY_PASCAL__Table` into the stack index plus any required exports; confirm `npm -w @cdk/backend-server-cdk run lint` stays green.",
+        "- [ ] Describe the table and placeholder GSIs inside `cdk/platform-cdk/src/stacks/api-stack/__ENTITY_CAMEL__-table.constants.ts`; run `npm -w @cdk/platform-cdk run lint`.",
+        "- [ ] Flesh out `cdk/platform-cdk/src/stacks/api-stack/generate-__ENTITY_SLUG__-table.ts` (attributes, TTL, outputs) and re-run `npm -w @cdk/platform-cdk run lint`.",
+        "- [ ] Wire `generate__ENTITY_PASCAL__Table` into the stack index plus any required exports; confirm `npm -w @cdk/platform-cdk run lint` stays green.",
         "- [ ] Extend `ApiStackOutputSchema`, `apps/node-server/src/clients/cdkOutputs.ts`, and related stubs/tests with the table name; execute `npm -w apps/node-server run lint`.",
         "",
         "## Service layer — incremental wiring",

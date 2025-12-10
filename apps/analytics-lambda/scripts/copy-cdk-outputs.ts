@@ -11,7 +11,7 @@ if (!ENV) {
 
 const outputsDirectory = resolve(
   monorepoRootDir,
-  'cdk/backend-server-cdk/cdktf-outputs',
+  'cdk/platform-cdk/cdktf-outputs',
 );
 
 const distDirectory = resolve(packageRootDir, 'dist');

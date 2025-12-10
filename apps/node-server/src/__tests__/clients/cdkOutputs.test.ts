@@ -2,7 +2,7 @@ import {
   ANALYTICS_LAMBDA_STACK_NAME,
   ANALYTICS_STACK_NAME,
   API_STACK_NAME,
-} from '@cdk/backend-server-cdk';
+} from '@cdk/platform-cdk';
 import {
   clearBundledRuntime,
   setBundledRuntime,
@@ -60,14 +60,14 @@ const { outputsByStack, loadCalls, loadCDKOutputMock } = vi.hoisted(() => {
   };
 });
 
-type BackendServerCdkModule = Record<string, unknown> & {
+type PlatformCdkModule = Record<string, unknown> & {
   loadCDKOutput: (stack: string, basePath?: string) => unknown;
 };
 
-vi.mock('@cdk/backend-server-cdk', async () => {
-  const actual = await vi.importActual('@cdk/backend-server-cdk');
-  if (!isBackendServerCdkModule(actual)) {
-    throw new Error('Failed to load backend-server-cdk module');
+vi.mock('@cdk/platform-cdk', async () => {
+  const actual = await vi.importActual('@cdk/platform-cdk');
+  if (!isPlatformCdkModule(actual)) {
+    throw new Error('Failed to load platform-cdk module');
   }
 
   const apiStackName = actual.API_STACK_NAME as StackName;
@@ -105,9 +105,7 @@ vi.mock('@cdk/backend-server-cdk', async () => {
 
 // Required to hoist before the mock factory runs
 // eslint-disable-next-line func-style
-function isBackendServerCdkModule(
-  value: unknown,
-): value is BackendServerCdkModule {
+function isPlatformCdkModule(value: unknown): value is PlatformCdkModule {
   if (typeof value !== 'object' || value === null) {
     return false;
   }

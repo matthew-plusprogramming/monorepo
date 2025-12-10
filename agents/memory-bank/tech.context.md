@@ -22,18 +22,18 @@ Environment
 Entrypoints
 
 - Server: `apps/node-server/src/index.ts` (dev) | `apps/node-server/src/lambda.ts` (Lambda)
-- Infra: `cdk/backend-server-cdk/src/index.ts`
+- Infra: `cdk/platform-cdk/src/index.ts`
 
 Where To Look First
 
 - Handlers: `apps/node-server/src/handlers/*`
 - Schemas: `packages/core/schemas/schemas/**/*`
-- Infra stacks: `cdk/backend-server-cdk/src/stacks/**/*`
+- Infra stacks: `cdk/platform-cdk/src/stacks/**/*`
 
 Codebase Map
 
 - `apps/node-server`: Express app, middleware, handlers, Lambda wrapper.
-- `cdk/backend-server-cdk`: Stacks, consumers, outputs loader.
+- `cdk/platform-cdk`: Stacks, consumers, outputs loader.
 - `packages/core/backend-core`: Effect→Express adapter, services, types.
 - `packages/core/schemas`: Zod domain schemas and constants.
 - Shared configs: `packages/configs/*`.

@@ -3,7 +3,7 @@ import {
   ANALYTICS_STACK_NAME,
   API_STACK_NAME,
   loadCDKOutput,
-} from '@cdk/backend-server-cdk';
+} from '@cdk/platform-cdk';
 
 const baseCdkOutputsPath = __BUNDLED__ ? '.' : undefined;
 

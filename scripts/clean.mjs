@@ -13,7 +13,7 @@ const turboArgs = args.filter((arg) => arg !== SAVE_FLAG);
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
 if (saveCdkOutputs) {
-  console.log('Preserving cdk/backend-server-cdk/cdktf-outputs (save flag set)');
+  console.log('Preserving cdk/platform-cdk/cdktf-outputs (save flag set)');
 }
 
 const turboResult = spawnSync('turbo', ['run', 'clean', ...turboArgs], {

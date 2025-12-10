@@ -9,7 +9,7 @@ import process from 'node:process';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(__dirname, '..');
-const CDK_SOURCE_ROOT = join(REPO_ROOT, 'cdk', 'backend-server-cdk', 'src');
+const CDK_SOURCE_ROOT = join(REPO_ROOT, 'cdk', 'platform-cdk', 'src');
 const STACKS_FILE = join(CDK_SOURCE_ROOT, 'stacks.ts');
 const STACK_NAMES_FILE = join(CDK_SOURCE_ROOT, 'stacks', 'names.ts');
 const CONSTANTS_FILE = join(CDK_SOURCE_ROOT, 'constants.ts');
@@ -31,7 +31,7 @@ const usage = () => {
       '',
       'Commands:',
       '  bootstrap-backend         Deploys the bootstrap stack, migrates state, and removes the local tfstate file.',
-      '  copy-assets-for-cdk       Runs the asset copy script for backend CDK stacks.',
+      '  copy-assets-for-cdk       Runs the asset copy script for the platform CDK stacks.',
       '  cdk list                  Lists available stacks with descriptions.',
       '  cdk deploy <stack> [--prod]  Deploys the specified stack (defaults to dev).',
       '  cdk output <stack> [--prod]  Writes CDK outputs for the specified stack (defaults to dev).',
@@ -393,13 +393,13 @@ const removeLocalTfState = async (stackName) => {
     join(
       REPO_ROOT,
       'cdk',
-      'backend-server-cdk',
+      'platform-cdk',
       `terraform.${stackName}.tfstate`,
     ),
     join(
       REPO_ROOT,
       'cdk',
-      'backend-server-cdk',
+      'platform-cdk',
       'cdktf.out',
       'stacks',
       stackName,
@@ -440,7 +440,7 @@ const bootstrapBackend = async () => {
       'npm',
       [
         '-w',
-        '@cdk/backend-server-cdk',
+        '@cdk/platform-cdk',
         'run',
         'cdk:deploy:dev',
         bootstrapStackName,
@@ -455,7 +455,7 @@ const bootstrapBackend = async () => {
 
     await runCommand(
       'npm',
-      ['-w', '@cdk/backend-server-cdk', 'run', 'cdk:synth:dev'],
+      ['-w', '@cdk/platform-cdk', 'run', 'cdk:synth:dev'],
       {
         env: { STACK: bootstrapStackName },
         step: 'Synthesizing stacks',
@@ -464,7 +464,7 @@ const bootstrapBackend = async () => {
 
     await runCommand(
       'npm',
-      ['-w', '@cdk/backend-server-cdk', 'run', 'cdk:bootstrap:migrate:dev'],
+      ['-w', '@cdk/platform-cdk', 'run', 'cdk:bootstrap:migrate:dev'],
       {
         step: 'Migrating Terraform state',
       },
@@ -515,7 +515,7 @@ const handleCdkDeploy = async (args) => {
   for (const stack of stacks) {
     const npmArgs = [
       '-w',
-      '@cdk/backend-server-cdk',
+      '@cdk/platform-cdk',
       'run',
       scriptName,
       stack.stackName,
@@ -540,7 +540,7 @@ const handleCdkOutput = async (args) => {
   for (const stack of stacks) {
     const npmArgs = [
       '-w',
-      '@cdk/backend-server-cdk',
+      '@cdk/platform-cdk',
       'run',
       scriptName,
       stack.stackName,
@@ -581,8 +581,8 @@ const handleCdkCommand = async (args) => {
 const handleCopyAssetsForCdk = async () => {
   await runCommand(
     'npm',
-    ['-w', '@cdk/backend-server-cdk', 'run', 'copy-assets-for-cdk'],
-    { step: 'Copying assets for backend CDK stack' },
+    ['-w', '@cdk/platform-cdk', 'run', 'copy-assets-for-cdk'],
+    { step: 'Copying assets for platform CDK stack' },
   );
 };
 

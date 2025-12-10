@@ -1,11 +1,11 @@
 # analytics-lambda
 
-EventBridge handler that records heartbeat analytics into DynamoDB. The lambda consumes EventBridge `UserAction` events, dedupes user activity, and updates daily/monthly aggregates using stack outputs from `@cdk/backend-server-cdk`.
+EventBridge handler that records heartbeat analytics into DynamoDB. The lambda consumes EventBridge `UserAction` events, dedupes user activity, and updates daily/monthly aggregates using stack outputs from `@cdk/platform-cdk`.
 
 ## Quick Start
 
 - Install deps at the repo root: `npm install`
-- Ensure analytics CDK outputs exist locally: `npm -w @cdk/backend-server-cdk run cdk:output:dev analytics-stack`
+- Ensure analytics CDK outputs exist locally: `npm -w @cdk/platform-cdk run cdk:output:dev analytics-stack`
 - Run the dev build/watch loop: `npm -w analytics-lambda run dev`
 - Build for production: `npm -w analytics-lambda run build`
 
@@ -33,7 +33,7 @@ Run scripts from the repo root with the workspace flag, e.g. `npm -w analytics-l
 
 - Handler entry: `src/index.ts` wires AWS SDK DynamoDB client and delegates to `AnalyticsProcessor`.
 - Processor (`src/analyticsProcessor.ts`) dedupes events per user/day/month and increments aggregate counts; conditional DynamoDB writes are idempotent per period.
-- CDK outputs (table names) load via `@cdk/backend-server-cdk` (`src/clients/cdkOutputs.ts`); when bundled for Lambda, outputs are expected alongside the build artifacts.
+- CDK outputs (table names) load via `@cdk/platform-cdk` (`src/clients/cdkOutputs.ts`); when bundled for Lambda, outputs are expected alongside the build artifacts.
 
 ## Troubleshooting
 

@@ -6,8 +6,8 @@ Opinionated TypeScript monorepo with an Express 5 backend, a Next 16 marketing s
 
 - Install deps: `npm install`
 - Generate CDK outputs for dev (so services find table/log names):
-  - API stack: `npm -w @cdk/backend-server-cdk run cdk:output:dev api-stack`
-  - Analytics stack (for heartbeat + analytics lambda): `npm -w @cdk/backend-server-cdk run cdk:output:dev analytics-stack`
+  - API stack: `npm -w @cdk/platform-cdk run cdk:output:dev api-stack`
+  - Analytics stack (for heartbeat + analytics lambda): `npm -w @cdk/platform-cdk run cdk:output:dev analytics-stack`
 - Run the backend in dev: `npm -w node-server run dev`
 - Run the client website (Next app router): `npm -w client-website run dev`
 
@@ -17,7 +17,7 @@ Encrypted envs (dotenvx):
 - Encrypted files are examples. If you lack the private key, delete them and create your own env files.
 - Manage secrets with workspace scripts:
   - Server: `npm -w node-server run decrypt-envs` / `npm -w node-server run encrypt-envs`
-  - CDK: `npm -w @cdk/backend-server-cdk run decrypt-envs` / `npm -w @cdk/backend-server-cdk run encrypt-envs`
+  - CDK: `npm -w @cdk/platform-cdk run decrypt-envs` / `npm -w @cdk/platform-cdk run encrypt-envs`
   - Do not commit decrypted `.env` files (scripts print a warning).
 
 ## Workspaces
@@ -27,7 +27,7 @@ Encrypted envs (dotenvx):
   - `node-server` — Express server (Effect) with optional Lambda entry. See `apps/node-server/README.md`.
   - `analytics-lambda` — EventBridge → DynamoDB processor for heartbeat analytics. See `apps/analytics-lambda/README.md`.
 - CDK/Infra
-  - `@cdk/backend-server-cdk` — CDKTF stacks (DynamoDB, CloudWatch, Lambda packaging). See `cdk/backend-server-cdk/README.md`.
+  - `@cdk/platform-cdk` — CDKTF stacks (DynamoDB, CloudWatch, Lambda packaging). See `cdk/platform-cdk/README.md`.
 - Packages (selected)
   - `@packages/backend-core` — Effect-powered HTTP helpers (request handler adapter, AWS service contexts, auth/error types). See `packages/core/backend-core/README.md`.
   - `@packages/schemas` — Zod schemas for user/security domains and constants (keys, GSIs).
@@ -39,7 +39,7 @@ Encrypted envs (dotenvx):
 - Lint all: `npm run lint` (fix: `npm run lint:fix`)
 - Clean all: `npm run clean`
 - Run a workspace script: `npm -w <package-name> run <script>`
-  - Examples: `npm -w node-server run build`, `npm -w @cdk/backend-server-cdk run cdk:deploy:dev`
+  - Examples: `npm -w node-server run build`, `npm -w @cdk/platform-cdk run cdk:deploy:dev`
 
 ## Automation Scripts
 
@@ -53,8 +53,8 @@ Encrypted envs (dotenvx):
 
 1) Ensure `LAMBDA=true` in the server’s env for the build stage
 2) Build server: `npm -w node-server run build`
-3) Prepare Lambda zip in CDK pkg: `npm -w @cdk/backend-server-cdk run copy-assets-for-cdk`
-   - Produces `cdk/backend-server-cdk/dist/lambda.zip`
+3) Prepare Lambda zip in CDK pkg: `npm -w @cdk/platform-cdk run copy-assets-for-cdk`
+   - Produces `cdk/platform-cdk/dist/lambda.zip`
 
 ## Agents & Memory Bank
 

@@ -13,8 +13,8 @@ Build and deploy lambda (node-server) — `build-deploy-node-server`
 ```
 npm -w node-server run decrypt-envs
 npm -w node-server run build
-npm -w @cdk/backend-server-cdk run copy-assets-for-cdk
-npm -w @cdk/backend-server-cdk run cdk:deploy:dev myapp-api-lambda-stack
+npm -w @cdk/platform-cdk run copy-assets-for-cdk
+npm -w @cdk/platform-cdk run cdk:deploy:dev myapp-api-lambda-stack
 npm -w node-server run encrypt-envs
 ```
 
@@ -22,7 +22,7 @@ Get outputs for myapp-api-stack after clean — `outputs-after-clean`
 
 ```
 npm run build
-npm -w @cdk/backend-server-cdk run cdk:output:dev myapp-api-stack
+npm -w @cdk/platform-cdk run cdk:output:dev myapp-api-stack
 ```
 
 Full clean and test — `full-clean-and-test`
@@ -31,12 +31,12 @@ Full clean and test — `full-clean-and-test`
 npm run clean
 npm i
 npm run build
-npm -w @cdk/backend-server-cdk run cdk:output:dev myapp-api-stack
-npm -w @cdk/backend-server-cdk run cdk:output:dev myapp-analytics-stack
+npm -w @cdk/platform-cdk run cdk:output:dev myapp-api-stack
+npm -w @cdk/platform-cdk run cdk:output:dev myapp-analytics-stack
 npm -w node-server run decrypt-envs
 npm -w node-server run build
-npm -w @cdk/backend-server-cdk run copy-assets-for-cdk
-npm -w @cdk/backend-server-cdk run cdk:deploy:dev myapp-api-lambda-stack
+npm -w @cdk/platform-cdk run copy-assets-for-cdk
+npm -w @cdk/platform-cdk run cdk:deploy:dev myapp-api-lambda-stack
 npm -w node-server run encrypt-envs
 npm run test
 ```

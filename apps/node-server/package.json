@@ -34,7 +34,7 @@
     "@aws-sdk/client-dynamodb": "^3.946.0",
     "@aws-sdk/client-eventbridge": "^3.946.0",
     "@aws-sdk/util-dynamodb": "^3.946.0",
-    "@cdk/backend-server-cdk": "*",
+    "@cdk/platform-cdk": "*",
     "@dotenvx/dotenvx": "^1.51.1",
     "@node-rs/argon2": "^2.0.2",
     "@packages/backend-core": "*",
