@@ -2,6 +2,11 @@ Scripts that may help during development:
 
 > Looking for automation details? See [scripts/README.md](scripts/README.md) for bundle options and deeper guidance.
 
+Aspect ejection
+
+- Preview analytics tear‑out: `npm run eject:analytics -- --dry-run`
+- Apply analytics tear‑out: `npm run eject:analytics`
+
 Command sequences (configurable via `scripts/sequences.config.json`)
 
 - List available sequences: `npm run sequence -- list`
