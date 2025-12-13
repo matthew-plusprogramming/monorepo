@@ -9,7 +9,7 @@
     "// -- 🛠️ Build & Clean": "--",
     "prebuild": "npm run gen:css-types && tsc -b",
     "build": "next build",
-    "clean": "rm -rf .next && rm -rf node_modules && rm -rf .turbo",
+    "clean": "rm -rf .next && rm -rf node_modules && rm -rf .turbo && rm -rf out",
     "gen:css-types": "typed-scss-modules src --aliasPrefixes.@ src --exportType default --outputFolder __generated__",
     "// -- 🧪 Testing": "--",
     "test": "vitest run",

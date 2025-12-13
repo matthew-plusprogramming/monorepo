@@ -8,6 +8,7 @@ Opinionated TypeScript monorepo with an Express 5 backend, a Next 16 marketing s
 - Generate CDK outputs for dev (so services find table/log names):
   - API stack: `npm -w @cdk/platform-cdk run cdk:output:dev api-stack`
   - Analytics stack (for heartbeat + analytics lambda): `npm -w @cdk/platform-cdk run cdk:output:dev analytics-stack`
+  - Client website stack: `npm -w @cdk/platform-cdk run cdk:output:dev client-website-stack`
 - Run the backend in dev: `npm -w node-server run dev`
 - Run the client website (Next app router): `npm -w client-website run dev`
 
@@ -27,7 +28,7 @@ Encrypted envs (dotenvx):
   - `node-server` — Express server (Effect) with optional Lambda entry. See `apps/node-server/README.md`.
   - `analytics-lambda` — EventBridge → DynamoDB processor for heartbeat analytics. See `apps/analytics-lambda/README.md`.
 - CDK/Infra
-  - `@cdk/platform-cdk` — CDKTF stacks (DynamoDB, CloudWatch, Lambda packaging). See `cdk/platform-cdk/README.md`.
+  - `@cdk/platform-cdk` — CDKTF stacks (DynamoDB, CloudWatch, Lambda packaging, static client site hosting). See `cdk/platform-cdk/README.md`.
 - Packages (selected)
   - `@packages/backend-core` — Effect-powered HTTP helpers (request handler adapter, AWS service contexts, auth/error types). See `packages/core/backend-core/README.md`.
   - `@packages/schemas` — Zod schemas for user/security domains and constants (keys, GSIs).
@@ -49,12 +50,14 @@ Encrypted envs (dotenvx):
 - CDKTF state manager: `node scripts/manage-cdktf-state.mjs <command>` handles bootstrap/deploy/output flows with guardrails.
 - Codemod helper: `tsx scripts/convert-to-arrows.ts` converts eligible functions to arrow expressions across TS/TSX.
 
-## Lambda Packaging (overview)
+## CDK Asset Staging (overview)
 
 1) Ensure `LAMBDA=true` in the server’s env for the build stage
 2) Build server: `npm -w node-server run build`
-3) Prepare Lambda zip in CDK pkg: `npm -w @cdk/platform-cdk run copy-assets-for-cdk`
-   - Produces `cdk/platform-cdk/dist/lambda.zip`
+3) Build/export the static client site: `npm -w client-website run build` (creates `apps/client-website/out`)
+4) Prepare artifacts in the CDK pkg: `npm -w @cdk/platform-cdk run copy-assets-for-cdk`
+   - Produces `cdk/platform-cdk/dist/lambda.zip` plus staged lambdas under `cdk/platform-cdk/dist/lambdas`
+   - Stages the client site export under `cdk/platform-cdk/dist/client-website`
 
 ## Agents & Memory Bank
 

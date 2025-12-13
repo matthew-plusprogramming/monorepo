@@ -16,7 +16,7 @@ import {
   resolveStagingDirectory,
   resolveZipPath,
 } from '../src/lambda/artifacts';
-import { packageRootDir } from '../src/location';
+import { monorepoRootDir, packageRootDir } from '../src/location';
 
 const lambdaDefinitions = listLambdaArtifactDefinitions();
 const distDirectory = resolve(packageRootDir, 'dist');
@@ -39,6 +39,82 @@ interface ManifestEntry {
 }
 
 const manifestEntries: ManifestEntry[] = [];
+
+interface WebsiteAssetsManifestEntry {
+  status: 'prepared' | 'missing';
+  description: string;
+  sourceDir: string;
+  destinationDir: string;
+  filesCopied?: number;
+  reason?: string;
+}
+
+const websiteAssetsManifestEntries: WebsiteAssetsManifestEntry[] = [];
+
+const countFiles = (root: string): number => {
+  let count = 0;
+  const stack = [root];
+
+  while (stack.length) {
+    const current = stack.pop();
+    if (!current) continue;
+    const entries = readdirSync(current, { withFileTypes: true });
+
+    for (const entry of entries) {
+      const fullPath = join(current, entry.name);
+      if (entry.isDirectory()) {
+        stack.push(fullPath);
+      } else if (entry.isFile()) {
+        count++;
+      }
+    }
+  }
+
+  return count;
+};
+
+const copyClientWebsiteAssets = (): WebsiteAssetsManifestEntry => {
+  const sourceDir = resolve(
+    monorepoRootDir,
+    'apps',
+    'client-website',
+    'out',
+  );
+  const destinationDir = resolve(distDirectory, 'client-website');
+
+  if (!existsSync(sourceDir)) {
+    console.warn(
+      `⚠️  Skipping client-website assets: export not found (${sourceDir})`,
+    );
+    return {
+      status: 'missing',
+      description: 'Client website static export',
+      sourceDir,
+      destinationDir,
+      reason: 'source-missing',
+    };
+  }
+
+  if (existsSync(destinationDir)) {
+    rmSync(destinationDir, { recursive: true });
+  }
+
+  mkdirSync(destinationDir, { recursive: true });
+  cpSync(sourceDir, destinationDir, { recursive: true });
+
+  const filesCopied = countFiles(destinationDir);
+  console.info(
+    `✅ Prepared client-website assets at ${destinationDir} (${filesCopied} file(s))`,
+  );
+
+  return {
+    status: 'prepared',
+    description: 'Client website static export',
+    sourceDir,
+    destinationDir,
+    filesCopied,
+  };
+};
 
 const createZipArchive = (sourceDir: string, zipPath: string): void => {
   const zipResult = spawnSync('zip', ['-rq', zipPath, '.'], {
@@ -184,6 +260,8 @@ if (existsSync(outputsDirectory)) {
   );
 }
 
+websiteAssetsManifestEntries.push(copyClientWebsiteAssets());
+
 const manifestPath = resolve(distDirectory, 'lambda-artifacts.manifest.json');
 writeFileSync(
   manifestPath,
@@ -195,6 +273,11 @@ writeFileSync(
         stagingDir: relative(packageRootDir, entry.stagingDir),
         sourceDist: relative(packageRootDir, entry.sourceDist),
         zipPath: entry.zipPath ? relative(packageRootDir, entry.zipPath) : null,
+      })),
+      websiteAssets: websiteAssetsManifestEntries.map((entry) => ({
+        ...entry,
+        destinationDir: relative(packageRootDir, entry.destinationDir),
+        sourceDir: relative(packageRootDir, entry.sourceDir),
       })),
     },
     null,

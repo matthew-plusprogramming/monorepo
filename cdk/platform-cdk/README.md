@@ -7,6 +7,7 @@ Stacks ([src/stacks.ts](src/stacks.ts)):
 - `api-stack`: Application DynamoDB tables (users, verification, rate limit, deny list)
 - `api-lambda-stack`: Lambda packaging, IAM role, and analytics permissions
 - `analytics-stack`: EventBridge bus, DLQ, DynamoDB tables, and log groups for analytics
+- `client-website-stack`: Static hosting for the client site (S3 + CloudFront + ACM)
 
 ## Quick Start
 
@@ -17,6 +18,7 @@ Stacks ([src/stacks.ts](src/stacks.ts)):
 - Export outputs for app consumption:
   - API stack: `npm -w @cdk/platform-cdk run cdk:output:dev api-stack`
   - Analytics stack: `npm -w @cdk/platform-cdk run cdk:output:dev analytics-stack`
+  - Client website stack: `npm -w @cdk/platform-cdk run cdk:output:dev client-website-stack`
 
 ## Prerequisites
 
@@ -35,6 +37,11 @@ Encrypted env files provide AWS settings:
 
 Scripts set `ENV=dev|production` and load `.env.$ENV` with `dotenvx`. You can prefix any command with `STACK=<prefixed stack name from src/stacks.ts>` to operate on a single stack.
 
+Client website stack env:
+- `CLIENT_WEBSITE_DOMAIN_NAME`: primary domain (e.g., `example.com`)
+- `CLIENT_WEBSITE_HOSTED_ZONE_ID`: Route53 hosted zone ID used for DNS validation + alias records
+- `CLIENT_WEBSITE_ALTERNATE_DOMAINS`: optional comma-separated aliases (e.g., `www.example.com,app.example.com`)
+
 Encrypted envs (dotenvx):
 - The checked-in encrypted files are examples. If you don't have the private key, decryption will fail. In that case, delete the existing [`.env.dev`](.env.dev) and [`.env.production`](.env.production) and create your own with the required variables.
 - Manage secrets with scripts:
@@ -51,17 +58,19 @@ Encrypted envs (dotenvx):
 - Output JSON for app consumption:
   - `npm -w @cdk/platform-cdk run cdk:output:dev myapp-api-stack`
   - `npm -w @cdk/platform-cdk run cdk:output:dev myapp-analytics-stack`
+  - `npm -w @cdk/platform-cdk run cdk:output:dev myapp-client-website-stack`
 
 Outputs are written under [`cdktf-outputs/stacks`](cdktf-outputs/stacks) and validated by schemas in [src/consumer/output](src/consumer/output). The app reads these via `@cdk/platform-cdk`’s `loadCDKOutput` ([src/consumer/consumers.ts](src/consumer/consumers.ts)).
 
-## Lambda Artifact
+## Asset Staging (Lambdas + Client Website)
 
-To package the app Lambda:
-1) Build the app with `LAMBDA=true`: `npm -w node-server run build`
-2) Copy + zip artifacts here: `npm -w @cdk/platform-cdk run copy-assets-for-cdk`
-   - Produces [dist/lambda.zip](dist/lambda.zip)
-
-The copy script ([scripts/copy-lambda-artifacts.ts](scripts/copy-lambda-artifacts.ts)) also brings `cdktf-outputs/**/outputs.json` alongside the bundle so runtime discovery works when `__BUNDLED__` is true.
+To package deployable artifacts:
+1) Build the app Lambda with `LAMBDA=true`: `npm -w node-server run build`
+2) Build/export the client website (static): `npm -w client-website run build` (creates `apps/client-website/out`)
+3) Copy + zip artifacts here: `npm -w @cdk/platform-cdk run copy-assets-for-cdk`
+   - Produces [dist/lambda.zip](dist/lambda.zip) and staged lambda artifacts under [`dist/lambdas`](dist/lambdas)
+   - Stages the client website export at [`dist/client-website`](dist/client-website)
+   - Copies `cdktf-outputs/**/outputs.json` alongside bundles so runtime discovery works when `__BUNDLED__` is true
 
 ## Bootstrap/Migration (WIP)
 

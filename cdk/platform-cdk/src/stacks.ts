@@ -5,6 +5,7 @@ import {
   AnalyticsStackOutputSchema,
   ApiLambdaStackOutputSchema,
   ApiStackOutputSchema,
+  ClientWebsiteStackOutputSchema,
 } from './consumer/output';
 import {
   buildArtifactRequirement,
@@ -16,13 +17,32 @@ import { ApiLambdaStack } from './stacks/api-lambda-stack';
 import { ApiStack, type ApiStackProps } from './stacks/api-stack';
 import { BootstrapStack, type BootstrapStackProps } from './stacks/bootstrap';
 import {
+  ClientWebsiteStack,
+  type ClientWebsiteStackProps,
+} from './stacks/client-website-stack';
+import {
   ANALYTICS_LAMBDA_STACK_NAME,
   ANALYTICS_STACK_NAME,
   API_LAMBDA_STACK_NAME,
   API_STACK_NAME,
   BOOTSTRAP_STACK_NAME,
+  CLIENT_WEBSITE_STACK_NAME,
 } from './stacks/names';
 import type { Stack, UniversalStackProps } from './types/stack';
+
+type StackDefinitionEntry =
+  | Stack<BootstrapStackProps>
+  | Stack<ApiStackProps>
+  | Stack<ClientWebsiteStackProps>
+  | Stack<UniversalStackProps>;
+
+const clientWebsiteDomainName = process.env.CLIENT_WEBSITE_DOMAIN_NAME ?? '';
+const clientWebsiteHostedZoneId =
+  process.env.CLIENT_WEBSITE_HOSTED_ZONE_ID ?? '';
+const clientWebsiteAlternateDomainNames =
+  process.env.CLIENT_WEBSITE_ALTERNATE_DOMAINS?.split(',')
+    .map((value) => value.trim())
+    .filter(Boolean) ?? [];
 
 const stackDefinitions = [
   {
@@ -70,6 +90,18 @@ const stackDefinitions = [
     props: {},
     outputSchema: AnalyticsStackOutputSchema,
   },
-] as const satisfies ReadonlyArray<Stack<UniversalStackProps>>;
+  {
+    name: CLIENT_WEBSITE_STACK_NAME,
+    description: 'Static hosting for the client website',
+    Stack: ClientWebsiteStack,
+    props: {
+      domainName: clientWebsiteDomainName,
+      hostedZoneId: clientWebsiteHostedZoneId,
+      alternateDomainNames: clientWebsiteAlternateDomainNames,
+    },
+    outputSchema: ClientWebsiteStackOutputSchema,
+  },
+] as const satisfies ReadonlyArray<StackDefinitionEntry>;
 
+export type StackDefinition = (typeof stackDefinitions)[number];
 export const stacks = stackDefinitions;

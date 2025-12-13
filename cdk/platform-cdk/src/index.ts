@@ -5,9 +5,10 @@ import '@dotenvx/dotenvx/config';
 import { App } from 'cdktf';
 
 import type { ArtifactRequirement } from './lambda/artifacts';
-import type { AnyStack } from './types/stack';
 import { STACK_PREFIX } from './constants';
 import { stacks } from './stacks';
+
+type StackDefinition = (typeof stacks)[number];
 
 const isArtifactRequirement = (
   value: unknown,
@@ -83,7 +84,7 @@ if (!region) {
 const app = new App();
 
 const collectMissingArtifacts = (
-  artifacts: AnyStack['requiredArtifacts'],
+  artifacts: StackDefinition['requiredArtifacts'],
 ): ArtifactRequirement[] => {
   if (!Array.isArray(artifacts)) {
     return [];
@@ -105,7 +106,7 @@ const collectMissingArtifacts = (
 };
 
 const instantiateStack = (
-  stack: AnyStack,
+  stack: StackDefinition,
   appContext: App,
   stackRegion: string,
 ): void => {
