@@ -39,8 +39,9 @@ Scripts set `ENV=dev|production` and load `.env.$ENV` with `dotenvx`. You can pr
 
 Client website stack env:
 - `CLIENT_WEBSITE_DOMAIN_NAME`: primary domain (e.g., `example.com`)
-- `CLIENT_WEBSITE_HOSTED_ZONE_ID`: Route53 hosted zone ID used for DNS validation + alias records
+- `CLIENT_WEBSITE_HOSTED_ZONE_ID`: optional Route53 hosted zone ID (only used to create alias A records; certificate validation is managed outside this stack)
 - `CLIENT_WEBSITE_ALTERNATE_DOMAINS`: optional comma-separated aliases (e.g., `www.example.com,app.example.com`)
+- Routing note: CloudFront rewrites extensionless paths (e.g., `/login`) to `.html` to support Next `output: 'export'` builds.
 
 Encrypted envs (dotenvx):
 - The checked-in encrypted files are examples. If you don't have the private key, decryption will fail. In that case, delete the existing [`.env.dev`](.env.dev) and [`.env.production`](.env.production) and create your own with the required variables.

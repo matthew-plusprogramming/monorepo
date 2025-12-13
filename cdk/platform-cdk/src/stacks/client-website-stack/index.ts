@@ -10,13 +10,14 @@ import {
   loadClientWebsiteAssets,
   normalizeDomainConfig,
 } from './config';
+import { createOutputs } from './outputs';
 import {
   createAliasRecords,
   createBucketPolicy,
   createCertificateResources,
   createDistribution,
+  createHtmlRewriteFunction,
   createOriginAccessControl,
-  createOutputs,
   createWebsiteBucket,
   uploadWebsiteAssets,
 } from './resources';
@@ -42,8 +43,9 @@ export class ClientWebsiteStack extends TerraformStack {
 
     const bucketResources = createWebsiteBucket(this, region);
     const originAccessControl = createOriginAccessControl(this);
+    const rewriteFunction = createHtmlRewriteFunction(this);
 
-    const { certificate, validation } = createCertificateResources(
+    const certificate = createCertificateResources(
       this,
       domainConfig,
       usEast1Provider,
@@ -53,9 +55,9 @@ export class ClientWebsiteStack extends TerraformStack {
       this,
       bucketResources.bucket,
       originAccessControl,
+      rewriteFunction,
       certificate,
       domainConfig.domainNames,
-      validation,
     );
 
     createBucketPolicy(this, region, bucketResources.bucket, distribution);

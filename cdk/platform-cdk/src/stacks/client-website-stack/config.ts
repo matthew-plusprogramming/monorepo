@@ -5,14 +5,14 @@ import { packageRootDir } from '../../location';
 import type { UniversalStackProps } from '../../types/stack';
 
 export interface ClientWebsiteStackProps extends UniversalStackProps {
-  domainName: string;
-  hostedZoneId: string;
+  domainName?: string;
+  hostedZoneId?: string;
   alternateDomainNames?: string[];
 }
 
 export interface DomainConfig {
   domainNames: string[];
-  hostedZoneId: string;
+  hostedZoneId?: string;
 }
 
 export const CLIENT_WEBSITE_ASSETS_ROOT = resolve(
@@ -54,19 +54,14 @@ export const resolveCacheControl = (objectKey: string): string =>
 export const normalizeDomainConfig = (
   props: ClientWebsiteStackProps,
 ): DomainConfig => {
-  const trimmedDomain = props.domainName.trim();
+  const trimmedDomain = props.domainName?.trim();
   if (!trimmedDomain) {
     throw new Error(
       'CLIENT_WEBSITE_DOMAIN_NAME is required to deploy the client website stack.',
     );
   }
 
-  const trimmedHostedZoneId = props.hostedZoneId.trim();
-  if (!trimmedHostedZoneId) {
-    throw new Error(
-      'CLIENT_WEBSITE_HOSTED_ZONE_ID is required to deploy the client website stack.',
-    );
-  }
+  const trimmedHostedZoneId = props.hostedZoneId?.trim();
 
   const domainNames = Array.from(
     new Set(
@@ -84,7 +79,7 @@ export const normalizeDomainConfig = (
 
   return {
     domainNames,
-    hostedZoneId: trimmedHostedZoneId,
+    hostedZoneId: trimmedHostedZoneId || undefined,
   };
 };
 

@@ -1,5 +1,5 @@
 ---
-last_reviewed: 2025-09-03
+last_reviewed: 2025-12-13
 ---
 
 # Technical Context
@@ -33,7 +33,7 @@ Where To Look First
 Codebase Map
 
 - `apps/node-server`: Express app, middleware, handlers, Lambda wrapper.
-- `cdk/platform-cdk`: Stacks, consumers, outputs loader.
+- `cdk/platform-cdk`: CDKTF stacks (API, analytics, client website), consumers, outputs loader.
 - `packages/core/backend-core`: Effect→Express adapter, services, types.
 - `packages/core/schemas`: Zod domain schemas and constants.
 - Shared configs: `packages/configs/*`.

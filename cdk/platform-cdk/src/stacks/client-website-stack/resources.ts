@@ -1,6 +1,6 @@
 import { AcmCertificate } from '@cdktf/provider-aws/lib/acm-certificate';
-import { AcmCertificateValidation } from '@cdktf/provider-aws/lib/acm-certificate-validation';
 import { CloudfrontDistribution } from '@cdktf/provider-aws/lib/cloudfront-distribution';
+import { CloudfrontFunction } from '@cdktf/provider-aws/lib/cloudfront-function';
 import { CloudfrontOriginAccessControl } from '@cdktf/provider-aws/lib/cloudfront-origin-access-control';
 import { DataAwsIamPolicyDocument } from '@cdktf/provider-aws/lib/data-aws-iam-policy-document';
 import type { AwsProvider } from '@cdktf/provider-aws/lib/provider';
@@ -10,7 +10,7 @@ import { S3BucketObject } from '@cdktf/provider-aws/lib/s3-bucket-object';
 import { S3BucketOwnershipControls } from '@cdktf/provider-aws/lib/s3-bucket-ownership-controls';
 import { S3BucketPolicy } from '@cdktf/provider-aws/lib/s3-bucket-policy';
 import { S3BucketPublicAccessBlock } from '@cdktf/provider-aws/lib/s3-bucket-public-access-block';
-import { Fn, TerraformOutput } from 'cdktf';
+import { Fn } from 'cdktf';
 import type { Construct } from 'constructs';
 
 import { STACK_PREFIX } from '../../constants';
@@ -71,54 +71,66 @@ export const createOriginAccessControl = (
     signingProtocol: 'sigv4',
   });
 
+export const createHtmlRewriteFunction = (
+  scope: Construct,
+): CloudfrontFunction =>
+  new CloudfrontFunction(scope, 'clientWebsiteHtmlRewriteFunction', {
+    name: `${STACK_PREFIX}-client-website-html-rewrite`,
+    runtime: 'cloudfront-js-1.0',
+    publish: true,
+    comment: 'Rewrite extensionless routes to .html for Next export.',
+    code: [
+      'function handler(event) {',
+      '  var request = event.request;',
+      '  var uri = request.uri;',
+      '',
+      "  if (uri === '/') {",
+      "    request.uri = '/index.html';",
+      '    return request;',
+      '  }',
+      '',
+      "  if (uri.indexOf('/_next') === 0) {",
+      '    return request;',
+      '  }',
+      '',
+      "  if (uri.length > 1 && uri.charAt(uri.length - 1) === '/') {",
+      '    uri = uri.substring(0, uri.length - 1);',
+      '  }',
+      '',
+      '  var lastSlash = uri.lastIndexOf("/");',
+      '  var lastSegment = uri.substring(lastSlash + 1);',
+      '',
+      '  if (lastSegment.indexOf(".") === -1) {',
+      '    request.uri = uri + ".html";',
+      '    return request;',
+      '  }',
+      '',
+      '  request.uri = uri;',
+      '  return request;',
+      '}',
+      '',
+    ].join('\n'),
+  });
+
 export const createCertificateResources = (
   scope: Construct,
   domainConfig: DomainConfig,
   provider: AwsProvider,
-): { certificate: AcmCertificate; validation: AcmCertificateValidation } => {
-  const certificate = new AcmCertificate(scope, 'clientWebsiteCertificate', {
+): AcmCertificate =>
+  new AcmCertificate(scope, 'clientWebsiteCertificate', {
     domainName: domainConfig.domainNames[0],
     subjectAlternativeNames: domainConfig.domainNames.slice(1),
     validationMethod: 'DNS',
     provider,
   });
 
-  const validationRecords = domainConfig.domainNames.map((_, index) => {
-    const validationOption = certificate.domainValidationOptions.get(index);
-    return new Route53Record(
-      scope,
-      `clientWebsiteCertificateValidationRecord-${index}`,
-      {
-        allowOverwrite: true,
-        name: validationOption.resourceRecordName,
-        type: validationOption.resourceRecordType,
-        records: [validationOption.resourceRecordValue],
-        ttl: 60,
-        zoneId: domainConfig.hostedZoneId,
-      },
-    );
-  });
-
-  const validation = new AcmCertificateValidation(
-    scope,
-    'clientWebsiteCertificateValidation',
-    {
-      certificateArn: certificate.arn,
-      validationRecordFqdns: validationRecords.map((record) => record.fqdn),
-      provider,
-    },
-  );
-
-  return { certificate, validation };
-};
-
 export const createDistribution = (
   scope: Construct,
   bucket: S3Bucket,
   originAccessControl: CloudfrontOriginAccessControl,
+  rewriteFunction: CloudfrontFunction,
   certificate: AcmCertificate,
   domainNames: string[],
-  validation: AcmCertificateValidation,
 ): CloudfrontDistribution => {
   const originId = `${STACK_PREFIX}-client-website-origin`;
 
@@ -129,6 +141,20 @@ export const createDistribution = (
     enabled: true,
     isIpv6Enabled: true,
     priceClass: 'PriceClass_All',
+    customErrorResponse: [
+      {
+        errorCode: 403,
+        responseCode: 404,
+        responsePagePath: '/404.html',
+        errorCachingMinTtl: 0,
+      },
+      {
+        errorCode: 404,
+        responseCode: 404,
+        responsePagePath: '/404.html',
+        errorCachingMinTtl: 0,
+      },
+    ],
     origin: [
       {
         domainName: bucket.bucketRegionalDomainName,
@@ -144,6 +170,12 @@ export const createDistribution = (
       defaultTtl: 300,
       maxTtl: 86400,
       minTtl: 0,
+      functionAssociation: [
+        {
+          eventType: 'viewer-request',
+          functionArn: rewriteFunction.arn,
+        },
+      ],
       forwardedValues: {
         cookies: { forward: 'none' },
         queryString: false,
@@ -157,7 +189,6 @@ export const createDistribution = (
       minimumProtocolVersion: 'TLSv1.2_2021',
       sslSupportMethod: 'sni-only',
     },
-    dependsOn: [validation],
   });
 };
 
@@ -228,6 +259,11 @@ export const createAliasRecords = (
   domainConfig: DomainConfig,
   distribution: CloudfrontDistribution,
 ): void => {
+  const hostedZoneId = domainConfig.hostedZoneId;
+  if (!hostedZoneId) {
+    return;
+  }
+
   domainConfig.domainNames.forEach((recordDomain, index) => {
     new Route53Record(scope, `clientWebsiteAliasRecord-${index}`, {
       alias: {
@@ -238,51 +274,7 @@ export const createAliasRecords = (
       allowOverwrite: true,
       name: recordDomain,
       type: 'A',
-      zoneId: domainConfig.hostedZoneId,
+      zoneId: hostedZoneId,
     });
-  });
-};
-
-export const createOutputs = (
-  scope: Construct,
-  bucket: S3Bucket,
-  distribution: CloudfrontDistribution,
-  certificate: AcmCertificate,
-  domainConfig: DomainConfig,
-): void => {
-  new TerraformOutput(scope, 'clientWebsiteBucketName', {
-    value: bucket.bucket,
-    description: 'Name of the client website asset bucket',
-  });
-
-  new TerraformOutput(scope, 'clientWebsiteDistributionId', {
-    value: distribution.id,
-    description: 'ID of the CloudFront distribution serving the client website',
-  });
-
-  new TerraformOutput(scope, 'clientWebsiteDistributionDomainName', {
-    value: distribution.domainName,
-    description: 'Domain name of the CloudFront distribution',
-  });
-
-  new TerraformOutput(scope, 'clientWebsiteDistributionHostedZoneId', {
-    value: distribution.hostedZoneId,
-    description:
-      'Hosted zone ID of the CloudFront distribution (for alias records)',
-  });
-
-  new TerraformOutput(scope, 'clientWebsiteCertificateArn', {
-    value: certificate.arn,
-    description: 'ARN of the ACM certificate for the client website domain(s)',
-  });
-
-  new TerraformOutput(scope, 'clientWebsiteDomainName', {
-    value: domainConfig.domainNames[0],
-    description: 'Primary domain name for the client website',
-  });
-
-  new TerraformOutput(scope, 'clientWebsiteAlternateDomainNames', {
-    value: domainConfig.domainNames.slice(1),
-    description: 'Alternate domain names configured for the client website',
   });
 };

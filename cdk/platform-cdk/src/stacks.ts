@@ -30,12 +30,6 @@ import {
 } from './stacks/names';
 import type { Stack, UniversalStackProps } from './types/stack';
 
-type StackDefinitionEntry =
-  | Stack<BootstrapStackProps>
-  | Stack<ApiStackProps>
-  | Stack<ClientWebsiteStackProps>
-  | Stack<UniversalStackProps>;
-
 const clientWebsiteDomainName = process.env.CLIENT_WEBSITE_DOMAIN_NAME ?? '';
 const clientWebsiteHostedZoneId =
   process.env.CLIENT_WEBSITE_HOSTED_ZONE_ID ?? '';
@@ -100,8 +94,7 @@ const stackDefinitions = [
       alternateDomainNames: clientWebsiteAlternateDomainNames,
     },
     outputSchema: ClientWebsiteStackOutputSchema,
-  },
-] as const satisfies ReadonlyArray<StackDefinitionEntry>;
+  } as const satisfies Stack<ClientWebsiteStackProps>,
+] as const satisfies ReadonlyArray<Stack<UniversalStackProps>>;
 
-export type StackDefinition = (typeof stackDefinitions)[number];
 export const stacks = stackDefinitions;
