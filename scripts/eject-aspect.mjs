@@ -19,6 +19,8 @@ const CLI_CONFIG = {
     'Examples:',
     '  node scripts/eject-aspect.mjs analytics --dry-run',
     '  node scripts/eject-aspect.mjs analytics',
+    '  node scripts/eject-aspect.mjs users --dry-run',
+    '  node scripts/eject-aspect.mjs users',
   ],
   flags: [
     {
@@ -177,4 +179,3 @@ if (invokedPath === fileURLToPath(import.meta.url)) {
     process.exit(1);
   });
 }
-

@@ -1,5 +1,5 @@
 ---
-last_reviewed: 2025-12-13
+last_reviewed: 2025-12-14
 ---
 
 # Technical Context
@@ -42,7 +42,7 @@ Tech Stack Details
 
 - Validation: Zod 4 for inputs and env `apps/node-server/src/types/environment.ts`.
 - Effects: Effect 3 for typed effects/layers/errors `packages/core/backend-core`.
-- Auth: JWT with custom claims `packages/core/schemas/schemas/user/userToken.ts`.
+- Auth: JWT with custom claims `packages/core/schemas/schemas/user/userToken.ts` (optional; can be ejected via `npm run eject:users`).
 - Build: Vite SSR to CJS; TS strict, shared configs.
 
 Workflows
@@ -61,4 +61,4 @@ Scaffolding
 
 - Repository scaffolding scripts live under `scripts/**`; `scripts/create-repository-service.mjs` is a thin wrapper over a config-driven runner defined in `scripts/scaffolds/repository-service.config.json` plus shared utilities in `scripts/utils/**`.
 - Reusable hooks register via `scripts/utils/hooks.mjs`; configs declare which hooks run per stage (`preScaffold`, `renderTemplates`, `postScaffold`) and map template tokens to resolvers.
-- Aspect ejection codemods live under `scripts/eject-aspect.mjs` with per-aspect definitions in `scripts/aspects/*.aspect.mjs` (e.g., `npm run eject:analytics`).
+- Aspect ejection codemods live under `scripts/eject-aspect.mjs` with per-aspect definitions in `scripts/aspects/*.aspect.mjs` (e.g., `npm run eject:analytics`, `npm run eject:users`).

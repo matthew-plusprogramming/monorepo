@@ -6,6 +6,8 @@ Aspect ejection
 
 - Preview analytics tear‑out: `npm run eject:analytics -- --dry-run`
 - Apply analytics tear‑out: `npm run eject:analytics`
+- Preview users tear‑out: `npm run eject:users -- --dry-run`
+- Apply users tear‑out: `npm run eject:users`
 
 Command sequences (configurable via `scripts/sequences.config.json`)
 
