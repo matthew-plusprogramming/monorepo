@@ -20,4 +20,4 @@ Policies
 - Retrieval: Follow the Retrieval Policy in `agents/memory-bank.md`.
 - Commit proposal: Format commit proposals using conventional commit format under 70 chars and a brief body preview.
 - Markdown: use Prettier (`npm run format:markdown`) to format Markdown in `agents/**`.
-- Memory stamp: run `node agents/scripts/update-memory-stamp.mjs` once canonical updates are ready so `agents/memory-bank.md` reflects the current date and HEAD SHA.
+- Memory validation: run `npm run memory:validate` (or `npm run agent:finalize`) once canonical updates are ready to ensure referenced paths exist.

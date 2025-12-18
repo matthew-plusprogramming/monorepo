@@ -64,13 +64,13 @@ Phase: execution
   - Implement code/docs; keep changes focused; update canonicals when needed.
   - Run `npm run phase:check` as changes evolve.
   - Run targeted tests; gather outputs; tie evidence back to acceptance criteria.
-  - Update Memory Bank canonicals if needed; stamp via `node agents/scripts/update-memory-stamp.mjs` once stable.
+  - Update Memory Bank canonicals if needed; keep `npm run memory:validate` green.
   - Capture line-numbered diff with `node agents/scripts/git-diff-with-lines.mjs` for verification reports.
   - Run `npm run agent:finalize` before concluding.
   - Propose a conventional commit message.
 - Outputs: Code/doc changes; updated task spec Execution log; tests/evidence; Memory Bank updates; commit message proposal; reflection logged.
 - Done_when: Acceptance criteria satisfied; risks addressed; quality checks pass; spec reflects what shipped.
-- Gates: `npm run agent:finalize` passes; evidence traces to acceptance criteria; memory stamp updated if canonicals changed.
+- Gates: `npm run agent:finalize` passes; evidence traces to acceptance criteria.
 
 End
 

@@ -19,9 +19,8 @@ The Memory Bank provides durable, structured context for all tasks.
 Update Requirements (per task)
 
 - Update relevant canonical files under `agents/memory-bank/` to reflect changes.
-- Use `node agents/scripts/update-memory-stamp.mjs` to apply the stamp once updates are ready.
-- Validate and check drift:
-  - `npm run agent:finalize` - verify referenced paths exist across all memory files, check stamped SHA matches.
+- Validate and check quality:
+  - `npm run agent:finalize` - format markdown, verify referenced paths exist across Memory/Workflow docs, and run repo quality checks.
 - Retrieval helpers: follow the Retrieval Policy in `agents/memory-bank.md` for the authoritative list of discovery commands (`list-files-recursively.mjs`, `smart-file-query.mjs`, `read-files.mjs`), numbered output expectations, and when `--json` is appropriate.
 
 Convenience helpers

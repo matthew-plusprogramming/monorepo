@@ -1,14 +1,12 @@
 ---
 memory_bank: v1
-generated_at: 2025-12-14
-repo_git_sha: d6d2b7dc8e0dba7f371a300431bb612be5b05a34
 ---
 
 Memory Bank
 
 - Canonical: `agents/memory-bank/*`
 - Single source of truth: This file defines knowledge representation. Other docs should reference (not duplicate) these rules.
-- Script catalog: `agents/tools.md` lists automation helpers for loading context, stamping metadata, and running validations.
+- Script catalog: `agents/tools.md` lists automation helpers for loading context, discovery, and running validations.
 - Operating model: `agents/memory-bank/operating-model.md` defines the default Requirements → Design → Implementation Planning → Execution loop.
 - Task specs: per-task specs live under `agents/ephemeral/task-specs/` and are guided by `agents/memory-bank/task-spec.guide.md`.
 
