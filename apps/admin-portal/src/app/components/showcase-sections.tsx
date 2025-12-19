@@ -4,6 +4,7 @@ import {
   DropdownMenu,
   type DropdownMenuItem,
 } from '@ui/components';
+import classnames from 'classnames';
 import type { JSX } from 'react';
 
 import styles from './page.module.scss';
@@ -74,9 +75,12 @@ const ButtonControls = ({
           {clickStyleOptions.map((option) => (
             <button
               aria-pressed={clickStyle === option.value}
-              className={`${styles.pillButton} ${
-                clickStyle === option.value ? styles.pillButtonActive : ''
-              }`}
+              className={classnames(
+                styles.pillButton,
+                clickStyle === option.value
+                  ? styles.pillButtonActive
+                  : undefined,
+              )}
               key={option.value}
               onClick={(): void => {
                 onClickStyleChange(option.value);
@@ -99,9 +103,10 @@ const ButtonControls = ({
           {sizeOptions.map((option) => (
             <button
               aria-pressed={size === option.value}
-              className={`${styles.pillButton} ${
-                size === option.value ? styles.pillButtonActive : ''
-              }`}
+              className={classnames(
+                styles.pillButton,
+                size === option.value ? styles.pillButtonActive : undefined,
+              )}
               key={option.value}
               onClick={(): void => {
                 onSizeChange(option.value);

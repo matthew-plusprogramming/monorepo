@@ -5,9 +5,10 @@
     "baseUrl": ".",
     "jsx": "react-jsx",
     "lib": ["ES2024", "DOM", "DOM.Iterable"],
+    "rootDirs": ["src", "__generated__/src"],
     "paths": {
       "@ui/components": ["./src/index.ts"]
     }
   },
-  "include": ["src/**/*"]
+  "include": ["src/**/*", "__generated__/src"]
 }

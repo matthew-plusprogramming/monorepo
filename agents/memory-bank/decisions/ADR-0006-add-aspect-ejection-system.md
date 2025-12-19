@@ -23,5 +23,3 @@ Consequences (Positive/Negative):
 - Negative: ejection scripts must be kept in sync with repo structure; transforms may need updates as code evolves.
 
 Related:
-
-- Task spec: `agents/ephemeral/task-specs/2025-12-12-eject-analytics.md`

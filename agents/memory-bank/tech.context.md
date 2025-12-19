@@ -38,7 +38,7 @@ Codebase Map
 - `packages/core/backend-core`: Effect→Express adapter, services, types.
 - `packages/core/schemas`: Zod domain schemas and constants.
 - Shared configs: `packages/configs/*`.
-- Shared UI: `packages/ui-components` exports reusable React components/styles for the web apps.
+- Shared UI: `packages/ui-components` exports reusable React components/styles for the web apps; CSS module typings are generated via `gen:css-types` (watch in `dev`) into `__generated__/src`.
 
 Tech Stack Details
 
@@ -46,6 +46,7 @@ Tech Stack Details
 - Effects: Effect 3 for typed effects/layers/errors `packages/core/backend-core`.
 - Auth: JWT with custom claims `packages/core/schemas/schemas/user/userToken.ts` (optional; can be ejected via `npm run eject:users`); role constants in `packages/core/backend-core/src/auth/roles.ts`, admin enforcement via `apps/node-server/src/middleware/isAdmin.middleware.ts`.
 - Build: Vite SSR to CJS; TS strict, shared configs.
+- Node-server build: Vite config tolerates missing DOTENV_PRIVATE_KEY_PRODUCTION by defaulting PORT/LAMBDA for build-time config.
 
 Workflows
 

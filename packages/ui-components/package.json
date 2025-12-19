@@ -7,7 +7,10 @@
   },
   "types": "./src/index.ts",
   "scripts": {
-    "build": "tsc -p tsconfig.json"
+    "dev": "npm run gen:css-types -- --watch",
+    "prebuild": "npm run gen:css-types",
+    "build": "tsc -p tsconfig.json",
+    "gen:css-types": "typed-scss-modules src --aliasPrefixes.@ ../../apps/client-website/src --exportType default --outputFolder __generated__"
   },
   "dependencies": {
     "classnames": "^2.5.1",
@@ -20,6 +23,7 @@
   },
   "devDependencies": {
     "@configs/ts-config": "*",
+    "typed-scss-modules": "^8.1.1",
     "typescript": "^5.9.3"
   },
   "sideEffects": [
