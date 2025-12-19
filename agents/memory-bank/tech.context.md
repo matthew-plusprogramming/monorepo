@@ -44,7 +44,7 @@ Tech Stack Details
 
 - Validation: Zod 4 for inputs and env `apps/node-server/src/types/environment.ts`.
 - Effects: Effect 3 for typed effects/layers/errors `packages/core/backend-core`.
-- Auth: JWT with custom claims `packages/core/schemas/schemas/user/userToken.ts` (optional; can be ejected via `npm run eject:users`).
+- Auth: JWT with custom claims `packages/core/schemas/schemas/user/userToken.ts` (optional; can be ejected via `npm run eject:users`); role constants in `packages/core/backend-core/src/auth/roles.ts`, admin enforcement via `apps/node-server/src/middleware/isAdmin.middleware.ts`.
 - Build: Vite SSR to CJS; TS strict, shared configs.
 
 Workflows
