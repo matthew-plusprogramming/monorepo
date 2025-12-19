@@ -1,5 +1,5 @@
 import { execSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 export const root = process.cwd();
@@ -31,8 +31,13 @@ export const isTestFile = (file) =>
   /\.test\.(?:cts|mts|tsx|ts)$/i.test(file) ||
   /\.spec\.(?:cts|mts|tsx|ts)$/i.test(file);
 
-export const readFile = (relativePath) =>
-  readFileSync(resolve(root, relativePath), 'utf8');
+export const readFile = (relativePath) => {
+  const fullPath = resolve(root, relativePath);
+  if (!existsSync(fullPath)) {
+    return '';
+  }
+  return readFileSync(fullPath, 'utf8');
+};
 
 export const splitLines = (text) => text.split(/\r?\n/);
 

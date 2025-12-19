@@ -1,5 +1,5 @@
 ---
-last_reviewed: 2025-12-18
+last_reviewed: 2025-12-19
 ---
 
 # Technical Context
@@ -18,7 +18,7 @@ Constraints
 Environment
 
 - Local dev for the server; CDKTF for infra with outputs consumed by the app.
-- Optional: use `git worktree` to keep parallel changes isolated (e.g. sibling worktrees under `../agentic-demo-worktrees/{admin,backend,client}` on `worktree/*` branches).
+- Optional: use `git worktree` to keep parallel changes isolated (e.g. hidden repo-local `.worktrees/{admin,backend,client}` on `worktree/*` branches).
 
 Entrypoints
 
@@ -38,6 +38,7 @@ Codebase Map
 - `packages/core/backend-core`: Effect→Express adapter, services, types.
 - `packages/core/schemas`: Zod domain schemas and constants.
 - Shared configs: `packages/configs/*`.
+- Shared UI: `packages/ui-components` exports reusable React components/styles for the web apps.
 
 Tech Stack Details
 

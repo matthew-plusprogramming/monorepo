@@ -202,4 +202,7 @@ $RECYCLE.BIN/
 # Ephemeral agent state (active context and scratch files)
 agents/ephemeral/*
 
+# Local git worktrees
+.worktrees/
+
 # End of https://www.toptal.com/developers/gitignore/api/macos,windows,node
