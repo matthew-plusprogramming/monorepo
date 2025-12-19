@@ -1,5 +1,5 @@
 ---
-last_reviewed: 2025-12-14
+last_reviewed: 2025-12-18
 ---
 
 # Technical Context
@@ -18,6 +18,7 @@ Constraints
 Environment
 
 - Local dev for the server; CDKTF for infra with outputs consumed by the app.
+- Optional: use `git worktree` to keep parallel changes isolated (e.g. sibling worktrees under `../agentic-demo-worktrees/{admin,backend,client}` on `worktree/*` branches).
 
 Entrypoints
 

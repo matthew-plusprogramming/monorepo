@@ -1,0 +1,13 @@
+{
+  "extends": "@configs/ts-config/tsconfig.package.json",
+  "compilerOptions": {
+    "outDir": "dist",
+    "baseUrl": ".",
+    "jsx": "react-jsx",
+    "lib": ["ES2024", "DOM", "DOM.Iterable"],
+    "paths": {
+      "@ui/components": ["./src/index.ts"]
+    }
+  },
+  "include": ["src/**/*"]
+}

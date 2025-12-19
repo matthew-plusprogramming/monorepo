@@ -1,0 +1,149 @@
+@use '@/app/globals.scss' as *;
+@use '@/styles/form-colors.scss' as formColors;
+
+$text-muted-strong: color-mix(
+  in oklch,
+  var(--text-color) 80%,
+  var(--muted-color)
+);
+$card-max-width: 420px;
+$card-padding: clamp(2rem, 5vw, 3rem);
+$field-gap: 0.35rem;
+$stack-gap: 1.25rem;
+
+.page {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  min-height: 100dvh;
+  margin: 0;
+  padding: 0 clamp(1rem, 8vw, 12vw);
+
+  @include fancy-gradient-background;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: $stack-gap;
+
+  width: min($card-max-width, 100%);
+  padding: $card-padding;
+  border-radius: 1.5rem;
+
+  color: var(--text-color);
+
+  background: var(--background-color);
+  box-shadow: 0 30px 80px formColors.$surface-card-shadow;
+}
+
+.header {
+  text-align: center;
+
+  & h1 {
+    margin-bottom: 0.35rem;
+    font-size: clamp(1.75rem, 3vw, 2.1rem);
+  }
+
+  & p {
+    margin: 0;
+    font-size: 1rem;
+    color: $text-muted-strong;
+  }
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: $stack-gap;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: $field-gap;
+}
+
+.fieldLabel {
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.input {
+  padding: 0.85rem 0.95rem;
+  border: 1px solid formColors.$input-border-color;
+  border-radius: 0.75rem;
+
+  font-size: 1rem;
+  color: inherit;
+
+  background: formColors.$input-background-color;
+
+  transition:
+    border-color var(--transition-medium) ease,
+    box-shadow var(--transition-medium) ease;
+
+  &::placeholder {
+    color: formColors.$input-placeholder-color;
+  }
+
+  &:focus-visible {
+    border-color: formColors.$input-focus-border-color;
+    outline: none;
+    box-shadow: 0 0 0 3px formColors.$input-focus-ring-color;
+  }
+
+  &:invalid:focus-visible {
+    border-color: formColors.$input-error-border-color;
+  }
+}
+
+.error {
+  font-size: 0.85rem;
+  color: formColors.$input-error-border-color;
+}
+
+.formError {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: formColors.$input-error-border-color;
+}
+
+.supportText {
+  margin: 0;
+  font-size: 0.9rem;
+  color: $text-muted-strong;
+}
+
+.actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+
+  & .submitButton {
+    width: 100%;
+  }
+}
+
+.utilityLink {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--secondary-color-light);
+  text-align: center;
+  text-decoration: none;
+
+  transition: opacity var(--transition-fast) ease;
+
+  &:hover,
+  &:focus-visible {
+    opacity: 0.8;
+  }
+}
+
+@include respond(mobile) {
+  .card {
+    padding: clamp(1.5rem, 8vw, 2rem);
+  }
+}

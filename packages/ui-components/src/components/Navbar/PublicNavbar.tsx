@@ -2,11 +2,11 @@ import Image from 'next/image';
 import Link from 'next/link';
 import type { JSX } from 'react';
 
-import { Button } from '@/components/Button';
+import { Button } from '../Button';
 
 import styles from './Navbar.module.scss';
 
-const Navbar = (): JSX.Element => {
+const PublicNavbar = (): JSX.Element => {
   return (
     <nav className={styles.navbar} aria-label="Primary navigation">
       <Link className={styles.brandLink} href="/">
@@ -26,28 +26,33 @@ const Navbar = (): JSX.Element => {
 
       <ul className={styles.links}>
         <li>
-          <Link href="#dashboard">Dashboard</Link>
+          <Link href="/features">Features</Link>
         </li>
         <li>
-          <Link href="#projects">Projects</Link>
-        </li>
-        <li>
-          <Link href="#support">Support</Link>
+          <Link href="/components">Components</Link>
         </li>
       </ul>
 
       <div className={styles.actions}>
         <Button
           className={styles.navButton}
+          displayStyle="secondary"
+          clickStyle="flat"
+          href="/login"
+        >
+          Log in
+        </Button>
+        <Button
+          className={styles.navButton}
           displayStyle="cta"
           clickStyle="3d"
-          href="/account"
+          href="/signup"
         >
-          My Account
+          Get started
         </Button>
       </div>
     </nav>
   );
 };
 
-export { Navbar };
+export { PublicNavbar };

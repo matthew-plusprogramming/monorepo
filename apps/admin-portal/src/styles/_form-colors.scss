@@ -1,0 +1,60 @@
+@use '@/app/globals.scss' as *;
+
+// Shared surface accents
+$surface-card-shadow: color-mix(
+  in oklch,
+  var(--secondary-color) 15%,
+  transparent
+);
+
+// Input tokens
+$input-background-color: color-mix(
+  in oklch,
+  var(--background-color) 90%,
+  transparent
+);
+$input-border-color: color-mix(in oklch, var(--text-color) 30%, transparent);
+$input-placeholder-color: color-mix(
+  in oklch,
+  var(--text-color) 65%,
+  var(--muted-color)
+);
+$input-focus-border-color: color-mix(
+  in oklch,
+  var(--primary-color) 70%,
+  transparent
+);
+$input-focus-ring-color: color-mix(
+  in oklch,
+  var(--primary-color) 35%,
+  transparent
+);
+$input-error-border-color: color-mix(
+  in oklch,
+  var(--secondary-color) 20%,
+  var(--error-color)
+);
+
+// Button tokens
+$button-focus-outline-color: color-mix(
+  in oklch,
+  var(--text-color) 40%,
+  transparent
+);
+$button-shadow-default: color-mix(in oklch, var(--text-color) 25%, transparent);
+$button-shadow-cta: color-mix(in oklch, var(--primary-color) 30%, transparent);
+$button-cta-hover-background: color-mix(
+  in oklch,
+  var(--primary-color) 85%,
+  var(--secondary-color)
+);
+$button-secondary-background: color-mix(
+  in oklch,
+  var(--text-color) 90%,
+  var(--muted-color)
+);
+$button-secondary-hover-background: color-mix(
+  in oklch,
+  var(--text-color) 85%,
+  var(--muted-color)
+);

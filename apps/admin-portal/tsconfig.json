@@ -1,0 +1,42 @@
+{
+  "extends": "@configs/ts-config/tsconfig.build.json",
+  "compilerOptions": {
+    "isolatedModules": true,
+    "useDefineForClassFields": true,
+
+    /* Bundler mode */
+    "allowImportingTsExtensions": true,
+    "jsx": "react-jsx",
+
+    /* Target */
+    "lib": ["ES2024", "DOM", "DOM.Iterable"],
+
+    /* Linting */
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedSideEffectImports": true,
+    "erasableSyntaxOnly": true,
+
+    /* Helps when generating CSS module .d.ts into a parallel tree */
+    "rootDirs": ["src", "__generated__/src"],
+
+    /* Next plugin */
+    "plugins": [{ "name": "next" }],
+
+    "paths": {
+      "@/*": ["./src/*"]
+    }
+  },
+  "include": [
+    "next-env.d.ts",
+    "src",
+    "__generated__/src",
+    "**/*.ts",
+    "**/*.tsx",
+    "**/*.mts",
+    ".next/types/**/*.ts",
+    ".next/dev/types/**/*.ts"
+  ],
+  "exclude": ["node_modules"]
+}

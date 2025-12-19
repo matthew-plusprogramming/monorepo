@@ -61,6 +61,9 @@ const heartbeatModule = vi.hoisted<SingleMockState>(() => ({
 const registerModule = vi.hoisted<SingleMockState>(() => ({
   handler: undefined,
 }));
+const loginModule = vi.hoisted<SingleMockState>(() => ({
+  handler: undefined,
+}));
 const getUserModule = vi.hoisted<SingleMockState>(() => ({
   handler: undefined,
 }));
@@ -130,6 +133,12 @@ vi.mock('@/handlers/register.handler', () => {
   const handler = vi.fn();
   registerModule.handler = handler;
   return { registerRequestHandler: handler };
+});
+
+vi.mock('@/handlers/login.handler', () => {
+  const handler = vi.fn();
+  loginModule.handler = handler;
+  return { loginRequestHandler: handler };
 });
 
 vi.mock('@/handlers/heartbeat.handler', () => {

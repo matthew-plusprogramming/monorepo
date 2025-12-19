@@ -38,20 +38,20 @@ type NativeButtonElementProps = Omit<ButtonAsButton, keyof BaseProps>;
 type ButtonElementProps = AnchorElementProps | NativeButtonElementProps;
 
 const displayClassNames: Record<DisplayStyle, string> = {
-  cta: styles.displayCta,
-  secondary: styles.displaySecondary,
-  ghost: styles.displayGhost,
-  dangerGhost: styles.displayDangerGhost,
+  cta: styles.displayCta!,
+  secondary: styles.displaySecondary!,
+  ghost: styles.displayGhost!,
+  dangerGhost: styles.displayDangerGhost!,
 };
 
 const clickClassNames: Record<ClickStyle, string> = {
-  flat: styles.clickFlat,
-  '3d': styles.clickThreeD,
+  flat: styles.clickFlat!,
+  '3d': styles.clickThreeD!,
 };
 
 const sizeClassNames: Record<ButtonSize, string> = {
-  md: styles.sizeMd,
-  sm: styles.sizeSm,
+  md: styles.sizeMd!,
+  sm: styles.sizeSm!,
 };
 
 const isLinkProps = (props: ButtonElementProps): props is AnchorElementProps =>

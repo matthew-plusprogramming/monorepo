@@ -1,0 +1,248 @@
+@use '@/app/globals.scss' as *;
+
+$muted-strong: color-mix(
+  in oklch,
+  var(--text-color) 80%,
+  var(--muted-color)
+);
+$card-border: color-mix(
+  in oklch,
+  var(--muted-color) 70%,
+  var(--background-color)
+);
+
+.layout {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(1rem, 2vw, 1.4rem);
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(0.85rem, 2vw, 1.25rem);
+
+  padding: clamp(1.1rem, 3vw, 1.5rem);
+  border: 1px solid $card-border;
+  border-radius: 1.1rem;
+
+  background: color-mix(
+    in oklch,
+    var(--background-color) 95%,
+    var(--muted-color) 5%
+  );
+  box-shadow: 0 12px 30px rgb(0 0 0 / 0.08);
+}
+
+.sectionHeader {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.85rem;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.sectionEyebrow {
+  margin: 0;
+  padding: 0.35rem 0.6rem;
+  border-radius: 999px;
+
+  font-size: 0.85rem;
+  font-weight: 800;
+  color: var(--text-color);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+
+  background: color-mix(
+    in oklch,
+    var(--background-color) 92%,
+    var(--muted-color) 8%
+  );
+}
+
+.sectionTitle {
+  margin: 0;
+  font-size: 1.3rem;
+}
+
+.sectionDescription {
+  margin: 0.3rem 0 0;
+  line-height: 1.6;
+  color: $muted-strong;
+}
+
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.85rem;
+  align-items: center;
+
+  padding: 0.65rem;
+  border: 1px dashed $card-border;
+  border-radius: 0.9rem;
+
+  background: color-mix(
+    in oklch,
+    var(--background-color) 97%,
+    var(--muted-color) 3%
+  );
+}
+
+.controlGroup {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.controlLabel {
+  margin: 0;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.pillRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.pillButton {
+  cursor: pointer;
+
+  padding: 0.35rem 0.85rem;
+  border: 1px solid $card-border;
+  border-radius: 999px;
+
+  font-weight: 700;
+  color: $muted-strong;
+
+  background: color-mix(
+    in oklch,
+    var(--background-color) 93%,
+    var(--muted-color) 7%
+  );
+
+  transition:
+    background var(--transition-fast) ease,
+    color var(--transition-fast) ease,
+    border-color var(--transition-fast) ease,
+    transform var(--transition-fast) ease;
+
+  &:hover,
+  &:focus-visible {
+    transform: translateY(-1px);
+    border-color: var(--text-color);
+    color: var(--text-color);
+    outline: none;
+  }
+}
+
+.pillButtonActive {
+  border-color: var(--text-color);
+  color: var(--text-color);
+  background: color-mix(
+    in oklch,
+    var(--background-color) 88%,
+    var(--muted-color) 12%
+  );
+}
+
+.buttonGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: clamp(0.75rem, 2vw, 1rem);
+
+  margin: 0;
+  padding: 0;
+
+  list-style: none;
+}
+
+.buttonCard {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+
+  padding: 1rem;
+  border: 1px solid $card-border;
+  border-radius: 0.9rem;
+
+  background: color-mix(
+    in oklch,
+    var(--background-color) 94%,
+    var(--muted-color) 6%
+  );
+}
+
+.variantHeader {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.variantLabel {
+  margin: 0;
+
+  font-size: 0.9rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.variantDescription {
+  margin: 0;
+  line-height: 1.5;
+  color: $muted-strong;
+}
+
+.demoActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  align-items: center;
+}
+
+.dropdownRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.85rem;
+  align-items: center;
+}
+
+.dropdownWrapper {
+  display: inline-flex;
+  align-items: center;
+}
+
+.dropdownTrigger {
+  min-width: 8.75rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+.dropdownPanel {
+  min-width: 14rem;
+}
+
+.dropdownHint {
+  max-width: 30rem;
+  margin: 0;
+  line-height: 1.5;
+  color: $muted-strong;
+}
+
+.destructiveItem {
+  color: var(--danger-color);
+}
+
+@include respond(mobile) {
+  .controls {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .dropdownRow {
+    align-items: flex-start;
+  }
+}

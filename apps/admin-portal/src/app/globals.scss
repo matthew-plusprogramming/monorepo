@@ -1,0 +1,99 @@
+@use 'sass:map';
+
+$breakpoints: (
+  laptop: 1024px,
+  tablet: 720px,
+  mobile: 375px,
+);
+
+@mixin respond($key) {
+  $size: map.get($breakpoints, $key);
+
+  @if not $size {
+    @error "Unknown breakpoint `#{$key}`";
+  }
+
+  @media (width <= $size) {
+    @content;
+  }
+}
+
+// Shared layered gradient for hero/login backgrounds.
+@mixin fancy-gradient-background {
+  background:
+    radial-gradient(
+      circle at 10% 0%,
+      color-mix(in oklch, var(--primary-color) 55%, var(--background-color)) 0%,
+      transparent 65%
+    ),
+    radial-gradient(
+      circle at 110% -10%,
+      color-mix(in oklch, var(--accent-color) 65%, var(--background-color)) 0%,
+      transparent 50%
+    ),
+    linear-gradient(
+      135deg,
+      color-mix(in oklch, var(--primary-color) 70%, var(--secondary-color)) 0%,
+      color-mix(in oklch, var(--secondary-color) 70%, var(--accent-color)) 100%
+    );
+}
+
+@mixin flex-row($gap, $justify: flex-start) {
+  display: flex;
+  gap: $gap;
+  align-items: center;
+  justify-content: $justify;
+}
+
+@mixin standard-page-padding() {
+  padding: clamp(2rem, 2vw, 4rem) clamp(1rem, 20vw, 25vw);
+}
+
+:root {
+  // Colors
+  --primary-color: #7a5db8;
+  --secondary-color: #0042ac;
+  --secondary-color-light: #5a83cb;
+  --accent-color: #80d169;
+  --muted-color: #bbb;
+  --text-color: #2b2b2b;
+  --background-color: #f7f5fa;
+  --error-color: #e11212;
+  --danger-color: #c43232;
+
+  // Motion
+  --transition-fast: 120ms;
+  --transition-medium: 150ms;
+  --transition-slow: 200ms;
+
+  // Typography
+  font-family: Inter, sans-serif;
+  font-optical-sizing: auto;
+  font-weight: 400;
+  font-style: normal;
+  font-synthesis: none;
+  line-height: 1.5;
+  color: var(--text-color);
+  text-rendering: optimizelegibility;
+
+  // Layout
+  color-scheme: light dark;
+  background-color: var(--background-color);
+
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --text-color: #f7f5fa;
+    --background-color: #2b2b2b;
+  }
+}
