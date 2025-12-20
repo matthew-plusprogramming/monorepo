@@ -4,10 +4,10 @@ import {
   DropdownMenu,
   type DropdownMenuItem,
 } from '@ui/components';
+import classnames from 'classnames';
 import type { JSX } from 'react';
 
 import styles from './page.module.scss';
-import classnames from 'classnames';
 
 type ButtonDisplayStyle = NonNullable<ButtonProps['displayStyle']>;
 type ButtonClickStyle = NonNullable<ButtonProps['clickStyle']>;
