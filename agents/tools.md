@@ -26,3 +26,12 @@ Prefer the purpose-built discovery scripts (`list-files-recursively.mjs`, `smart
   Emits a CSV (`path,size,modifiedAt`) of files under the given root whose repo-relative paths match the pattern; supports substring or regex matching plus optional type filters (`ts`, `md`, `all`).
 - `node agents/scripts/git-diff-with-lines.mjs [--cached]`
   Emits the working tree (or staged) diff against `HEAD` with old/new line numbers for verification reports.
+
+## Worktrees & Env Keys
+
+- `node agents/scripts/manage-worktrees.mjs add --path <path> [--branch <name>] [--ref <ref>] [--force]`
+  Creates a git worktree and syncs `.env.keys` from the primary repo.
+- `node agents/scripts/sync-worktree-env-keys.mjs [--target <path>] [--source <path>] [--dry-run] [--force]`
+  Copies missing `.env.keys` into the target worktree and preserves relative paths.
+- `node agents/scripts/dotenvx-run.mjs <dotenvx args>`
+  Runs dotenvx and emits guidance when missing private keys are detected.

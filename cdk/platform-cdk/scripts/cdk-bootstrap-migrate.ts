@@ -2,7 +2,7 @@ import { execSync } from 'node:child_process';
 import { resolve } from 'node:path';
 
 import { STACK_PREFIX } from '../src/constants';
-import { packageRootDir } from '../src/location';
+import { monorepoRootDir, packageRootDir } from '../src/location';
 
 const ENV = process.env.ENV;
 if (!ENV) {
@@ -15,13 +15,17 @@ const workDir = resolve(
   `cdktf.out/stacks/${STACK_PREFIX}-bootstrap-stack`,
 );
 const envFile = resolve(packageRootDir, `.env.${ENV}`);
+const dotenvxRunner = resolve(
+  monorepoRootDir,
+  'agents/scripts/dotenvx-run.mjs',
+);
 
 try {
   // Change to working directory
   process.chdir(workDir);
 
   // Run dotenvx + tofu command
-  execSync(`dotenvx run -f "${envFile}" -- tofu init -migrate-state`, {
+  execSync(`node "${dotenvxRunner}" run -f "${envFile}" -- tofu init -migrate-state`, {
     stdio: 'inherit',
     env: process.env,
   });
