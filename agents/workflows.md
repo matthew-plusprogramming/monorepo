@@ -13,7 +13,6 @@ Usage
 - Reference `agents/tools.md` for script helpers that support each phase.
   - Use `node agents/scripts/append-memory-entry.mjs --requirements "..." --design "..." --implementation "..." --execution "..."` to capture reflections.
   - Retrieval tooling and single-pass rules live in `agents/memory-bank.md#retrieval-policy`; defer to that section for discovery commands and numbered output expectations.
-- For system-impacting changes, open an ADR stub using `agents/memory-bank/decisions/ADR-0000-template.md`.
 
 Policies
 
