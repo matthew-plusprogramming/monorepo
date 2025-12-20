@@ -47,7 +47,6 @@ Tech Stack Details
 - Effects: Effect 3 for typed effects/layers/errors `packages/core/backend-core`.
 - Auth: JWT with custom claims `packages/core/schemas/schemas/user/userToken.ts` (optional; can be ejected via `npm run eject:users`); role constants in `packages/core/backend-core/src/auth/roles.ts`, admin enforcement via `apps/node-server/src/middleware/isAdmin.middleware.ts`.
 - Build: Vite SSR to CJS; TS strict, shared configs.
-- Node-server build: Vite config tolerates missing DOTENV_PRIVATE_KEY_PRODUCTION by defaulting PORT/LAMBDA for build-time config.
 
 Workflows
 
