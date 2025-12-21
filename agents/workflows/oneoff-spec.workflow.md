@@ -50,11 +50,13 @@ Phase: implementation-planning
   - List discrete tasks with outcomes/owners (if relevant) and dependencies.
   - Identify non-primitive fields and define storage format. (if applicable)
   - Map tests to acceptance criteria (traceability back to EARS items).
+  - Identify documentation updates needed (user/dev/runbook/README) and target files.
+  - Identify Memory Bank canonical updates needed (which `agents/memory-bank/*` files and why).
   - Note sequencing/blockers and checkpoints for progress updates.
   - Update the Implementation Planning section of the task spec.
-- Outputs: Task list with outcomes/dependencies; test plan mapped to acceptance criteria; reflection logged.
+- Outputs: Task list with outcomes/dependencies; test plan mapped to acceptance criteria; documentation and Memory Bank update notes; reflection logged.
 - Done_when: Tasks are actionable, ordered, and traceable to Requirements/Design.
-- Gates: Each acceptance criterion has at least one planned verification; dependencies/risks identified.
+- Gates: Each acceptance criterion has at least one planned verification; dependencies/risks identified; documentation/Memory Bank updates noted when applicable.
 - Next: execution
 
 Phase: execution

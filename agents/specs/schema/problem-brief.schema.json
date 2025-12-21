@@ -1,0 +1,27 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ProblemBrief Front Matter",
+  "type": "object",
+  "required": [
+    "id",
+    "title",
+    "summary",
+    "goals",
+    "non_goals",
+    "constraints",
+    "success_criteria",
+    "open_questions"
+  ],
+  "properties": {
+    "id": { "type": "string" },
+    "title": { "type": "string" },
+    "summary": { "type": "string" },
+    "goals": { "type": "array", "items": { "type": "string" } },
+    "non_goals": { "type": "array", "items": { "type": "string" } },
+    "constraints": { "type": "array", "items": { "type": "string" } },
+    "success_criteria": { "type": "array", "items": { "type": "string" } },
+    "open_questions": { "type": "array", "items": { "type": "string" } },
+    "status": { "type": "string" }
+  },
+  "additionalProperties": false
+}

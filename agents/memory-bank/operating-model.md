@@ -23,7 +23,9 @@ last_reviewed: 2025-11-26
 - **Implementation Planning**
   - Break work into discrete tasks with outcomes, dependencies, and owners (when relevant).
   - Identify non-primitive fields and define storage format. (if applicable)
-  - Map tests to acceptance criteria for traceability; note blockers and sequencing.
+  - Map tests to acceptance criteria for traceability.
+  - Identify documentation updates and Memory Bank canonical updates needed.
+  - Note blockers and sequencing.
 - **Execution**
   - Track progress against tasks, update the spec as reality changes, and log evidence/tests tied to acceptance criteria.
   - Keep changes focused; update canonicals as needed and run quality gates (`npm run phase:check`, `npm run agent:finalize`).

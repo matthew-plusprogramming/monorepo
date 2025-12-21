@@ -32,6 +32,8 @@ last_reviewed: 2025-11-26
   - Break work into tasks with outcomes, dependencies, and sequencing.
   - Identify non-primitive fields and define storage format. (if applicable)
   - Map tests to acceptance criteria for traceability.
+  - Identify documentation updates needed (user/dev/runbook/README) and target files.
+  - Identify Memory Bank canonical updates needed (which `agents/memory-bank/*` files and why).
 - **Execution**
   - Log progress updates and adjustments to the spec.
   - Record evidence/tests tied to acceptance criteria; note follow-ups.

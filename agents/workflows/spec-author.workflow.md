@@ -45,8 +45,10 @@ Phase: implementation-planning
   - Translate requirements + design into a Task List with outcomes/dependencies.
   - Identify non-primitive fields and define storage format. (if applicable)
   - Map tests or evidence to requirements.
+  - Identify documentation updates needed (user/dev/runbook/README) and target files.
+  - Identify Memory Bank canonical updates needed (which `agents/memory-bank/*` files and why).
   - Note any blockers or sequencing constraints.
-- Outputs: Task List and Testing sections complete.
+- Outputs: Task List and Testing sections complete; documentation and Memory Bank update notes captured.
 - Next: execution
 
 Phase: execution
