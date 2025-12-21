@@ -19,6 +19,7 @@ Desired Outcome
 Global Prompts
 
 - Reference `agents/memory-bank.md#retrieval-policy` for discovery tooling, numbered output expectations, and single-pass context discipline.
+- Record approvals and key decisions in the Decision & Work Log for the active spec/task.
 - Call out any workflow-specific safety, coordination, or communication rules.
 
 Phase: requirements
@@ -27,7 +28,7 @@ Phase: requirements
 - Inputs: <Key files, context, or systems to inspect before proposing work.>
 - Checklist:
   - <Add bullet items that define requirements steps and acceptance criteria.>
-- Outputs: <Artifacts required to exit the phase.>
+- Outputs: <Artifacts required to exit the phase (include Decision & Work Log updates).>
 - Next: design
 
 Phase: design
@@ -35,7 +36,7 @@ Phase: design
 - Goal: <What the Design phase should deliver.>
 - Checklist:
   - <Design tasks and decisions to capture.>
-- Outputs: <Design artifacts (diagrams, contracts, notes).>
+- Outputs: <Design artifacts (diagrams, contracts, notes) + Decision & Work Log updates.>
 - Next: implementation-planning
 
 Phase: implementation-planning
@@ -43,7 +44,7 @@ Phase: implementation-planning
 - Goal: <How to break down work into tasks with test mapping.>
 - Checklist:
   - <Tasks, dependencies, and test traceability steps.>
-- Outputs: <Task list and verification plan.>
+- Outputs: <Task list and verification plan with Decision & Work Log updates.>
 - Next: execution
 
 Phase: execution
@@ -51,7 +52,7 @@ Phase: execution
 - Goal: <How to deliver and validate the change.>
 - Checklist:
   - <Execution tasks, tests, and validation steps.>
-- Outputs: <Code/doc changes, evidence, reflections.>
+- Outputs: <Code/doc changes, evidence, reflections, and Decision & Work Log updates.>
 - Next: done
 
 End

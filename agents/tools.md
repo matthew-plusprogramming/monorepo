@@ -6,12 +6,21 @@ Prefer the purpose-built discovery scripts (`list-files-recursively.mjs`, `smart
 
 ## Context & Memory Management
 
-- `node agents/scripts/load-context.mjs [--include-optional] [--list]`
-  Prints required Memory Bank + workflow files for the current task with numbered lines to encourage single-pass note taking. Add `--include-optional` to pull in supplemental context and `--list` to show paths without content.
+- `node agents/scripts/load-context.mjs [--include-optional] [--list] [--task <path>]`
+  Prints required Memory Bank + workflow files for the current task with numbered lines to encourage single-pass note taking. Add `--include-optional` to pull in supplemental context, `--list` to show paths without content, and `--task` to include the current task spec explicitly.
 - `node agents/scripts/append-memory-entry.mjs --requirements "<text>" [--design "<text>"] [--implementation "<text>"] [--execution "<text>"] [--dry-run]`
-  Appends formatted reflections (Requirements, Design, Implementation Planning, Execution) to `agents/ephemeral/active.context.md`; at least one flag is required.
+  Deprecated; prints a formatted reflection entry for manual copy into the task spec (no file writes).
 - `node agents/scripts/reset-active-context.mjs --slug "<task-slug>" [--title "<text>"] [--date "<YYYY-MM-DD>"]`
-  Creates a per-task spec under `agents/ephemeral/task-specs/` and refreshes the active context index (date defaults to today UTC).
+  Creates a per-task spec (date defaults to today UTC).
+
+## Spec Tooling
+
+- `node agents/scripts/spec-validate.mjs --specs "<path[,path...]>" [--root <path>] [--registry <path>] [--allow-empty]`
+  Validates spec front matter, required sections, and contract registry references.
+- `node agents/scripts/spec-merge.mjs --specs "<path[,path...]>" --output <path> [--report <path>] [--registry <path>]`
+  Generates a MasterSpec and gate report from workstream specs.
+- `npm run spec:finalize`
+  Runs spec validation and Memory Bank validation in one pass.
 
 ## Search & Discovery
 
@@ -20,18 +29,20 @@ Prefer the purpose-built discovery scripts (`list-files-recursively.mjs`, `smart
 - `node agents/scripts/read-files.mjs --files "<path[,path...]>" [--file-list ...] [--encoding ...] [--maxFileSizeKB ...] [--json]`
   Reads multiple repo-relative files, applying size/binary guards, and prints numbered text blocks by default so you can cite `path:line` without re-reading. Use `--json` when automation requires the legacy `{ files: [{ path, content }] }` payload.
 
+## Git Worktrees
+
+- `node agents/scripts/create-worktree.mjs --name "<worktree-name>" [--branch "<branch-name>"] [--base "<git-ref>"]`
+  Creates a git worktree under `.worktrees/`, defaulting to the `worktree/<name>` branch when none is provided.
+- `node agents/scripts/manage-worktrees.mjs <command> [options]`
+  Manages orchestrator worktrees (ensure/list/status/remove/prune) under `.worktrees/` using workstream specs or explicit lists.
+- `node agents/scripts/sync-worktree-env-keys.mjs [--target <path>] [--source <path>] [--dry-run] [--force]`
+  Copies missing `.env.keys` into the target worktree and preserves relative paths.
+- `node agents/scripts/dotenvx-run.mjs <dotenvx args>`
+  Runs dotenvx and emits guidance when missing private keys are detected.
+
 ## Reporting & Diff Utilities
 
 - `node agents/scripts/list-files-recursively.mjs --root <path> --pattern <pattern> [--types ...] [--regex] [--case-sensitive]`
   Emits a CSV (`path,size,modifiedAt`) of files under the given root whose repo-relative paths match the pattern; supports substring or regex matching plus optional type filters (`ts`, `md`, `all`).
 - `node agents/scripts/git-diff-with-lines.mjs [--cached]`
   Emits the working tree (or staged) diff against `HEAD` with old/new line numbers for verification reports.
-
-## Worktrees & Env Keys
-
-- `node agents/scripts/manage-worktrees.mjs add --path <path> [--branch <name>] [--ref <ref>] [--force]`
-  Creates a git worktree and syncs `.env.keys` from the primary repo.
-- `node agents/scripts/sync-worktree-env-keys.mjs [--target <path>] [--source <path>] [--dry-run] [--force]`
-  Copies missing `.env.keys` into the target worktree and preserves relative paths.
-- `node agents/scripts/dotenvx-run.mjs <dotenvx args>`
-  Runs dotenvx and emits guidance when missing private keys are detected.

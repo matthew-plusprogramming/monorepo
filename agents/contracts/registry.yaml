@@ -1,0 +1,6 @@
+# Contract registry entries must include: id, type, path, owner, version.
+- id: contract-example
+  type: placeholder
+  path: agents/contracts/example.contract.md
+  owner: ws-example
+  version: 1

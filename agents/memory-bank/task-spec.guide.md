@@ -6,7 +6,7 @@ last_reviewed: 2025-11-26
 
 ## Location & Naming
 
-- One file per task under `agents/ephemeral/task-specs/`, named `<YYYY-MM-DD>-<slug>.md`.
+- One file per task under `agents/specs/task-specs/`, named `<YYYY-MM-DD>-<slug>.md`.
 - Create via `node agents/scripts/reset-active-context.mjs --slug <task-slug> [--title "..."] [--date YYYY-MM-DD]`.
 - Keep the spec updated as the source of truth for the task.
 
@@ -39,4 +39,5 @@ last_reviewed: 2025-11-26
 
 - Keep traceability: link each acceptance criterion to tests or evidence in Execution.
 - Update the spec incrementally as decisions change; avoid drift between plan and reality.
-- Use reflections (`append-memory-entry.mjs`) after each phase to summarize decisions and risks.
+- After each phase, capture a brief reflection in the task spec and log approvals in the Decision & Work Log.
+- When loading context, include the task spec explicitly with `node agents/scripts/load-context.mjs --task agents/specs/task-specs/<YYYY-MM-DD>-<slug>.md`.

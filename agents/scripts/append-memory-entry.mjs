@@ -1,13 +1,7 @@
 #!/usr/bin/env node
-import { readFile, writeFile } from 'node:fs/promises';
-import { resolve } from 'node:path';
-
-const ACTIVE_CONTEXT_PATH = 'agents/ephemeral/active.context.md';
-const RESET_COMMAND = 'node agents/scripts/reset-active-context.mjs';
-
 const USAGE = `Usage: node agents/scripts/append-memory-entry.mjs [options]
 
-Append a formatted entry to the Memory Bank active context.
+Deprecated: format a reflection entry for task specs. This script no longer writes to disk.
 
 Options
   --requirements "<text>"     Requirements phase summary
@@ -93,53 +87,6 @@ const normalize = (value) =>
 const formatDate = (date) =>
   new Intl.DateTimeFormat('en-CA', { timeZone: 'UTC' }).format(date);
 
-const ensureEndsWithNewline = (text) =>
-  text.endsWith('\n') ? text : `${text}\n`;
-
-const insertEntry = (content, entry) => {
-  const marker = '## Legacy Reflections';
-  const contentWithNewline = ensureEndsWithNewline(content);
-  const markerIndex = contentWithNewline.indexOf(marker);
-
-  if (markerIndex === -1) {
-    return `${contentWithNewline}${entry}\n`;
-  }
-
-  const before = contentWithNewline.slice(0, markerIndex).trimEnd();
-  const after = contentWithNewline.slice(markerIndex);
-
-  const beforeBlock = before ? `${before}\n` : '';
-  return `${beforeBlock}${entry}\n\n${after}`;
-};
-
-const appendEntry = async (filePath, entry, dryRun) => {
-  const absolutePath = resolve(process.cwd(), filePath);
-  let originalContent;
-
-  try {
-    originalContent = await readFile(absolutePath, 'utf8');
-  } catch (error) {
-    if (error.code === 'ENOENT') {
-      console.error(
-        `❌ Missing active context at ${filePath}. Run "${RESET_COMMAND}" to regenerate it.`,
-      );
-      process.exit(1);
-    }
-
-    throw error;
-  }
-
-  const updatedContent = insertEntry(originalContent, entry);
-
-  if (dryRun) {
-    console.log('ℹ️  Dry run: entry preview');
-    console.log(entry);
-    return;
-  }
-
-  await writeFile(absolutePath, updatedContent, 'utf8');
-  console.log(`✅ Appended entry to ${filePath}`);
-};
 
 const buildActiveEntry = (
   date,
@@ -155,7 +102,7 @@ const buildActiveEntry = (
 
   if (segments.length === 0) {
     console.error(
-      '❌ At least one of --requirements, --design, --implementation, or --execution is required for the active context.',
+      '❌ At least one of --requirements, --design, --implementation, or --execution is required to build a reflection entry.',
     );
     process.exit(1);
   }
@@ -175,7 +122,15 @@ const main = async () => {
   const date = formatDate(new Date());
 
   const entry = buildActiveEntry(date, options);
-  await appendEntry(ACTIVE_CONTEXT_PATH, entry, options.dryRun);
+  console.warn(
+    '⚠️  Deprecated: log reflections in the task spec (Execution progress log or Decision & Work Log).',
+  );
+  if (options.dryRun) {
+    console.log('ℹ️  Dry run: entry preview');
+  } else {
+    console.log('Suggested entry:');
+  }
+  console.log(entry);
 };
 
 main().catch((error) => {

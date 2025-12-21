@@ -10,6 +10,8 @@ each file with a section header so agents can review everything at once.
 Options
   -o, --include-optional   Include optional Memory Bank context files
   -l, --list               Only list the resolved file paths (no contents)
+  --task <path>            Include a specific task spec path
+  --task-spec <path>       Alias for --task
   -h, --help               Show this help message
 `;
 
@@ -24,17 +26,41 @@ const includeOptional =
   args.includes('-o') || args.includes('--include-optional');
 const listOnly = args.includes('-l') || args.includes('--list');
 
-const ACTIVE_CONTEXT_PATH = 'agents/ephemeral/active.context.md';
+const getOptionValue = (flag) => {
+  for (let index = 0; index < args.length; index += 1) {
+    const arg = args[index];
+    if (arg === flag) {
+      const value = args[index + 1];
+      if (!value || value.startsWith('-')) {
+        console.error(`❌ Missing value for ${flag}`);
+        process.exit(1);
+      }
+      return value;
+    }
+    if (arg.startsWith(`${flag}=`)) {
+      const value = arg.slice(flag.length + 1);
+      if (!value) {
+        console.error(`❌ Missing value for ${flag}`);
+        process.exit(1);
+      }
+      return value;
+    }
+  }
+  return null;
+};
 
-const alwaysInclude = [
+const taskSpecPath =
+  getOptionValue('--task') ?? getOptionValue('--task-spec');
+const ALWAYS_INCLUDE = [
   'agents/memory-bank.md',
   'agents/workflows.md',
   'agents/tools.md',
-  'agents/workflows/default.workflow.md',
+  'agents/workflows/oneoff.workflow.md',
+  'agents/workflows/oneoff-spec.workflow.md',
+  'agents/workflows/oneoff-vibe.workflow.md',
   'agents/memory-bank/operating-model.md',
   'agents/memory-bank/task-spec.guide.md',
   'agents/memory-bank/project.brief.md',
-  ACTIVE_CONTEXT_PATH,
 ];
 
 const optional = ['agents/memory-bank/tech.context.md'];
@@ -42,7 +68,15 @@ const optional = ['agents/memory-bank/tech.context.md'];
 const root = process.cwd();
 
 const collectPaths = () => {
-  return includeOptional ? [...alwaysInclude, ...optional] : alwaysInclude;
+  const base = [...ALWAYS_INCLUDE];
+  if (taskSpecPath) {
+    base.push(taskSpecPath);
+  } else {
+    console.warn(
+      '⚠️  No task spec provided. Use --task <path> to include the current task spec.',
+    );
+  }
+  return includeOptional ? [...base, ...optional] : base;
 };
 
 const formatWithLineNumbers = (content) => {
@@ -66,11 +100,7 @@ const readFileSafely = (relativePath) => {
   const absolutePath = resolve(root, relativePath);
 
   if (!existsSync(absolutePath)) {
-    const missingMessage =
-      relativePath === ACTIVE_CONTEXT_PATH
-        ? `⚠️  Missing file: ${relativePath}. Run "node agents/scripts/reset-active-context.mjs" to create the template.`
-        : `⚠️  Missing file: ${relativePath}`;
-    console.warn(missingMessage);
+    console.warn(`⚠️  Missing file: ${relativePath}`);
     return null;
   }
 
