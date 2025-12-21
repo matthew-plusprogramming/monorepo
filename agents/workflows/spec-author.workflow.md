@@ -43,6 +43,7 @@ Phase: implementation-planning
 - Goal: Produce the Task List and verification plan.
 - Checklist:
   - Translate requirements + design into a Task List with outcomes/dependencies.
+  - Identify non-primitive fields and define storage format. (if applicable)
   - Map tests or evidence to requirements.
   - Note any blockers or sequencing constraints.
 - Outputs: Task List and Testing sections complete.

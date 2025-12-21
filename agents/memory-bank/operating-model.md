@@ -22,6 +22,7 @@ last_reviewed: 2025-11-26
   - Capture interfaces/contracts, data shapes, edge/failure behaviors, and performance/security/migration considerations.
 - **Implementation Planning**
   - Break work into discrete tasks with outcomes, dependencies, and owners (when relevant).
+  - Identify non-primitive fields and define storage format. (if applicable)
   - Map tests to acceptance criteria for traceability; note blockers and sequencing.
 - **Execution**
   - Track progress against tasks, update the spec as reality changes, and log evidence/tests tied to acceptance criteria.

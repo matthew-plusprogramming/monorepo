@@ -30,6 +30,7 @@ last_reviewed: 2025-11-26
   - Define interfaces/contracts, data shapes, and edge/failure behaviors.
 - **Implementation Planning**
   - Break work into tasks with outcomes, dependencies, and sequencing.
+  - Identify non-primitive fields and define storage format. (if applicable)
   - Map tests to acceptance criteria for traceability.
 - **Execution**
   - Log progress updates and adjustments to the spec.

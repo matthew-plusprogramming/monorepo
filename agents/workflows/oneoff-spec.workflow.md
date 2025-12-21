@@ -48,6 +48,7 @@ Phase: implementation-planning
 - Goal: Break down the work into trackable tasks with coverage mapping.
 - Checklist:
   - List discrete tasks with outcomes/owners (if relevant) and dependencies.
+  - Identify non-primitive fields and define storage format. (if applicable)
   - Map tests to acceptance criteria (traceability back to EARS items).
   - Note sequencing/blockers and checkpoints for progress updates.
   - Update the Implementation Planning section of the task spec.

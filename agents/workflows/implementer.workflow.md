@@ -41,6 +41,7 @@ Phase: implementation-planning
 - Goal: Break implementation into tasks with verification mapping.
 - Checklist:
   - Convert MasterSpec tasks into actionable steps with dependencies.
+  - Identify non-primitive fields and define storage format. (if applicable)
   - Map tests/evidence to acceptance criteria.
   - Set checkpoints for progress updates.
 - Outputs: task breakdown and verification plan.
