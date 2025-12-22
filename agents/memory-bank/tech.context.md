@@ -20,6 +20,7 @@ Environment
 - Local dev for the server; CDKTF for infra with outputs consumed by the app.
 - Worktree env keys: `.env.keys` are untracked; use `node agents/scripts/sync-worktree-env-keys.mjs` (or `manage-worktrees.mjs` when creating worktrees) to copy keys into `.worktrees` checkouts. `manage-worktrees.mjs` also syncs `cdk/platform-cdk/cdktf-outputs` when present, and use the `dotenvx-run.mjs` wrapper for missing-key hints.
 - Optional: use `git worktree` to keep parallel changes isolated (e.g. hidden repo-local `.worktrees/{admin,backend,client}` on `worktree/*` branches).
+- When you hit a `"package not found"` error, run `npm run install` at the repo root and retry first.
 
 Entrypoints
 
