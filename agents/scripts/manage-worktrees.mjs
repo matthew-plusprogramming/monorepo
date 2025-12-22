@@ -18,6 +18,7 @@ Manage orchestrator worktrees under .worktrees/ for parallel workstreams.
 
 Commands
   ensure    Create missing worktrees for workstreams
+  sync      Sync cdktf-outputs and .env.keys into worktrees
   list      List worktrees under .worktrees/
   status    Show branch + clean/dirty status for worktrees
   remove    Remove selected worktrees
@@ -42,7 +43,7 @@ if (args.length === 0 || args.includes('--help') || args.includes('-h')) {
 }
 
 const command = args[0];
-const validCommands = new Set(['ensure', 'list', 'status', 'remove', 'prune']);
+const validCommands = new Set(['ensure', 'sync', 'list', 'status', 'remove', 'prune']);
 
 if (!validCommands.has(command)) {
   console.error(`ERROR: Unknown command "${command}".`);
@@ -461,6 +462,39 @@ const ensureWorktrees = async (repoRoot) => {
   }
 };
 
+const syncManagedWorktrees = async (repoRoot) => {
+  const worktreesDir = resolve(repoRoot, '.worktrees');
+  const allWorktrees = parseWorktrees(
+    runGit(['worktree', 'list', '--porcelain'], { cwd: repoRoot }),
+  );
+  const managed = allWorktrees.filter((entry) =>
+    isUnderWorktreesDir(entry.path, worktreesDir),
+  );
+
+  if (managed.length === 0) {
+    console.log('No worktrees under .worktrees/.');
+    return;
+  }
+
+  console.log(`Syncing artifacts into ${managed.length} worktree(s).`);
+  const syncSummary = await syncWorktreeArtifacts(
+    repoRoot,
+    managed.map((entry) => ({ id: basename(entry.path), path: entry.path })),
+  );
+
+  if (!syncSummary.outputsAvailable) {
+    console.log('No cdktf-outputs directory found; skipping output sync.');
+  } else {
+    console.log(
+      `cdktf-outputs: copied ${syncSummary.outputsSummary.copied}, skipped ${syncSummary.outputsSummary.skipped}.`,
+    );
+  }
+
+  console.log(
+    `.env.keys: copied ${syncSummary.envKeysSummary.copied}, skipped ${syncSummary.envKeysSummary.skipped}.`,
+  );
+};
+
 const listWorktrees = (repoRoot) => {
   const worktreesDir = resolve(repoRoot, '.worktrees');
   const allWorktrees = parseWorktrees(
@@ -570,6 +604,9 @@ const main = async () => {
     switch (command) {
       case 'ensure':
         await ensureWorktrees(repoRoot);
+        break;
+      case 'sync':
+        await syncManagedWorktrees(repoRoot);
         break;
       case 'list':
         listWorktrees(repoRoot);
