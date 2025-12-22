@@ -18,7 +18,7 @@ Manage orchestrator worktrees under .worktrees/ for parallel workstreams.
 
 Commands
   ensure    Create missing worktrees for workstreams
-  sync      Sync cdktf-outputs and .env.keys into worktrees
+  sync      Sync cdktf-outputs and .env.keys into worktrees (overwrites existing)
   list      List worktrees under .worktrees/
   status    Show branch + clean/dirty status for worktrees
   remove    Remove selected worktrees
@@ -289,13 +289,14 @@ const formatBranchName = (branchRef) => {
 
 const CDK_OUTPUTS_RELATIVE_PATH = ['cdk', 'platform-cdk', 'cdktf-outputs'];
 
-const copyDirectoryContents = (sourceDir, targetDir) => {
+const copyDirectoryContents = (sourceDir, targetDir, { overwrite = false } = {}) => {
   if (!existsSync(targetDir)) {
     mkdirSync(targetDir, { recursive: true });
   }
 
   let found = 0;
   let copied = 0;
+  let overwritten = 0;
   let skipped = 0;
 
   const walk = (currentSource, currentTarget) => {
@@ -318,21 +319,30 @@ const copyDirectoryContents = (sourceDir, targetDir) => {
 
       if (entry.isFile()) {
         found += 1;
-        if (existsSync(targetPath)) {
+        const targetExists = existsSync(targetPath);
+        if (targetExists && !overwrite) {
           skipped += 1;
           continue;
         }
         copyFileSync(sourcePath, targetPath);
-        copied += 1;
+        if (targetExists) {
+          overwritten += 1;
+        } else {
+          copied += 1;
+        }
       }
     }
   };
 
   walk(sourceDir, targetDir);
-  return { found, copied, skipped };
+  return { found, copied, overwritten, skipped };
 };
 
-const syncWorktreeArtifacts = async (repoRoot, worktreePaths) => {
+const syncWorktreeArtifacts = async (
+  repoRoot,
+  worktreePaths,
+  { overwrite = false } = {},
+) => {
   const outputsSource = resolve(repoRoot, ...CDK_OUTPUTS_RELATIVE_PATH);
   const outputsAvailable = existsSync(outputsSource);
 
@@ -340,8 +350,8 @@ const syncWorktreeArtifacts = async (repoRoot, worktreePaths) => {
     throw new Error(`Expected directory at ${outputsSource}`);
   }
 
-  const outputsSummary = { copied: 0, skipped: 0 };
-  const envKeysSummary = { copied: 0, skipped: 0 };
+  const outputsSummary = { copied: 0, overwritten: 0, skipped: 0 };
+  const envKeysSummary = { copied: 0, overwritten: 0, skipped: 0 };
 
   for (const { id, path: worktreePath } of worktreePaths) {
     if (!existsSync(worktreePath)) {
@@ -351,16 +361,21 @@ const syncWorktreeArtifacts = async (repoRoot, worktreePaths) => {
 
     if (outputsAvailable) {
       const targetOutputs = resolve(worktreePath, ...CDK_OUTPUTS_RELATIVE_PATH);
-      const copySummary = copyDirectoryContents(outputsSource, targetOutputs);
+      const copySummary = copyDirectoryContents(outputsSource, targetOutputs, {
+        overwrite,
+      });
       outputsSummary.copied += copySummary.copied;
+      outputsSummary.overwritten += copySummary.overwritten;
       outputsSummary.skipped += copySummary.skipped;
     }
 
     const envSummary = await syncEnvKeys({
       sourceRoot: repoRoot,
       targetRoot: worktreePath,
+      overwrite,
     });
     envKeysSummary.copied += envSummary.copied;
+    envKeysSummary.overwritten += envSummary.overwritten;
     envKeysSummary.skipped += envSummary.skipped;
   }
 
@@ -480,18 +495,19 @@ const syncManagedWorktrees = async (repoRoot) => {
   const syncSummary = await syncWorktreeArtifacts(
     repoRoot,
     managed.map((entry) => ({ id: basename(entry.path), path: entry.path })),
+    { overwrite: true },
   );
 
   if (!syncSummary.outputsAvailable) {
     console.log('No cdktf-outputs directory found; skipping output sync.');
   } else {
     console.log(
-      `cdktf-outputs: copied ${syncSummary.outputsSummary.copied}, skipped ${syncSummary.outputsSummary.skipped}.`,
+      `cdktf-outputs: copied ${syncSummary.outputsSummary.copied}, overwritten ${syncSummary.outputsSummary.overwritten}, skipped ${syncSummary.outputsSummary.skipped}.`,
     );
   }
 
   console.log(
-    `.env.keys: copied ${syncSummary.envKeysSummary.copied}, skipped ${syncSummary.envKeysSummary.skipped}.`,
+    `.env.keys: copied ${syncSummary.envKeysSummary.copied}, overwritten ${syncSummary.envKeysSummary.overwritten}, skipped ${syncSummary.envKeysSummary.skipped}.`,
   );
 };
 

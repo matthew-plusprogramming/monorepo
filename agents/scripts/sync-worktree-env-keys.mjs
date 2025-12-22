@@ -7,12 +7,13 @@ import { pathToFileURL } from 'node:url';
 
 const USAGE = `Usage: node agents/scripts/sync-worktree-env-keys.mjs [options]
 
-Copies missing .env.keys files from the primary repo into a worktree, preserving
-relative paths.
+Copies .env.keys files from the primary repo into a worktree, preserving relative
+paths (use --overwrite to replace existing files).
 
 Options
   --target <path>   Target worktree root (defaults to git worktree root)
   --source <path>   Source repo root (defaults to git common dir parent)
+  --overwrite      Replace existing .env.keys files in the target
   --dry-run         Print planned copies without writing files
   --force           Allow syncing even if target is not under .worktrees
   -h, --help        Show this help message
@@ -24,6 +25,7 @@ const parseArgs = (argv) => {
     target: null,
     source: null,
     dryRun: false,
+    overwrite: false,
     force: false,
     help: false,
   };
@@ -46,6 +48,9 @@ const parseArgs = (argv) => {
         break;
       case '--dry-run':
         options.dryRun = true;
+        break;
+      case '--overwrite':
+        options.overwrite = true;
         break;
       case '--force':
         options.force = true;
@@ -148,6 +153,7 @@ export const syncEnvKeys = async ({
   sourceRoot,
   targetRoot,
   dryRun = false,
+  overwrite = false,
 }) => {
   const resolvedSource = resolve(sourceRoot);
   const resolvedTarget = resolve(targetRoot);
@@ -165,19 +171,22 @@ export const syncEnvKeys = async ({
       targetRoot: resolvedTarget,
       found: 0,
       copied: 0,
+      overwritten: 0,
       skipped: 0,
       dryRun,
     };
   }
 
   let copied = 0;
+  let overwritten = 0;
   let skipped = 0;
 
   for (const sourcePath of envKeyFiles) {
     const relativePath = relative(resolvedSource, sourcePath);
     const targetPath = resolve(resolvedTarget, relativePath);
 
-    if (existsSync(targetPath)) {
+    const targetExists = existsSync(targetPath);
+    if (targetExists && !overwrite) {
       skipped += 1;
       continue;
     }
@@ -187,7 +196,11 @@ export const syncEnvKeys = async ({
       await fs.copyFile(sourcePath, targetPath);
     }
 
-    copied += 1;
+    if (targetExists) {
+      overwritten += 1;
+    } else {
+      copied += 1;
+    }
   }
 
   return {
@@ -195,6 +208,7 @@ export const syncEnvKeys = async ({
     targetRoot: resolvedTarget,
     found: envKeyFiles.length,
     copied,
+    overwritten,
     skipped,
     dryRun,
   };
@@ -238,6 +252,7 @@ const main = async () => {
       sourceRoot,
       targetRoot,
       dryRun: options.dryRun,
+      overwrite: options.overwrite,
     });
   } catch (error) {
     console.error(
@@ -256,7 +271,7 @@ const main = async () => {
     `${action} .env.keys from ${toPosix(sourceRoot)} to ${toPosix(targetRoot)}.`,
   );
   console.log(
-    `Found: ${summary.found}, Copied: ${summary.copied}, Skipped: ${summary.skipped}`,
+    `Found: ${summary.found}, Copied: ${summary.copied}, Overwritten: ${summary.overwritten}, Skipped: ${summary.skipped}`,
   );
 };
 

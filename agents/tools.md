@@ -34,9 +34,9 @@ Prefer the purpose-built discovery scripts (`list-files-recursively.mjs`, `smart
 - `node agents/scripts/create-worktree.mjs --name "<worktree-name>" [--branch "<branch-name>"] [--base "<git-ref>"]`
   Creates a git worktree under `.worktrees/`, defaulting to the `worktree/<name>` branch when none is provided.
 - `node agents/scripts/manage-worktrees.mjs <command> [options]`
-  Manages orchestrator worktrees (ensure/sync/list/status/remove/prune) under `.worktrees/` using workstream specs or explicit lists.
-- `node agents/scripts/sync-worktree-env-keys.mjs [--target <path>] [--source <path>] [--dry-run] [--force]`
-  Copies missing `.env.keys` into the target worktree and preserves relative paths.
+  Manages orchestrator worktrees (ensure/sync/list/status/remove/prune) under `.worktrees/` using workstream specs or explicit lists; `sync` overwrites existing artifacts.
+- `node agents/scripts/sync-worktree-env-keys.mjs [--target <path>] [--source <path>] [--overwrite] [--dry-run] [--force]`
+  Copies `.env.keys` into the target worktree and preserves relative paths (use `--overwrite` to replace existing files).
 - `node agents/scripts/dotenvx-run.mjs <dotenvx args>`
   Runs dotenvx and emits guidance when missing private keys are detected.
 
