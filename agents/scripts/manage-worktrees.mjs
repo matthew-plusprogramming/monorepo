@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { execFileSync } from 'node:child_process';
 import {
+  copyFileSync,
   existsSync,
   mkdirSync,
   readFileSync,
@@ -9,6 +10,7 @@ import {
 } from 'node:fs';
 import { basename, join, resolve, sep } from 'node:path';
 import { parseFrontMatter } from './spec-utils.mjs';
+import { syncEnvKeys } from './sync-worktree-env-keys.mjs';
 
 const USAGE = `Usage: node agents/scripts/manage-worktrees.mjs <command> [options]
 
@@ -284,7 +286,87 @@ const formatBranchName = (branchRef) => {
   return branchRef;
 };
 
-const ensureWorktrees = (repoRoot) => {
+const CDK_OUTPUTS_RELATIVE_PATH = ['cdk', 'platform-cdk', 'cdktf-outputs'];
+
+const copyDirectoryContents = (sourceDir, targetDir) => {
+  if (!existsSync(targetDir)) {
+    mkdirSync(targetDir, { recursive: true });
+  }
+
+  let found = 0;
+  let copied = 0;
+  let skipped = 0;
+
+  const walk = (currentSource, currentTarget) => {
+    const entries = readdirSync(currentSource, { withFileTypes: true });
+    for (const entry of entries) {
+      if (entry.isSymbolicLink()) {
+        continue;
+      }
+
+      const sourcePath = join(currentSource, entry.name);
+      const targetPath = join(currentTarget, entry.name);
+
+      if (entry.isDirectory()) {
+        if (!existsSync(targetPath)) {
+          mkdirSync(targetPath, { recursive: true });
+        }
+        walk(sourcePath, targetPath);
+        continue;
+      }
+
+      if (entry.isFile()) {
+        found += 1;
+        if (existsSync(targetPath)) {
+          skipped += 1;
+          continue;
+        }
+        copyFileSync(sourcePath, targetPath);
+        copied += 1;
+      }
+    }
+  };
+
+  walk(sourceDir, targetDir);
+  return { found, copied, skipped };
+};
+
+const syncWorktreeArtifacts = async (repoRoot, worktreePaths) => {
+  const outputsSource = resolve(repoRoot, ...CDK_OUTPUTS_RELATIVE_PATH);
+  const outputsAvailable = existsSync(outputsSource);
+
+  if (outputsAvailable && !statSync(outputsSource).isDirectory()) {
+    throw new Error(`Expected directory at ${outputsSource}`);
+  }
+
+  const outputsSummary = { copied: 0, skipped: 0 };
+  const envKeysSummary = { copied: 0, skipped: 0 };
+
+  for (const { id, path: worktreePath } of worktreePaths) {
+    if (!existsSync(worktreePath)) {
+      console.warn(`WARN: Worktree path not found for ${id}; skipping sync.`);
+      continue;
+    }
+
+    if (outputsAvailable) {
+      const targetOutputs = resolve(worktreePath, ...CDK_OUTPUTS_RELATIVE_PATH);
+      const copySummary = copyDirectoryContents(outputsSource, targetOutputs);
+      outputsSummary.copied += copySummary.copied;
+      outputsSummary.skipped += copySummary.skipped;
+    }
+
+    const envSummary = await syncEnvKeys({
+      sourceRoot: repoRoot,
+      targetRoot: worktreePath,
+    });
+    envKeysSummary.copied += envSummary.copied;
+    envKeysSummary.skipped += envSummary.skipped;
+  }
+
+  return { outputsAvailable, outputsSummary, envKeysSummary };
+};
+
+const ensureWorktrees = async (repoRoot) => {
   const branchPrefix = normalizeBranchPrefix(options.branchPrefix);
   const worktreesDir = resolve(repoRoot, '.worktrees');
   const allWorktrees = parseWorktrees(
@@ -298,14 +380,14 @@ const ensureWorktrees = (repoRoot) => {
     mkdirSync(worktreesDir, { recursive: true });
   }
 
-  workstreams.forEach((id) => {
+  for (const id of workstreams) {
     const worktreePath = resolve(worktreesDir, id);
     const existingByPath = allWorktrees.find(
       (entry) => resolve(entry.path) === worktreePath,
     );
     if (existingByPath) {
       skipped.push(id);
-      return;
+      continue;
     }
 
     const branchName = `${branchPrefix}${id}`;
@@ -350,7 +432,7 @@ const ensureWorktrees = (repoRoot) => {
       });
     }
     created.push(id);
-  });
+  }
 
   console.log(
     `Worktrees ensured: ${created.length} created, ${skipped.length} existing.`,
@@ -360,6 +442,22 @@ const ensureWorktrees = (repoRoot) => {
   }
   if (skipped.length > 0) {
     console.log(`Existing: ${skipped.join(', ')}`);
+  }
+
+  const syncSummary = await syncWorktreeArtifacts(
+    repoRoot,
+    workstreams.map((id) => ({ id, path: resolve(worktreesDir, id) })),
+  );
+
+  if (syncSummary.outputsAvailable && syncSummary.outputsSummary.copied > 0) {
+    console.log(
+      `Synced ${syncSummary.outputsSummary.copied} cdktf-outputs file(s) into worktrees.`,
+    );
+  }
+  if (syncSummary.envKeysSummary.copied > 0) {
+    console.log(
+      `Synced ${syncSummary.envKeysSummary.copied} .env.keys file(s) into worktrees.`,
+    );
   }
 };
 
@@ -465,13 +563,13 @@ const pruneWorktrees = (repoRoot) => {
   runGit(argsList, { cwd: repoRoot, stdio: 'inherit' });
 };
 
-const main = () => {
+const main = async () => {
   const repoRoot = getRepoRoot();
 
   try {
     switch (command) {
       case 'ensure':
-        ensureWorktrees(repoRoot);
+        await ensureWorktrees(repoRoot);
         break;
       case 'list':
         listWorktrees(repoRoot);
