@@ -14,9 +14,9 @@
     "// -- 🧪 Testing": "--",
     "test": "vitest run",
     "// -- 🧹 Linting & Formatting": "--",
-    "lint": "eslint src --cache && stylelint 'src/**/*.{css,scss}' --cache --config ./stylelint.config.ts",
-    "lint:fix": "eslint src --fix --cache && stylelint 'src/**/*.{css,scss}' --fix --cache --config ./stylelint.config.ts",
-    "lint:no-cache": "eslint src && stylelint 'src/**/*.{css,scss}' --config ./stylelint.config.ts",
+    "lint": "eslint src --cache && stylelint 'src/**/*.{css,scss}' --cache --config ./stylelint.config.mjs",
+    "lint:fix": "eslint src --fix --cache && stylelint 'src/**/*.{css,scss}' --fix --cache --config ./stylelint.config.mjs",
+    "lint:no-cache": "eslint src && stylelint 'src/**/*.{css,scss}' --config ./stylelint.config.mjs",
     "// -- ✅ Verification & CI": "--",
     "// -- 🔧 Miscellaneous": "--"
   },
