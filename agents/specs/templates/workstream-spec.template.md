@@ -69,6 +69,11 @@ sequenceDiagram
 
 - ...
 
+## Workstream Reflection
+
+- Capture problems encountered and preventable errors (lint failures, deprecated code, missing tests).
+- Note root cause and remediation ideas for future runs.
+
 ## Decision & Work Log
 
 - Decision:

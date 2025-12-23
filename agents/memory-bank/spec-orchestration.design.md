@@ -144,6 +144,7 @@ contracts:
 - Task List (derived from Requirements and Design)
 - Testing
 - Open Questions
+- Workstream Reflection (record issues encountered and preventable errors for future runs)
 - Decision & Work Log (required for multi-session specs; record user approvals here)
 
 Example sequence diagram (align with `agents/memory-bank/task-spec.guide.md`):

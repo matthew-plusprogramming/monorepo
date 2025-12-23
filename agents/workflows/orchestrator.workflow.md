@@ -14,6 +14,7 @@ Global Prompts
 - Use `node agents/scripts/manage-worktrees.mjs ensure` to create per-workstream worktrees under `.worktrees/` once workstreams are defined.
 - Record approvals and gating decisions in the Decision & Work Log.
 - Use `node agents/scripts/spec-validate.mjs` and `node agents/scripts/spec-merge.mjs` to enforce gates.
+- Ensure workstream specs include a Workstream Reflection section that captures preventable errors (lint, deprecated code) and remediation ideas.
 
 Phase: requirements
 
@@ -44,6 +45,7 @@ Phase: implementation-planning
 - Goal: Plan spec production and gate checks.
 - Checklist:
   - Provide spec authors with `agents/specs/templates/workstream-spec.template.md`.
+  - Call out the Workstream Reflection section; instruct authors to capture problems and preventable errors as they arise (lint, deprecated code) with remediation ideas.
   - Run `node agents/scripts/manage-worktrees.mjs ensure --workstreams <ws-ids>` to provision per-workstream worktrees.
   - Define required validation cadence (`spec-validate` before merge).
   - Set spec-complete gates and required evidence.
@@ -56,6 +58,7 @@ Phase: execution
 - Goal: Collect specs, validate, merge, and approve the MasterSpec.
 - Checklist:
   - Gather workstream specs from authors.
+  - Confirm each workstream spec includes a Workstream Reflection section with issues and prevention notes before merge.
   - Run `node agents/scripts/spec-validate.mjs` on workstream specs and the registry.
   - Run `node agents/scripts/spec-merge.mjs` to generate the MasterSpec and gate report.
   - Resolve validation or merge issues with spec authors.
