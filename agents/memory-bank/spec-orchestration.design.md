@@ -122,6 +122,8 @@ id: ws-api
 title: API Workstream
 owner: spec-author-api
 scope: API surface and request/response contracts.
+status: draft
+implementation_status: not_started
 dependencies:
   - ws-data
 contracts:

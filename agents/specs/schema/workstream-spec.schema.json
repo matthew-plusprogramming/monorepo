@@ -9,7 +9,8 @@
     "scope",
     "dependencies",
     "contracts",
-    "status"
+    "status",
+    "implementation_status"
   ],
   "properties": {
     "id": { "type": "string" },
@@ -31,6 +32,10 @@
     "status": {
       "type": "string",
       "enum": ["draft", "review", "approved"]
+    },
+    "implementation_status": {
+      "type": "string",
+      "enum": ["not_started", "in_progress", "complete"]
     }
   },
   "additionalProperties": false

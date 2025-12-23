@@ -54,6 +54,7 @@ Phase: execution
   - Execute tasks and update the task spec Execution log.
   - Run relevant tests and gather evidence tied to acceptance criteria.
   - Update Memory Bank canonicals if needed.
+  - Set the workstream spec front matter `implementation_status` to `complete`.
   - Run `npm run phase:check` as changes evolve.
   - Run `npm run agent:finalize` before concluding.
 - Outputs: code/doc changes, evidence, updated task spec.
