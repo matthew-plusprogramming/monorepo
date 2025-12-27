@@ -94,4 +94,4 @@ const DropdownMenu = ({
 };
 
 export type { DropdownMenuItem, DropdownMenuProps };
-export { DropdownMenu };
+export { DropdownMenu, styles as DropdownMenuStyles };
