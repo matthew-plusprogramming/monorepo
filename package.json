@@ -30,14 +30,17 @@
     "lint:fix": "turbo run lint:fix",
     "test": "turbo run test",
     "test:coverage": "turbo run test:coverage",
+    "// -- ⏏️ Ejection": "--",
+    "eject:analytics": "node scripts/eject-aspect.mjs analytics",
+    "eject:users": "node scripts/eject-aspect.mjs users",
     "// -- 🤖 Agent Scripts": "--",
     "format:markdown": "prettier --write \"agents/**/*.md\"",
     "test:scripts": "node --test \"scripts/utils/__tests__/*.mjs\"",
     "memory:validate": "node agents/scripts/validate-memory-bank.mjs",
-    "memory:drift": "node agents/scripts/check-memory-drift.mjs",
     "phase:check": "npm run lint:fix && node agents/scripts/check-code-quality.mjs && npm run build && npm run test",
     "agent:finalize": "npm run memory:validate && npm run phase:check && npm run build:no-cache",
-    "eject:analytics": "node scripts/eject-aspect.mjs analytics",
-    "eject:users": "node scripts/eject-aspect.mjs users"
+    "spec:validate": "node agents/scripts/spec-validate.mjs --root agents/specs --registry agents/contracts/registry.yaml --allow-empty",
+    "spec:merge": "node agents/scripts/spec-merge.mjs",
+    "spec:finalize": "npm run spec:validate && npm run memory:validate"
   }
 }
