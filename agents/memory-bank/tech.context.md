@@ -40,7 +40,7 @@ Codebase Map
 - `packages/core/backend-core`: Effect→Express adapter, services, types.
 - `packages/core/schemas`: Zod domain schemas and constants.
 - Shared configs: `packages/configs/*`.
-- Shared UI: `packages/ui-components` exports reusable React components/styles for the web apps; CSS module typings are generated via `gen:css-types` (watch in `dev`) into `__generated__/src`.
+- Shared UI: `packages/core/ui-components` exports reusable React components/styles for the web apps; CSS module typings are generated via `gen:css-types` (watch in `dev`) into `__generated__/src`.
 
 Tech Stack Details
 
