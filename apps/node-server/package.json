@@ -30,21 +30,21 @@
     "decrypt-envs": "dotenvx decrypt -f .env.dev .env.production&& echo 'WARNING: DO NOT COMMIT decrypted .env files to the repository!'"
   },
   "dependencies": {
-    "@aws-sdk/client-cloudwatch-logs": "^3.946.0",
-    "@aws-sdk/client-dynamodb": "^3.946.0",
-    "@aws-sdk/client-eventbridge": "^3.946.0",
-    "@aws-sdk/util-dynamodb": "^3.946.0",
+    "@aws-sdk/client-cloudwatch-logs": "^3.958.0",
+    "@aws-sdk/client-dynamodb": "^3.958.0",
+    "@aws-sdk/client-eventbridge": "^3.958.0",
+    "@aws-sdk/util-dynamodb": "^3.958.0",
     "@cdk/platform-cdk": "*",
-    "@dotenvx/dotenvx": "^1.51.1",
+    "@dotenvx/dotenvx": "^1.51.2",
     "@node-rs/argon2": "^2.0.2",
     "@packages/backend-core": "*",
     "@packages/schemas": "*",
     "cors": "^2.8.5",
-    "effect": "^3.19.9",
+    "effect": "^3.19.13",
     "express": "^5.2.1",
     "jsonwebtoken": "^9.0.3",
     "serverless-http": "^4.0.0",
-    "zod": "^4.1.13"
+    "zod": "^4.2.1"
   },
   "devDependencies": {
     "@configs/eslint-config": "*",
@@ -56,14 +56,14 @@
     "@types/jsonwebtoken": "^9.0.10",
     "@types/supertest": "^6.0.3",
     "@utils/ts-utils": "*",
-    "@vitest/coverage-v8": "^4.0.15",
+    "@vitest/coverage-v8": "^4.0.16",
     "concurrently": "^9.2.1",
     "cross-env": "^10.1.0",
-    "eslint": "^9.39.1",
+    "eslint": "^9.39.2",
     "jiti": "^2.6.1",
     "supertest": "^7.1.4",
     "typescript": "^5.9.3",
-    "vite": "^7.2.6",
-    "vitest": "^4.0.15"
+    "vite": "^7.3.0",
+    "vitest": "^4.0.16"
   }
 }

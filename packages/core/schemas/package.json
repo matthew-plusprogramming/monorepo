@@ -31,14 +31,14 @@
     "dist"
   ],
   "dependencies": {
-    "zod": "^4.1.13",
+    "zod": "^4.2.1",
     "typescript": "^5.9.3"
   },
   "devDependencies": {
     "@configs/eslint-config": "*",
     "@configs/ts-config": "*",
-    "eslint": "^9.39.1",
-    "vitest": "^4.0.15"
+    "eslint": "^9.39.2",
+    "vitest": "^4.0.16"
   },
   "peerDependencies": {
   }
