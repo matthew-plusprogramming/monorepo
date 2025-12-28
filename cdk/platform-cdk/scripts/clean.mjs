@@ -2,7 +2,7 @@ import { rmSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const SAVE_FLAG = '--save-cdk-ouptuts';
+const SAVE_FLAG = '--save-cdk-outputs';
 const args = process.argv.slice(2);
 const saveCdkOutputs =
   process.env.SAVE_CDK_OUPTUTS === 'true' ||
