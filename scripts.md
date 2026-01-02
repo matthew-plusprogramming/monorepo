@@ -4,6 +4,8 @@ Scripts that may help during development:
 
 Aspect ejection
 
+- Preview backend-only tear‑out: `npm run eject:backend-only -- --dry-run`
+- Apply backend-only tear‑out: `npm run eject:backend-only`
 - Preview analytics tear‑out: `npm run eject:analytics -- --dry-run`
 - Apply analytics tear‑out: `npm run eject:analytics`
 - Preview users tear‑out: `npm run eject:users -- --dry-run`
