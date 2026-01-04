@@ -25,6 +25,12 @@ const isArtifactRequirement = (
 
 const region = process.env.AWS_REGION;
 
+/**
+ * By default, we fail hard when required artifacts are missing.
+ * Set CDKTF_ALLOW_SKIP=true to allow stacks to be skipped (old behavior).
+ */
+const allowSkipMissingArtifacts = process.env.CDKTF_ALLOW_SKIP === 'true';
+
 const parseCliStackArgs = (): string[] => {
   const args = process.argv.slice(2);
   const firstArg = args[0];
@@ -148,14 +154,32 @@ for (const stack of stacks) {
   const missingArtifacts = collectMissingArtifacts(
     'requiredArtifacts' in stack ? stack.requiredArtifacts : [],
   );
+
   if (missingArtifacts.length > 0) {
-    console.warn(
-      `⚠️  Skipping stack "${stack.name}" because required artifacts were not found:`,
-    );
-    for (const artifact of missingArtifacts) {
-      console.warn(`  - ${artifact.description} (${artifact.path})`);
+    const artifactList = missingArtifacts
+      .map((a) => `  - ${a.description} (${a.path})`)
+      .join('\n');
+
+    if (allowSkipMissingArtifacts) {
+      console.warn(
+        `⚠️  Skipping stack "${stack.name}" because required artifacts were not found:`,
+      );
+      console.warn(artifactList);
+      continue;
     }
-    continue;
+
+    // Fail hard by default - this prevents silent deployment failures
+    console.error(
+      `❌ Cannot synthesize stack "${stack.name}" - required artifacts are missing:\n${artifactList}`,
+    );
+    console.error('');
+    console.error('To fix this, run:');
+    console.error('  node scripts/deploy-orchestrator.mjs build');
+    console.error('');
+    console.error(
+      'Or set CDKTF_ALLOW_SKIP=true to skip stacks with missing artifacts.',
+    );
+    process.exit(1);
   }
 
   instantiateStack(stack, app, region);
