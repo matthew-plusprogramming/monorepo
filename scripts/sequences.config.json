@@ -1,39 +1,52 @@
 {
   "sequences": [
     {
-      "name": "build-deploy-node-server",
-      "description": "Build and deploy the node-server lambda (decrypt/envs, build, copy assets, deploy, re-encrypt).",
+      "name": "build-deploy-api-lambda",
+      "description": "Build and deploy the API lambda using the orchestrator.",
       "steps": [
         "npm -w node-server run decrypt-envs",
-        "npm -w node-server run build",
-        "npm -w @cdk/platform-cdk run copy-assets-for-cdk",
-        "npm -w @cdk/platform-cdk run cdk:deploy:dev myapp-api-lambda-stack",
+        "node scripts/deploy-orchestrator.mjs deploy myapp-api-lambda-stack",
         "npm -w node-server run encrypt-envs"
       ]
     },
     {
-      "name": "outputs-after-clean",
-      "description": "Rebuild and fetch CDK outputs for myapp-api-stack after a clean.",
+      "name": "deploy-infra",
+      "description": "Deploy all infrastructure stacks (api-stack, analytics-stack).",
       "steps": [
-        "npm run build",
-        "npm -w @cdk/platform-cdk run cdk:output:dev myapp-api-stack"
+        "node scripts/deploy-orchestrator.mjs deploy infra"
       ]
     },
     {
-      "name": "full-clean-and-test",
-      "description": "Full clean + reinstall, rebuild, write CDK outputs, deploy lambda, and run tests.",
+      "name": "deploy-lambdas",
+      "description": "Build and deploy all Lambda stacks.",
+      "steps": [
+        "node scripts/deploy-orchestrator.mjs deploy lambdas"
+      ]
+    },
+    {
+      "name": "full-deploy",
+      "description": "Full deployment: build everything, deploy all stacks in order.",
+      "steps": [
+        "node scripts/deploy-orchestrator.mjs prepare",
+        "node scripts/deploy-orchestrator.mjs deploy all"
+      ]
+    },
+    {
+      "name": "clean-and-deploy",
+      "description": "Clean rebuild followed by full deployment.",
       "steps": [
         "npm run clean",
         "npm i",
-        "npm run build",
-        "npm -w @cdk/platform-cdk run cdk:output:dev myapp-api-stack",
-        "npm -w @cdk/platform-cdk run cdk:output:dev myapp-analytics-stack",
-        "npm -w node-server run decrypt-envs",
-        "npm -w node-server run build",
-        "npm -w @cdk/platform-cdk run copy-assets-for-cdk",
-        "npm -w @cdk/platform-cdk run cdk:deploy:dev myapp-api-lambda-stack",
-        "npm -w node-server run encrypt-envs",
+        "node scripts/deploy-orchestrator.mjs prepare",
+        "node scripts/deploy-orchestrator.mjs deploy all",
         "npm run test"
+      ]
+    },
+    {
+      "name": "refresh-outputs",
+      "description": "Pull fresh outputs from all deployed infrastructure stacks.",
+      "steps": [
+        "node scripts/deploy-orchestrator.mjs outputs infra"
       ]
     }
   ]
