@@ -1,0 +1,28 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "comment": "Auto-format TypeScript files after editing",
+            "command": "file_path=$(jq -r '.tool_input.file_path' 2>/dev/null); if echo \"$file_path\" | grep -q '\\.ts$'; then npx prettier --write \"$file_path\" 2>/dev/null || true; fi"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "comment": "Log session activity",
+            "command": "echo \"[$(date '+%Y-%m-%d %H:%M:%S')] Session stop\" >> ~/.claude/session-log.txt"
+          }
+        ]
+      }
+    ]
+  }
+}

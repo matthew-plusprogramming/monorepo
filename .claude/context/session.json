@@ -1,0 +1,332 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Session Context",
+  "description": "Tracks current session state for resumability",
+  "type": "object",
+  "properties": {
+    "session_id": {
+      "type": "string",
+      "description": "Unique identifier for this session"
+    },
+    "started_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Session start timestamp (ISO 8601)"
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Last update timestamp (ISO 8601)"
+    },
+    "current_task": {
+      "type": "object",
+      "description": "Active task information",
+      "properties": {
+        "spec_path": {
+          "type": "string",
+          "description": "Path to active spec file",
+          "example": ".claude/specs/active/logout-button.md"
+        },
+        "task_id": {
+          "type": "string",
+          "description": "Unique task identifier",
+          "example": "task-logout-button"
+        },
+        "workflow": {
+          "type": "string",
+          "enum": ["oneoff-vibe", "oneoff-spec", "orchestrator"],
+          "description": "Current workflow type"
+        },
+        "phase": {
+          "type": "string",
+          "enum": ["route", "pm-interview", "spec-authoring", "spec-approval", "implementation", "testing", "validation", "security-review", "browser-test", "complete"],
+          "description": "Current phase in workflow"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["in_progress", "blocked", "complete"],
+          "description": "Overall task status"
+        }
+      }
+    },
+    "routing_decision": {
+      "type": "object",
+      "description": "Most recent routing decision",
+      "properties": {
+        "timestamp": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "workflow": {
+          "type": "string",
+          "enum": ["oneoff-vibe", "oneoff-spec", "orchestrator"]
+        },
+        "rationale": {
+          "type": "string",
+          "description": "Explanation for routing decision"
+        },
+        "estimated_scope": {
+          "type": "string",
+          "enum": ["small", "medium", "large"]
+        },
+        "estimated_files": {
+          "type": "number",
+          "description": "Number of files expected to be modified"
+        },
+        "workstreams": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Identified workstreams (for orchestrator only)"
+        }
+      }
+    },
+    "subagent_history": {
+      "type": "array",
+      "description": "History of subagent dispatches",
+      "items": {
+        "type": "object",
+        "properties": {
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "subagent_type": {
+            "type": "string",
+            "enum": ["product-manager", "spec-author", "implementer", "test-writer", "unifier", "security-reviewer", "browser-tester"]
+          },
+          "agent_id": {
+            "type": "string",
+            "description": "Subagent execution ID for resuming"
+          },
+          "purpose": {
+            "type": "string",
+            "description": "Why this subagent was dispatched"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["running", "completed", "failed"]
+          },
+          "result_summary": {
+            "type": "string",
+            "description": "Brief summary of subagent output"
+          }
+        }
+      }
+    },
+    "convergence_status": {
+      "type": "object",
+      "description": "Latest convergence validation result",
+      "properties": {
+        "timestamp": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["converged", "not_converged", "not_validated"]
+        },
+        "spec_complete": {
+          "type": "boolean"
+        },
+        "implementation_aligned": {
+          "type": "boolean"
+        },
+        "tests_passing": {
+          "type": "boolean"
+        },
+        "iteration_count": {
+          "type": "number",
+          "description": "Number of convergence iterations attempted"
+        },
+        "issues": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": ["spec_gap", "impl_bug", "missing_test", "failing_test"]
+              },
+              "description": {
+                "type": "string"
+              },
+              "priority": {
+                "type": "string",
+                "enum": ["high", "medium", "low"]
+              }
+            }
+          }
+        }
+      }
+    },
+    "open_questions": {
+      "type": "array",
+      "description": "Unresolved questions blocking progress",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "question": {
+            "type": "string"
+          },
+          "priority": {
+            "type": "string",
+            "enum": ["high", "medium", "low"]
+          },
+          "status": {
+            "type": "string",
+            "enum": ["open", "resolved", "deferred"]
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      }
+    },
+    "next_steps": {
+      "type": "array",
+      "description": "Concrete next actions to resume work",
+      "items": {
+        "type": "string"
+      },
+      "example": [
+        "Run /unify to validate convergence",
+        "Fix AC2.3 implementation (retry button)",
+        "Re-run browser tests"
+      ]
+    },
+    "worktree_allocation": {
+      "type": "object",
+      "description": "Git worktree allocation and tracking for orchestrator workflow",
+      "properties": {
+        "strategy": {
+          "type": "string",
+          "description": "Allocation strategy rationale",
+          "example": "ws-1 and ws-4 share worktree (tight coupling), ws-2 isolated (independent)"
+        },
+        "worktrees": {
+          "type": "array",
+          "description": "Active worktrees for this session",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Worktree identifier",
+                "example": "worktree-1"
+              },
+              "path": {
+                "type": "string",
+                "description": "Absolute path to worktree"
+              },
+              "branch": {
+                "type": "string",
+                "description": "Git branch name",
+                "example": "feature/ws-1-websocket-server"
+              },
+              "workstreams": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "Workstream IDs using this worktree",
+                "example": ["ws-1", "ws-4"]
+              },
+              "status": {
+                "type": "string",
+                "enum": ["active", "converged", "merged", "cleanup"],
+                "description": "Current worktree status"
+              },
+              "created_at": {
+                "type": "string",
+                "format": "date-time",
+                "description": "When this worktree was created"
+              }
+            },
+            "required": ["id", "path", "branch", "workstreams", "status"]
+          }
+        }
+      }
+    },
+    "workstream_execution": {
+      "type": "object",
+      "description": "Workstream execution tracking for orchestrator workflow",
+      "properties": {
+        "workstreams": {
+          "type": "array",
+          "description": "All workstreams in current task",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Workstream identifier",
+                "example": "ws-1"
+              },
+              "title": {
+                "type": "string",
+                "description": "Workstream title",
+                "example": "WebSocket Server Infrastructure"
+              },
+              "worktree_id": {
+                "type": "string",
+                "description": "Which worktree this workstream is assigned to",
+                "example": "worktree-1"
+              },
+              "dependencies": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "Workstream IDs this depends on",
+                "example": ["ws-1"]
+              },
+              "status": {
+                "type": "string",
+                "enum": ["blocked", "ready", "in_progress", "converged", "merged"],
+                "description": "Current workstream status"
+              },
+              "blocking_reason": {
+                "type": "string",
+                "description": "Why workstream is blocked (if status=blocked)",
+                "example": "Waiting for ws-1 to merge (dependency)"
+              },
+              "convergence_status": {
+                "type": "object",
+                "description": "Latest convergence validation",
+                "properties": {
+                  "spec_complete": {"type": "boolean"},
+                  "implementation_aligned": {"type": "boolean"},
+                  "tests_passing": {"type": "boolean"},
+                  "security_reviewed": {"type": "boolean"},
+                  "browser_tested": {"type": "boolean"}
+                }
+              },
+              "merge_timestamp": {
+                "type": "string",
+                "format": "date-time",
+                "description": "When this workstream was merged to main"
+              }
+            },
+            "required": ["id", "title", "worktree_id", "dependencies", "status"]
+          }
+        },
+        "merge_queue": {
+          "type": "array",
+          "description": "Ordered queue of workstreams ready to merge",
+          "items": {
+            "type": "object",
+            "properties": {
+              "workstream_id": {"type": "string"},
+              "worktree_id": {"type": "string"},
+              "ready_at": {"type": "string", "format": "date-time"}
+            },
+            "required": ["workstream_id", "worktree_id"]
+          }
+        }
+      }
+    }
+  },
+  "required": ["session_id", "started_at", "updated_at"]
+}
