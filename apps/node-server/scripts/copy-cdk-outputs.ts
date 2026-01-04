@@ -7,6 +7,8 @@ import { monorepoRootDir, packageRootDir } from '../src/location';
 
 const LAMBDA = process.env.LAMBDA;
 const ENV = process.env.ENV;
+const SKIP_OUTPUTS = process.env.SKIP_CDK_OUTPUTS === 'true';
+
 if (!ENV) {
   console.error('❌ ENV is not set. Please set the ENV environment variable.');
   process.exit(1);
@@ -26,10 +28,20 @@ const distDirectory = resolve(packageRootDir, 'dist');
 const destRoot = resolve(distDirectory, 'cdktf-outputs');
 
 if (!existsSync(outputsDirectory)) {
-  console.error(
-    '❌ CDK outputs directory not found. Please build CDK and retry',
-  );
-  process.exit(LAMBDA ? 0 : 1);
+  if (SKIP_OUTPUTS) {
+    console.warn('⚠️  CDK outputs directory not found (skipped via SKIP_CDK_OUTPUTS)');
+    process.exit(0);
+  }
+  console.warn('⚠️  CDK outputs directory not found.');
+  console.warn('');
+  console.warn('   This is expected on first build before infrastructure is deployed.');
+  console.warn('   The Lambda will work once you deploy infrastructure and pull outputs.');
+  console.warn('');
+  console.warn('   To deploy and pull outputs, run:');
+  console.warn('     node scripts/deploy-orchestrator.mjs deploy infra');
+  console.warn('');
+  // Exit 0 during build phase - runtime will fail with clear error if outputs missing
+  process.exit(0);
 }
 
 if (!existsSync(distDirectory)) {

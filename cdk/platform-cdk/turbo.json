@@ -2,8 +2,13 @@
   "extends": ["//"],
   "tasks": {
     "copy-assets-for-cdk": {
-      "dependsOn": ["node-server#build"],
-      "outputs": ["dist/**"]
+      "dependsOn": [
+        "node-server#build",
+        "analytics-lambda#build",
+        "client-website#build"
+      ],
+      "outputs": ["dist/**"],
+      "cache": false
     }
   }
 }
