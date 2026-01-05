@@ -128,6 +128,8 @@ Use the routing skill to determine the appropriate workflow for each task:
 | `/test` | Write tests for acceptance criteria | Parallel with implementation or after |
 | `/unify` | Validate spec-impl-test alignment | After implementation and tests complete |
 | `/security` | Security review of implementation | After convergence, before merge |
+| `/orchestrate` | Coordinate multi-workstream projects | For large tasks with 3+ workstreams |
+| `/browser-test` | Browser-based UI testing | For UI features, after security review |
 
 ### Specialized Subagents
 
@@ -135,11 +137,12 @@ Use the routing skill to determine the appropriate workflow for each task:
 |----------|-------|---------|
 | `product-manager` | opus | Interview users, gather/refine requirements |
 | `spec-author` | opus | Author workstream specs (no code) |
-| `implementer` | opus | Implement from approved specs |
+| `implementer` | sonnet | Implement from approved specs |
 | `test-writer` | sonnet | Write tests for acceptance criteria |
 | `unifier` | opus | Validate convergence |
 | `security-reviewer` | sonnet | Security review (read-only) |
-| `facilitator` | opus | Orchestrate multi-workstream projects |
+| `facilitator` | opus | Orchestrate multi-workstream projects with git worktrees |
+| `browser-tester` | sonnet | Browser-based UI testing |
 
 ### Spec is Contract Principle
 
@@ -168,7 +171,7 @@ Request → Route → PM Interview → Spec → Approve →
 Request → Route → PM Interview → ProblemBrief →
   [Parallel: WorkstreamSpecs] → MasterSpec → Approve →
   [Parallel per workstream: Implement + Test] →
-  Unify → Security → Commit
+  Unify → Security → Browser Test → Commit
 ```
 
 ### Persistence
@@ -177,17 +180,24 @@ All artifacts are stored in `.claude/`:
 
 ```
 .claude/
-├── agents/           # Subagent specifications
-├── skills/           # Skill definitions
+├── agents/              # Subagent specifications
+├── skills/              # Skill definitions
 ├── specs/
-│   ├── active/       # Current specs
-│   └── archive/      # Completed specs
+│   ├── active/          # Current specs
+│   └── archive/         # Completed specs
 ├── context/
-│   └── session.json  # Session state
-├── scripts/          # Code quality checks
-├── templates/        # Spec templates
-└── settings.json     # Hooks configuration
+│   └── session.json     # Session state
+├── scripts/             # Code quality checks (project-specific)
+├── templates/           # Spec templates
+└── settings.json        # Hooks configuration
 ```
+
+### Parallel Execution
+
+For large tasks, the main agent orchestrates parallel execution:
+- Multiple `spec-author` subagents for workstreams
+- `implementer` and `test-writer` run in parallel
+- Main agent handles integration and validation
 
 ### Convergence Gates
 
@@ -197,8 +207,68 @@ Before merge, all gates must pass:
 - All tests passing (100% AC coverage)
 - Unifier validation passed
 - Security review passed
+- Browser tests passed (if UI)
+
+### Example Workflow
+
+```markdown
+User: "Add a logout button to the dashboard"
+
+1. `/route` → oneoff-spec (medium complexity)
+2. `/pm` → Interview user about placement, behavior, error handling
+3. `/spec` → Create TaskSpec with 4 ACs, 6 tasks
+4. User approves spec
+5. [Parallel] `/implement` + `/test`
+6. `/unify` → Validate convergence (all ACs implemented and tested)
+7. `/security` → Security review (auth endpoint validated)
+8. `/browser-test` → UI testing (logout button click, toast, redirect)
+9. Commit with spec evidence
+```
 
 ---
+
+# Project: Monorepo
+
+## Overview
+
+Full-stack TypeScript monorepo with multiple applications, shared packages, and infrastructure-as-code.
+
+## Tech Stack
+
+- **Language**: TypeScript
+- **Runtime**: Node.js
+- **Build**: Turborepo
+- **Infrastructure**: CDK (AWS) + CDKTF (Terraform)
+- **Effect System**: Effect-ts for functional error handling
+
+## Directory Structure
+
+```
+monorepo/
+├── apps/                    # Deployed applications
+│   ├── admin-portal/
+│   ├── analytics-lambda/
+│   ├── client-website/
+│   └── node-server/
+├── packages/                # Shared libraries
+│   ├── configs/
+│   ├── core/
+│   └── utils/
+├── cdk/                     # Infrastructure as Code
+│   └── platform-cdk/
+├── scripts/                 # Infrastructure scripts (deploy, scaffold)
+├── .claude/                 # Agentic system
+└── turbo.json              # Turborepo configuration
+```
+
+## Commands
+
+```bash
+npm run build          # Build all packages
+npm run test           # Run all tests
+npm run lint:fix       # Fix linting issues
+npm run phase:check    # Full quality gate (lint + quality checks + build + test)
+```
 
 ## Code Quality Gates
 
@@ -230,37 +300,6 @@ Located in `.claude/scripts/`:
 | `check-resource-names.mjs` | Validates AWS resource naming conventions |
 | `check-test-aaa-comments.mjs` | Enforces AAA (Arrange-Act-Assert) test comments |
 
-### Running Individual Checks
-
-```bash
-node .claude/scripts/check-effect-run-promise.mjs
-node .claude/scripts/check-env-schema-usage.mjs --list-allowed
-```
-
----
-
-## Monorepo Structure
-
-```
-monorepo/
-├── apps/                    # Deployed applications
-│   ├── admin-portal/
-│   ├── analytics-lambda/
-│   ├── client-website/
-│   └── node-server/
-├── packages/                # Shared libraries
-│   ├── configs/
-│   ├── core/
-│   └── utils/
-├── cdk/                     # Infrastructure as Code
-│   └── platform-cdk/
-├── scripts/                 # Infrastructure scripts (deploy, scaffold)
-├── .claude/                 # Agentic system
-└── turbo.json              # Turborepo configuration
-```
-
----
-
 ## Infrastructure Scripts
 
 Located in `scripts/` (separate from agentic `.claude/scripts/`):
@@ -272,5 +311,12 @@ Located in `scripts/` (separate from agentic `.claude/scripts/`):
 | `run-sequence.mjs` | Named command chains |
 | `create-repository-service.mjs` | Scaffold new repository services |
 | `create-node-server-handler.mjs` | Scaffold new API handlers |
+
+## Conventions
+
+- All Effect-ts code must use proper error handling patterns
+- Environment variables must be declared in EnvironmentSchema
+- Tests must use AAA (Arrange-Act-Assert) comments
+- AWS resources follow naming conventions checked by quality scripts
 
 ---
