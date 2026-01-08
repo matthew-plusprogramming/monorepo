@@ -2,8 +2,8 @@
 id: task-agentic-system-restoration
 title: Agentic System Restoration
 date: 2026-01-07
-status: draft
-implementation_status: not_started
+status: complete
+implementation_status: complete
 ---
 
 # Agentic System Restoration
@@ -166,22 +166,22 @@ Scripts from old system need path updates:
 
 ## Task List
 
-- [ ] **T1**: Create condensed `.claude/OPERATOR-GUIDE.md` with decision tree and gotchas
+- [x] **T1**: Create condensed `.claude/OPERATOR-GUIDE.md` with decision tree and gotchas
 - [x] **T2**: Create `.claude/memory-bank/` directory structure
 - [x] **T3**: Restore `project.brief.md` adapted for current project state
 - [x] **T4**: Restore `tech.context.md` with current tech stack
 - [x] **T5**: Restore `testing.guidelines.md` with testing patterns
 - [x] **T6**: Restore `best-practices/` directory with key files
 - [x] **T7**: Add retrieval policy section to `CLAUDE.md`
-- [ ] **T8**: Restore and adapt `reset-active-context.mjs` to `.claude/scripts/`
-- [ ] **T9**: Restore and adapt `spec-validate.mjs` to `.claude/scripts/`
-- [ ] **T10**: Restore and adapt `load-context.mjs` to `.claude/scripts/`
-- [ ] **T11**: Restore and adapt `manage-worktrees.mjs` to `.claude/scripts/`
+- [x] **T8**: Restore and adapt `reset-active-context.mjs` to `.claude/scripts/`
+- [x] **T9**: Restore and adapt `spec-validate.mjs` to `.claude/scripts/`
+- [x] **T10**: Restore and adapt `load-context.mjs` to `.claude/scripts/`
+- [x] **T11**: Restore and adapt `manage-worktrees.mjs` to `.claude/scripts/`
 - [x] **T12**: Create `.claude/contracts/registry.yaml` with lightweight structure
-- [ ] **T13**: Move `sync-worktree-env-keys.mjs` from `agents/scripts/` to `.claude/scripts/`
-- [ ] **T14**: Remove duplicate `check-*.mjs` scripts from `agents/scripts/`
-- [ ] **T15**: Remove empty `agents/` directory (or document what remains)
-- [ ] **T16**: Run `npm run phase:check` to verify no regressions
+- [x] **T13**: Move `sync-worktree-env-keys.mjs` from `agents/scripts/` to `.claude/scripts/`
+- [x] **T14**: Remove duplicate `check-*.mjs` scripts from `agents/scripts/`
+- [x] **T15**: Remove empty `agents/` directory (or document what remains)
+- [x] **T16**: Run `npm run phase:check` to verify no regressions
 
 ## Test Plan
 
@@ -227,3 +227,11 @@ This is primarily a documentation and tooling restoration task. Verification is 
   - AC4.1: Registry exists with lightweight structure ✓
   - AC4.2: Registry includes id, type, owner, path fields (no version) ✓
   - AC4.3: Example contract entry included ✓
+- 2026-01-08: All tasks complete - Implementation verified during PR review
+  - T1: OPERATOR-GUIDE.md exists at 65 lines with decision tree and gotchas
+  - T8-T11: All automation scripts restored and adapted to `.claude/scripts/`
+  - T13: `sync-worktree-env-keys.mjs` moved to `.claude/scripts/`
+  - T14-T15: Old `agents/` directory cleanup complete
+  - T16: Phase check verified (package.json scripts updated to use `.claude/` paths)
+  - All acceptance criteria verified during PR #25 review
+  - Status updated to complete
