@@ -7,12 +7,15 @@ allowed-tools: Read, Glob, Grep
 # Route Skill
 
 ## Purpose
+
 Analyze the user request and determine the appropriate workflow path based on task complexity, scope, and estimated effort.
 
 ## Complexity Heuristics
 
 ### Small (oneoff-vibe)
+
 Route to quick execution without formal spec:
+
 - Single file change or very localized modification
 - Bug fix with clear location and obvious solution
 - Documentation update or README change
@@ -22,7 +25,9 @@ Route to quick execution without formal spec:
 - **No spec needed**: Changes are self-documenting
 
 ### Medium (oneoff-spec / TaskSpec)
+
 Route to TaskSpec workflow:
+
 - 2-5 files impacted
 - Single feature or enhancement with clear boundaries
 - Bug fix requiring investigation across multiple files
@@ -32,7 +37,9 @@ Route to TaskSpec workflow:
 - **Needs light spec**: Requirements, acceptance criteria, task list
 
 ### Large (orchestrator / MasterSpec)
+
 Route to multi-workstream orchestration with git worktrees:
+
 - 5+ files impacted across multiple layers
 - Multiple workstreams with interdependencies
 - Cross-cutting concerns (contracts, interfaces, shared state)
@@ -47,15 +54,20 @@ Route to multi-workstream orchestration with git worktrees:
 ## Routing Process
 
 ### Step 1: Load Context
+
 If the user references an existing spec:
+
 ```bash
 # Check for active spec
 ls .claude/specs/active/<slug>.md 2>/dev/null
 ```
+
 Load the spec and continue from its current state.
 
 ### Step 2: Analyze Scope
+
 Use Glob and Grep to understand impact:
+
 ```bash
 # Find relevant files
 glob "**/*.ts" | grep -i "<keyword>"
@@ -65,13 +77,16 @@ grep -r "class <Name>" --include="*.ts"
 ```
 
 ### Step 3: Apply Heuristics
+
 Count impacted files and assess complexity:
+
 - **File count**: How many files need changes?
 - **Coupling**: Are changes isolated or cross-cutting?
 - **Unknowns**: How many open questions exist?
 - **Testing**: What test coverage is needed?
 
 ### Step 4: Make Routing Decision
+
 Produce a routing decision with:
 
 ```yaml
@@ -86,7 +101,9 @@ next_action: <Suggested next step>
 ```
 
 ### Step 5: Persist Decision
+
 Save routing decision to session state:
+
 ```bash
 # Append to session context
 echo "{\"timestamp\": \"$(date -Iseconds)\", \"workflow\": \"oneoff-spec\", \"rationale\": \"...\"}" >> .claude/context/session.json
@@ -95,19 +112,25 @@ echo "{\"timestamp\": \"$(date -Iseconds)\", \"workflow\": \"oneoff-spec\", \"ra
 ## Edge Cases
 
 ### Ambiguous Complexity
+
 When a task could be either medium or large:
+
 - **Default to oneoff-spec** (safer than vibe, less overhead than orchestrator)
 - Can escalate to orchestrator if spec reveals hidden complexity
 - Better to discover scope during spec phase than during implementation
 
 ### User Override
+
 If user explicitly requests a workflow:
+
 - "Just make the change" → oneoff-vibe (even if medium complexity)
 - "Write a full spec first" → oneoff-spec or orchestrator
 - Honor user preference and note in rationale
 
 ### Existing Spec
+
 If `.claude/specs/active/<slug>.md` exists:
+
 - Check its `status` field
 - If `status: draft` → Continue spec authoring
 - If `status: approved` → Route to implementation
@@ -134,6 +157,7 @@ Always output a clear routing decision:
 ## Integration with Other Skills
 
 After routing:
+
 - **oneoff-vibe**: Proceed directly to implementation
 - **oneoff-spec**: Use `/pm` to gather requirements, then `/spec` to author TaskSpec
 - **orchestrator**: Use `/pm` to create ProblemBrief, then `/spec` to coordinate WorkstreamSpecs
@@ -141,18 +165,22 @@ After routing:
 ## Examples
 
 ### Example 1: Small Task
+
 **Request**: "Fix the typo in README.md line 42"
 
 **Routing**:
+
 - workflow: oneoff-vibe
 - rationale: Single file, single line change with no side effects
 - estimated_scope: small
 - next_action: Make the edit directly
 
 ### Example 2: Medium Task
+
 **Request**: "Add a logout button to the user dashboard"
 
 **Routing**:
+
 - workflow: oneoff-spec
 - rationale: Requires UI component, event handler, API call, state management (3-4 files). Need to clarify placement, behavior on logout, error handling.
 - estimated_scope: medium
@@ -160,9 +188,11 @@ After routing:
 - next_action: Use `/pm` to gather UI/UX requirements
 
 ### Example 3: Large Task
+
 **Request**: "Implement real-time notifications across the application"
 
 **Routing**:
+
 - workflow: orchestrator
 - rationale: Cross-cutting feature affecting multiple layers: WebSocket server, frontend client, database schema, auth middleware, notification service (8+ files, 3+ workstreams)
 - estimated_scope: large

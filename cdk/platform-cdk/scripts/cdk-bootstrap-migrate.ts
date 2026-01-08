@@ -17,7 +17,7 @@ const workDir = resolve(
 const envFile = resolve(packageRootDir, `.env.${ENV}`);
 const dotenvxRunner = resolve(
   monorepoRootDir,
-  'agents/scripts/dotenvx-run.mjs',
+  '.claude/scripts/dotenvx-run.mjs',
 );
 
 try {
@@ -25,10 +25,13 @@ try {
   process.chdir(workDir);
 
   // Run dotenvx + tofu command
-  execSync(`node "${dotenvxRunner}" run -f "${envFile}" -- tofu init -migrate-state`, {
-    stdio: 'inherit',
-    env: process.env,
-  });
+  execSync(
+    `node "${dotenvxRunner}" run -f "${envFile}" -- tofu init -migrate-state`,
+    {
+      stdio: 'inherit',
+      env: process.env,
+    },
+  );
 } catch (err) {
   console.error(
     `❌ Error during bootstrap migration${err instanceof Error ? `: ${err.message}` : ''}`,

@@ -12,7 +12,7 @@ const ALLOWLIST = new Set([]);
 const args = new Set(process.argv.slice(2));
 
 if (args.has('--help') || args.has('-h')) {
-  console.log(`Usage: node agents/scripts/check-effect-promise.mjs
+  console.log(`Usage: node .claude/scripts/check-effect-promise.mjs
 
 Flags Effect.promise usages outside the explicit allowlist so callers prefer Effect.tryPromise with typed error channels.
 

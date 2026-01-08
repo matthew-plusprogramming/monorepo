@@ -20,7 +20,7 @@ const ALLOWLIST = new Set([
 const args = new Set(process.argv.slice(2));
 
 if (args.has('--help') || args.has('-h')) {
-  console.log(`Usage: node agents/scripts/check-effect-run-promise.mjs
+  console.log(`Usage: node .claude/scripts/check-effect-run-promise.mjs
 
 Ensures Effect.runPromise is only used in explicitly allowed runtime entry points.
 

@@ -15,7 +15,7 @@ const ALLOWLIST = new Set([
 const args = new Set(process.argv.slice(2));
 
 if (args.has('--help') || args.has('-h')) {
-  console.log(`Usage: node agents/scripts/check-console-usage.mjs
+  console.log(`Usage: node .claude/scripts/check-console-usage.mjs
 
 Ensures console logging stays inside approved entry points and logger adapters.
 

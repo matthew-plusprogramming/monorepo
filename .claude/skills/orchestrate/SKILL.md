@@ -13,6 +13,7 @@ Orchestrate large multi-workstream projects (orchestrator workflow) using git wo
 ## When to Use
 
 Use this skill when:
+
 - MasterSpec has been approved (3+ workstreams)
 - Multiple workstreams need to execute in parallel
 - Workstreams have dependencies that require ordered execution
@@ -30,6 +31,7 @@ cat .claude/specs/active/<slug>/master.md
 ```
 
 **Extract**:
+
 - Workstream Overview (IDs, titles, dependencies)
 - Contract Registry
 - Dependency Graph
@@ -41,7 +43,7 @@ If MasterSpec doesn't have worktree allocation strategy, dispatch facilitator to
 
 ```javascript
 Task({
-  description: "Allocate worktrees for MasterSpec",
+  description: 'Allocate worktrees for MasterSpec',
   prompt: `
 Analyze the MasterSpec at .claude/specs/active/<slug>/master.md and determine worktree allocation.
 
@@ -58,8 +60,8 @@ Analyze the MasterSpec at .claude/specs/active/<slug>/master.md and determine wo
 5. Document allocation strategy in MasterSpec
 6. Initialize session.json with worktree_allocation
   `,
-  subagent_type: "facilitator"
-})
+  subagent_type: 'facilitator',
+});
 ```
 
 ### 3. Create Worktrees
@@ -81,6 +83,7 @@ git worktree list
 ```
 
 **Update session.json**:
+
 ```json
 {
   "worktree_allocation": {
@@ -104,14 +107,17 @@ git worktree list
 For each workstream, determine if ready to start:
 
 **Ready** (no dependencies):
+
 - ws-1: No dependencies → Ready to start
 - ws-3: No dependencies → Ready to start
 
 **Blocked** (has dependencies):
+
 - ws-2: Depends on ws-1 → Blocked
 - ws-4: Depends on ws-1 → Blocked (but shares worktree with ws-1)
 
 **Update session.json**:
+
 ```json
 {
   "workstream_execution": {
@@ -143,7 +149,7 @@ For each **ready** workstream, dispatch implementer and test-writer in parallel:
 ```javascript
 // ws-1 is ready
 const ws1Impl = Task({
-  description: "Implement ws-1 in worktree-1",
+  description: 'Implement ws-1 in worktree-1',
   prompt: `
 You are implementing workstream ws-1.
 
@@ -160,21 +166,25 @@ You are implementing workstream ws-1.
 2. **Isolation**: Do NOT modify files in the main worktree
 3. **Spec Location**: .claude/specs/active/<slug>/ws-1.md
 
-${ws1.sharedWorktree ? `
+${
+  ws1.sharedWorktree
+    ? `
 ## SHARED WORKTREE NOTICE
 This worktree is shared with: ws-4 (Integration Tests)
 Coordinate with test-writer: you implement, they test (parallel execution)
-` : ''}
+`
+    : ''
+}
 
 ## YOUR TASK
 Implement WorkstreamSpec ws-1 following standard implementation process.
   `,
-  subagent_type: "implementer",
-  run_in_background: true
+  subagent_type: 'implementer',
+  run_in_background: true,
 });
 
 const ws1Tests = Task({
-  description: "Write tests for ws-1 in worktree-1",
+  description: 'Write tests for ws-1 in worktree-1',
   prompt: `
 You are writing tests for workstream ws-1.
 
@@ -188,12 +198,13 @@ You are writing tests for workstream ws-1.
 ## YOUR TASK
 Write tests for all acceptance criteria in ws-1 spec.
   `,
-  subagent_type: "test-writer",
-  run_in_background: true
+  subagent_type: 'test-writer',
+  run_in_background: true,
 });
 ```
 
 **Update session state**:
+
 ```json
 {
   "workstream_execution": {
@@ -213,8 +224,8 @@ Poll background tasks for completion:
 
 ```javascript
 // Wait for both implementer and test-writer
-const ws1ImplResult = TaskOutput({task_id: ws1Impl.task_id, block: true});
-const ws1TestsResult = TaskOutput({task_id: ws1Tests.task_id, block: true});
+const ws1ImplResult = TaskOutput({ task_id: ws1Impl.task_id, block: true });
+const ws1TestsResult = TaskOutput({ task_id: ws1Tests.task_id, block: true });
 
 // Both complete → Ready for convergence validation
 ```
@@ -225,7 +236,7 @@ Dispatch unifier to validate workstream:
 
 ```javascript
 Task({
-  description: "Validate ws-1 convergence in worktree-1",
+  description: 'Validate ws-1 convergence in worktree-1',
   prompt: `
 Validate convergence for workstream ws-1.
 
@@ -244,15 +255,17 @@ Validate convergence for workstream ws-1.
 
 Produce convergence report with CONVERGED or NOT_CONVERGED status.
   `,
-  subagent_type: "unifier"
-})
+  subagent_type: 'unifier',
+});
 ```
 
 **If CONVERGED**:
+
 - Update workstream status: "converged"
 - Proceed to security review
 
 **If NOT_CONVERGED**:
+
 - Iteration count < 3 → Fix issues, re-run unifier
 - Iteration count >= 3 → Escalate to user
 
@@ -260,7 +273,7 @@ Produce convergence report with CONVERGED or NOT_CONVERGED status.
 
 ```javascript
 Task({
-  description: "Security review for ws-1 in worktree-1",
+  description: 'Security review for ws-1 in worktree-1',
   prompt: `
 Review workstream ws-1 for security vulnerabilities.
 
@@ -269,15 +282,17 @@ Review workstream ws-1 for security vulnerabilities.
 
 Check: OWASP Top 10, input validation, auth/authz, secrets handling.
   `,
-  subagent_type: "security-reviewer"
-})
+  subagent_type: 'security-reviewer',
+});
 ```
 
 **If PASSED**:
+
 - Update convergence_status.security_reviewed: true
 - Add to merge queue
 
 **If FAILED (Critical/High severity)**:
+
 - Block merge
 - Escalate to user with findings
 
@@ -286,6 +301,7 @@ Check: OWASP Top 10, input validation, auth/authz, secrets handling.
 For each workstream in merge queue (FIFO, respecting dependencies):
 
 **Pre-Merge Checks**:
+
 ```bash
 # Switch to worktree
 cd /Users/matthewlin/Desktop/Personal\ Projects/engineering-assistant-ws-1
@@ -305,6 +321,7 @@ fi
 ```
 
 **Execute Merge**:
+
 ```bash
 # Commit any uncommitted changes in worktree
 git add .
@@ -343,6 +360,7 @@ git push origin main
 ```
 
 **Update session state**:
+
 ```json
 {
   "workstream_execution": {
@@ -363,23 +381,24 @@ After ws-1 merges, evaluate dependent workstreams:
 
 ```javascript
 // Find workstreams that depend on ws-1
-const dependents = workstreams.filter(ws => ws.dependencies.includes("ws-1"));
+const dependents = workstreams.filter((ws) => ws.dependencies.includes('ws-1'));
 
 for (const ws of dependents) {
   // Check if all dependencies now satisfied
-  const allDepsMerged = ws.dependencies.every(dep =>
-    getWorkstream(dep).status === "merged"
+  const allDepsMerged = ws.dependencies.every(
+    (dep) => getWorkstream(dep).status === 'merged',
   );
 
   if (allDepsMerged) {
     // Unblock and dispatch
-    updateWorkstreamStatus(ws.id, "ready", null);
+    updateWorkstreamStatus(ws.id, 'ready', null);
     dispatchImplementer(ws.id, ws.worktree_id);
   }
 }
 ```
 
 **Example**:
+
 ```
 ws-1: merged ✅
 ws-2: ready (dependency satisfied) → Dispatch implementer to worktree-2
@@ -389,6 +408,7 @@ ws-4: ready (dependency satisfied, shares worktree-1 with ws-1) → Dispatch tes
 ### 11. Repeat for All Workstreams
 
 Continue cycle for each workstream:
+
 1. Monitor completion
 2. Run convergence validation
 3. Run security review
@@ -418,6 +438,7 @@ git worktree list  # Should only show main worktree
 ```
 
 **Update session state**:
+
 ```json
 {
   "worktree_allocation": {
@@ -448,6 +469,7 @@ If all pass → Mark orchestrator task complete.
 ### Merge Conflicts
 
 If merge conflict detected:
+
 1. Check if contract-based (favor contract owner)
 2. Otherwise, escalate to user with conflict details
 3. Preserve both worktrees for manual resolution
@@ -455,6 +477,7 @@ If merge conflict detected:
 ### Failed Convergence (3+ iterations)
 
 If workstream fails convergence after 3 iterations:
+
 1. Update workstream status: "blocked"
 2. Preserve worktree for debugging
 3. Escalate to user with validation results
@@ -462,6 +485,7 @@ If workstream fails convergence after 3 iterations:
 ### Security Failures (Critical/High)
 
 If security review finds critical/high severity issues:
+
 1. Block merge
 2. Report findings to user
 3. Wait for fixes, then re-validate
@@ -469,11 +493,13 @@ If security review finds critical/high severity issues:
 ## State Management
 
 Throughout orchestration, maintain session.json with:
+
 - `worktree_allocation`: All active worktrees
 - `workstream_execution`: Status of each workstream
 - `merge_queue`: Workstreams ready to merge
 
 Update after:
+
 - Worktree creation
 - Workstream status changes
 - Convergence validation
@@ -483,6 +509,7 @@ Update after:
 ## Success Criteria
 
 Orchestrator task complete when:
+
 - ✅ All workstreams merged to main
 - ✅ All worktrees cleaned up
 - ✅ Integration tests passing
@@ -494,11 +521,13 @@ Orchestrator task complete when:
 **User Request**: "Add real-time notifications"
 
 **MasterSpec**: 3 workstreams
+
 - ws-1: WebSocket Server (no deps)
 - ws-2: Frontend Client (depends on ws-1)
 - ws-3: Notification Service (depends on ws-1)
 
 **Orchestration**:
+
 1. Load MasterSpec ✅
 2. Allocate worktrees (3 separate) ✅
 3. Create worktrees ✅

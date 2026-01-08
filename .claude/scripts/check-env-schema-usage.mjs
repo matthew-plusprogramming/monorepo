@@ -15,7 +15,7 @@ const EXTRA_ALLOWLIST = new Set(['NODE_ENV', 'npm_package_version']);
 const args = new Set(process.argv.slice(2));
 
 if (args.has('--help') || args.has('-h')) {
-  console.log(`Usage: node agents/scripts/check-env-schema-usage.mjs
+  console.log(`Usage: node .claude/scripts/check-env-schema-usage.mjs
 
 Ensures every process.env access in apps/node-server/src matches the EnvironmentSchema or approved extras.
 

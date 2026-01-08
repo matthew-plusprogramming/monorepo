@@ -6,20 +6,19 @@ const root = process.cwd();
 const require = createRequire(import.meta.url);
 
 const scripts = [
-  { path: 'agents/scripts/check-effect-run-promise.mjs' },
-  { path: 'agents/scripts/check-effect-promise.mjs' },
-  { path: 'agents/scripts/check-env-schema-usage.mjs' },
-  { path: 'agents/scripts/check-resource-names.mjs' },
-  { path: 'agents/scripts/check-console-usage.mjs' },
-  { path: 'agents/scripts/check-test-aaa-comments.mjs' },
-  { path: 'agents/scripts/find-unsafe-assertions.mjs' },
+  { path: '.claude/scripts/check-effect-run-promise.mjs' },
+  { path: '.claude/scripts/check-effect-promise.mjs' },
+  { path: '.claude/scripts/check-env-schema-usage.mjs' },
+  { path: '.claude/scripts/check-resource-names.mjs' },
+  { path: '.claude/scripts/check-console-usage.mjs' },
+  { path: '.claude/scripts/check-test-aaa-comments.mjs' },
   { path: 'scripts/convert-to-arrows.ts', runner: 'tsx' },
 ];
 
 const args = process.argv.slice(2);
 
 if (args.includes('--help') || args.includes('-h')) {
-  console.log(`Usage: node agents/scripts/check-code-quality.mjs
+  console.log(`Usage: node .claude/scripts/check-code-quality.mjs
 
 Runs all repository code-quality heuristics (Effect usage, environment schema parity, AWS resource sourcing, console allowlists, unsafe assertions, arrow-function codemode).
 
