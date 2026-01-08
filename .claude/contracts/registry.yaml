@@ -1,0 +1,10 @@
+# Contract Registry
+# Tracks shared interfaces across workstreams
+# Lightweight format: no versioning
+#
+# Each entry requires: id, type, owner, path
+
+- id: example-api-contract
+  type: api
+  owner: ws-example
+  path: src/services/example.ts

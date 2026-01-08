@@ -13,7 +13,7 @@ const TARGET_PROPERTIES = new Set(['TableName', 'EventBusName']);
 const args = new Set(process.argv.slice(2));
 
 if (args.has('--help') || args.has('-h')) {
-  console.log(`Usage: node agents/scripts/check-resource-names.mjs
+  console.log(`Usage: node .claude/scripts/check-resource-names.mjs
 
 Flags string-literal resource identifiers (e.g., TableName, EventBusName) in production code so callers reuse CDK outputs.
 

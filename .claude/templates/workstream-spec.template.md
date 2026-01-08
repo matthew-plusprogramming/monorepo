@@ -12,6 +12,7 @@ implementation_status: not_started
 # <Workstream Title>
 
 ## Context
+
 Background and motivation for this workstream.
 
 ## Goals / Non-goals
@@ -24,12 +25,14 @@ Background and motivation for this workstream.
 ## Requirements
 
 List atomic, testable requirements (EARS format preferred):
+
 - **WHEN** <condition>, **THEN** the system shall <behavior>
 - ...
 
 ## Core Flows
 
 Primary user flows and system behaviors:
+
 - Flow 1: ...
 - Flow 2: ...
 
@@ -55,12 +58,14 @@ sequenceDiagram
 ## Interfaces & Data Model
 
 Define contracts, APIs, and data structures:
+
 - Interface 1: ...
 - Data model: ...
 
 ## Security
 
 Security considerations and requirements:
+
 - Input validation: ...
 - Authentication/Authorization: ...
 - Data protection: ...
@@ -73,6 +78,7 @@ Security considerations and requirements:
 ## Task List
 
 Translate requirements and design into discrete tasks:
+
 - [ ] Task 1: <outcome> (depends on: none)
 - [ ] Task 2: <outcome> (depends on: Task 1)
 - [ ] Task 3: <outcome> (depends on: Task 1)
@@ -80,6 +86,7 @@ Translate requirements and design into discrete tasks:
 ## Testing
 
 Testing strategy and coverage:
+
 - Unit tests: ...
 - Integration tests: ...
 - Test mapping to requirements: ...
@@ -92,6 +99,7 @@ Testing strategy and coverage:
 ## Workstream Reflection
 
 Capture problems encountered and preventable errors:
+
 - Issue: ...
 - Root cause: ...
 - Prevention: ...

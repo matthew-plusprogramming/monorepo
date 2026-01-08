@@ -319,4 +319,16 @@ Located in `scripts/` (separate from agentic `.claude/scripts/`):
 - Tests must use AAA (Arrange-Act-Assert) comments
 - AWS resources follow naming conventions checked by quality scripts
 
+## Memory Bank Retrieval Policy
+
+The memory bank at `.claude/memory-bank/` contains persistent project knowledge.
+
+| File | Load When |
+|------|-----------|
+| `project.brief.md` | Starting new major feature, onboarding |
+| `tech.context.md` | Making architectural decisions, choosing patterns |
+| `testing.guidelines.md` | Writing tests, reviewing test coverage |
+| `best-practices/typescript.md` | TypeScript-specific implementation questions |
+| `best-practices/software-principles.md` | Design pattern decisions |
+
 ---
