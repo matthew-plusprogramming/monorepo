@@ -7,22 +7,18 @@ allowed-tools: Read, Write, Edit, Glob, Grep, Task
 # Spec Author Skill
 
 ## Purpose
-
 Create specifications that serve as the authoritative contract for implementation. Specs document requirements, design decisions, task breakdowns, and test plans.
 
 ## Spec Tiers
 
 ### TaskSpec (Light) - For Small to Medium Tasks
-
 Use for:
-
 - Single feature or enhancement
 - 2-5 files impacted
 - Clear scope, single workstream
 - Estimated 30 min - 4 hours
 
 **Sections**:
-
 - Context & Goal
 - Requirements (EARS format)
 - Acceptance Criteria
@@ -32,9 +28,7 @@ Use for:
 - Decision & Work Log
 
 ### WorkstreamSpec (Full) - For Complex Single-Workstream Tasks
-
 Use for:
-
 - Complex feature requiring detailed design
 - Multiple components or layers involved
 - Needs sequence diagrams and interface definitions
@@ -42,7 +36,6 @@ Use for:
 - Part of a larger effort but can be worked independently
 
 **Sections**:
-
 - Context
 - Goals / Non-goals
 - Requirements (atomic, testable)
@@ -59,9 +52,7 @@ Use for:
 - Decision & Work Log
 
 ### MasterSpec (Multi-workstream) - For Large Projects
-
 Use for:
-
 - 5+ workstreams needed
 - Multiple parallel efforts
 - Complex dependencies and contracts
@@ -72,30 +63,24 @@ Use for:
 ## Process: TaskSpec Creation
 
 ### Step 1: Load Template
-
 ```bash
 cp .claude/templates/task-spec.template.md .claude/specs/active/<date>-<slug>.md
 ```
 
 ### Step 2: Fill Context & Goal
-
 From PM requirements document:
-
 - Summarize the problem and motivation
 - State the clear goal and success criteria
 
 ### Step 3: Write Requirements (EARS Format)
-
 Transform PM requirements into EARS format:
 
 **EARS Pattern**:
-
 - **WHEN** <trigger or condition>
 - **THEN** the system shall <required behavior>
 - **AND** <additional required behavior>
 
 Example:
-
 ```markdown
 ## Requirements
 
@@ -111,7 +96,6 @@ Example:
 ```
 
 ### Step 4: Define Acceptance Criteria
-
 Extract testable criteria from requirements:
 
 ```markdown
@@ -126,9 +110,7 @@ Extract testable criteria from requirements:
 ```
 
 ### Step 5: Add Design Notes
-
 If non-trivial, document approach:
-
 - Architecture decisions
 - Key algorithms or data structures
 - Sequence diagrams for primary flows
@@ -137,7 +119,6 @@ If non-trivial, document approach:
 ## Design Notes
 
 The logout flow will:
-
 1. Call `/api/auth/logout` endpoint
 2. Clear local storage token on success
 3. Update auth context state
@@ -147,24 +128,23 @@ Sequence diagram:
 
 \`\`\`mermaid
 sequenceDiagram
-autonumber
-participant User
-participant UI
-participant AuthService
-participant API
-User->>UI: Click logout
-UI->>AuthService: logout()
-AuthService->>API: POST /api/auth/logout
-API-->>AuthService: 200 OK
-AuthService->>AuthService: clearToken()
-AuthService-->>UI: Success
-UI->>UI: Redirect to /login
-UI-->>User: Show confirmation
+  autonumber
+  participant User
+  participant UI
+  participant AuthService
+  participant API
+  User->>UI: Click logout
+  UI->>AuthService: logout()
+  AuthService->>API: POST /api/auth/logout
+  API-->>AuthService: 200 OK
+  AuthService->>AuthService: clearToken()
+  AuthService-->>UI: Success
+  UI->>UI: Redirect to /login
+  UI-->>User: Show confirmation
 \`\`\`
 ```
 
 ### Step 6: Generate Task List
-
 Break down requirements into concrete tasks:
 
 ```markdown
@@ -179,7 +159,6 @@ Break down requirements into concrete tasks:
 ```
 
 ### Step 7: Map Test Plan
-
 Map each acceptance criterion to test cases:
 
 ```markdown
@@ -194,7 +173,6 @@ Map each acceptance criterion to test cases:
 ```
 
 ### Step 8: Record Initial Decision
-
 Add to Decision & Work Log:
 
 ```markdown
@@ -205,21 +183,17 @@ Add to Decision & Work Log:
 ```
 
 ### Step 9: Update Status
-
 Set status to `draft`, ready for user approval.
 
 ## Process: WorkstreamSpec Creation
 
 ### Step 1: Load Template
-
 ```bash
 cp .claude/templates/workstream-spec.template.md .claude/specs/active/<slug>/ws-<id>.md
 ```
 
 ### Step 2: Complete All Required Sections
-
 Follow the template structure:
-
 1. **Context**: Background and motivation
 2. **Goals / Non-goals**: Explicit boundaries
 3. **Requirements**: Atomic, testable requirements (EARS format)
@@ -236,7 +210,6 @@ Follow the template structure:
 14. **Decision & Work Log**: Decisions and approvals
 
 ### Step 3: Define Contracts
-
 If this workstream creates interfaces used by others:
 
 ```yaml
@@ -250,7 +223,6 @@ contracts:
 Add to contract registry in MasterSpec (if applicable).
 
 ### Step 4: Identify Dependencies
-
 List other workstreams this depends on:
 
 ```yaml
@@ -264,7 +236,6 @@ dependencies:
 For large multi-workstream efforts, coordinate parallel spec authoring.
 
 ### Step 1: Create ProblemBrief
-
 Start with high-level brief:
 
 ```bash
@@ -274,33 +245,29 @@ cp .claude/templates/master-spec.template.md .claude/specs/active/<slug>/master.
 Fill Problem Brief section from PM discovery.
 
 ### Step 2: Identify Workstreams
-
 Decompose into parallel workstreams:
-
 - Each workstream should be independently executable
 - Minimize cross-workstream coupling
 - Identify clear contracts/interfaces between workstreams
 
 Example workstream breakdown:
-
 ```markdown
 ## Workstream Overview
 
-| ID   | Title                | Owner         | Estimated Effort |
-| ---- | -------------------- | ------------- | ---------------- |
-| ws-1 | WebSocket Server     | spec-author-1 | 6-8h             |
-| ws-2 | Frontend Client      | spec-author-2 | 4-6h             |
-| ws-3 | Notification Service | spec-author-3 | 6-8h             |
+| ID | Title | Owner | Estimated Effort |
+|----|-------|-------|------------------|
+| ws-1 | WebSocket Server | spec-author-1 | 6-8h |
+| ws-2 | Frontend Client | spec-author-2 | 4-6h |
+| ws-3 | Notification Service | spec-author-3 | 6-8h |
 ```
 
 ### Step 3: Dispatch Spec-Author Subagents
-
 Use Task tool to create workstream specs in parallel:
 
 ```javascript
 // Dispatch subagent for ws-1
 Task({
-  description: 'Author WebSocket Server workstream spec',
+  description: "Author WebSocket Server workstream spec",
   prompt: `Create a WorkstreamSpec for the WebSocket Server workstream.
 
 Context from ProblemBrief:
@@ -318,24 +285,20 @@ Dependencies:
 - ws-3 (Notification Service provides messages)
 
 Follow the WorkstreamSpec template at .claude/templates/workstream-spec.template.md`,
-  subagent_type: 'spec-author',
-});
+  subagent_type: "spec-author"
+})
 ```
 
 Dispatch one subagent per workstream.
 
 ### Step 4: Collect and Review
-
 Review completed workstream specs:
-
 - Check for missing sections
 - Verify contracts are registered
 - Confirm dependencies are valid (no cycles)
 
 ### Step 5: Merge into MasterSpec
-
 Update MasterSpec with:
-
 - Links to workstream specs
 - Contract registry (consolidated)
 - Dependency graph
@@ -344,17 +307,17 @@ Update MasterSpec with:
 ```markdown
 ## Contract Registry
 
-| Contract ID               | Type | Owner Workstream | Path                          | Version |
-| ------------------------- | ---- | ---------------- | ----------------------------- | ------- |
-| contract-websocket-api    | API  | ws-1             | src/websocket/server.ts       | 1.0     |
-| contract-notification-api | API  | ws-3             | src/services/notifications.ts | 1.0     |
+| Contract ID | Type | Owner Workstream | Path | Version |
+|-------------|------|------------------|------|---------|
+| contract-websocket-api | API | ws-1 | src/websocket/server.ts | 1.0 |
+| contract-notification-api | API | ws-3 | src/services/notifications.ts | 1.0 |
 
 ## Cross-Workstream Dependencies
 
 \`\`\`mermaid
 graph TD
-ws-1[WebSocket Server] --> ws-3[Notification Service]
-ws-2[Frontend Client] --> ws-1
+  ws-1[WebSocket Server] --> ws-3[Notification Service]
+  ws-2[Frontend Client] --> ws-1
 \`\`\`
 ```
 
@@ -363,7 +326,6 @@ ws-2[Frontend Client] --> ws-1
 Analyze dependency graph and workstream coupling to allocate worktrees:
 
 **Allocation Analysis**:
-
 1. **Identify independent workstreams**:
    - No shared files
    - No tight coupling
@@ -382,7 +344,6 @@ Analyze dependency graph and workstream coupling to allocate worktrees:
    - Document merge order in allocation strategy
 
 **Example Allocation**:
-
 ```markdown
 # Analyzing 4 workstreams
 
@@ -392,13 +353,11 @@ ws-3: Database schema (no dependencies, independent) → worktree-3
 ws-4: Integration tests (tests ws-1, tight coupling) → worktree-1 (shared with ws-1)
 
 **Rationale**:
-
 - ws-1 and ws-4 share worktree: ws-4 tests ws-1 implementation (tight coupling)
 - ws-2 separate: Independent frontend work, no file conflicts with backend
 - ws-3 separate: Independent database work, can run in parallel
 
 **Merge Order**:
-
 1. ws-1 (no dependencies) + ws-4 (tests ws-1) → Merge together from worktree-1
 2. ws-2 (depends on ws-1) → Blocked until ws-1 merges
 3. ws-3 (no dependencies) → Can merge anytime (parallel with ws-1)
@@ -406,20 +365,18 @@ ws-4: Integration tests (tests ws-1, tight coupling) → worktree-1 (shared with
 
 **Document in MasterSpec**:
 Add worktree allocation strategy to MasterSpec:
-
 ```markdown
 ## Worktree Allocation Strategy
 
 **Strategy**: ws-1 and ws-4 share worktree (tight coupling), ws-2 and ws-3 isolated (independent)
 
-| Worktree ID | Branch                       | Workstreams | Rationale                      |
-| ----------- | ---------------------------- | ----------- | ------------------------------ |
-| worktree-1  | feature/ws-1-backend-api     | ws-1, ws-4  | ws-4 tests ws-1 implementation |
-| worktree-2  | feature/ws-2-frontend-ui     | ws-2        | Independent frontend work      |
-| worktree-3  | feature/ws-3-database-schema | ws-3        | Independent database work      |
+| Worktree ID | Branch | Workstreams | Rationale |
+|-------------|--------|-------------|-----------|
+| worktree-1 | feature/ws-1-backend-api | ws-1, ws-4 | ws-4 tests ws-1 implementation |
+| worktree-2 | feature/ws-2-frontend-ui | ws-2 | Independent frontend work |
+| worktree-3 | feature/ws-3-database-schema | ws-3 | Independent database work |
 
 **Merge Order**:
-
 1. ws-1+ws-4 (no dependencies)
 2. ws-3 (no dependencies) - can merge in parallel with ws-1
 3. ws-2 (depends on ws-1) - blocked until ws-1 merges
@@ -428,9 +385,7 @@ Add worktree allocation strategy to MasterSpec:
 Update Workstream Overview table with Worktree column.
 
 ### Step 6: Validate Gates
-
 Check spec-complete gates:
-
 - [ ] All workstream specs approved
 - [ ] Contract registry complete and validated
 - [ ] No unresolved cross-workstream conflicts
@@ -447,7 +402,6 @@ Check spec-complete gates:
 - Spec updates require user approval
 
 If during implementation you discover:
-
 - Missing requirements → Add to spec Open Questions, get approval
 - Invalid assumptions → Update spec, note in Decision Log
 - Better approaches → Propose spec amendment before implementing
@@ -465,19 +419,16 @@ Before implementation begins:
 5. **Record approval** in Decision & Work Log with date
 
 Example approval request:
-
 ```markdown
 ## Spec Ready for Approval
 
 I've created a TaskSpec for adding the logout button.
 
 **Key decisions**:
-
 - Using toast for confirmation (consistent with existing patterns)
 - Network errors keep user logged in and allow retry
 
 **Open questions**:
-
 - Should we add keyboard shortcut (Cmd+L) for logout? (Low priority, can defer)
 
 **Task list**: 6 tasks, estimated 2-3 hours
@@ -488,7 +439,6 @@ May I proceed with implementation?
 ## Integration with Other Skills
 
 After spec approval:
-
 - Use `/implement` skill to execute implementation
 - Use `/test` skill to write tests (can run in parallel with implementation)
 - Use `/unify` skill to validate spec-impl-test alignment before merge
@@ -508,11 +458,9 @@ status: draft
 # Add Logout Button to User Dashboard
 
 ## Context
-
 Users currently cannot log out from the dashboard. They must manually delete cookies or close the browser.
 
 ## Goal
-
 Provide a visible, accessible logout button that clears authentication and redirects to login page.
 
 ## Requirements (EARS Format)
@@ -568,7 +516,6 @@ Use AuthService.logout() method. Toast for confirmation (consistent with existin
 See `.claude/templates/workstream-spec.template.md` for full structure.
 
 Key sections filled:
-
 - Context: Real-time notifications require WebSocket infrastructure
 - Requirements: Authentication, message routing, connection management (EARS format)
 - Sequence Diagram: Client connection, authentication, message delivery flows
