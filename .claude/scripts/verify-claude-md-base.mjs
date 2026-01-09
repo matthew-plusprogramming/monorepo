@@ -3,8 +3,15 @@
 /**
  * Verifies CLAUDE.md base section matches canonical template.
  *
+ * This script runs from the metaclaude-assistant repo and verifies
+ * that a target repo's CLAUDE.md base section matches the canonical template.
+ *
  * Usage:
- *   node verify-claude-md-base.mjs [path-to-repo]
+ *   node verify-claude-md-base.mjs <path-to-target-repo>
+ *
+ * Examples:
+ *   node .claude/scripts/verify-claude-md-base.mjs ../my-project
+ *   node .claude/scripts/verify-claude-md-base.mjs /absolute/path/to/repo
  *
  * Exit codes:
  *   0 - Base sections match
