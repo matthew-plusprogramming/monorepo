@@ -477,13 +477,16 @@ tabs_create_mcp();
 ## Integration with Other Skills
 
 After browser testing:
-- If PASS → Ready for commit
+- If PASS with public API → Trigger `/docs` for documentation, then commit
+- If PASS (no public API) → Ready for commit
 - If FAIL → Use `/implement` to fix, then re-test
 
 Before browser testing:
 - Run `/unify` for spec-impl-test convergence
 - Run `/security` for security review
-- Browser testing is final validation before merge
+- Browser testing validates UI before final gates
+
+**Documentation trigger**: If the implementation adds or modifies public APIs, user-facing features, or configuration options, dispatch the documenter subagent after browser tests pass (before commit).
 
 ## Example Test Suite
 

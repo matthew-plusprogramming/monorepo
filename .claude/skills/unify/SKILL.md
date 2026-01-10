@@ -422,10 +422,14 @@ All WorkstreamSpec gates plus:
 
 ## Integration with Other Skills
 
-After convergence:
-- Use `/security` for security review
-- Use `/browser-test` for UI validation
-- Propose commit if all validations pass
+After convergence, the review chain is:
+1. `/code-review` - Code quality review (always)
+2. `/security` - Security review (always)
+3. `/browser-test` - UI validation (if UI changes)
+4. `/docs` - Documentation generation (if public API)
+5. Commit
+
+**Next step after unify passes**: Dispatch `/code-review`
 
 If not converged:
 - Use `/spec`, `/implement`, or `/test` to address gaps

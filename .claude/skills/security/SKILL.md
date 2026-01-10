@@ -445,12 +445,16 @@ Add to spec's Decision & Work Log:
 ## Integration with Other Skills
 
 After security review:
-- If PASS → Proceed to browser testing or commit
+- If PASS with UI changes → Proceed to `/browser-test`
+- If PASS with public API → Trigger `/docs` for documentation
+- If PASS (simple change, no UI, no public API) → Ready for commit
 - If FAIL → Use `/implement` to fix issues, then re-review
 
 Before security review:
 - Run `/unify` to ensure spec-impl-test convergence
-- Security review is final gate before approval
+- Run `/code-review` for code quality review
+
+**Documentation trigger**: If the implementation adds or modifies public APIs, user-facing features, or configuration options, dispatch the documenter subagent after security passes.
 
 ## Examples
 

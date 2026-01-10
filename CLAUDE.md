@@ -262,7 +262,8 @@ Request → Route → Delegate to subagent → Synthesize → Commit
 #### Medium Task (oneoff-spec)
 ```
 Request → Route → PM Interview → Spec → Approve →
-  [Parallel: Implement + Test] → Unify → Code Review → Security → Commit
+  [Parallel: Implement + Test] → Unify → Code Review → Security →
+  [If UI: Browser Test] → [If public API: Docs] → Commit
 ```
 
 #### Large Task (orchestrator)

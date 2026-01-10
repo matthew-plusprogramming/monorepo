@@ -259,8 +259,13 @@ Main agent retains integration responsibility:
 
 After implementation:
 - Use `/unify` to validate spec-impl-test alignment
-- Use `/security` if implementation handles sensitive data or user input
-- Use `/browser-test` if implementation includes UI changes
+
+**After unify passes, the review chain is**:
+1. `/code-review` - Code quality review (always)
+2. `/security` - Security review (always)
+3. `/browser-test` - UI validation (if UI changes)
+4. `/docs` - Documentation generation (if public API)
+5. Commit
 
 ## Error Handling
 

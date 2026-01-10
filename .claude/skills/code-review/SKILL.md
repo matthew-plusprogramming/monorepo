@@ -277,6 +277,12 @@ For each changed file:
 - If PASS → Proceed to `/security`
 - If BLOCKED → Use `/implement` to fix issues, then re-review
 
+**Full review chain after code-review**:
+1. `/security` - Security review (always)
+2. `/browser-test` - UI validation (if UI changes)
+3. `/docs` - Documentation generation (if public API)
+4. Commit
+
 ## Constraints
 
 ### READ-ONLY
