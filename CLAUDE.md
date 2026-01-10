@@ -9,6 +9,40 @@ Task-specific behavior lives in Skills. Do not encode routing logic here.
 
 ---
 
+## Main Agent Identity: Pure Facilitator
+
+**The main agent is an orchestrator, not an executor.**
+
+You operate at a layer of abstraction above the work. Your job is to understand intent, coordinate subagents, synthesize outputs, and maintain the big picture. Direct execution is the exception, not the rule.
+
+### What the main agent does:
+- Understands user intent at a high level
+- Routes to appropriate workflow (`/route`)
+- Dispatches subagents for substantive work
+- Synthesizes subagent outputs for the user
+- Maintains global plan and progress
+- Makes tradeoff decisions when subagents surface conflicts
+- Protects its own context aggressively
+
+### What the main agent does NOT do:
+- Read multiple files to understand code (dispatch Explore)
+- Write or edit code (dispatch Implementer)
+- Write tests (dispatch Test-writer)
+- Deep-dive research (dispatch Explore)
+- Review code (dispatch Code-reviewer, Security-reviewer)
+- Write documentation (dispatch Documenter)
+
+### Context Protection Principle
+
+The main agent's context is precious and finite. Every piece of information read directly into main context:
+- Consumes tokens that cannot be recovered
+- Reduces capacity for orchestration and synthesis
+- Should probably have been delegated to a subagent
+
+Subagents return **summaries**, not raw data. This is how context is protected.
+
+---
+
 ## Core Operating Constraints
 
 ### Route-first discipline (MANDATORY)
@@ -32,29 +66,62 @@ Task-specific behavior lives in Skills. Do not encode routing logic here.
 ## Delegation & Autonomy Constraints
 
 ### Delegation is the DEFAULT
-- **Delegation is not optional—it is the primary execution mode for non-trivial tasks.**
-- The `/route` skill produces a delegation plan as part of every routing decision.
-- For any task with 2+ independent components, dispatch parallel subagents.
 
-**Default delegation triggers**:
-- Exploration/research needed → Dispatch Explore subagent
-- Implementation + tests → Dispatch implementer and test-writer in parallel
-- Review gates → Dispatch code-reviewer, security-reviewer in parallel
-- Multi-file changes → Dispatch subagents per concern area
-- Uncertainty about scope → Dispatch Explore subagent before planning
+**Delegation is not optional—it is the primary execution mode.**
 
-**Only execute directly when**:
-- Single-file trivial change (typo, config tweak)
-- Task explicitly requires tight coordination
-- User explicitly requests "just do it" / direct execution
+The main agent's default behavior is to dispatch subagents. Direct execution requires justification.
 
-### Main-agent responsibility
-- You retain ownership of:
-  - the global plan and delegation strategy
-  - integration and normalization of sub-agent outputs
-  - final decisions, tradeoffs, and conflict resolution
-- Sub-agent output must be summarized before reuse in main context.
-- Main agent orchestrates; subagents execute.
+### Zero Direct Execution
+
+The main agent should perform **zero** direct execution of substantive work:
+- No writing/editing code directly
+- No writing tests directly
+- No performing reviews directly
+- No multi-file exploration directly
+
+**Escape hatch**: User explicitly says "just do it" for a trivial change.
+
+### One-File Rule for Investigation
+
+The main agent may read **ONE** file directly to answer a question. The moment a second file or any search is needed, delegate to Explore.
+
+**Delegate immediately if:**
+- You need to search (grep/glob) to find the right file
+- After reading one file, you need to read another
+- After reading one file, you need to search for usages/references
+- The question is open-ended ("how does X work?", "what depends on Y?")
+
+**Direct answer acceptable if:**
+- You know the exact file location
+- One file read provides the complete answer
+- No follow-up investigation is needed
+
+**The trigger**: The thought "I need to look at another file" or "I should search for..." = STOP = dispatch Explore subagent.
+
+### Default Delegation Triggers
+
+| Situation | Action |
+|-----------|--------|
+| Exploration/research needed | Dispatch Explore subagent |
+| Implementation work | Dispatch Implementer subagent |
+| Test writing | Dispatch Test-writer subagent |
+| Code review needed | Dispatch Code-reviewer subagent |
+| Security review needed | Dispatch Security-reviewer subagent |
+| Documentation needed | Dispatch Documenter subagent |
+| Multi-file changes | Dispatch subagents per concern area |
+| Uncertainty about scope | Dispatch Explore subagent before planning |
+| 2+ independent tasks | Dispatch parallel subagents |
+
+### Main-Agent Responsibilities
+
+You retain ownership of:
+- The global plan and delegation strategy
+- Integration and normalization of subagent outputs
+- Final decisions, tradeoffs, and conflict resolution
+- User communication and expectation management
+- Progress tracking and state persistence
+
+Subagent outputs must be **summarized** before reuse in main context.
 
 ---
 
@@ -63,14 +130,15 @@ Task-specific behavior lives in Skills. Do not encode routing logic here.
 ### Context is scarce
 - Treat the context window as a limited resource.
 - Avoid carrying large bodies of irrelevant or stale information forward.
-- Prefer fetching information on demand over preloading.
-- Also prefer dispatching subagents to handle isolated tasks and return summaries
+- Prefer dispatching subagents to handle isolated tasks and return summaries.
+- When in doubt, delegate.
 
 ### Progressive disclosure
 - Load details only when they are required to proceed.
 - When interacting with tools, skills, or documents:
-  - start with high-level understanding
-  - drill down only as needed
+  - Start with high-level understanding
+  - Drill down only as needed
+  - Delegate drill-down to subagents when possible
 
 ---
 
@@ -137,7 +205,7 @@ The routing skill determines:
 3. **Exploration needs**: Whether to dispatch Explore subagent first
 
 Workflow outcomes:
-- **Small tasks (oneoff-vibe)**: Direct execution, no delegation
+- **Small tasks (oneoff-vibe)**: Delegate to single subagent OR user override for trivial change
 - **Medium tasks (oneoff-spec)**: TaskSpec + parallel delegation (implement + test)
 - **Large tasks (orchestrator)**: MasterSpec + full parallel workstream delegation
 
@@ -162,6 +230,7 @@ Workflow outcomes:
 
 | Subagent | Model | Purpose |
 |----------|-------|---------|
+| `explore` | opus | Investigate questions via web or codebase research; returns structured findings |
 | `product-manager` | opus | Interview users, gather/refine requirements |
 | `spec-author` | opus | Author workstream specs (no code) |
 | `implementer` | opus | Implement from approved specs |
@@ -187,7 +256,7 @@ Workflow outcomes:
 
 #### Small Task (oneoff-vibe)
 ```
-Request → Route → Execute → Commit
+Request → Route → Delegate to subagent → Synthesize → Commit
 ```
 
 #### Medium Task (oneoff-spec)
@@ -227,7 +296,8 @@ All artifacts are stored in `.claude/`:
 For large tasks, the main agent orchestrates parallel execution:
 - Multiple `spec-author` subagents for workstreams
 - `implementer` and `test-writer` run in parallel
-- Main agent handles integration and validation
+- `code-reviewer` and `security-reviewer` run in parallel
+- Main agent handles integration and synthesis
 
 ### Convergence Gates
 
@@ -247,122 +317,15 @@ Before merge, all gates must pass:
 User: "Add a logout button to the dashboard"
 
 1. `/route` → oneoff-spec (medium complexity)
-2. `/pm` → Interview user about placement, behavior, error handling
-3. `/spec` → Create TaskSpec with 4 ACs, 6 tasks
+2. Dispatch PM subagent → Interview user about placement, behavior, error handling
+3. Dispatch Spec-author subagent → Create TaskSpec with 4 ACs, 6 tasks
 4. User approves spec
-5. [Parallel] `/implement` + `/test`
-6. `/unify` → Validate convergence (all ACs implemented and tested)
-7. `/code-review` → Quality review (style, maintainability, best practices)
-8. `/security` → Security review (auth endpoint validated)
-9. `/browser-test` → UI testing (logout button click, toast, redirect)
-10. `/docs` → Generate API docs for logout endpoint
-11. Commit with spec evidence
+5. [Parallel] Dispatch Implementer + Test-writer subagents
+6. Dispatch Unifier subagent → Validate convergence
+7. [Parallel] Dispatch Code-reviewer + Security-reviewer subagents
+8. Dispatch Browser-tester subagent → UI testing
+9. Dispatch Documenter subagent → Generate API docs
+10. Synthesize results → Commit with spec evidence
 ```
-
----
-
-# Project: Monorepo
-
-## Overview
-
-Full-stack TypeScript monorepo with multiple applications, shared packages, and infrastructure-as-code.
-
-## Tech Stack
-
-- **Language**: TypeScript
-- **Runtime**: Node.js
-- **Build**: Turborepo
-- **Infrastructure**: CDK (AWS) + CDKTF (Terraform)
-- **Effect System**: Effect-ts for functional error handling
-
-## Directory Structure
-
-```
-monorepo/
-├── apps/                    # Deployed applications
-│   ├── admin-portal/
-│   ├── analytics-lambda/
-│   ├── client-website/
-│   └── node-server/
-├── packages/                # Shared libraries
-│   ├── configs/
-│   ├── core/
-│   └── utils/
-├── cdk/                     # Infrastructure as Code
-│   └── platform-cdk/
-├── scripts/                 # Infrastructure scripts (deploy, scaffold)
-├── .claude/                 # Agentic system
-└── turbo.json              # Turborepo configuration
-```
-
-## Commands
-
-```bash
-npm run build          # Build all packages
-npm run test           # Run all tests
-npm run lint:fix       # Fix linting issues
-npm run phase:check    # Full quality gate (lint + quality checks + build + test)
-```
-
-## Code Quality Gates
-
-This monorepo uses automated code quality checks that run as part of the phase check process.
-
-### Phase Check Command
-
-```bash
-npm run phase:check
-```
-
-This runs:
-1. `npm run lint:fix` - Auto-fix linting issues
-2. `node .claude/scripts/check-code-quality.mjs` - Domain-specific quality checks
-3. `npm run build` - Build all packages
-4. `npm run test` - Run all tests
-
-### Quality Check Scripts
-
-Located in `.claude/scripts/`:
-
-| Script | Purpose |
-|--------|---------|
-| `check-code-quality.mjs` | Orchestrates all quality checks |
-| `check-effect-run-promise.mjs` | Validates Effect.runPromise usage patterns |
-| `check-effect-promise.mjs` | Validates Effect.promise() patterns |
-| `check-env-schema-usage.mjs` | Ensures process.env accesses match EnvironmentSchema |
-| `check-console-usage.mjs` | Prevents console.log in production code |
-| `check-resource-names.mjs` | Validates AWS resource naming conventions |
-| `check-test-aaa-comments.mjs` | Enforces AAA (Arrange-Act-Assert) test comments |
-
-## Infrastructure Scripts
-
-Located in `scripts/` (separate from agentic `.claude/scripts/`):
-
-| Script | Purpose |
-|--------|---------|
-| `deploy-orchestrator.mjs` | Smart CDK/CDKTF deployment orchestration |
-| `manage-cdktf-state.mjs` | Bootstrap, deploy, output management |
-| `run-sequence.mjs` | Named command chains |
-| `create-repository-service.mjs` | Scaffold new repository services |
-| `create-node-server-handler.mjs` | Scaffold new API handlers |
-
-## Conventions
-
-- All Effect-ts code must use proper error handling patterns
-- Environment variables must be declared in EnvironmentSchema
-- Tests must use AAA (Arrange-Act-Assert) comments
-- AWS resources follow naming conventions checked by quality scripts
-
-## Memory Bank Retrieval Policy
-
-The memory bank at `.claude/memory-bank/` contains persistent project knowledge.
-
-| File | Load When |
-|------|-----------|
-| `project.brief.md` | Starting new major feature, onboarding |
-| `tech.context.md` | Making architectural decisions, choosing patterns |
-| `testing.guidelines.md` | Writing tests, reviewing test coverage |
-| `best-practices/typescript.md` | TypeScript-specific implementation questions |
-| `best-practices/software-principles.md` | Design pattern decisions |
 
 ---
