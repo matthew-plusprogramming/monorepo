@@ -4,6 +4,6 @@
   "license": "UNLICENSED",
   "type": "module",
   "peerDependencies": {
-    "@types/node": "^25.0.3"
+    "@types/node": "^25.0.6"
   }
 }

@@ -1,78 +1,148 @@
-Monorepo Infra:
+# Dependency Update Verification Checklist
 
-- [ ] Docs generation
-  - [ ] OpenAPI
-- [x] Integrate IaC (OpenTofu)
-- [x] Integrate linting into all packages
-- [ ] CI pipeline of some kind
-- [x] Prettier formatting via config.ts and cli
-  - [x] Part of CI?
-- [ ] Implement publishing website to CF for SSG
-- [ ] Implement publishing website to CF + API Gateway + EC2 for SSR
+This checklist documents all tests and checks that should be run after updating dependencies to verify nothing is broken.
 
-Backend:
+## 1. Install Dependencies
 
-Auth Package (Integrated into node server)
+- [ ] Run `npm install` to install the updated dependencies
+- [ ] Verify no peer dependency warnings or errors
+- [ ] Verify `package-lock.json` is updated correctly
 
-- [x] Error obfuscation for default routes and unauthenticated routes
-  - [x] Customizable to send 500 or 502 to mask 400 level errors
-- [x] Set low concurrency (10)
-- [x] Coarse rate limiting
-  - [ ] Global config
-- [ ] Other rate limiting types (token bucket)
-- [ ] Implement repo services for specific data access
-- [x] Authenticates user
-- [ ] Deny-list check
-- [ ] Integrate authzed (spiceDB)
-- [ ] Configurable kill switch based on conditions or manual action
-  - [ ] Cuts reserved concurrency to 0 or 1 depending on the condition
-  - [ ] Triggers an alert to be sent to the administrator
+## 2. Build Checks
 
-Analytics Lambda
+- [ ] Run `npm run build` (turbo build across all packages)
+- [ ] Verify all packages compile without errors:
+  - [ ] `packages/configs/vite-config` (tsc)
+  - [ ] `packages/configs/vitest-config` (tsc)
+  - [ ] `packages/core/schemas` (tsc)
+  - [ ] `packages/core/ui-components` (tsc)
+  - [ ] `packages/core/backend-core` (tsc + tsc-alias)
+  - [ ] `apps/admin-portal` (next build)
+  - [ ] `apps/client-website` (next build)
+  - [ ] `apps/node-server` (vite build)
+  - [ ] `apps/analytics-lambda` (vite build)
 
-- [x] Testing
-- [ ] Local server (adapter express)
+## 3. Linting
 
-Node Server (Lambda)
+- [ ] Run `npm run lint` (turbo lint across all packages)
+- [ ] Verify ESLint passes for all apps and packages
+- [ ] Verify Stylelint passes for Next.js apps (admin-portal, client-website)
+- [ ] Run `npm run lint:fix` if there are auto-fixable issues
 
-- [x] Integrate Effect library
-- [x] Integrate zod
-- [x] Integrate express
-- [x] Integrate db options
-  - [x] Dynamo
-  - [ ] Mongo
-    - [ ] Maybe later?
-- [x] Integration test suite to ensure configuration setup correctly
-  - [x] Test behavior, not implementation. Mock only true boundaries (network, DB, clock, randomness, filesystem, process env).
-  - [x] Prefer small, deterministic units + a few integration tests that exercise real wiring.
-  - [x] Standardize patterns: dependency injection, test data builders, and strict AAA (Arrange-Act-Assert).
-- [ ] Integrate graphql (gql.tada)
-  - [ ] Maybe later?
-- [ ] Redis
-  - [ ] Maybe later?
+## 4. Type Checking
 
-Frontend:
+- [ ] TypeScript compilation succeeds (covered by build step)
+- [ ] No new type errors introduced by dependency updates
+- [ ] Check for any breaking type changes in:
+  - [ ] `zod` (4.2.1 -> 4.3.5) - schema validation types
+  - [ ] `@tanstack/react-query` (5.90.14 -> 5.90.16)
+  - [ ] `typescript-eslint` (8.50.1 -> 8.52.0)
+  - [ ] `@types/node` (25.0.3 -> 25.0.6)
 
-- [x] React
-- [x] NextJS
-- [x] Scss
-  - [x] Classnames
-- [x] Zustand
-- [x] React query
-- [x] React hookform
-- [ ] UI Tests
-- [ ] Integrate single-spa (why not)
-  - [ ] Maybe later? (too cumbersome for now)
-- [ ] Create a barebones component suite for common usecases
-  - [x] Button
-  - [x] Navbar
-  - [ ] Footer
-  - [ ] Sidebar
-  - [ ] Sidenav
-- [ ] Barebones admin dashboard
-- [ ] Barebones user-facing application
-- [x] Barebones landing page
+## 5. Unit Tests
 
-Chores:
+- [ ] Run `npm run test` (turbo test across all packages)
+- [ ] Verify all test suites pass:
+  - [ ] `apps/admin-portal` tests (vitest)
+  - [ ] `apps/client-website` tests (vitest)
+  - [ ] `apps/node-server` tests (vitest)
+  - [ ] `packages/core/schemas` tests (vitest)
 
-- [x] Setup guide on README
+## 6. Code Quality Checks
+
+- [ ] Run `node .claude/scripts/check-code-quality.mjs`
+- [ ] Verify all custom checks pass:
+  - [ ] Effect run promise checks
+  - [ ] Effect promise checks
+  - [ ] Environment schema usage
+  - [ ] Resource names
+  - [ ] Console usage
+  - [ ] Test AAA comments
+  - [ ] Arrow function codemod
+
+## 7. Agent Finalization
+
+- [ ] Run `npm run phase:check` (combined lint:fix + code quality + build + test)
+- [ ] Run `npm run agent:finalize` for final verification
+
+## 8. Manual Smoke Tests
+
+### Admin Portal (Next.js)
+- [ ] Run `npm run dev` in `apps/admin-portal`
+- [ ] Verify app starts without errors
+- [ ] Check for React hydration errors in console
+- [ ] Verify framer-motion animations work correctly
+- [ ] Test react-hook-form form submissions
+
+### Client Website (Next.js)
+- [ ] Run `npm run dev` in `apps/client-website`
+- [ ] Verify app starts without errors
+- [ ] Check for React hydration errors in console
+- [ ] Verify framer-motion animations work correctly
+- [ ] Test react-hook-form form submissions
+
+### Node Server (Express/Hono)
+- [ ] Run `npm run dev` in `apps/node-server`
+- [ ] Verify server starts without errors
+- [ ] Test heartbeat endpoint
+- [ ] Verify DynamoDB connections (if configured)
+- [ ] Check Effect library functionality
+
+### Analytics Lambda
+- [ ] Run `npm run dev` in `apps/analytics-lambda`
+- [ ] Verify lambda handler can be invoked locally
+- [ ] Check DynamoDB operations work correctly
+
+## 9. AWS SDK Verification
+
+The following AWS SDK packages were updated (3.958.0 -> 3.966.0):
+- [ ] Verify DynamoDB client operations work
+- [ ] Verify EventBridge client operations work
+- [ ] Verify CloudWatch Logs client operations work
+- [ ] Check for any breaking changes in SDK responses
+
+## 10. CDK Verification
+
+- [ ] Navigate to `cdk/platform-cdk`
+- [ ] Run `npm run synth` or `cdk synth` to verify CDK synthesis
+- [ ] Verify no CloudFormation template changes (unless expected)
+
+## 11. Monorepo Scripts
+
+- [ ] Run `npm run test:scripts` to verify utility scripts work
+- [ ] Verify turbo caching works correctly
+
+## Summary of Updated Packages
+
+### Root
+- turbo: 2.7.2 -> 2.7.3
+
+### AWS SDK (multiple packages)
+- @aws-sdk/client-dynamodb: 3.958.0 -> 3.966.0
+- @aws-sdk/client-eventbridge: 3.958.0 -> 3.966.0
+- @aws-sdk/client-cloudwatch-logs: 3.958.0 -> 3.966.0
+- @aws-sdk/util-dynamodb: 3.958.0 -> 3.966.0
+
+### React Ecosystem
+- @tanstack/react-query: 5.90.14 -> 5.90.16
+- framer-motion: 12.23.26 -> 12.25.0
+- react-hook-form: 7.69.0 -> 7.70.0
+
+### Build Tools
+- vite: 7.3.0 -> 7.3.1
+- sass: 1.97.1 -> 1.97.2
+
+### TypeScript/ESLint
+- @typescript-eslint/eslint-plugin: 8.50.1 -> 8.52.0
+- @typescript-eslint/parser: 8.50.1 -> 8.52.0
+- typescript-eslint: 8.50.1 -> 8.52.0
+- @eslint/compat: 2.0.0 -> 2.0.1
+- @stylistic/eslint-plugin: 5.6.1 -> 5.7.0
+
+### Other
+- zod: 4.2.1 -> 4.3.5
+- effect: 3.19.13 -> 3.19.14
+- globals: 16.5.0 -> 17.0.0
+- @dotenvx/dotenvx: 1.51.2 -> 1.51.4
+- supertest: 7.1.4 -> 7.2.2
+- @types/node: 25.0.3 -> 25.0.6

@@ -14,7 +14,7 @@
   },
   "dependencies": {
     "classnames": "^2.5.1",
-    "framer-motion": "^12.23.26"
+    "framer-motion": "^12.25.0"
   },
   "peerDependencies": {
     "next": "^16.1.1",

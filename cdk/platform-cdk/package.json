@@ -46,7 +46,7 @@
     "@cdktf/provider-aws": "^21.22.1",
     "@configs/eslint-config": "*",
     "@configs/ts-config": "*",
-    "@dotenvx/dotenvx": "^1.51.2",
+    "@dotenvx/dotenvx": "^1.51.4",
     "@packages/schemas": "*",
     "@utils/type-utils": "*",
     "cdktf": "^0.21.0",
@@ -55,6 +55,6 @@
     "eslint": "^9.39.2",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",
-    "zod": "^4.2.1"
+    "zod": "^4.3.5"
   }
 }
