@@ -41,6 +41,7 @@ const usage = () => {
       'Flags:',
       '  -h, --help                Show this help message.',
       '  --prod                    Target production (cdk deploy/output).',
+      '  --auto-approve            Skip interactive approval prompts (for CI/non-TTY).',
     ].join('\n'),
   );
 };
@@ -419,7 +420,7 @@ const removeLocalTfState = async (stackName) => {
   }
 };
 
-const bootstrapBackend = async () => {
+const bootstrapBackend = async ({ autoApprove = false } = {}) => {
   const stackPrefix = await getStackPrefix();
   const bootstrapStackName = `${stackPrefix}-bootstrap-stack`;
   console.log(
@@ -436,15 +437,21 @@ const bootstrapBackend = async () => {
   try {
     await withFlagValue(false);
 
+    // Build deploy command args, appending --auto-approve if needed
+    const deployArgs = [
+      '-w',
+      '@cdk/platform-cdk',
+      'run',
+      'cdk:deploy:dev',
+      bootstrapStackName,
+    ];
+    if (autoApprove) {
+      deployArgs.push('--', '--auto-approve');
+    }
+
     await runCommand(
       'npm',
-      [
-        '-w',
-        '@cdk/platform-cdk',
-        'run',
-        'cdk:deploy:dev',
-        bootstrapStackName,
-      ],
+      deployArgs,
       {
         env: { STACK: bootstrapStackName },
         step: 'Deploying bootstrap stack',
@@ -594,7 +601,9 @@ const main = async () => {
     process.exit(0);
   }
 
-  const command = args.shift();
+  const autoApprove = args.includes('--auto-approve');
+
+  const command = args.filter((a) => !a.startsWith('--')).shift();
 
   if (!command) {
     usage();
@@ -606,7 +615,7 @@ const main = async () => {
       await handleCopyAssetsForCdk();
       break;
     case 'bootstrap-backend':
-      await bootstrapBackend();
+      await bootstrapBackend({ autoApprove });
       break;
     case 'cdk':
       await handleCdkCommand(args);

@@ -116,11 +116,12 @@ const usage = () => {
       '  all       All stacks in correct order',
       '',
       'Options:',
-      '  --prod       Target production environment',
-      '  --dry-run    Show what would be done without executing',
-      '  --force      Force rebuild even if artifacts exist',
-      '  --no-cache   Disable Turborepo cache for builds',
-      '  -h, --help   Show this help message',
+      '  --prod          Target production environment',
+      '  --dry-run       Show what would be done without executing',
+      '  --force         Force rebuild even if artifacts exist',
+      '  --no-cache      Disable Turborepo cache for builds',
+      '  --auto-approve  Skip interactive approval prompts (for CI/non-TTY)',
+      '  -h, --help      Show this help message',
     ].join('\n')
   );
 };
@@ -349,7 +350,7 @@ const prepare = async ({ isProd = false, noCache = true } = {}) => {
 // Deployment
 // ============================================================================
 
-const deployStack = async (stackName, { isProd = false, dryRun = false } = {}) => {
+const deployStack = async (stackName, { isProd = false, dryRun = false, autoApprove = false } = {}) => {
   const stage = isProd ? 'prod' : 'dev';
   const stageLabel = isProd ? 'production' : 'development';
 
@@ -358,9 +359,15 @@ const deployStack = async (stackName, { isProd = false, dryRun = false } = {}) =
     return;
   }
 
+  // Build the command args, appending --auto-approve after -- if needed
+  const cmdArgs = ['-w', '@cdk/platform-cdk', 'run', `cdk:deploy:${stage}`, stackName];
+  if (autoApprove) {
+    cmdArgs.push('--', '--auto-approve');
+  }
+
   await runCommand(
     'npm',
-    ['-w', '@cdk/platform-cdk', 'run', `cdk:deploy:${stage}`, stackName],
+    cmdArgs,
     {
       step: `Deploying ${stackName} to ${stageLabel}`,
       env: { STACK: stackName },
@@ -368,7 +375,7 @@ const deployStack = async (stackName, { isProd = false, dryRun = false } = {}) =
   );
 };
 
-const deployWithDependencies = async (stacks, { isProd = false, dryRun = false, force = false } = {}) => {
+const deployWithDependencies = async (stacks, { isProd = false, dryRun = false, force = false, autoApprove = false } = {}) => {
   // Topologically sort stacks based on dependencies
   const sorted = topologicalSort(stacks);
 
@@ -419,7 +426,7 @@ const deployWithDependencies = async (stacks, { isProd = false, dryRun = false, 
 
   // Deploy each stack
   for (const stackName of sorted) {
-    await deployStack(stackName, { isProd, dryRun });
+    await deployStack(stackName, { isProd, dryRun, autoApprove });
 
     // Pull outputs after successful deployment if the stack provides them
     const def = STACK_DEFINITIONS[stackName];
@@ -491,6 +498,7 @@ const parseArgs = (rawArgs) => {
   let dryRun = false;
   let force = false;
   let noCache = true; // Default to no-cache
+  let autoApprove = false;
   let help = false;
 
   for (const arg of rawArgs) {
@@ -510,6 +518,9 @@ const parseArgs = (rawArgs) => {
       case '--cache':
         noCache = false;
         break;
+      case '--auto-approve':
+        autoApprove = true;
+        break;
       case '-h':
       case '--help':
         help = true;
@@ -519,7 +530,7 @@ const parseArgs = (rawArgs) => {
     }
   }
 
-  return { args, isProd, dryRun, force, noCache, help };
+  return { args, isProd, dryRun, force, noCache, autoApprove, help };
 };
 
 const resolveStacks = (identifier) => {
@@ -558,7 +569,7 @@ const resolveStacks = (identifier) => {
 // ============================================================================
 
 const main = async () => {
-  const { args, isProd, dryRun, force, noCache, help } = parseArgs(
+  const { args, isProd, dryRun, force, noCache, autoApprove, help } = parseArgs(
     process.argv.slice(2)
   );
 
@@ -608,7 +619,7 @@ const main = async () => {
           throw new Error('Missing stack or group identifier');
         }
         const stacks = resolveStacks(target);
-        await deployWithDependencies(stacks, { isProd, dryRun, force });
+        await deployWithDependencies(stacks, { isProd, dryRun, force, autoApprove });
         break;
       }
 

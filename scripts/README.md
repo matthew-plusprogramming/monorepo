@@ -75,7 +75,7 @@ node scripts/create-node-server-handler.mjs <handler-slug> [options]
 
 - Creates a handler under `apps/node-server/src/handlers/<name>.handler.ts` and a matching Vitest suite under `apps/node-server/src/__tests__/handlers`.
 - Registers the handler automatically in `apps/node-server/src/index.ts` (import + `app.<method>(route, handler)` call).
-- Powers the Repository Service workflow’s optional handler bundle so we only maintain handler boilerplate in one place.
+- Powers the Repository Service workflow's optional handler bundle so we only maintain handler boilerplate in one place.
 
 ### Required arguments
 
@@ -102,22 +102,143 @@ The repository service scaffolder calls this CLI whenever the `handler` bundle i
 
 Have an idea for a new automation bundle? Add templates under `scripts/templates/repository-service/bundles/<bundle>` and register the bundle in the manifest—then document it in this file so other contributors can discover it.
 
+## CDK Deploy Orchestrator
+
+```
+node scripts/deploy-orchestrator.mjs <command> [options]
+npm run deploy -- <command> [options]
+```
+
+### What it does
+
+- Smart orchestration for the CDKTF build/deploy flow that detects current state and determines minimum steps needed.
+- Handles stack dependencies automatically and validates prerequisites before deployment.
+- Supports deploying individual stacks, groups of stacks, or all stacks in the correct order.
+
+### Commands
+
+- `status` — Show current state of outputs and artifacts.
+- `validate <stack|group>` — Check if prerequisites are met for deployment.
+- `plan <stack|group>` — Show what steps would be executed.
+- `deploy <stack|group>` — Deploy with automatic prerequisite handling.
+- `outputs <stack|group>` — Pull outputs for deployed stacks.
+- `build` — Build all apps with no cache.
+- `prepare` — Full preparation: build, copy assets, pull outputs.
+
+### Stack groups
+
+- `infra` — Infrastructure stacks (api-stack, analytics-stack).
+- `lambdas` — Lambda stacks (api-lambda-stack, analytics-lambda-stack).
+- `website` — Client website stack.
+- `all` — All stacks in correct dependency order.
+
+### Flags
+
+- `--prod` — Target production environment.
+- `--dry-run` — Show what would be done without executing.
+- `--force` — Force rebuild even if artifacts exist.
+- `--no-cache` — Disable Turborepo cache for builds.
+- `--auto-approve` — Skip interactive approval prompts (see below).
+
+### Examples
+
+```bash
+# Deploy all stacks to dev
+npm run deploy -- deploy all
+
+# Deploy lambdas to production without prompts
+npm run deploy -- deploy lambdas --prod --auto-approve
+
+# Check what would be deployed
+npm run deploy -- plan all --dry-run
+```
+
+---
+
 ## CDKTF State Manager
 
 ```
-node scripts/manage-cdktf-state.mjs bootstrap-backend
+node scripts/manage-cdktf-state.mjs <command> [options]
 ```
 
 ### What it does
 
 - Automates the sanctioned bootstrap sequence for the CDKTF backend: toggles the bootstrap stack flag, deploys the bootstrap stack, restores the flag, synthesizes stacks, runs the state migration helper, and deletes the local Terraform state file.
 
+### Commands
+
+- `bootstrap-backend` — Deploy the bootstrap stack and migrate Terraform state.
+- `copy-assets-for-cdk` — Run the asset copy script for platform CDK stacks.
+- `cdk list` — List available stacks with descriptions.
+- `cdk deploy <stack> [--prod]` — Deploy the specified stack.
+- `cdk output <stack> [--prod]` — Write CDK outputs for the specified stack.
+
+### Flags
+
+- `--prod` — Target production environment (for `cdk deploy` and `cdk output`).
+- `--auto-approve` — Skip interactive approval prompts (see below).
+
 ### Usage notes
 
 - Run from the repository root with credentials configured for the target environment.
 - The script derives the stack name from `cdk/platform-cdk/src/constants.ts`, removes `cdk/platform-cdk/terraform.<stack>.tfstate` (plus the legacy `.terraform/terraform.tfstate` copy), and restores `migrateStateToBootstrappedBackend` to its original value even if a command fails.
 - Command output streams directly to your terminal; rerun once issues are resolved.
-- `node scripts/manage-cdktf-state.mjs cdk deploy <stack> [--prod]` and `node scripts/manage-cdktf-state.mjs cdk output <stack> [--prod]` target a specific stack. Omitting `<stack>` in an interactive terminal opens a picker so you can select and confirm one or more stacks; the script runs each deploy/output sequentially with the same flags. Append `--` before any extra CDK arguments (for example, `-- --context stage=dev`) to forward them to every selected stack.
+- Omitting `<stack>` in an interactive terminal opens a picker so you can select and confirm one or more stacks; the script runs each deploy/output sequentially with the same flags. Append `--` before any extra CDK arguments (for example, `-- --context stage=dev`) to forward them to every selected stack.
+
+### Examples
+
+```bash
+# Bootstrap the backend interactively
+node scripts/manage-cdktf-state.mjs bootstrap-backend
+
+# Bootstrap without prompts (for CI)
+node scripts/manage-cdktf-state.mjs bootstrap-backend --auto-approve
+```
+
+---
+
+## Auto-Approve Flag
+
+The `--auto-approve` flag is available on both CDK deployment scripts to skip interactive confirmation prompts. This is essential for non-interactive environments where stdin is not a TTY.
+
+### When to use --auto-approve
+
+| Environment | Use --auto-approve? | Reason |
+|-------------|---------------------|--------|
+| CI/CD pipelines (GitHub Actions, etc.) | Yes | No TTY available for prompts |
+| Automated scripts | Yes | Cannot respond to interactive prompts |
+| Claude Code / AI agents | Yes | Non-interactive execution environment |
+| Local development (interactive) | No | Review prompts catch mistakes |
+| Production deployments (manual) | No | Human verification is a safety check |
+
+### Behavior
+
+When `--auto-approve` is passed:
+
+- **deploy-orchestrator.mjs**: Skips the "Would you like to run preparation steps first?" prompt when validation fails. The script exits with an error instead of offering interactive recovery. The flag is also forwarded to the underlying CDKTF deploy command.
+- **manage-cdktf-state.mjs**: The `bootstrap-backend` command passes `--auto-approve` to the CDKTF deploy step, allowing unattended bootstrap operations.
+
+### Usage examples
+
+```bash
+# Deploy all stacks without prompts (CI/CD)
+npm run deploy -- deploy all --auto-approve
+
+# Deploy to production without prompts
+npm run deploy -- deploy all --prod --auto-approve
+
+# Bootstrap backend in CI environment
+node scripts/manage-cdktf-state.mjs bootstrap-backend --auto-approve
+
+# Combine with other flags
+npm run deploy -- deploy lambdas --prod --auto-approve --force
+```
+
+### Safety considerations
+
+- Always use `--dry-run` first in new environments to preview changes.
+- In CI pipelines, ensure proper branch protections and approval gates before deployment steps.
+- The `--auto-approve` flag does not bypass validation checks—it only skips interactive prompts. If prerequisites are missing, the script still fails.
 
 ---
 

@@ -475,6 +475,17 @@ const ensureWorktrees = async (repoRoot) => {
       `Synced ${syncSummary.envKeysSummary.copied} .env.keys file(s) into worktrees.`,
     );
   }
+
+  // Remind users to install dependencies in new worktrees
+  if (created.length > 0) {
+    console.log('');
+    console.log(
+      'NOTE: Run `npm install` in each worktree before deploying:',
+    );
+    for (const id of created) {
+      console.log(`  cd ${resolve(worktreesDir, id)} && npm install`);
+    }
+  }
 };
 
 const syncManagedWorktrees = async (repoRoot) => {
