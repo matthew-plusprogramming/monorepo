@@ -16,6 +16,7 @@ A TypeScript monorepo containing multiple applications (admin portal, client web
 ### The Agentic System
 
 The repo had developed a custom "agentic software development system" - a framework for AI-assisted development with:
+
 - **Memory Bank**: Persistent project knowledge (tech context, testing guidelines, best practices)
 - **Workflows**: Executable markdown guides driving agent behavior
 - **Task Specs**: Per-task specifications with requirements, design, and acceptance criteria
@@ -24,6 +25,7 @@ The repo had developed a custom "agentic software development system" - a framew
 ### The Migration Problem
 
 A recent migration (commit `53a279d`) moved from a custom `agents/` directory to Claude Code's native `.claude/` structure. While this brought benefits (native skills, specialized subagents), valuable content was lost:
+
 - 285-line operator guide
 - 7+ memory bank files
 - 17 automation scripts
@@ -42,6 +44,7 @@ Restore the highest-value components while avoiding redundancy. The user wanted 
 Before diving into implementation, I facilitated a structured discussion to make explicit decisions about each potential restoration item.
 
 **Approach**: For each item, I presented:
+
 - What was lost
 - Trade-offs of restoring vs not restoring
 - Options (e.g., "full restore" vs "condensed version")
@@ -86,10 +89,12 @@ I dispatched 4 implementer subagents in parallel:
 ### Phase 4: Cleanup (Premature)
 
 After the subagents reported completion, I proceeded with cleanup:
+
 - Removed duplicate scripts from `agents/scripts/`
 - Removed the `agents/` directory
 
 **What went wrong**:
+
 1. Build immediately broke - `dotenvx-run.mjs` was referenced by 3 package.json files
 2. Quality checks broke - `utils.mjs` was imported by other scripts
 3. I hadn't scanned for dependencies before deletion
@@ -101,6 +106,7 @@ After the subagents reported completion, I proceeded with cleanup:
 The user asked: **"Were there any files you created or was it all pulled from history?"**
 
 This question exposed a critical oversight. I had to admit:
+
 - Some files were pulled from git (by me directly)
 - Some were "created new" by subagents
 - I wasn't sure which was which
@@ -121,6 +127,7 @@ At user request, I dispatched **10 separate subagents** (one per file) to compar
 | Others | Enhanced | Intentional improvements, kept |
 
 **Critical finding**: `manage-worktrees.mjs` looked plausible on the surface but had fatal bugs:
+
 - `copyFileSync` used to copy directories (would fail at runtime)
 - Missing 12 functions including `parseWorktrees()`, `validateWorkstreamId()`, `copyDirectoryContents()`
 
@@ -143,15 +150,15 @@ After restoring from git, the validator required a `version` field in registry e
 
 ## Key Metrics
 
-| Metric | Value |
-|--------|-------|
-| Files created/restored | 18 |
-| Files replaced after fidelity check | 4 |
-| Files with intentional enhancements kept | 3 |
-| Subagents dispatched (implementation) | 4 |
-| Subagents dispatched (fidelity verification) | 10 |
-| Build breakages during cleanup | 2 |
-| Path references updated | 15+ |
+| Metric                                       | Value |
+| -------------------------------------------- | ----- |
+| Files created/restored                       | 18    |
+| Files replaced after fidelity check          | 4     |
+| Files with intentional enhancements kept     | 3     |
+| Subagents dispatched (implementation)        | 4     |
+| Subagents dispatched (fidelity verification) | 10    |
+| Build breakages during cleanup               | 2     |
+| Path references updated                      | 15+   |
 
 ---
 
@@ -164,6 +171,7 @@ After restoring from git, the validator required a `version` field in registry e
 **Impact**: 4 of 10 files needed replacement after fidelity check. One (`manage-worktrees.mjs`) had critical runtime bugs.
 
 **Should have done**:
+
 ```bash
 # Explicit extraction, not "restoration"
 git show 53a279d^:agents/scripts/file.mjs > .claude/scripts/file.mjs
@@ -175,10 +183,12 @@ sed -i 's/agents\//.claude\//g' .claude/scripts/file.mjs
 **What happened**: Removed `agents/` directory without checking what depended on it.
 
 **Impact**:
+
 - `dotenvx-run.mjs` was referenced by 3 package.json files → build broke
 - `utils.mjs` was imported by check scripts → quality checks broke
 
 **Should have done**:
+
 ```bash
 grep -r "agents/" --include="*.json" --include="*.ts" --include="*.mjs" | grep -v node_modules
 ```
@@ -198,6 +208,7 @@ grep -r "agents/" --include="*.json" --include="*.ts" --include="*.mjs" | grep -
 **Impact**: Would have failed at runtime when trying to sync worktree artifacts.
 
 **Should have done**: Functional testing, not just syntax checks.
+
 ```bash
 node script.mjs --help        # Syntax check (insufficient)
 node script.mjs list          # Actual functionality (needed)
@@ -234,12 +245,14 @@ node script.mjs list          # Actual functionality (needed)
 ### 1. "Restore" ≠ "Create Similar"
 
 When telling an agent to "restore" something, be explicit about extraction vs creation:
+
 - ❌ "Restore from recovery report"
 - ✅ "Extract verbatim using `git show <commit>:<path>`, then only update paths"
 
 ### 2. Verify Subagent Output for Restoration Tasks
 
 Subagents are optimized for creation, not extraction. When restoration is the goal:
+
 - Dispatch verification agents to diff against source
 - Don't trust "looks similar" - verify functional equivalence
 - Challenge subagent output: "Did you extract or create?"
@@ -247,6 +260,7 @@ Subagents are optimized for creation, not extraction. When restoration is the go
 ### 3. Map Dependencies Before Deletion
 
 Before removing any directory:
+
 ```bash
 grep -r "<directory>" --include="*.json" --include="*.ts" | grep -v node_modules
 ```
@@ -254,6 +268,7 @@ grep -r "<directory>" --include="*.json" --include="*.ts" | grep -v node_modules
 ### 4. Verify Before Cleanup
 
 Order of operations for migration/restoration:
+
 1. Create new files
 2. Update all references
 3. Verify build/tests pass
@@ -262,6 +277,7 @@ Order of operations for migration/restoration:
 ### 5. Functional Testing > Syntax Checking
 
 For restored scripts:
+
 - `node --check` only catches syntax errors
 - Actually run commands to verify functionality
 - Test the specific use cases that matter
@@ -269,6 +285,7 @@ For restored scripts:
 ### 6. One Agent Per File for Verification
 
 When verifying fidelity across multiple files:
+
 - Dispatch separate agents per file
 - Prevents issues from slipping through in batch processing
 - Each agent can do deep comparison without context limits
@@ -289,20 +306,24 @@ The user's simple question "Were these created or pulled from history?" caught i
 ## Restoration Checklist
 
 ### Pre-Implementation
+
 - [ ] Create recovery report with full source content
 - [ ] Map all dependencies on source directory
 - [ ] Make explicit decisions on what to restore vs create new
 
 ### Implementation
+
 - [ ] Use explicit extraction commands, not "restore" instructions
 - [ ] Update all path references before cleanup
 
 ### Verification (per file)
+
 - [ ] Diff against source: `git diff <commit>:<old-path> <new-path>`
 - [ ] Syntax check: `node --check <file>`
 - [ ] Functional test: Run actual commands
 
 ### Cleanup
+
 - [ ] Verify build passes
 - [ ] Verify tests pass
 - [ ] Then delete source directory
@@ -313,21 +334,25 @@ The user's simple question "Were these created or pulled from history?" caught i
 ## Appendix: Commands Used
 
 ### Recovery from Git History
+
 ```bash
 git show 53a279d^:agents/scripts/file.mjs > .claude/scripts/file.mjs
 ```
 
 ### Dependency Scan
+
 ```bash
 grep -r "agents/scripts" --include="*.json" --include="*.ts" --include="*.mjs" | grep -v node_modules
 ```
 
 ### Path Update
+
 ```bash
 sed -i 's/agents\//.claude\//g' .claude/scripts/file.mjs
 ```
 
 ### Fidelity Check
+
 ```bash
 git diff 53a279d^:agents/scripts/file.mjs .claude/scripts/file.mjs
 ```

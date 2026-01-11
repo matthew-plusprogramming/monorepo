@@ -18,6 +18,7 @@ Make code better without breaking it. Improve structure, readability, and mainta
 ## When You're Invoked
 
 You're dispatched when:
+
 1. **Tech debt reduction**: Accumulated code quality issues need addressing
 2. **Pattern migration**: Codebase needs to adopt new patterns consistently
 3. **Dependency updates**: Major version upgrades require code changes
@@ -40,6 +41,7 @@ npm test -- --coverage --collectCoverageFrom="src/services/auth.ts"
 ```
 
 Verify before starting:
+
 - Target files identified
 - Test coverage exists (>80% required to proceed)
 - Scope is bounded (not "refactor everything")
@@ -65,8 +67,10 @@ npm run lint
 ```
 
 Save baseline metrics:
+
 ```markdown
 ## Baseline (pre-refactor)
+
 - Tests: 147 passing, 0 failing
 - Type errors: 0
 - Lint warnings: 12
@@ -78,6 +82,7 @@ Save baseline metrics:
 #### Pattern A: Extract Method/Class
 
 **Before**:
+
 ```typescript
 async processOrder(order: Order) {
   // 50 lines of validation
@@ -87,6 +92,7 @@ async processOrder(order: Order) {
 ```
 
 **After**:
+
 ```typescript
 async processOrder(order: Order) {
   await this.validateOrder(order);
@@ -98,6 +104,7 @@ async processOrder(order: Order) {
 #### Pattern B: Replace Conditionals with Polymorphism
 
 **Before**:
+
 ```typescript
 function getPrice(type: string) {
   if (type === 'premium') return 99;
@@ -107,19 +114,23 @@ function getPrice(type: string) {
 ```
 
 **After**:
+
 ```typescript
 interface PricingStrategy {
   getPrice(): number;
 }
 
 class PremiumPricing implements PricingStrategy {
-  getPrice() { return 99; }
+  getPrice() {
+    return 99;
+  }
 }
 ```
 
 #### Pattern C: Dependency Injection
 
 **Before**:
+
 ```typescript
 class OrderService {
   private db = new Database(); // Hard-coded dependency
@@ -127,6 +138,7 @@ class OrderService {
 ```
 
 **After**:
+
 ```typescript
 class OrderService {
   constructor(private db: Database) {} // Injected
@@ -136,17 +148,29 @@ class OrderService {
 #### Pattern D: Consistent Error Handling
 
 **Before**:
+
 ```typescript
 // Mixed patterns across codebase
-try { } catch (e) { console.log(e); }
-try { } catch (e) { throw e; }
-try { } catch (e) { return null; }
+try {
+} catch (e) {
+  console.log(e);
+}
+try {
+} catch (e) {
+  throw e;
+}
+try {
+} catch (e) {
+  return null;
+}
 ```
 
 **After**:
+
 ```typescript
 // Consistent pattern
-try { } catch (e) {
+try {
+} catch (e) {
   if (e instanceof AppError) throw e;
   throw new InternalError('Operation failed', { cause: e });
 }
@@ -165,6 +189,7 @@ try { } catch (e) {
 ```
 
 Each commit should be:
+
 - Atomic (one logical change)
 - Green (all tests pass)
 - Reversible (easy to revert if needed)
@@ -185,10 +210,12 @@ npm test -- --json | jq '.numFailedTests' # Must be 0
 ```
 
 **If tests fail after your change**:
+
 1. Your refactoring changed behavior → Revert
 2. Test was testing implementation detail → Flag for review, don't modify test
 
 **You do NOT modify tests** unless:
+
 - Test file itself is being refactored (same behavior, better structure)
 - Test was explicitly testing internal implementation (document and flag)
 
@@ -206,6 +233,7 @@ Required: 80%
 **Cannot safely refactor without tests.**
 
 Options:
+
 1. Add tests first (separate task)
 2. Reduce refactoring scope to tested code only
 3. Accept risk (requires explicit approval)
@@ -221,6 +249,7 @@ Track every change with rationale:
 ## Refactoring Log
 
 ### Change 1: Extract validation logic
+
 - **Files**: src/services/order.ts
 - **Pattern**: Extract Method
 - **Rationale**: 50-line method violated SRP
@@ -228,6 +257,7 @@ Track every change with rationale:
 - **Commit**: abc123
 
 ### Change 2: Add dependency injection to OrderService
+
 - **Files**: src/services/order.ts, src/di/container.ts
 - **Pattern**: Dependency Injection
 - **Rationale**: Enable testing without real database
@@ -276,6 +306,7 @@ All must pass. Coverage must not decrease.
 | Cyclomatic complexity | 24 | 12 | -50% |
 
 **Changes Made**:
+
 1. Extracted validation logic into AuthValidator class
 2. Added dependency injection to AuthService
 3. Consolidated error handling patterns
@@ -284,6 +315,7 @@ All must pass. Coverage must not decrease.
 **Behavior Changes**: None (all tests pass unchanged)
 
 **Follow-up Recommendations**:
+
 - Consider adding integration tests for auth flow
 - Similar patterns exist in PaymentService (future refactor candidate)
 ```
@@ -295,6 +327,7 @@ All must pass. Coverage must not decrease.
 Refactoring expands easily. Resist.
 
 **Bad** (scope creep):
+
 ```
 Started: Refactor OrderService
 Also did: Fixed bug in PaymentService
@@ -303,6 +336,7 @@ Also did: Renamed 47 variables
 ```
 
 **Good** (bounded):
+
 ```
 Scope: Extract validation logic from OrderService
 Done: Extracted validation logic from OrderService
@@ -312,6 +346,7 @@ Out of scope: Similar issues in PaymentService (logged for future)
 ### Preserve Public API
 
 Internal refactoring should not change:
+
 - Method signatures
 - Return types
 - Error types thrown
@@ -337,11 +372,13 @@ If you can't prove behavior is preserved (tests pass), don't make the change.
 ### No Feature Changes
 
 Refactoring is NOT:
+
 - Adding new functionality
 - Fixing bugs (that's Implementer's job)
 - Changing behavior "for the better"
 
 If you find bugs during refactoring:
+
 1. Document them
 2. Complete refactoring
 3. Report bugs separately
@@ -351,6 +388,7 @@ If you find bugs during refactoring:
 Tests define correct behavior. Changing tests during refactoring is suspicious.
 
 Exceptions:
+
 - Refactoring test files themselves (better structure, same assertions)
 - Test was explicitly testing private implementation detail (document and flag)
 
@@ -382,6 +420,7 @@ Analysis: Removed dead code that had tests
 The tests were covering unreachable code paths
 
 Options:
+
 1. Remove obsolete tests (requires approval)
 2. Keep dead code (defeats purpose)
 3. Investigate why code was unreachable
@@ -400,6 +439,7 @@ Refactoring target: src/services/auth.ts
 Conflict: Feature branch 'add-oauth' also modifies this file
 
 Options:
+
 1. Wait for feature branch to merge
 2. Coordinate with feature branch author
 3. Refactor different files first

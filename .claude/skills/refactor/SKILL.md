@@ -22,10 +22,10 @@ Improve code quality without changing behavior. Make code more maintainable, rea
 
 Unlike implementation (spec-driven), refactoring uses the **test suite as the contract**.
 
-| Aspect | Implementation | Refactoring |
-|--------|----------------|-------------|
-| Contract | Spec with ACs | Test suite |
-| Success | All ACs implemented | All tests still pass |
+| Aspect     | Implementation      | Refactoring               |
+| ---------- | ------------------- | ------------------------- |
+| Contract   | Spec with ACs       | Test suite                |
+| Success    | All ACs implemented | All tests still pass      |
 | Constraint | Follow spec exactly | Preserve behavior exactly |
 
 ## Refactoring Process
@@ -60,8 +60,10 @@ npm run lint
 ```
 
 Document baseline:
+
 ```markdown
 ## Baseline (pre-refactor)
+
 - Tests: 147 passing, 0 failing
 - Type errors: 0
 - Lint warnings: 12
@@ -81,6 +83,7 @@ Document baseline:
 ```
 
 Each commit should be:
+
 - **Atomic**: One logical change
 - **Green**: All tests pass
 - **Reversible**: Easy to revert if needed
@@ -88,6 +91,7 @@ Each commit should be:
 ### Step 4: Common Refactoring Patterns
 
 #### Extract Method
+
 ```typescript
 // Before: 50-line function
 async processOrder(order: Order) {
@@ -105,6 +109,7 @@ async processOrder(order: Order) {
 ```
 
 #### Replace Conditionals with Polymorphism
+
 ```typescript
 // Before: Type checking
 function getPrice(type: string) {
@@ -114,11 +119,18 @@ function getPrice(type: string) {
 }
 
 // After: Polymorphism
-interface PricingStrategy { getPrice(): number; }
-class PremiumPricing implements PricingStrategy { getPrice() { return 99; } }
+interface PricingStrategy {
+  getPrice(): number;
+}
+class PremiumPricing implements PricingStrategy {
+  getPrice() {
+    return 99;
+  }
+}
 ```
 
 #### Dependency Injection
+
 ```typescript
 // Before: Hard-coded dependency
 class OrderService {
@@ -152,6 +164,7 @@ npm test -- --json | jq '.numFailedTests' # Must be 0
 ## Refactoring Log
 
 ### Change 1: Extract validation logic
+
 - **Files**: src/services/order.ts
 - **Pattern**: Extract Method
 - **Rationale**: 50-line method violated SRP
@@ -159,6 +172,7 @@ npm test -- --json | jq '.numFailedTests' # Must be 0
 - **Commit**: abc123
 
 ### Change 2: Add dependency injection
+
 - **Files**: src/services/order.ts, src/di/container.ts
 - **Pattern**: Dependency Injection
 - **Rationale**: Enable testing without real database
@@ -203,6 +217,7 @@ npm test -- --coverage
 | Cyclomatic complexity | 24 | 12 | -50% |
 
 **Changes Made**:
+
 1. Extracted validation logic into AuthValidator class
 2. Added dependency injection to AuthService
 3. Consolidated error handling patterns
@@ -214,6 +229,7 @@ npm test -- --coverage
 ## Rules
 
 ### DO:
+
 - Run tests after every change
 - Make atomic, reversible commits
 - Document rationale for each change
@@ -221,6 +237,7 @@ npm test -- --coverage
 - Improve metrics (coverage, complexity, lint)
 
 ### DON'T:
+
 - Modify tests (usually)
 - Change public API signatures
 - Add new features
@@ -235,6 +252,7 @@ Tests define correct behavior. You do NOT modify tests unless:
 2. **Test explicitly tests implementation detail** (document and flag for review)
 
 If tests fail after your change:
+
 - Your refactoring changed behavior → **Revert**
 - Test was wrong → **Flag for separate review** (don't modify during refactor)
 
@@ -278,6 +296,7 @@ After: 79%
 Analysis: Removed dead code that had tests covering unreachable paths
 
 **Options**:
+
 1. Remove obsolete tests (requires approval)
 2. Keep dead code (defeats purpose)
 
@@ -287,10 +306,12 @@ Recommendation: Option 1 with careful review
 ## Integration with Other Skills
 
 **Before refactoring**:
+
 - Ensure sufficient test coverage exists
 - If not, use `/test` to add coverage first
 
 **After refactoring**:
+
 - Use `/code-review` to validate quality improvements
 - Use `/security` if changes touch security-sensitive code
 
@@ -305,11 +326,13 @@ If you can't prove behavior is preserved (tests pass), don't make the change.
 ### No Feature Changes
 
 Refactoring is NOT:
+
 - Adding new functionality
 - Fixing bugs
 - Changing behavior "for the better"
 
 If you find bugs during refactoring:
+
 1. Document them
 2. Complete refactoring
 3. Report bugs as separate issue
@@ -320,11 +343,13 @@ Refactoring scope expands easily. Resist.
 
 ```markdown
 # Bad (scope creep)
+
 Started: Refactor OrderService
 Also did: Fixed bug in PaymentService
 Also did: Updated logging format
 
 # Good (bounded)
+
 Scope: Extract validation logic from OrderService
 Done: Extract validation logic from OrderService
 Out of scope: Similar issues in PaymentService (logged for future)
@@ -335,6 +360,7 @@ Out of scope: Similar issues in PaymentService (logged for future)
 ### Example 1: Extract Method
 
 **Before**:
+
 ```typescript
 async processOrder(order: Order) {
   // 20 lines of validation
@@ -356,6 +382,7 @@ async processOrder(order: Order) {
 ```
 
 **After**:
+
 ```typescript
 async processOrder(order: Order) {
   this.validateOrder(order);
@@ -375,18 +402,21 @@ private async persistOrder(order: Order, total: number) { /* extracted */ }
 **Request**: Refactor legacy payment service
 
 **Analysis**:
+
 ```bash
 npm test -- --coverage --collectCoverageFrom="src/services/payment.ts"
 # Coverage: 23%
 ```
 
 **Response**:
+
 ```markdown
 ## Blocked: Insufficient Coverage
 
 Cannot safely refactor src/services/payment.ts with 23% coverage.
 
 **Recommendation**:
+
 1. Create separate task to add tests
 2. Achieve >80% coverage
 3. Then proceed with refactoring

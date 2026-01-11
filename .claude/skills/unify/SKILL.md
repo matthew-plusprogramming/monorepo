@@ -7,11 +7,13 @@ allowed-tools: Read, Glob, Grep, Bash, Task
 # Unify Skill
 
 ## Purpose
+
 Validate that implementation and tests conform to the spec. Ensure convergence before approval and merge.
 
 ## Convergence Criteria
 
 A task is **converged** when:
+
 1. **Spec is complete** - All required sections present, open questions resolved
 2. **Implementation aligns** - Code matches spec requirements exactly
 3. **Tests pass** - All tests passing, coverage adequate
@@ -22,11 +24,13 @@ If any criterion fails → Task is **not converged** → Iteration needed.
 ## Validation Process
 
 ### Step 1: Load Spec
+
 ```bash
 cat .claude/specs/active/<slug>.md
 ```
 
 Read:
+
 - Acceptance criteria
 - Requirements (EARS format)
 - Task list
@@ -36,7 +40,9 @@ Read:
 ### Step 2: Spec Completeness Check
 
 #### For TaskSpec
+
 Verify:
+
 - [ ] Context and Goal present
 - [ ] Requirements in EARS format
 - [ ] Acceptance criteria are testable
@@ -47,7 +53,9 @@ Verify:
 - [ ] No unresolved blocking open questions
 
 #### For WorkstreamSpec
+
 Verify all sections from template:
+
 - [ ] Context, Goals/Non-goals
 - [ ] Atomic testable requirements
 - [ ] Core flows documented
@@ -61,7 +69,9 @@ Verify all sections from template:
 - [ ] Decision & Work Log complete
 
 #### For MasterSpec
+
 Verify:
+
 - [ ] All workstream specs linked
 - [ ] Contract registry complete
 - [ ] Dependency graph is acyclic
@@ -85,7 +95,9 @@ Verify:
 Verify implementation matches spec requirements.
 
 #### Approach
+
 For each requirement/AC:
+
 1. Identify implementation location (from task list evidence)
 2. Read implementation code
 3. Verify behavior matches spec
@@ -100,6 +112,7 @@ cat src/services/auth-service.ts
 ```
 
 #### Alignment Checklist
+
 - [ ] All requirements have corresponding implementation
 - [ ] Interfaces match spec definitions
 - [ ] Error handling matches spec edge cases
@@ -123,26 +136,32 @@ cat src/services/auth-service.ts
 #### Common Misalignments
 
 **Extra features**:
+
 ```markdown
 ❌ Found feature not in spec:
-  - File: src/services/auth-service.ts:65
-  - Feature: Auto-retry on network failure
-  - **Action**: Remove or add to spec and get approval
+
+- File: src/services/auth-service.ts:65
+- Feature: Auto-retry on network failure
+- **Action**: Remove or add to spec and get approval
 ```
 
 **Missing requirements**:
+
 ```markdown
 ❌ Requirement AC2.3 not implemented:
-  - AC2.3: Retry button appears on error
-  - **Action**: Implement missing requirement
+
+- AC2.3: Retry button appears on error
+- **Action**: Implement missing requirement
 ```
 
 **Behavioral deviation**:
+
 ```markdown
 ❌ Behavior differs from spec:
-  - Spec: "redirect to /login"
-  - Implementation: "redirect to /login?error=logged_out"
-  - **Action**: Match spec exactly or propose amendment
+
+- Spec: "redirect to /login"
+- Implementation: "redirect to /login?error=logged_out"
+- **Action**: Match spec exactly or propose amendment
 ```
 
 ### Step 4: Test Coverage Check
@@ -158,6 +177,7 @@ npm test -- --coverage
 ```
 
 #### Coverage Checklist
+
 - [ ] Every acceptance criterion has at least one test
 - [ ] Tests verify spec requirements (not implementation details)
 - [ ] All tests passing
@@ -169,11 +189,11 @@ npm test -- --coverage
 ```markdown
 ## Test Coverage: ✅ Pass
 
-| AC | Test | Status |
-|----|------|--------|
+| AC    | Test                    | Status  |
+| ----- | ----------------------- | ------- |
 | AC1.1 | auth-service.test.ts:12 | ✅ Pass |
-| AC1.2 | auth-router.test.ts:24 | ✅ Pass |
-| AC1.3 | user-menu.test.ts:35 | ✅ Pass |
+| AC1.2 | auth-router.test.ts:24  | ✅ Pass |
+| AC1.3 | user-menu.test.ts:35    | ✅ Pass |
 | AC2.1 | auth-service.test.ts:28 | ✅ Pass |
 
 **Coverage**: 12 tests total, 100% AC coverage, 94% line coverage
@@ -182,26 +202,32 @@ npm test -- --coverage
 #### Common Coverage Issues
 
 **Missing test**:
+
 ```markdown
 ❌ AC2.3 has no test:
-  - AC2.3: Retry button appears on error
-  - **Action**: Add test in user-menu.test.ts
+
+- AC2.3: Retry button appears on error
+- **Action**: Add test in user-menu.test.ts
 ```
 
 **Failing test**:
+
 ```markdown
 ❌ Test failing:
-  - Test: auth-service.test.ts:28
-  - Error: Expected null, got "test-token"
-  - **Action**: Fix implementation or fix test
+
+- Test: auth-service.test.ts:28
+- Error: Expected null, got "test-token"
+- **Action**: Fix implementation or fix test
 ```
 
 **Low coverage**:
+
 ```markdown
-⚠️  Coverage below standard:
-  - Current: 72% line coverage
-  - Required: 80%
-  - **Action**: Add tests for uncovered branches
+⚠️ Coverage below standard:
+
+- Current: 72% line coverage
+- Required: 80%
+- **Action**: Add tests for uncovered branches
 ```
 
 ### Step 5: Contract Validation (MasterSpec Only)
@@ -217,6 +243,7 @@ grep -A 5 "^## Contract Registry" .claude/specs/active/<slug>/master.md
 ```
 
 #### Contract Checklist
+
 - [ ] All contracts registered in registry
 - [ ] No duplicate contract IDs
 - [ ] Contract owners match workstreams
@@ -228,10 +255,10 @@ grep -A 5 "^## Contract Registry" .claude/specs/active/<slug>/master.md
 ```markdown
 ## Contract Validation: ✅ Pass
 
-| Contract ID | Owner | Implementation | Status |
-|-------------|-------|----------------|--------|
-| contract-websocket-api | ws-1 | src/websocket/server.ts | ✅ Match |
-| contract-notification-api | ws-3 | src/services/notifications.ts | ✅ Match |
+| Contract ID               | Owner | Implementation                | Status   |
+| ------------------------- | ----- | ----------------------------- | -------- |
+| contract-websocket-api    | ws-1  | src/websocket/server.ts       | ✅ Match |
+| contract-notification-api | ws-3  | src/services/notifications.ts | ✅ Match |
 
 **No conflicts detected**
 ```
@@ -239,21 +266,25 @@ grep -A 5 "^## Contract Registry" .claude/specs/active/<slug>/master.md
 #### Common Contract Issues
 
 **Interface mismatch**:
+
 ```markdown
 ❌ Contract implementation mismatch:
-  - Contract: contract-websocket-api (ws-1)
-  - Expected: `connect(userId: string): Promise<WebSocket>`
-  - Found: `connect(userId: number): Promise<WebSocket>`
-  - **Action**: Fix implementation to match contract or update contract
+
+- Contract: contract-websocket-api (ws-1)
+- Expected: `connect(userId: string): Promise<WebSocket>`
+- Found: `connect(userId: number): Promise<WebSocket>`
+- **Action**: Fix implementation to match contract or update contract
 ```
 
 **Dependency cycle**:
+
 ```markdown
 ❌ Dependency cycle detected:
-  - ws-1 depends on ws-2
-  - ws-2 depends on ws-3
-  - ws-3 depends on ws-1
-  - **Action**: Restructure to break cycle
+
+- ws-1 depends on ws-2
+- ws-2 depends on ws-3
+- ws-3 depends on ws-1
+- **Action**: Restructure to break cycle
 ```
 
 ### Step 6: Generate Convergence Report
@@ -275,6 +306,7 @@ All validation checks passed. Ready for approval and merge.
 ## Validation Results
 
 ### Spec Completeness: ✅ Pass
+
 - All required sections present
 - 4 acceptance criteria (all testable)
 - 6 tasks completed
@@ -282,12 +314,14 @@ All validation checks passed. Ready for approval and merge.
 - Approval: 2026-01-02
 
 ### Implementation Alignment: ✅ Pass
+
 - All 4 ACs implemented correctly
 - No undocumented features
 - Error handling matches spec
 - Interfaces match spec definitions
 
 ### Test Coverage: ✅ Pass
+
 - 12 tests total
 - 100% AC coverage
 - All tests passing
@@ -296,6 +330,7 @@ All validation checks passed. Ready for approval and merge.
 ### Overall Status: CONVERGED ✅
 
 **Next Steps**:
+
 1. Run security review (if applicable)
 2. Run browser tests (if UI changes)
 3. Propose commit
@@ -305,26 +340,31 @@ All validation checks passed. Ready for approval and merge.
 ## Evidence
 
 **Implementation files**:
+
 - src/services/auth-service.ts (logout method)
 - src/components/UserMenu.tsx (logout button)
 - src/router/auth-router.ts (redirect logic)
 
 **Test files**:
-- src/services/__tests__/auth-service.test.ts (4 tests)
-- src/components/__tests__/user-menu.test.ts (3 tests)
-- src/router/__tests__/auth-router.test.ts (2 tests)
+
+- src/services/**tests**/auth-service.test.ts (4 tests)
+- src/components/**tests**/user-menu.test.ts (3 tests)
+- src/router/**tests**/auth-router.test.ts (2 tests)
 - tests/integration/logout-flow.test.ts (3 tests)
 
 **Test run**:
 ```
-PASS  src/services/__tests__/auth-service.test.ts
-PASS  src/components/__tests__/user-menu.test.ts
-PASS  src/router/__tests__/auth-router.test.ts
-PASS  tests/integration/logout-flow.test.ts
+
+PASS src/services/**tests**/auth-service.test.ts
+PASS src/components/**tests**/user-menu.test.ts
+PASS src/router/**tests**/auth-router.test.ts
+PASS tests/integration/logout-flow.test.ts
 
 Tests: 12 passed, 12 total
 Coverage: 94% statements, 92% branches, 96% functions, 95% lines
+
 ```
+
 ```
 
 ### Step 7: Handle Non-Convergence
@@ -343,16 +383,19 @@ Issues found in implementation alignment and test coverage.
 ## Issues
 
 ### Issue 1: Missing Implementation (Priority: High)
+
 - **AC2.3**: Retry button appears on error
 - **Status**: Not implemented
 - **Action**: Implement retry button in UserMenu component
 
 ### Issue 2: Test Failing (Priority: High)
+
 - **Test**: auth-service.test.ts:28
 - **Error**: Expected null, got "test-token"
 - **Action**: Fix token clearing logic in AuthService.logout()
 
 ### Issue 3: Low Coverage (Priority: Medium)
+
 - **Current**: 72% line coverage
 - **Required**: 80%
 - **Action**: Add tests for error paths
@@ -376,22 +419,22 @@ If not converged, route to appropriate fix:
 
 ```javascript
 // Spec gap → Update spec
-if (issue.type === "spec_gap") {
-  useSkill("/spec"); // Amend spec with user approval
+if (issue.type === 'spec_gap') {
+  useSkill('/spec'); // Amend spec with user approval
 }
 
 // Implementation bug → Fix implementation
-if (issue.type === "impl_bug") {
-  useSkill("/implement"); // Fix and re-test
+if (issue.type === 'impl_bug') {
+  useSkill('/implement'); // Fix and re-test
 }
 
 // Missing test → Add test
-if (issue.type === "missing_test") {
-  useSkill("/test"); // Write missing test
+if (issue.type === 'missing_test') {
+  useSkill('/test'); // Write missing test
 }
 
 // Re-validate
-useSkill("/unify"); // Run convergence check again
+useSkill('/unify'); // Run convergence check again
 ```
 
 **Iteration cap**: Maximum 3 iterations before escalating to user.
@@ -399,6 +442,7 @@ useSkill("/unify"); // Run convergence check again
 ## Convergence Gates
 
 ### TaskSpec Gates
+
 - [ ] Spec complete and approved
 - [ ] All ACs implemented
 - [ ] All tests passing
@@ -406,14 +450,18 @@ useSkill("/unify"); // Run convergence check again
 - [ ] No undocumented features
 
 ### WorkstreamSpec Gates
+
 All TaskSpec gates plus:
+
 - [ ] Sequence diagrams match implementation
 - [ ] Interfaces defined and implemented
 - [ ] Security considerations addressed
 - [ ] Workstream reflection complete
 
 ### MasterSpec Gates
+
 All WorkstreamSpec gates plus:
+
 - [ ] All workstream specs converged
 - [ ] Contract registry validated
 - [ ] No cross-workstream conflicts
@@ -423,6 +471,7 @@ All WorkstreamSpec gates plus:
 ## Integration with Other Skills
 
 After convergence, the review chain is:
+
 1. `/code-review` - Code quality review (always)
 2. `/security` - Security review (always)
 3. `/browser-test` - UI validation (if UI changes)
@@ -432,6 +481,7 @@ After convergence, the review chain is:
 **Next step after unify passes**: Dispatch `/code-review`
 
 If not converged:
+
 - Use `/spec`, `/implement`, or `/test` to address gaps
 - Re-run `/unify` after fixes
 
@@ -442,6 +492,7 @@ If not converged:
 **Input**: TaskSpec for logout button (all ACs implemented, tests passing)
 
 **Unifier Process**:
+
 1. Spec completeness: ✅ All sections present
 2. Implementation alignment: ✅ All 4 ACs implemented
 3. Test coverage: ✅ 12 tests, all passing, 94% coverage
@@ -453,11 +504,13 @@ If not converged:
 **Input**: WorkstreamSpec for WebSocket server (missing edge case test)
 
 **Unifier Process**:
+
 1. Spec completeness: ✅ Pass
 2. Implementation alignment: ✅ Pass
 3. Test coverage: ❌ Fail - No test for connection timeout edge case
 
 **Output**:
+
 ```markdown
 ❌ NOT CONVERGED
 
@@ -473,18 +526,21 @@ After test added → Re-run unifier → CONVERGED ✅
 **Input**: MasterSpec with 3 workstreams
 
 **Unifier Process**:
+
 1. Spec completeness: ✅ Pass
 2. Implementation alignment: ✅ Pass (per-workstream)
 3. Test coverage: ✅ Pass
 4. Contract validation: ❌ Fail - Interface mismatch between ws-1 and ws-2
 
 **Output**:
+
 ```markdown
 ❌ NOT CONVERGED
 
 **Issue**: Contract interface mismatch
-  - ws-1 implements: `send(data: Buffer)`
-  - ws-2 expects: `send(data: string)`
+
+- ws-1 implements: `send(data: Buffer)`
+- ws-2 expects: `send(data: string)`
 
 **Action**: Update ws-1 to match contract or amend contract
 **Iteration 1**: Fix interface to accept string
