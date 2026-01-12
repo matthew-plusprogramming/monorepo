@@ -111,6 +111,7 @@ The main agent may read **ONE** file directly to answer a question. The moment a
 | Multi-file changes | Dispatch subagents per concern area |
 | Uncertainty about scope | Dispatch Explore subagent before planning |
 | 2+ independent tasks | Dispatch parallel subagents |
+| Deployment/infrastructure | Dispatch Deployer subagent |
 
 ### Main-Agent Responsibilities
 
@@ -242,6 +243,7 @@ Workflow outcomes:
 | `refactorer` | opus | Code quality improvements with behavior preservation |
 | `facilitator` | opus | Orchestrate multi-workstream projects with git worktrees |
 | `browser-tester` | opus | Browser-based UI testing |
+| `deployer` | opus | CDKTF deployment orchestration, asset staging, stack management |
 
 ### Spec is Contract Principle
 
