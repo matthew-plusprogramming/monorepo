@@ -13,14 +13,12 @@ Review implementation for quality issues before security review. Catch maintaina
 ## When to Use
 
 **Mandatory for**:
-
 - Any implementation completing the spec workflow
 - Multi-file changes
 - Public API additions or modifications
 - Changes to core services
 
 **Optional for**:
-
 - Single-file bug fixes
 - Documentation-only changes
 - Test-only changes
@@ -35,7 +33,6 @@ Implementation → Code Review → Security Review → Merge
 ```
 
 Code Review runs BEFORE Security Review because:
-
 - Quality issues may mask security issues
 - Consistent code is easier to security-review
 - Catches different class of problems
@@ -107,12 +104,12 @@ Check each category systematically:
 
 ### Step 3: Severity Classification
 
-| Level        | Meaning                           | Blocks Merge |
-| ------------ | --------------------------------- | ------------ |
-| **Critical** | Will cause runtime failure        | Yes          |
-| **High**     | Significant maintainability issue | Yes          |
-| **Medium**   | Should fix but not blocking       | No           |
-| **Low**      | Suggestion for improvement        | No           |
+| Level | Meaning | Blocks Merge |
+|-------|---------|--------------|
+| **Critical** | Will cause runtime failure | Yes |
+| **High** | Significant maintainability issue | Yes |
+| **Medium** | Should fix but not blocking | No |
+| **Low** | Suggestion for improvement | No |
 
 ### Step 4: Generate Review Report
 
@@ -126,11 +123,11 @@ Check each category systematically:
 ### Summary
 
 | Severity | Count |
-| -------- | ----- |
-| Critical | 0     |
-| High     | 0     |
-| Medium   | 2     |
-| Low      | 3     |
+|----------|-------|
+| Critical | 0 |
+| High | 0 |
+| Medium | 2 |
+| Low | 3 |
 
 **Verdict**: ✅ PASS
 
@@ -139,14 +136,12 @@ Check each category systematically:
 #### Medium Severity
 
 **M1: Function too long**
-
 - **File**: src/services/order.ts:45-120
 - **Issue**: `processOrder` is 75 lines with 8 branches
 - **Impact**: Hard to test, hard to modify safely
 - **Suggestion**: Extract validation and calculation into separate methods
 
 **M2: Missing return type**
-
 - **File**: src/api/users.ts:34
 - **Issue**: `getUserProfile` has no return type annotation
 - **Impact**: Type safety lost for consumers
@@ -180,14 +175,12 @@ If Critical or High severity issues found:
 ### Blocking Issues
 
 **H1: Swallowed exception in payment processing**
-
 - **File**: src/services/payment.ts:78
 - **Issue**: Catch block returns null, hiding failure cause
 - **Impact**: Payment failures will be silent, hard to debug
 - **Required Fix**: Throw PaymentError with cause chain
 
 **H2: Type assertion without validation**
-
 - **File**: src/api/handlers.ts:34
 - **Issue**: `response as UserData` without validation
 - **Impact**: Runtime type errors possible
@@ -215,16 +208,13 @@ Add to spec's Decision & Work Log:
 ### Be Specific and Actionable
 
 **Bad**:
-
 ```markdown
 Code quality could be better in auth.ts
 ```
 
 **Good**:
-
 ```markdown
 **Quality: Function too long** (Medium)
-
 - File: src/services/auth.ts:45-120
 - Issue: `validateSession` is 75 lines with 8 branches
 - Impact: Hard to test, hard to modify safely
@@ -234,13 +224,11 @@ Code quality could be better in auth.ts
 ### Distinguish Standards from Opinions
 
 **Standard** (objective):
-
 ```markdown
 TypeScript: Missing return type on public method
 ```
 
 **Opinion** (subjective):
-
 ```markdown
 Style suggestion: Consider using early returns for readability
 ```
@@ -250,7 +238,6 @@ Mark opinions clearly so implementer can prioritize.
 ### Acknowledge Good Patterns
 
 Include positive observations:
-
 - Well-structured code
 - Good test coverage
 - Clever but readable solutions
@@ -284,16 +271,13 @@ For each changed file:
 ## Integration with Other Skills
 
 **Before code review**:
-
 - `/unify` to ensure spec-impl-test convergence
 
 **After code review**:
-
 - If PASS → Proceed to `/security`
 - If BLOCKED → Use `/implement` to fix issues, then re-review
 
 **Full review chain after code-review**:
-
 1. `/security` - Security review (always)
 2. `/browser-test` - UI validation (if UI changes)
 3. `/docs` - Documentation generation (if public API)
@@ -308,7 +292,6 @@ You report findings but do not modify code. Let Implementer fix issues.
 ### Not Security Review
 
 Focus on code quality. Security Reviewer handles:
-
 - Injection vulnerabilities
 - Authentication/authorization flaws
 - Secrets exposure
@@ -323,7 +306,6 @@ Flag obvious security issues, but security review is the comprehensive check.
 **Input**: Well-structured logout implementation
 
 **Review**:
-
 - Style: ✅ Consistent naming
 - Quality: ✅ Functions <50 lines
 - TypeScript: ✅ Return types present
@@ -337,7 +319,6 @@ Flag obvious security issues, but security review is the comprehensive check.
 **Input**: Feature implementation with minor issues
 
 **Review**:
-
 - 2 Medium findings (long function, missing JSDoc)
 - 3 Low findings (style suggestions)
 
@@ -348,7 +329,6 @@ Flag obvious security issues, but security review is the comprehensive check.
 **Input**: Implementation with swallowed exceptions
 
 **Review**:
-
 - 1 High finding (swallowed exception hides payment failures)
 
 **Output**: ❌ BLOCKED - Fix H1 before proceeding

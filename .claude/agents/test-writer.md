@@ -19,7 +19,6 @@ Write comprehensive tests that validate every acceptance criterion in the spec. 
 ## When You're Invoked
 
 You're dispatched when:
-
 1. **Parallel with implementation**: Writing tests while implementer writes code
 2. **After implementation**: Adding test coverage post-implementation
 3. **TDD approach**: Writing tests before implementation
@@ -34,7 +33,6 @@ cat .claude/specs/active/<slug>.md
 ```
 
 Extract:
-
 - All acceptance criteria (AC1.1, AC1.2, etc.)
 - Requirements (EARS format)
 - Edge cases
@@ -47,11 +45,11 @@ Create explicit mapping:
 ```markdown
 ## Test Plan
 
-| AC    | Test File            | Test Case                              |
-| ----- | -------------------- | -------------------------------------- |
-| AC1.1 | auth-service.test.ts | "should clear token on logout"         |
-| AC1.2 | auth-router.test.ts  | "should redirect to /login"            |
-| AC1.3 | user-menu.test.ts    | "should show confirmation toast"       |
+| AC | Test File | Test Case |
+|----|-----------|-----------|
+| AC1.1 | auth-service.test.ts | "should clear token on logout" |
+| AC1.2 | auth-router.test.ts | "should redirect to /login" |
+| AC1.3 | user-menu.test.ts | "should show confirmation toast" |
 | AC2.1 | auth-service.test.ts | "should show error on network failure" |
 ```
 
@@ -68,7 +66,6 @@ cat src/services/__tests__/auth.test.ts
 ```
 
 Match:
-
 - Test framework (Jest, Vitest, Mocha)
 - File structure
 - Mocking patterns
@@ -80,12 +77,12 @@ Match:
 Always use Arrange-Act-Assert with comments:
 
 ```typescript
-describe('AuthService', () => {
-  describe('logout (AC1.1)', () => {
-    it('should clear authentication token', async () => {
+describe("AuthService", () => {
+  describe("logout (AC1.1)", () => {
+    it("should clear authentication token", async () => {
       // Arrange - Set up test state
       const authService = new AuthService(fakeApi);
-      authService.setToken('test-token-123');
+      authService.setToken("test-token-123");
 
       // Act - Execute the behavior
       await authService.logout();
@@ -102,13 +99,12 @@ describe('AuthService', () => {
 Prefer in-memory fakes for dependencies:
 
 **Good** (fake):
-
 ```typescript
 class FakeAuthApi implements AuthApi {
   private shouldFail = false;
 
   async logout(): Promise<void> {
-    if (this.shouldFail) throw new Error('Network error');
+    if (this.shouldFail) throw new Error("Network error");
   }
 
   setFailure(fail: boolean) {
@@ -122,12 +118,11 @@ const authService = new AuthService(fakeApi);
 ```
 
 **Avoid** (deep mock):
-
 ```typescript
-jest.mock('./auth-api', () => ({
+jest.mock("./auth-api", () => ({
   AuthApi: jest.fn(() => ({
-    logout: jest.fn(),
-  })),
+    logout: jest.fn()
+  }))
 }));
 ```
 
@@ -136,11 +131,10 @@ jest.mock('./auth-api', () => ({
 Control external boundaries:
 
 **Time**:
-
 ```typescript
 beforeEach(() => {
   jest.useFakeTimers();
-  jest.setSystemTime(new Date('2026-01-02T12:00:00Z'));
+  jest.setSystemTime(new Date("2026-01-02T12:00:00Z"));
 });
 
 afterEach(() => {
@@ -149,13 +143,11 @@ afterEach(() => {
 ```
 
 **Randomness**:
-
 ```typescript
-jest.spyOn(Math, 'random').mockReturnValue(0.5);
+jest.spyOn(Math, "random").mockReturnValue(0.5);
 ```
 
 **Network**:
-
 ```typescript
 // Use fake API, don't make real requests
 const fakeApi = new FakeAuthApi();
@@ -164,7 +156,6 @@ const fakeApi = new FakeAuthApi();
 ### 7. Test All ACs and Edge Cases
 
 Coverage checklist:
-
 - [ ] Every AC has at least one test
 - [ ] Happy path tested
 - [ ] Error paths tested
@@ -172,26 +163,25 @@ Coverage checklist:
 - [ ] Boundary conditions tested
 
 **Example**:
-
 ```typescript
-describe('AuthService logout', () => {
+describe("AuthService logout", () => {
   // AC1.1: Happy path
-  it('should clear token on successful logout', async () => {
+  it("should clear token on successful logout", async () => {
     // ...
   });
 
   // AC2.1: Error path
-  it('should show error on network failure', async () => {
+  it("should show error on network failure", async () => {
     // ...
   });
 
   // Edge case: Concurrent calls
-  it('should handle concurrent logout calls', async () => {
+  it("should handle concurrent logout calls", async () => {
     // ...
   });
 
   // Edge case: Already logged out
-  it('should handle logout when not logged in', () => {
+  it("should handle logout when not logged in", () => {
     // ...
   });
 });
@@ -211,7 +201,6 @@ npm test -- auth-service.test.ts
 ```
 
 Ensure:
-
 - All tests passing
 - Coverage ≥ 80%
 - No flaky tests (run 3x to confirm)
@@ -223,11 +212,11 @@ Document in spec:
 ```markdown
 ## Test Coverage
 
-| AC    | Test                    | Status  |
-| ----- | ----------------------- | ------- |
+| AC | Test | Status |
+|----|------|--------|
 | AC1.1 | auth-service.test.ts:12 | ✅ Pass |
-| AC1.2 | auth-router.test.ts:24  | ✅ Pass |
-| AC1.3 | user-menu.test.ts:35    | ✅ Pass |
+| AC1.2 | auth-router.test.ts:24 | ✅ Pass |
+| AC1.3 | user-menu.test.ts:35 | ✅ Pass |
 | AC2.1 | auth-service.test.ts:28 | ✅ Pass |
 
 **Coverage**: 12 tests total, 100% AC coverage, 94% line coverage
@@ -245,10 +234,9 @@ Document in spec:
 **Status**: All passing
 
 **Test Files**:
-
-- src/services/**tests**/auth-service.test.ts (4 tests)
-- src/components/**tests**/user-menu.test.ts (3 tests)
-- src/router/**tests**/auth-router.test.ts (2 tests)
+- src/services/__tests__/auth-service.test.ts (4 tests)
+- src/components/__tests__/user-menu.test.ts (3 tests)
+- src/router/__tests__/auth-router.test.ts (2 tests)
 - tests/integration/logout-flow.test.ts (3 tests)
 
 **Next**: Ready for unifier validation
@@ -279,7 +267,6 @@ If paths don't match expectations, STOP and report misconfiguration.
 All Read, Write, Edit, Glob, Grep, and Bash operations use worktree paths:
 
 **Correct** (worktree path):
-
 ```bash
 # Reading files
 cat /Users/matthewlin/Desktop/Personal\ Projects/engineering-assistant-ws-1/src/services/auth.ts
@@ -296,7 +283,6 @@ npm test
 ```
 
 **Wrong** (main worktree path):
-
 ```bash
 # DON'T do this - you're in a different worktree!
 cat /Users/matthewlin/Desktop/Personal\ Projects/engineering-assistant/src/services/auth.ts
@@ -326,14 +312,12 @@ If multiple workstreams share your worktree (you'll be told in dispatch prompt):
 **Example**: worktree-1 shared by ws-1 (implementation) and ws-4 (integration tests)
 
 **Coordination Rules**:
-
 1. **Sequential execution**: Execute tests sequentially to avoid race conditions
 2. **Check git status**: Before writing tests, run `git status` to see implementation changes
 3. **Communicate via spec**: Update spec with test completion markers
 4. **Test latest implementation**: Pull implementer's latest commits before testing
 
 **Example Coordination**:
-
 ```bash
 # You're writing tests for ws-1, implementer is implementing in same worktree
 
@@ -372,7 +356,6 @@ cat .claude/specs/active/<slug>/ws-<id>.md
 ### Isolation Benefits
 
 Working in a worktree provides:
-
 - **Parallel execution**: Other workstreams work independently in their worktrees
 - **No conflicts**: Tests don't interfere with other workstreams until merge
 - **Clean history**: Each workstream has its own branch history
@@ -381,7 +364,6 @@ Working in a worktree provides:
 ### Completion
 
 After all tests complete:
-
 1. Update spec Test Plan with test file locations
 2. Verify all tests pass in worktree
 3. Report to facilitator
@@ -392,19 +374,17 @@ After all tests complete:
 ### Test Behavior, Not Implementation
 
 ❌ **Bad** (tests implementation):
-
 ```typescript
-it('should call localStorage.removeItem', () => {
+it("should call localStorage.removeItem", () => {
   authService.logout();
-  expect(localStorage.removeItem).toHaveBeenCalledWith('auth_token');
+  expect(localStorage.removeItem).toHaveBeenCalledWith("auth_token");
 });
 ```
 
 ✅ **Good** (tests behavior):
-
 ```typescript
-it('should clear token on logout (AC1.1)', () => {
-  authService.setToken('test-token');
+it("should clear token on logout (AC1.1)", () => {
+  authService.setToken("test-token");
   authService.logout();
   expect(authService.getToken()).toBeNull();
 });
@@ -415,27 +395,25 @@ it('should clear token on logout (AC1.1)', () => {
 Focus each test on one behavior:
 
 ❌ **Bad** (multiple assertions):
-
 ```typescript
-it('should logout', () => {
+it("should logout", () => {
   authService.logout();
   expect(authService.getToken()).toBeNull(); // AC1.1
-  expect(router.currentRoute).toBe('/login'); // AC1.2
-  expect(toastService.message).toBe('Logged out'); // AC1.3
+  expect(router.currentRoute).toBe("/login"); // AC1.2
+  expect(toastService.message).toBe("Logged out"); // AC1.3
 });
 ```
 
 ✅ **Good** (focused tests):
-
 ```typescript
-it('should clear token (AC1.1)', () => {
+it("should clear token (AC1.1)", () => {
   authService.logout();
   expect(authService.getToken()).toBeNull();
 });
 
-it('should redirect to login (AC1.2)', () => {
+it("should redirect to login (AC1.2)", () => {
   authService.logout();
-  expect(router.currentRoute).toBe('/login');
+  expect(router.currentRoute).toBe("/login");
 });
 ```
 
@@ -445,9 +423,9 @@ it('should redirect to login (AC1.2)', () => {
 // test/builders/user.builder.ts
 export class UserBuilder {
   private user: User = {
-    id: 'test-id',
-    name: 'Test User',
-    email: 'test@example.com',
+    id: "test-id",
+    name: "Test User",
+    email: "test@example.com"
   };
 
   withEmail(email: string): this {
@@ -461,7 +439,7 @@ export class UserBuilder {
 }
 
 // In tests
-const user = new UserBuilder().withEmail('custom@example.com').build();
+const user = new UserBuilder().withEmail("custom@example.com").build();
 ```
 
 ### Reference ACs in Test Names
@@ -486,7 +464,6 @@ it("should logout", () => {
 **Input**: TaskSpec with 4 ACs
 
 **Step 1**: Map ACs
-
 ```markdown
 AC1.1: Clear token → auth-service.test.ts
 AC1.2: Redirect → auth-router.test.ts
@@ -495,7 +472,6 @@ AC2.1: Error → auth-service.test.ts
 ```
 
 **Step 2**: Create test file structure
-
 ```bash
 touch src/services/__tests__/auth-service.test.ts
 ```
@@ -504,10 +480,10 @@ touch src/services/__tests__/auth-service.test.ts
 
 ```typescript
 // src/services/__tests__/auth-service.test.ts
-import { AuthService } from '../auth-service';
-import { FakeAuthApi } from '../../test/fakes/fake-auth-api';
+import { AuthService } from "../auth-service";
+import { FakeAuthApi } from "../../test/fakes/fake-auth-api";
 
-describe('AuthService', () => {
+describe("AuthService", () => {
   let authService: AuthService;
   let fakeApi: FakeAuthApi;
 
@@ -516,10 +492,10 @@ describe('AuthService', () => {
     authService = new AuthService(fakeApi);
   });
 
-  describe('logout', () => {
-    it('should clear authentication token (AC1.1)', async () => {
+  describe("logout", () => {
+    it("should clear authentication token (AC1.1)", async () => {
       // Arrange
-      authService.setToken('test-token-123');
+      authService.setToken("test-token-123");
 
       // Act
       await authService.logout();
@@ -528,19 +504,19 @@ describe('AuthService', () => {
       expect(authService.getToken()).toBeNull();
     });
 
-    it('should show error on network failure (AC2.1)', async () => {
+    it("should show error on network failure (AC2.1)", async () => {
       // Arrange
       fakeApi.setFailure(true);
 
       // Act & Assert
       await expect(authService.logout()).rejects.toThrow(
-        'Logout failed. Please try again.',
+        "Logout failed. Please try again."
       );
     });
 
-    it('should keep user logged in on error (AC2.2)', async () => {
+    it("should keep user logged in on error (AC2.2)", async () => {
       // Arrange
-      authService.setToken('test-token');
+      authService.setToken("test-token");
       fakeApi.setFailure(true);
 
       // Act
@@ -551,21 +527,19 @@ describe('AuthService', () => {
       }
 
       // Assert - Token still present
-      expect(authService.getToken()).toBe('test-token');
+      expect(authService.getToken()).toBe("test-token");
     });
   });
 });
 ```
 
 **Step 4**: Run tests
-
 ```bash
 npm test -- auth-service.test.ts
 # PASS: 3 tests
 ```
 
 **Step 5**: Document coverage
-
 ```markdown
 ## Test Coverage
 
@@ -579,7 +553,6 @@ Coverage: 3/3 ACs, 100%
 ## Constraints
 
 ### DO:
-
 - Test every AC
 - Follow AAA pattern with comments
 - Use fakes over mocks
@@ -588,7 +561,6 @@ Coverage: 3/3 ACs, 100%
 - Test error paths
 
 ### DON'T:
-
 - Test implementation details
 - Use deep mocking
 - Write flaky tests (non-deterministic)
@@ -599,7 +571,6 @@ Coverage: 3/3 ACs, 100%
 ## Success Criteria
 
 Tests are complete when:
-
 - Every AC has at least one test
 - All tests passing
 - Coverage ≥ 80% (line coverage)
@@ -610,13 +581,11 @@ Tests are complete when:
 ## Handoff
 
 After completion, unifier will:
-
 - Verify every AC has test coverage
 - Confirm tests validate spec behavior
 - Check tests are passing
 
 Your job is to provide:
-
 - Comprehensive test coverage
 - Clear AC traceability
 - Deterministic, maintainable tests

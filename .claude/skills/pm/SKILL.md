@@ -7,7 +7,6 @@ allowed-tools: Read, Write, Edit, AskUserQuestion
 # Product Manager Skill
 
 ## Purpose
-
 Act as a product manager to thoroughly understand user needs, gather structured requirements, and ensure alignment before spec authoring or implementation.
 
 ## When to Use This Skill
@@ -25,7 +24,6 @@ Act as a product manager to thoroughly understand user needs, gather structured 
 Use this when starting a fresh task. Goal: Transform user request into structured requirements.
 
 #### Step 1: Problem Discovery
-
 Ask foundational questions:
 
 1. **What problem are you solving?**
@@ -39,7 +37,6 @@ Ask foundational questions:
    - Is there urgency or a deadline?
 
 #### Step 2: Goals & Success Criteria
-
 Understand desired outcomes:
 
 3. **What does success look like?**
@@ -53,7 +50,6 @@ Understand desired outcomes:
    - What can wait for v2 or later?
 
 #### Step 3: Constraints & Boundaries
-
 Define limits and scope:
 
 5. **What are the constraints?**
@@ -68,7 +64,6 @@ Define limits and scope:
    - What edge cases are we explicitly deferring?
 
 #### Step 4: Edge Cases & Failure Modes
-
 Explore the corners:
 
 7. **What could go wrong?**
@@ -82,7 +77,6 @@ Explore the corners:
    - What are the accessibility or internationalization needs?
 
 #### Step 5: User Experience & Interface
-
 For UI features, understand the interaction model:
 
 9. **How should users interact with this?**
@@ -107,32 +101,27 @@ For each ambiguity, ask targeted questions:
 I need to clarify <aspect> to ensure the spec is accurate:
 
 **Option A**: <interpretation 1>
-
-- Pros: <benefits>
-- Cons: <tradeoffs>
+  - Pros: <benefits>
+  - Cons: <tradeoffs>
 
 **Option B**: <interpretation 2>
-
-- Pros: <benefits>
-- Cons: <tradeoffs>
+  - Pros: <benefits>
+  - Cons: <tradeoffs>
 
 Which approach aligns with your intent? Or is there a third option I'm missing?
 ```
 
 Example:
-
 ```markdown
 I need to clarify how the logout button should behave:
 
 **Option A**: Logout immediately without confirmation
-
-- Pros: Faster, fewer clicks
-- Cons: Accidental logouts are frustrating
+  - Pros: Faster, fewer clicks
+  - Cons: Accidental logouts are frustrating
 
 **Option B**: Show confirmation dialog before logout
-
-- Pros: Prevents accidents
-- Cons: Extra step for users
+  - Pros: Prevents accidents
+  - Cons: Extra step for users
 
 Which approach do you prefer?
 ```
@@ -187,58 +176,46 @@ After initial discovery, produce a structured requirements document:
 # Requirements: <Feature Name>
 
 ## Problem Statement
-
 <Concise statement of the problem>
 
 ## Goals
-
 - Goal 1: <What we want to achieve>
 - Goal 2: <What we want to achieve>
 
 ## Non-goals
-
 - Non-goal 1: <What we explicitly won't do>
 - Non-goal 2: <What we explicitly won't do>
 
 ## Success Criteria
-
 - Criterion 1: <Measurable indicator of success>
 - Criterion 2: <Measurable indicator of success>
 
 ## Requirements (EARS Format)
-
 - **WHEN** <condition>, **THEN** the system shall <behavior>
 - **WHEN** <condition>, **THEN** the system shall <behavior>
 
 ## Constraints
-
 - Constraint 1: <Limitation or boundary>
 - Constraint 2: <Limitation or boundary>
 
 ## Edge Cases
-
 - Edge case 1: <Scenario and desired behavior>
 - Edge case 2: <Scenario and desired behavior>
 
 ## Open Questions
-
 - Q1: <Question>? (Priority: high/medium/low)
 - Q2: <Question>? (Priority: high/medium/low)
 
 ## Priorities
-
 **Must-have (v1)**:
-
 - Feature 1
 - Feature 2
 
 **Nice-to-have (v2)**:
-
 - Feature 3
 - Feature 4
 
 **Deferred**:
-
 - Feature 5
 ```
 
@@ -250,11 +227,9 @@ After clarifying ambiguities, record decisions:
 # Decision: <Topic>
 
 ## Context
-
 <What was unclear or ambiguous>
 
 ## Options Considered
-
 1. **Option A**: <description>
    - Pros: <benefits>
    - Cons: <drawbacks>
@@ -264,13 +239,11 @@ After clarifying ambiguities, record decisions:
    - Cons: <drawbacks>
 
 ## Decision
-
 **Chosen**: Option <A/B>
 
 **Rationale**: <Why this option was selected>
 
 ## Implications
-
 - Implication 1: <How this affects the design or implementation>
 - Implication 2: <How this affects the design or implementation>
 
@@ -285,29 +258,23 @@ After gathering feedback, produce an iteration plan:
 # Iteration Plan: <Feature Name> v2
 
 ## Feedback Summary
-
 **What's working**:
-
 - Item 1
 - Item 2
 
 **What needs improvement**:
-
 - Item 1 (Priority: high)
 - Item 2 (Priority: medium)
 
 **What's missing**:
-
 - Item 1 (Priority: high)
 - Item 2 (Priority: low)
 
 ## Proposed Changes
-
 1. <Change 1>: <Description and rationale>
 2. <Change 2>: <Description and rationale>
 
 ## Next Steps
-
 - [ ] Update spec with proposed changes
 - [ ] Get user approval
 - [ ] Implement v2
@@ -316,13 +283,11 @@ After gathering feedback, produce an iteration plan:
 ## Best Practices
 
 ### Ask Open-Ended Questions First
-
 - Start broad: "Tell me about the problem you're trying to solve"
 - Then narrow: "How do you envision the logout flow working?"
 - Avoid leading questions that bias answers
 
 ### Confirm Understanding
-
 After gathering information, summarize and confirm:
 
 ```markdown
@@ -338,45 +303,38 @@ Is this accurate, or did I misunderstand anything?
 ```
 
 ### Prioritize Ruthlessly
-
 Help the user focus:
-
 - "If we can only ship one thing, what is it?"
 - "What's the 80% use case we should nail first?"
 - "Can we defer this complexity to v2?"
 
 ### Surface Assumptions
-
 Make implicit assumptions explicit:
-
 - "I'm assuming users are already logged in. Is that correct?"
 - "It sounds like we don't need to support IE11. Can you confirm?"
 - "Are we okay with a 1-second delay for this operation?"
 
 ### Use AskUserQuestion Tool
-
 For multiple-choice clarifications, use the AskUserQuestion tool:
 
 ```javascript
 AskUserQuestion({
-  questions: [
-    {
-      question: 'How should the logout button behave?',
-      header: 'Logout UX',
-      options: [
-        {
-          label: 'Immediate logout',
-          description: 'Log out instantly without confirmation',
-        },
-        {
-          label: 'Confirm first',
-          description: 'Show confirmation dialog before logging out',
-        },
-      ],
-      multiSelect: false,
-    },
-  ],
-});
+  questions: [{
+    question: "How should the logout button behave?",
+    header: "Logout UX",
+    options: [
+      {
+        label: "Immediate logout",
+        description: "Log out instantly without confirmation"
+      },
+      {
+        label: "Confirm first",
+        description: "Show confirmation dialog before logging out"
+      }
+    ],
+    multiSelect: false
+  }]
+})
 ```
 
 ## Integration with Spec Skills
@@ -400,7 +358,6 @@ The spec-author can then reference the requirements document when creating the f
 **User Request**: "Add a dark mode toggle"
 
 **PM Interview**:
-
 1. What problem are you solving?
    → Users find the bright UI straining in low-light environments
 2. What does success look like?
@@ -419,7 +376,6 @@ The spec-author can then reference the requirements document when creating the f
 **User Request**: "Make the API faster"
 
 **PM Interview**:
-
 1. What specific slowness are you experiencing?
    → Certain endpoints take 3-5 seconds
 2. Which endpoints?
@@ -436,7 +392,6 @@ The spec-author can then reference the requirements document when creating the f
 **After implementation of logout button**
 
 **PM Interview**:
-
 1. Does this match expectations?
    → Yes, but the confirmation dialog is annoying for quick logouts
 2. What would you change?

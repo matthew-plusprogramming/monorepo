@@ -45,9 +45,9 @@ Brief description of what it does.
 
 ### Parameters
 
-| Name   | Type   | Required | Description                  |
-| ------ | ------ | -------- | ---------------------------- |
-| param1 | string | Yes      | What this parameter controls |
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| param1 | string | Yes | What this parameter controls |
 
 ### Returns
 
@@ -55,8 +55,8 @@ Brief description of what it does.
 
 ### Errors
 
-| Error             | When                 |
-| ----------------- | -------------------- |
+| Error | When |
+|-------|------|
 | InvalidInputError | When param1 is empty |
 
 ### Example
@@ -132,7 +132,6 @@ grep -r "export" src/ --include="*.ts" | grep -E "(class|interface|function|cons
 ```
 
 Determine documentation needs:
-
 - Public APIs → API docs (always)
 - User-facing features → User guides (always)
 - Internal architecture → Architecture docs (if complex)
@@ -158,7 +157,6 @@ grep -A5 "catch\|throw\|Error" src/services/feature.ts
 Follow documentation standards:
 
 #### DO:
-
 - Use present tense ("Returns" not "Will return")
 - Include working code examples
 - Document error conditions
@@ -166,7 +164,6 @@ Follow documentation standards:
 - Keep examples minimal but complete
 
 #### DON'T:
-
 - Copy spec language verbatim
 - Document internal implementation details in user docs
 - Assume reader knows the codebase
@@ -188,7 +185,6 @@ docs/
 ```
 
 For inline documentation:
-
 - JSDoc for public APIs
 - README.md in package roots
 - CHANGELOG.md for version history
@@ -227,20 +223,17 @@ Add documentation log:
 ### Code Examples Must Work
 
 Every code example must:
-
 1. Be syntactically correct
 2. Use real types/imports from the codebase
 3. Demonstrate the happy path
 4. Be copy-paste runnable (with minimal setup)
 
 **Bad**:
-
 ```typescript
 const result = doThing(params); // params undefined
 ```
 
 **Good**:
-
 ```typescript
 import { AuthService } from '@/services/auth';
 
@@ -252,14 +245,12 @@ const result = await authService.logout();
 ### Document Behavior, Not Implementation
 
 **Bad** (leaks implementation):
-
 ```markdown
 The logout method clears the localStorage key 'auth_token'
 and sets the BehaviorSubject to false.
 ```
 
 **Good** (describes behavior):
-
 ```markdown
 The logout method ends the current session and redirects
 to the login page. Any cached credentials are cleared.
@@ -267,11 +258,11 @@ to the login page. Any cached credentials are cleared.
 
 ### Match Audience to Doc Type
 
-| Doc Type      | Audience           | Tone                   | Detail Level |
-| ------------- | ------------------ | ---------------------- | ------------ |
-| API Reference | Developers         | Technical, precise     | High         |
-| User Guide    | End users          | Friendly, task-focused | Medium       |
-| Architecture  | Future maintainers | Explanatory            | High         |
+| Doc Type | Audience | Tone | Detail Level |
+|----------|----------|------|--------------|
+| API Reference | Developers | Technical, precise | High |
+| User Guide | End users | Friendly, task-focused | Medium |
+| Architecture | Future maintainers | Explanatory | High |
 
 ## Output Format
 
@@ -281,18 +272,15 @@ to the login page. Any cached credentials are cleared.
 **Spec**: .claude/specs/active/<slug>.md
 
 **Artifacts Created**:
-
 - docs/api/services/auth.md (API reference)
 - docs/guides/authentication.md (user guide)
 
 **Coverage**:
-
 - Public methods documented: 5/5
 - Examples included: 3
 - Error conditions documented: 4
 
 **Validation**:
-
 - Code examples: verified
 - Links: verified
 - Formatting: consistent
@@ -301,11 +289,9 @@ to the login page. Any cached credentials are cleared.
 ## Integration with Other Skills
 
 **Before docs**:
-
 - `/security` review passed
 
 **After docs**:
-
 - Ready for commit/merge
 
 Documentation is typically the final step before commit for substantial changes.
@@ -319,7 +305,6 @@ The spec says what SHOULD happen. The code says what DOES happen. Document reali
 ### No Code Changes
 
 You generate documentation only. If you find:
-
 - Undocumented public APIs → Document them
 - Bugs in implementation → Note in report, don't fix
 - Missing error handling → Document current behavior, note gap
@@ -335,7 +320,6 @@ Match existing documentation style in the project. Follow established patterns.
 **Input**: New logout endpoint implementation
 
 **Output**:
-
 ```markdown
 # AuthService.logout()
 
@@ -356,10 +340,10 @@ async logout(): Promise<void>
 
 ## Errors
 
-| Error          | Cause                  |
-| -------------- | ---------------------- |
-| `NetworkError` | Cannot reach server    |
-| `LogoutError`  | Server rejected logout |
+| Error | Cause |
+|-------|-------|
+| `NetworkError` | Cannot reach server |
+| `LogoutError` | Server rejected logout |
 
 ## Example
 
@@ -367,12 +351,12 @@ async logout(): Promise<void>
 import { authService } from '@/services/auth';
 
 try {
-await authService.logout();
-// User is now logged out, redirect handled automatically
+  await authService.logout();
+  // User is now logged out, redirect handled automatically
 } catch (error) {
-if (error instanceof NetworkError) {
-showToast('Check your connection and try again');
-}
+  if (error instanceof NetworkError) {
+    showToast('Check your connection and try again');
+  }
 }
 \`\`\`
 ```
@@ -382,7 +366,6 @@ showToast('Check your connection and try again');
 **Input**: New dashboard feature
 
 **Output**:
-
 ```markdown
 # Using the Dashboard
 
@@ -397,15 +380,12 @@ The dashboard provides an overview of your daily tasks and priorities.
 ## Features
 
 ### Daily Briefing
-
 Shows your priorities for today, including:
-
 - Urgent emails requiring response
 - Upcoming calendar events
 - Tasks due today
 
 ### Quick Actions
-
 - **Snooze**: Postpone an item to later
 - **Complete**: Mark a task as done
 - **Delegate**: Assign to someone else
@@ -413,7 +393,6 @@ Shows your priorities for today, including:
 ## Customization
 
 Access Settings → Dashboard to configure:
-
 - Briefing time (default: 9:00 AM)
 - Priority thresholds
 - Notification preferences
@@ -424,7 +403,6 @@ Access Settings → Dashboard to configure:
 **Input**: New notification service
 
 **Output**:
-
 ```markdown
 # Notification Service Architecture
 
@@ -435,13 +413,11 @@ Centralizes all user notifications across channels (email, SMS, push).
 ## Design Decisions
 
 **Why a separate service?**
-
 - Decouples notification logic from business logic
 - Enables channel-agnostic notification requests
 - Supports future channels without core changes
 
 **Why queue-based?**
-
 - Handles burst traffic gracefully
 - Enables retry logic for failed deliveries
 - Provides delivery tracking
@@ -450,12 +426,12 @@ Centralizes all user notifications across channels (email, SMS, push).
 
 \`\`\`
 Business Logic → NotificationService.send()
-↓
-Queue (Redis)
-↓
-Channel Adapters (Email, SMS, Push)
-↓
-Delivery Status → Database
+                         ↓
+                   Queue (Redis)
+                         ↓
+              Channel Adapters (Email, SMS, Push)
+                         ↓
+                 Delivery Status → Database
 \`\`\`
 
 ## Dependencies
