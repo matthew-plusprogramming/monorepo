@@ -32,12 +32,12 @@ You're dispatched when:
 
 | Stack | Purpose | Group |
 |-------|---------|-------|
-| `secretary-assistant-api-stack` | DynamoDB tables (users, verification, rate limit, deny list) | infra |
-| `secretary-assistant-analytics-stack` | EventBridge, DLQ, analytics tables, log groups | infra |
-| `secretary-assistant-api-lambda-stack` | Lambda packaging, IAM role, analytics permissions | lambdas |
-| `secretary-assistant-analytics-lambda-stack` | Analytics processor Lambda | lambdas |
-| `secretary-assistant-client-website-stack` | S3 + CloudFront static hosting | website |
-| `secretary-assistant-bootstrap-stack` | CDKTF backend/state resources | (standalone) |
+| `myapp-api-stack` | DynamoDB tables (users, verification, rate limit, deny list) | infra |
+| `myapp-analytics-stack` | EventBridge, DLQ, analytics tables, log groups | infra |
+| `myapp-api-lambda-stack` | Lambda packaging, IAM role, analytics permissions | lambdas |
+| `myapp-analytics-lambda-stack` | Analytics processor Lambda | lambdas |
+| `myapp-client-website-stack` | S3 + CloudFront static hosting | website |
+| `myapp-bootstrap-stack` | CDKTF backend/state resources | (standalone) |
 
 ### Stack Groups
 
@@ -289,8 +289,8 @@ After deployment, report:
 
 **Environment**: dev
 **Stacks Deployed**:
-- secretary-assistant-api-stack
-- secretary-assistant-api-lambda-stack
+- myapp-api-stack
+- myapp-api-lambda-stack
 
 **Outputs Refreshed**: Yes
 

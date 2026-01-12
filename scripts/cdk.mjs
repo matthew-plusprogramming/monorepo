@@ -30,44 +30,44 @@ const LOG_PREFIX = '[cdk]';
 // ============================================================================
 
 const STACK_DEFINITIONS = {
-  'secretary-assistant-bootstrap-stack': {
+  'myapp-bootstrap-stack': {
     description: 'Bootstrap stack for CDKTF backend state',
     dependencies: [],
     requiredOutputs: [],
     requiredArtifacts: [],
     providesOutputs: false,
   },
-  'secretary-assistant-api-stack': {
+  'myapp-api-stack': {
     description: 'DynamoDB tables for the API',
-    dependencies: ['secretary-assistant-bootstrap-stack'],
+    dependencies: ['myapp-bootstrap-stack'],
     requiredOutputs: [],
     requiredArtifacts: [],
     providesOutputs: true,
   },
-  'secretary-assistant-api-lambda-stack': {
+  'myapp-api-lambda-stack': {
     description: 'API Lambda function',
-    dependencies: ['secretary-assistant-api-stack'],
-    requiredOutputs: ['secretary-assistant-api-stack'],
+    dependencies: ['myapp-api-stack'],
+    requiredOutputs: ['myapp-api-stack'],
     requiredArtifacts: ['lambdas/api/lambda.zip'],
     providesOutputs: true,
   },
-  'secretary-assistant-analytics-stack': {
+  'myapp-analytics-stack': {
     description: 'EventBridge and analytics infrastructure',
-    dependencies: ['secretary-assistant-bootstrap-stack'],
+    dependencies: ['myapp-bootstrap-stack'],
     requiredOutputs: [],
     requiredArtifacts: [],
     providesOutputs: true,
   },
-  'secretary-assistant-analytics-lambda-stack': {
+  'myapp-analytics-lambda-stack': {
     description: 'Analytics processor Lambda',
-    dependencies: ['secretary-assistant-analytics-stack'],
-    requiredOutputs: ['secretary-assistant-analytics-stack'],
+    dependencies: ['myapp-analytics-stack'],
+    requiredOutputs: ['myapp-analytics-stack'],
     requiredArtifacts: ['lambdas/analytics/analytics-processor-lambda.zip'],
     providesOutputs: true,
   },
-  'secretary-assistant-client-website-stack': {
+  'myapp-client-website-stack': {
     description: 'S3 + CloudFront for static website',
-    dependencies: ['secretary-assistant-bootstrap-stack'],
+    dependencies: ['myapp-bootstrap-stack'],
     requiredOutputs: [],
     requiredArtifacts: [],
     providesOutputs: true,
@@ -75,16 +75,16 @@ const STACK_DEFINITIONS = {
 };
 
 const DEPLOYMENT_GROUPS = {
-  infra: ['secretary-assistant-api-stack', 'secretary-assistant-analytics-stack'],
-  lambdas: ['secretary-assistant-api-lambda-stack', 'secretary-assistant-analytics-lambda-stack'],
-  website: ['secretary-assistant-client-website-stack'],
+  infra: ['myapp-api-stack', 'myapp-analytics-stack'],
+  lambdas: ['myapp-api-lambda-stack', 'myapp-analytics-lambda-stack'],
+  website: ['myapp-client-website-stack'],
   all: [
-    'secretary-assistant-bootstrap-stack',
-    'secretary-assistant-api-stack',
-    'secretary-assistant-api-lambda-stack',
-    'secretary-assistant-analytics-stack',
-    'secretary-assistant-analytics-lambda-stack',
-    'secretary-assistant-client-website-stack',
+    'myapp-bootstrap-stack',
+    'myapp-api-stack',
+    'myapp-api-lambda-stack',
+    'myapp-analytics-stack',
+    'myapp-analytics-lambda-stack',
+    'myapp-client-website-stack',
   ],
 };
 
@@ -464,7 +464,7 @@ const cmdBootstrap = async (options) => {
     }
 
     // Step 2: Deploy bootstrap stack with local state
-    const args = ['deploy', 'secretary-assistant-bootstrap-stack'];
+    const args = ['deploy', 'myapp-bootstrap-stack'];
     if (autoApprove) {
       args.push('--auto-approve');
     }
@@ -481,7 +481,7 @@ const cmdBootstrap = async (options) => {
     }
 
     // Step 4: Clean up local state file
-    const localStateFile = join(CDK_ROOT, 'terraform.secretary-assistant-bootstrap-stack.tfstate');
+    const localStateFile = join(CDK_ROOT, 'terraform.myapp-bootstrap-stack.tfstate');
     if (existsSync(localStateFile)) {
       console.log(`${LOG_PREFIX} Removing local state file...`);
       unlinkSync(localStateFile);

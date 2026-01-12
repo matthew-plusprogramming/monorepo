@@ -55,7 +55,7 @@ node scripts/cdk.mjs bootstrap --auto-approve
 
 ```
 npm -w node-server run decrypt-envs
-node scripts/cdk.mjs deploy secretary-assistant-api-lambda-stack --auto-approve
+node scripts/cdk.mjs deploy myapp-api-lambda-stack --auto-approve
 npm -w node-server run encrypt-envs
 ```
 
