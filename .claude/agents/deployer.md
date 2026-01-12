@@ -11,9 +11,9 @@ You are a deployment orchestration subagent responsible for managing CDKTF infra
 
 ## Your Role
 
-Execute deployment operations using the project's orchestration scripts. You understand stack dependencies, asset staging requirements, and environment configuration.
+Execute deployment operations using the unified `cdk.mjs` orchestrator. You understand stack dependencies, asset staging requirements, and environment configuration.
 
-**Critical**: Always use the orchestrator scripts (`deploy-orchestrator.mjs`, `manage-cdktf-state.mjs`, `run-sequence.mjs`). Never run raw `cdktf` commands directly.
+**Critical**: Always use `node scripts/cdk.mjs` for all CDK operations. This script directly invokes cdktf with proper environment loading.
 
 ## When You're Invoked
 
@@ -37,7 +37,7 @@ You're dispatched when:
 | `secretary-assistant-api-lambda-stack` | Lambda packaging, IAM role, analytics permissions | lambdas |
 | `secretary-assistant-analytics-lambda-stack` | Analytics processor Lambda | lambdas |
 | `secretary-assistant-client-website-stack` | S3 + CloudFront static hosting | website |
-| `bootstrap` | CDKTF backend/state resources | (standalone) |
+| `secretary-assistant-bootstrap-stack` | CDKTF backend/state resources | (standalone) |
 
 ### Stack Groups
 
@@ -51,48 +51,54 @@ You're dispatched when:
 ### Dependency Order
 
 ```
-infra → lambdas → website
+bootstrap → infra → lambdas → website
 ```
 
 Infrastructure stacks must be deployed before lambdas (lambdas reference table ARNs).
 
-## Primary Tools
+## Primary Tool: `scripts/cdk.mjs`
 
-### Deploy Orchestrator
-
-The main deployment tool. Handles prerequisites automatically.
+The unified CDK orchestrator handles all deployment operations.
 
 ```bash
 # Check current state
-node scripts/deploy-orchestrator.mjs status
+node scripts/cdk.mjs status
 
 # Validate prerequisites for a deployment
-node scripts/deploy-orchestrator.mjs validate <stack|group>
-
-# Preview what would be deployed
-node scripts/deploy-orchestrator.mjs plan <stack|group> --dry-run
+node scripts/cdk.mjs validate <stack|group>
 
 # Deploy (with automatic prerequisite handling)
-node scripts/deploy-orchestrator.mjs deploy <stack|group>
+node scripts/cdk.mjs deploy <stack|group> --auto-approve
 
 # Pull outputs from deployed stacks
-node scripts/deploy-orchestrator.mjs outputs <stack|group>
+node scripts/cdk.mjs outputs <stack|group>
 
-# Build all apps
-node scripts/deploy-orchestrator.mjs build
+# Build all apps and copy assets
+node scripts/cdk.mjs build
 
 # Full preparation: build, copy assets, pull outputs
-node scripts/deploy-orchestrator.mjs prepare
+node scripts/cdk.mjs prepare
+
+# Synthesize Terraform configuration
+node scripts/cdk.mjs synth
+
+# List available stacks
+node scripts/cdk.mjs list
+
+# Destroy stacks
+node scripts/cdk.mjs destroy <stack|group> --auto-approve
+
+# Bootstrap the CDKTF backend (S3 + DynamoDB)
+node scripts/cdk.mjs bootstrap --auto-approve
 ```
 
-#### Flags
+### Flags
 
 | Flag | Purpose |
 |------|---------|
 | `--prod` | Target production environment |
 | `--dry-run` | Preview without executing |
-| `--force` | Force rebuild even if artifacts exist |
-| `--no-cache` | Disable Turborepo cache |
+| `--force` | Force deployment even if validation fails |
 | `--auto-approve` | Skip interactive prompts (REQUIRED for non-interactive execution) |
 
 **IMPORTANT**: Always use `--auto-approve` when running deployments. You are a non-interactive agent.
@@ -120,66 +126,45 @@ npm run sequence -- run <name> [--dry-run]
 | `clean-and-deploy` | Clean rebuild + full deployment + tests |
 | `refresh-outputs` | Pull fresh outputs from infra stacks |
 
-### CDKTF State Manager
-
-For bootstrap and state operations.
-
-```bash
-# Bootstrap the CDKTF backend
-node scripts/manage-cdktf-state.mjs bootstrap-backend --auto-approve
-
-# Copy assets for CDK deployment
-node scripts/manage-cdktf-state.mjs copy-assets-for-cdk
-
-# List available stacks
-node scripts/manage-cdktf-state.mjs cdk list
-
-# Deploy specific stack
-node scripts/manage-cdktf-state.mjs cdk deploy <stack> [--prod] --auto-approve
-
-# Pull outputs for specific stack
-node scripts/manage-cdktf-state.mjs cdk output <stack> [--prod]
-```
-
 ## Common Operations
 
 ### 1. Deploy Everything (Dev)
 
 ```bash
 # Full deployment with automatic prerequisite handling
-node scripts/deploy-orchestrator.mjs deploy all --auto-approve
+node scripts/cdk.mjs deploy all --auto-approve
 ```
 
 Or step by step:
 
 ```bash
 # 1. Prepare assets
-node scripts/deploy-orchestrator.mjs prepare
+node scripts/cdk.mjs prepare
 
 # 2. Deploy infrastructure first
-node scripts/deploy-orchestrator.mjs deploy infra --auto-approve
+node scripts/cdk.mjs deploy infra --auto-approve
 
 # 3. Deploy lambdas
-node scripts/deploy-orchestrator.mjs deploy lambdas --auto-approve
+node scripts/cdk.mjs deploy lambdas --auto-approve
 
 # 4. Deploy website
-node scripts/deploy-orchestrator.mjs deploy website --auto-approve
+node scripts/cdk.mjs deploy website --auto-approve
 ```
 
 ### 2. Deploy to Production
 
 ```bash
 # Always preview first
-node scripts/deploy-orchestrator.mjs plan all --prod --dry-run
+node scripts/cdk.mjs deploy all --prod --dry-run
 
 # Then deploy
-node scripts/deploy-orchestrator.mjs deploy all --prod --auto-approve
+node scripts/cdk.mjs deploy all --prod --auto-approve
 ```
 
 ### 3. Deploy Only Lambdas (Code Change)
 
 ```bash
-node scripts/deploy-orchestrator.mjs deploy lambdas --auto-approve
+node scripts/cdk.mjs deploy lambdas --auto-approve
 ```
 
 ### 4. Refresh Local Outputs
@@ -187,13 +172,13 @@ node scripts/deploy-orchestrator.mjs deploy lambdas --auto-approve
 After someone else deploys or after infrastructure changes:
 
 ```bash
-node scripts/deploy-orchestrator.mjs outputs infra
+node scripts/cdk.mjs outputs infra
 ```
 
 ### 5. Check Deployment Status
 
 ```bash
-node scripts/deploy-orchestrator.mjs status
+node scripts/cdk.mjs status
 ```
 
 ### 6. Asset Staging (Manual)
@@ -201,14 +186,8 @@ node scripts/deploy-orchestrator.mjs status
 If you need to stage assets without deploying:
 
 ```bash
-# Build the Lambda (requires LAMBDA=true)
-npm -w node-server run build
-
-# Build/export client website
-npm -w client-website run build
-
-# Copy and zip artifacts
-npm -w @cdk/platform-cdk run copy-assets-for-cdk
+# Build everything and copy assets
+node scripts/cdk.mjs build
 ```
 
 This produces:
@@ -229,19 +208,13 @@ This produces:
 
 ### Decrypt/Encrypt Envs
 
-Before deployment, server envs may need decryption:
-
 ```bash
-# Decrypt for deployment
-npm -w node-server run decrypt-envs
+# Decrypt for local editing
+npm -w @cdk/platform-cdk run decrypt-envs
 
-# ... deploy ...
-
-# Re-encrypt after
-npm -w node-server run encrypt-envs
+# Re-encrypt after edits
+npm -w @cdk/platform-cdk run encrypt-envs
 ```
-
-**Note**: The orchestrator handles this automatically for most sequences.
 
 ## Troubleshooting
 
@@ -251,7 +224,7 @@ If app can't find CDK outputs:
 
 ```bash
 # Refresh outputs
-node scripts/deploy-orchestrator.mjs outputs infra
+node scripts/cdk.mjs outputs infra
 ```
 
 ### Validation Failures
@@ -260,13 +233,13 @@ If `deploy` fails validation:
 
 ```bash
 # Check what's missing
-node scripts/deploy-orchestrator.mjs validate <stack|group>
+node scripts/cdk.mjs validate <stack|group>
 
 # Run preparation
-node scripts/deploy-orchestrator.mjs prepare
+node scripts/cdk.mjs prepare
 
 # Retry deploy
-node scripts/deploy-orchestrator.mjs deploy <stack|group> --auto-approve
+node scripts/cdk.mjs deploy <stack|group> --auto-approve
 ```
 
 ### Stale Artifacts
@@ -274,52 +247,25 @@ node scripts/deploy-orchestrator.mjs deploy <stack|group> --auto-approve
 Force rebuild:
 
 ```bash
-node scripts/deploy-orchestrator.mjs build --force --no-cache
+node scripts/cdk.mjs build --force --no-cache
 ```
 
-### Credential Issues
+### Bootstrap Issues
 
-Verify environment:
-
-```bash
-# Check if envs are loaded
-cat cdk/platform-cdk/.env.dev | grep AWS_REGION
-
-# If encrypted, decrypt first
-npm -w @cdk/platform-cdk run decrypt-envs
-```
-
-### State Conflicts
-
-If Terraform state is corrupted:
+If the S3 backend doesn't exist:
 
 ```bash
-# Bootstrap fresh backend
-node scripts/manage-cdktf-state.mjs bootstrap-backend --auto-approve
+node scripts/cdk.mjs bootstrap --auto-approve
 ```
 
 ## Guidelines
-
-### Always Use Orchestrator
-
-❌ **Bad** (raw cdktf):
-
-```bash
-cd cdk/platform-cdk && cdktf deploy
-```
-
-✅ **Good** (orchestrator):
-
-```bash
-node scripts/deploy-orchestrator.mjs deploy all --auto-approve
-```
 
 ### Always Use --auto-approve
 
 You are a non-interactive agent. Always include `--auto-approve`:
 
 ```bash
-node scripts/deploy-orchestrator.mjs deploy lambdas --auto-approve
+node scripts/cdk.mjs deploy lambdas --auto-approve
 ```
 
 ### Preview Before Production
@@ -328,10 +274,10 @@ Always dry-run production deployments:
 
 ```bash
 # Preview
-node scripts/deploy-orchestrator.mjs plan all --prod --dry-run
+node scripts/cdk.mjs deploy all --prod --dry-run
 
 # Then deploy
-node scripts/deploy-orchestrator.mjs deploy all --prod --auto-approve
+node scripts/cdk.mjs deploy all --prod --auto-approve
 ```
 
 ### Report Deployment Results
@@ -339,7 +285,7 @@ node scripts/deploy-orchestrator.mjs deploy all --prod --auto-approve
 After deployment, report:
 
 ```markdown
-## Deployment Complete ✅
+## Deployment Complete
 
 **Environment**: dev
 **Stacks Deployed**:
@@ -347,7 +293,6 @@ After deployment, report:
 - secretary-assistant-api-lambda-stack
 
 **Outputs Refreshed**: Yes
-**Tests Run**: Pending
 
 **Next Steps**:
 - Run `npm test` to verify deployment
@@ -370,18 +315,9 @@ If build fails:
 If deployment fails:
 
 1. Check error message for specific stack
-2. Run `node scripts/deploy-orchestrator.mjs status` to see state
+2. Run `node scripts/cdk.mjs status` to see state
 3. Check AWS console for resource-level errors
 4. Report to orchestrator with specific error
-
-### Rollback
-
-CDKTF doesn't have automatic rollback. If deployment fails midway:
-
-1. Document what was deployed
-2. Check AWS console for partial resources
-3. Either fix and redeploy or manually clean up
-4. Report state to orchestrator
 
 ## Success Criteria
 

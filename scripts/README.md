@@ -14,7 +14,7 @@ npm run sequence -- run <name> [--dry-run]
 ```
 
 - Config shape: `{ sequences: [{ name, description, steps[] }] }`; steps run from the repo root and stop on the first failure.
-- Current names: `build-deploy-node-server`, `outputs-after-clean`, `full-clean-and-test` (mirrors scripts.md).
+- Current names: `build-deploy-api-lambda`, `deploy-infra`, `deploy-lambdas`, `full-deploy`, `clean-and-deploy`, `refresh-outputs` (mirrors scripts.md).
 - Add/edit sequences by updating `scripts/sequences.config.json`; keep names kebab-case and steps ordered as they should execute. Use `--dry-run` to verify new sequences without running commands.
 
 ## Repository Service Scaffolder
@@ -102,28 +102,32 @@ The repository service scaffolder calls this CLI whenever the `handler` bundle i
 
 Have an idea for a new automation bundle? Add templates under `scripts/templates/repository-service/bundles/<bundle>` and register the bundle in the manifest—then document it in this file so other contributors can discover it.
 
-## CDK Deploy Orchestrator
+## CDK Orchestrator
 
 ```
-node scripts/deploy-orchestrator.mjs <command> [options]
-npm run deploy -- <command> [options]
+node scripts/cdk.mjs <command> [options]
+npm run cdk -- <command> [options]
 ```
 
 ### What it does
 
-- Smart orchestration for the CDKTF build/deploy flow that detects current state and determines minimum steps needed.
+- Unified orchestration for all CDKTF operations: deploy, outputs, build, synth, list, destroy, bootstrap.
+- Loads environment variables from `.env.{dev|prod}` using dotenvx programmatically.
+- Runs cdktf commands directly with proper argument handling.
 - Handles stack dependencies automatically and validates prerequisites before deployment.
-- Supports deploying individual stacks, groups of stacks, or all stacks in the correct order.
 
 ### Commands
 
 - `status` — Show current state of outputs and artifacts.
 - `validate <stack|group>` — Check if prerequisites are met for deployment.
-- `plan <stack|group>` — Show what steps would be executed.
 - `deploy <stack|group>` — Deploy with automatic prerequisite handling.
 - `outputs <stack|group>` — Pull outputs for deployed stacks.
-- `build` — Build all apps with no cache.
+- `build` — Build all apps and copy assets.
 - `prepare` — Full preparation: build, copy assets, pull outputs.
+- `synth` — Synthesize Terraform configuration.
+- `list` — List available stacks.
+- `destroy <stack|group>` — Destroy stacks.
+- `bootstrap` — Bootstrap the CDKTF backend (S3 + DynamoDB).
 
 ### Stack groups
 
@@ -136,109 +140,48 @@ npm run deploy -- <command> [options]
 
 - `--prod` — Target production environment.
 - `--dry-run` — Show what would be done without executing.
-- `--force` — Force rebuild even if artifacts exist.
-- `--no-cache` — Disable Turborepo cache for builds.
-- `--auto-approve` — Skip interactive approval prompts (see below).
+- `--force` — Force deployment even if validation fails.
+- `--auto-approve` — Skip interactive approval prompts (required for CI/agents).
 
 ### Examples
 
 ```bash
-# Deploy all stacks to dev
-npm run deploy -- deploy all
+# Check current state
+node scripts/cdk.mjs status
 
-# Deploy lambdas to production without prompts
-npm run deploy -- deploy lambdas --prod --auto-approve
+# Deploy infrastructure stacks to dev
+node scripts/cdk.mjs deploy infra --auto-approve
 
-# Check what would be deployed
-npm run deploy -- plan all --dry-run
+# Deploy all stacks to production
+node scripts/cdk.mjs deploy all --prod --auto-approve
+
+# Pull outputs from deployed stacks
+node scripts/cdk.mjs outputs infra
+
+# Full preparation: build + copy assets + pull outputs
+node scripts/cdk.mjs prepare
+
+# Bootstrap the CDKTF backend
+node scripts/cdk.mjs bootstrap --auto-approve
 ```
 
----
+### Auto-approve flag
 
-## CDKTF State Manager
-
-```
-node scripts/manage-cdktf-state.mjs <command> [options]
-```
-
-### What it does
-
-- Automates the sanctioned bootstrap sequence for the CDKTF backend: toggles the bootstrap stack flag, deploys the bootstrap stack, restores the flag, synthesizes stacks, runs the state migration helper, and deletes the local Terraform state file.
-
-### Commands
-
-- `bootstrap-backend` — Deploy the bootstrap stack and migrate Terraform state.
-- `copy-assets-for-cdk` — Run the asset copy script for platform CDK stacks.
-- `cdk list` — List available stacks with descriptions.
-- `cdk deploy <stack> [--prod]` — Deploy the specified stack.
-- `cdk output <stack> [--prod]` — Write CDK outputs for the specified stack.
-
-### Flags
-
-- `--prod` — Target production environment (for `cdk deploy` and `cdk output`).
-- `--auto-approve` — Skip interactive approval prompts (see below).
-
-### Usage notes
-
-- Run from the repository root with credentials configured for the target environment.
-- The script derives the stack name from `cdk/platform-cdk/src/constants.ts`, removes `cdk/platform-cdk/terraform.<stack>.tfstate` (plus the legacy `.terraform/terraform.tfstate` copy), and restores `migrateStateToBootstrappedBackend` to its original value even if a command fails.
-- Command output streams directly to your terminal; rerun once issues are resolved.
-- Omitting `<stack>` in an interactive terminal opens a picker so you can select and confirm one or more stacks; the script runs each deploy/output sequentially with the same flags. Append `--` before any extra CDK arguments (for example, `-- --context stage=dev`) to forward them to every selected stack.
-
-### Examples
-
-```bash
-# Bootstrap the backend interactively
-node scripts/manage-cdktf-state.mjs bootstrap-backend
-
-# Bootstrap without prompts (for CI)
-node scripts/manage-cdktf-state.mjs bootstrap-backend --auto-approve
-```
-
----
-
-## Auto-Approve Flag
-
-The `--auto-approve` flag is available on both CDK deployment scripts to skip interactive confirmation prompts. This is essential for non-interactive environments where stdin is not a TTY.
-
-### When to use --auto-approve
+The `--auto-approve` flag skips interactive confirmation prompts. This is essential for non-interactive environments.
 
 | Environment | Use --auto-approve? | Reason |
 |-------------|---------------------|--------|
-| CI/CD pipelines (GitHub Actions, etc.) | Yes | No TTY available for prompts |
+| CI/CD pipelines | Yes | No TTY available for prompts |
 | Automated scripts | Yes | Cannot respond to interactive prompts |
 | Claude Code / AI agents | Yes | Non-interactive execution environment |
-| Local development (interactive) | No | Review prompts catch mistakes |
-| Production deployments (manual) | No | Human verification is a safety check |
-
-### Behavior
-
-When `--auto-approve` is passed:
-
-- **deploy-orchestrator.mjs**: Skips the "Would you like to run preparation steps first?" prompt when validation fails. The script exits with an error instead of offering interactive recovery. The flag is also forwarded to the underlying CDKTF deploy command.
-- **manage-cdktf-state.mjs**: The `bootstrap-backend` command passes `--auto-approve` to the CDKTF deploy step, allowing unattended bootstrap operations.
-
-### Usage examples
-
-```bash
-# Deploy all stacks without prompts (CI/CD)
-npm run deploy -- deploy all --auto-approve
-
-# Deploy to production without prompts
-npm run deploy -- deploy all --prod --auto-approve
-
-# Bootstrap backend in CI environment
-node scripts/manage-cdktf-state.mjs bootstrap-backend --auto-approve
-
-# Combine with other flags
-npm run deploy -- deploy lambdas --prod --auto-approve --force
-```
+| Local development | Optional | Review prompts catch mistakes |
+| Production deployments | Recommended with `--dry-run` first | Preview before committing |
 
 ### Safety considerations
 
 - Always use `--dry-run` first in new environments to preview changes.
 - In CI pipelines, ensure proper branch protections and approval gates before deployment steps.
-- The `--auto-approve` flag does not bypass validation checks—it only skips interactive prompts. If prerequisites are missing, the script still fails.
+- The `--auto-approve` flag does not bypass validation checks—it only skips interactive prompts.
 
 ---
 

@@ -2,10 +2,10 @@
   "sequences": [
     {
       "name": "build-deploy-api-lambda",
-      "description": "Build and deploy the API lambda using the orchestrator.",
+      "description": "Build and deploy the API lambda.",
       "steps": [
         "npm -w node-server run decrypt-envs",
-        "node scripts/deploy-orchestrator.mjs deploy myapp-api-lambda-stack",
+        "node scripts/cdk.mjs deploy secretary-assistant-api-lambda-stack --auto-approve",
         "npm -w node-server run encrypt-envs"
       ]
     },
@@ -13,22 +13,22 @@
       "name": "deploy-infra",
       "description": "Deploy all infrastructure stacks (api-stack, analytics-stack).",
       "steps": [
-        "node scripts/deploy-orchestrator.mjs deploy infra"
+        "node scripts/cdk.mjs deploy infra --auto-approve"
       ]
     },
     {
       "name": "deploy-lambdas",
       "description": "Build and deploy all Lambda stacks.",
       "steps": [
-        "node scripts/deploy-orchestrator.mjs deploy lambdas"
+        "node scripts/cdk.mjs deploy lambdas --auto-approve"
       ]
     },
     {
       "name": "full-deploy",
       "description": "Full deployment: build everything, deploy all stacks in order.",
       "steps": [
-        "node scripts/deploy-orchestrator.mjs prepare",
-        "node scripts/deploy-orchestrator.mjs deploy all"
+        "node scripts/cdk.mjs prepare",
+        "node scripts/cdk.mjs deploy all --auto-approve"
       ]
     },
     {
@@ -37,8 +37,8 @@
       "steps": [
         "npm run clean",
         "npm i",
-        "node scripts/deploy-orchestrator.mjs prepare",
-        "node scripts/deploy-orchestrator.mjs deploy all",
+        "node scripts/cdk.mjs prepare",
+        "node scripts/cdk.mjs deploy all --auto-approve",
         "npm run test"
       ]
     },
@@ -46,7 +46,7 @@
       "name": "refresh-outputs",
       "description": "Pull fresh outputs from all deployed infrastructure stacks.",
       "steps": [
-        "node scripts/deploy-orchestrator.mjs outputs infra"
+        "node scripts/cdk.mjs outputs infra"
       ]
     }
   ]
