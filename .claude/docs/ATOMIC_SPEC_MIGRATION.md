@@ -2,6 +2,8 @@
 
 This document describes the changes made to the skills and agents system to support the new atomic spec workflow.
 
+> **Reference**: This guide implements the technical details of the [AI-Native Engineering System — Unified Vision](https://docs.google.com/document/d/1pQA7lIvofbKL7NzS4PkIRKlfBNnVsTtCMgSfJB7A17Y).
+
 ---
 
 ## Overview
@@ -10,8 +12,31 @@ The system has been migrated from a **task-list based workflow** to an **atomic 
 
 1. **Spec Groups**: A directory structure containing all artifacts for a feature/change
 2. **Atomic Specs**: Independently testable, deployable, reviewable, and reversible units
-3. **Full Traceability**: Chain from requirements → atomic specs → implementation → tests
+3. **Full Traceability**: Chain from requirements → atomic specs → implementation → tests → PRs
 4. **Two-Dimensional State**: Review state (approval) + Work state (progress)
+5. **PRD Versioning**: Specs trace to specific PRD versions (v1, v2, v3...)
+
+---
+
+## Canonical Artifacts
+
+The atomic spec workflow is built on these foundational primitives (per Unified Vision):
+
+| Artifact | Purpose | Location |
+|----------|---------|----------|
+| **PRDs** | Human-readable source of intent, versioned (v1, v2...), DRAFT/REVIEWED state | External (Notion/Google Docs) |
+| **Requirements** | Testable language derived from PRDs, bridge to specs | `requirements.md` in spec group |
+| **Atomic Specs** | Independently testable/reviewable/deployable units | `atomic/*.md` in spec group |
+| **Knowledge Base** | Curated institutional knowledge, queried by agents | `.claude/memory-bank/` |
+| **Traceability Matrix** | Links: Requirement → Spec → Tests → Code → PR | Validated by Unifier |
+
+### PRD Versioning
+
+PRDs are versioned (v1, v2, v3...) with state tracking:
+- **DRAFT**: Agent/system changes create new versions starting as DRAFT
+- **REVIEWED**: User changes can go directly to REVIEWED
+
+Spec groups are linked to specific PRD versions. When a PRD evolves, new spec groups may be created for the new version.
 
 ---
 
@@ -359,12 +384,62 @@ Key changes:
 │   │           ├── as-001-<slug>.md
 │   │           ├── as-002-<slug>.md
 │   │           └── ...
+│   ├── schema/           # JSON schemas for validation
+│   │   ├── atomic-spec.schema.json
+│   │   └── spec-group.schema.json
 │   └── archive/          # Completed spec groups
 ├── templates/            # Templates for specs
-│   ├── atomic-spec.md    # Atomic spec template
-│   ├── requirements.md   # Requirements template
-│   └── prd.md            # PRD template
+│   ├── atomic-spec.template.md      # Atomic spec template
+│   ├── requirements.template.md     # Requirements template
+│   ├── prd.template.md              # PRD template
+│   ├── task-spec.template.md        # Task spec template
+│   └── workstream-spec.template.md  # Workstream spec template
+├── skills/               # Skill definitions (new structure)
+│   ├── <skill-name>/
+│   │   ├── SKILL.md      # Skill metadata and instructions
+│   │   └── prompts/      # Skill-specific prompts (optional)
+│   └── ...
 ```
+
+### Skills Directory Structure
+
+Skills are now organized in `.claude/skills/<skill-name>/` directories:
+
+```
+.claude/skills/
+├── atomize/
+│   └── SKILL.md          # /atomize skill definition
+├── enforce/
+│   └── SKILL.md          # /enforce skill definition
+├── implement/
+│   └── SKILL.md          # /implement skill definition
+├── prd/
+│   └── SKILL.md          # /prd skill definition
+├── spec/
+│   └── SKILL.md          # /spec skill definition
+├── test/
+│   └── SKILL.md          # /test skill definition
+├── unify/
+│   └── SKILL.md          # /unify skill definition
+└── ...                   # Other skills
+```
+
+Each `SKILL.md` file contains:
+- Skill metadata (name, description, triggers)
+- Instructions for execution
+- Input/output specifications
+- Related agents and subagents
+
+### JSON Schemas
+
+The workflow includes validation schemas:
+
+| Schema | Purpose |
+|--------|---------|
+| `atomic-spec.schema.json` | Validates atomic spec YAML frontmatter and structure |
+| `spec-group.schema.json` | Validates manifest.json structure and convergence gates |
+
+These schemas enable tooling to validate spec artifacts before processing.
 
 ---
 
@@ -375,18 +450,39 @@ Key changes:
 1. **Create spec group structure**:
    ```bash
    mkdir -p .claude/specs/groups
+   mkdir -p .claude/specs/schema
+   mkdir -p .claude/skills
    ```
 
-2. **Migrate existing specs**:
+2. **Copy schemas and templates**:
+   - Copy `atomic-spec.schema.json` and `spec-group.schema.json` to `.claude/specs/schema/`
+   - Copy `atomic-spec.template.md`, `requirements.template.md`, `prd.template.md` to `.claude/templates/`
+
+3. **Set up skills directory**:
+   - Create skill directories under `.claude/skills/`
+   - Each skill needs a `SKILL.md` file with instructions
+   - Key skills: `atomize`, `enforce`, `prd`, `spec`, `implement`, `test`, `unify`
+
+4. **Migrate existing specs**:
    - Move spec to `<spec-group-id>/spec.md`
    - Extract requirements to `requirements.md`
+   - Create `manifest.json` with initial state
    - Run `/atomize` to create atomic specs
    - Run `/enforce` to validate atomicity
 
-3. **Update skill invocations**:
+5. **Archive legacy specs**:
+   - Move completed specs from `.claude/specs/active/` to `.claude/specs/archive/`
+   - For in-progress specs, migrate to spec groups before archiving
+   - **Important**: Do not leave orphaned specs in `active/` after migration
+
+6. **Update skill invocations**:
    - Change `/implement <slug>` to `/implement <spec-group-id>`
    - Change `/test` to `/test <spec-group-id>`
    - Change `/unify` to `/unify <spec-group-id>`
+
+7. **Update agent references**:
+   - Update agent files that reference `.claude/specs/active/<slug>.md`
+   - Change to `.claude/specs/groups/<spec-group-id>/` format
 
 ### For New Projects
 
@@ -621,6 +717,45 @@ if (
 
 ---
 
+## Agent Taxonomy
+
+The system uses 16 agents organized into 4 categories (per Unified Vision):
+
+### Orchestration Agents
+| Agent | Purpose |
+|-------|---------|
+| `main-facilitator` | Coordinates work, delegates to specialists, protects context |
+| `multi-workstream-orchestrator` | Manages parallel workstreams for large efforts (git worktrees) |
+
+### Specification Agents
+| Agent | Purpose |
+|-------|---------|
+| `product-manager` | Requirements gathering and user interviews |
+| `prd-critic` | Reviews PRDs for completeness and clarity |
+| `spec-author` | Authors atomic specs from requirements |
+| `atomizer` | Decomposes specs into atomic units |
+| `atomicity-enforcer` | Validates specs meet atomicity criteria |
+| `risk-reviewer` | Identifies risks and rollout concerns |
+
+### Execution Agents
+| Agent | Purpose |
+|-------|---------|
+| `explorer` | Research and investigation (codebase or web) |
+| `implementer` | Implements code from approved specs |
+| `test-writer` | Writes tests for acceptance criteria |
+| `refactorer` | Code quality improvements preserving behavior |
+
+### Verification Agents
+| Agent | Purpose |
+|-------|---------|
+| `unifier` | Validates spec-implementation-test alignment |
+| `code-reviewer` | Code quality and best practices (includes UX validation) |
+| `security-reviewer` | Security vulnerabilities and concerns |
+| `quality-scanner` | Continuous complexity and duplication monitoring |
+| `documenter` | Generates and maintains documentation |
+
+---
+
 ## Convergence Gates (Complete)
 
 Before merge, all gates must pass in manifest.json:
@@ -639,6 +774,44 @@ Before merge, all gates must pass in manifest.json:
   }
 }
 ```
+
+---
+
+## Quality Metrics
+
+The following metrics should be tracked (thresholds configurable per project):
+
+| Metric | Description |
+|--------|-------------|
+| Cyclomatic complexity | Per function complexity measurement |
+| Cognitive complexity | Per function readability measurement |
+| Code duplication | Percentage of duplicated code in codebase |
+| Code churn | Percentage of changes within time window |
+| Test coverage | Percentage of code covered by tests |
+| Refactor ratio | Percentage of changes that are refactors |
+| Complexity delta | Change in complexity per PR |
+
+The `quality-scanner` agent monitors these metrics continuously and opens refactor PRs when thresholds are exceeded.
+
+---
+
+## AI Guardrails
+
+Hard constraints on AI authority (per Unified Vision):
+
+- **AI cannot invent product intent** — intent comes from humans via PRDs
+- **AI cannot silently weaken tests** — test changes require explicit justification
+- **AI cannot merge to main** — humans approve all merges
+- **AI cannot skip human review** for security-critical code
+- **All changes are diff-based and reviewable**
+- **AI operates as a disciplined, auditable engineer** — not an unchecked author
+
+### Generator Cannot Grade Own Work
+
+The agent that creates must be structurally separate from the agent that reviews:
+- Generation and verification are distinct roles with distinct authorities
+- This separation is architectural, not advisory
+- Trust emerges from independent validation, not self-assessment
 
 ---
 
@@ -777,3 +950,39 @@ When user initiates logout, clear the authentication token from local storage.
 - `2026-01-14T14:30:00Z`: Implementation complete - auth-service.ts:67
 - `2026-01-14T15:00:00Z`: Tests written - 2 tests covering AC1, AC2
 ```
+
+---
+
+## Migration Checklist
+
+Use this checklist to verify a project has been fully migrated to the atomic spec workflow:
+
+### Directory Structure
+- [ ] `.claude/specs/groups/` directory exists
+- [ ] `.claude/specs/schema/` directory exists with:
+  - [ ] `atomic-spec.schema.json`
+  - [ ] `spec-group.schema.json`
+- [ ] `.claude/templates/` directory includes:
+  - [ ] `atomic-spec.template.md`
+  - [ ] `requirements.template.md`
+  - [ ] `prd.template.md`
+- [ ] `.claude/skills/` directory exists with skill subdirectories
+
+### Skills
+- [ ] `/atomize` skill implemented (`.claude/skills/atomize/SKILL.md`)
+- [ ] `/enforce` skill implemented (`.claude/skills/enforce/SKILL.md`)
+- [ ] `/prd` skill implemented (`.claude/skills/prd/SKILL.md`)
+- [ ] Other skills updated to reference spec groups
+
+### Agents
+- [ ] Agent files updated to reference `.claude/specs/groups/` paths
+- [ ] `atomizer` agent exists (`.claude/agents/atomizer.md`)
+- [ ] `atomicity-enforcer` agent exists (`.claude/agents/atomicity-enforcer.md`)
+
+### Legacy Cleanup
+- [ ] No orphaned specs in `.claude/specs/active/` (all migrated or archived)
+- [ ] Agent references to `.claude/specs/active/<slug>.md` removed
+
+### Example Artifacts
+- [ ] At least one example spec group exists in `.claude/specs/groups/`
+- [ ] Example includes: `manifest.json`, `requirements.md`, `spec.md`, `atomic/*.md`
