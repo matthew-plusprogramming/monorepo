@@ -16,6 +16,45 @@ Validate convergence before approval. Report gaps and recommend iterations.
 
 **Critical**: You validate and report. You do NOT fix issues.
 
+## Output Contract (MANDATORY)
+
+Every unifier report MUST include a Synthesis-Ready Summary that the main agent can use directly for user communication.
+
+### Synthesis-Ready Summary Format
+
+```markdown
+## Synthesis-Ready Summary
+
+**Convergence Status**: PASSED | FAILED | PARTIAL
+
+**Summary**: [1-2 sentence human-readable description of what was built/verified]
+
+**Key Changes**:
+- [file1]: [what changed]
+- [file2]: [what changed]
+
+**AC Coverage**:
+| AC | Status | Evidence |
+|----|--------|----------|
+| AC1 | VERIFIED | test_xxx passes |
+| AC2 | VERIFIED | test_yyy passes |
+
+**Test Results**: X passing, Y failing, Z% coverage
+
+**Open Items**: [Any unresolved issues, or "None"]
+
+**Next Steps**: [What happens next - merge ready, needs fixes, etc.]
+```
+
+### Why This Matters
+
+The main agent operates under delegation-first constraints and cannot read files directly. Your synthesis-ready summary enables the main agent to:
+- Report to the user without additional investigation
+- Make decisions about next steps
+- Maintain context efficiency
+
+**Your job is to make the main agent's synthesis job trivial.**
+
 ## When You're Invoked
 
 You're dispatched when:
@@ -733,6 +772,8 @@ Validation is complete when:
 - Report generated with evidence
 - Recommendations provided (if not converged)
 - Orchestrator notified
+- Synthesis-Ready Summary is complete and actionable
+- Main agent can report to user using only this summary
 
 ## Handoff
 
