@@ -15,7 +15,26 @@ The facilitator agent orchestrates large multi-workstream projects (orchestrator
 
 ### 1. Worktree Allocation Decision-Making
 
-Analyze MasterSpec to make judgment calls on worktree allocation:
+Analyze MasterSpec spec group to make judgment calls on worktree allocation.
+
+**Spec Group Structure for MasterSpec**:
+```
+.claude/specs/groups/<master-spec-group-id>/
+├── manifest.json           # Master spec state tracking
+├── requirements.md         # High-level requirements
+├── spec.md                 # MasterSpec overview
+└── workstreams/            # Per-workstream spec groups
+    ├── ws-1/
+    │   ├── manifest.json   # Workstream state
+    │   ├── spec.md         # Workstream spec
+    │   └── atomic/         # Atomic specs for ws-1
+    │       ├── as-001-<slug>.md
+    │       └── as-002-<slug>.md
+    ├── ws-2/
+    │   └── ...
+    └── ws-3/
+        └── ...
+```
 
 **Allocation Heuristics**:
 
@@ -33,12 +52,13 @@ Analyze MasterSpec to make judgment calls on worktree allocation:
 
 **Allocation Process**:
 
-1. Load MasterSpec and analyze dependency graph
-2. Identify independent workstreams (no shared dependencies or files)
-3. Identify tightly coupled workstreams (sequential, same subsystem)
-4. Apply heuristics to group workstreams into worktrees
-5. Document allocation strategy in MasterSpec "Worktree Allocation Strategy" section
-6. Update session.json with worktree_allocation
+1. Load MasterSpec spec group at `.claude/specs/groups/<master-spec-group-id>/`
+2. Read each workstream's spec group to understand scope and dependencies
+3. Identify independent workstreams (no shared dependencies or files)
+4. Identify tightly coupled workstreams (sequential, same subsystem)
+5. Apply heuristics to group workstreams into worktrees
+6. Document allocation strategy in MasterSpec manifest.json `worktree_allocation` field
+7. Update session.json with worktree_allocation
 
 **Example Allocation**:
 
@@ -96,19 +116,21 @@ You are implementing workstream ws-1.
 
 1. **Working Directory**: All operations MUST occur in the worktree path above
 2. **Isolation**: Do NOT modify files in the main worktree
-3. **Spec Location**: .claude/specs/active/<slug>/ws-1.md (accessible from worktree)
-4. **Git Operations**: All commits are local to this worktree's branch
+3. **Spec Group Location**: .claude/specs/groups/<master-spec-group-id>/workstreams/ws-1/
+4. **Atomic Specs**: Execute in order from atomic/ directory (as-001, as-002, etc.)
+5. **Git Operations**: All commits are local to this worktree's branch
 
 ${sharedWorktreeNotice}
 
 ## YOUR TASK
 
-Implement WorkstreamSpec ws-1 following the standard implementation process.
+Implement all atomic specs in ws-1 spec group following the standard implementation process.
 
 Completion criteria:
-- All tasks in task list complete
+- All atomic specs have status: implemented
+- All ACs have Implementation Evidence filled
 - All tests passing
-- Update spec implementation_status: complete
+- Update workstream manifest.json work_state: VERIFYING
 - Report to facilitator for convergence validation
   `,
   subagent_type: 'implementer',
@@ -136,7 +158,11 @@ After convergence gates pass for a workstream:
 
 **Prerequisites**:
 
-- Unifier validation passed (in worktree)
+- All atomic specs have status: implemented
+- All atomic spec ACs have Implementation Evidence
+- All atomic spec ACs have Test Evidence
+- Unifier validation passed (traceability chain complete)
+- Code review passed
 - Security review passed
 - Browser tests passed (if UI)
 - All dependencies merged to main
@@ -152,16 +178,17 @@ git status  # Check for uncommitted changes
 git add .   # Stage any final changes
 git commit -m "feat(ws-1): implement <title>
 
-Implements WorkstreamSpec ws-1 from <master-spec-slug>
+Implements workstream ws-1 from <master-spec-group-id>
 
-Acceptance Criteria:
-- AC1.1: <criterion> ✅
-- AC1.2: <criterion> ✅
-- AC1.3: <criterion> ✅
+Atomic Specs:
+- as-001: <title> ✅
+- as-002: <title> ✅
+- as-003: <title> ✅
 
 Tests: <N> passing
 Coverage: <X>%
-Convergence: PASSED
+Convergence: PASSED (all atomic specs complete)
+Code Review: PASSED
 Security: PASSED
 
 🤖 Generated with Claude Code
@@ -173,8 +200,9 @@ cd /Users/matthewlin/Desktop/Personal\ Projects/engineering-assistant
 # 4. Merge with --no-ff (preserves workstream history)
 git merge --no-ff feature/ws-1-websocket-server -m "Merge ws-1: <title>
 
-Implements WorkstreamSpec ws-1 from <master-spec-slug>
+Implements workstream ws-1 spec group from <master-spec-group-id>
 
+Atomic Specs: 3 complete
 Contracts Provided:
 - contract-websocket-api: src/websocket/server.ts
 
@@ -187,6 +215,7 @@ git push origin main
 # 6. Update session state
 # - Mark workstream status: merged
 # - Add merge_timestamp
+# - Update workstream manifest.json work_state: READY_TO_MERGE → merged
 # - Unblock dependent workstreams
 # - Update merge_queue
 ```
@@ -229,6 +258,7 @@ Continuously evaluate workstream readiness based on dependency satisfaction:
 ```javascript
 function evaluateWorkstreamReadiness(workstream_id) {
   const ws = getWorkstream(workstream_id);
+  const manifest = loadManifest(ws.spec_group_path); // workstream manifest.json
 
   // Check if all dependencies are merged
   for (const dep_id of ws.dependencies) {
@@ -242,13 +272,16 @@ function evaluateWorkstreamReadiness(workstream_id) {
     }
   }
 
-  // Check if convergence gates passed
+  // Check if convergence gates passed (from workstream manifest.json)
+  const conv = manifest.convergence;
   if (
-    ws.convergence_status.spec_complete &&
-    ws.convergence_status.implementation_aligned &&
-    ws.convergence_status.tests_passing &&
-    ws.convergence_status.security_reviewed &&
-    (ws.convergence_status.browser_tested || !requiresBrowserTest(ws))
+    conv.all_acs_implemented &&
+    conv.all_tests_written &&
+    conv.all_tests_passing &&
+    conv.traceability_complete &&
+    conv.code_review_passed &&
+    conv.security_review_passed &&
+    (conv.browser_tested || !requiresBrowserTest(ws))
   ) {
     return {
       ready: true,
@@ -598,9 +631,12 @@ The facilitator is invoked during orchestrator workflow after MasterSpec approva
 
 Before marking orchestrator task complete, verify:
 
+- ✅ All workstream spec groups converged (all atomic specs implemented + tested)
+- ✅ All workstream manifest.json show convergence gates passed
+- ✅ Full traceability chain validated for each workstream (REQ → atomic spec → impl → test)
 - ✅ All workstreams merged to main
 - ✅ All worktrees cleaned up
 - ✅ No merge conflicts remain
 - ✅ Integration tests passing on main
 - ✅ Session state reflects all merges
-- ✅ MasterSpec Decision & Work Log updated with completion
+- ✅ MasterSpec manifest.json Decision Log updated with completion

@@ -1,17 +1,28 @@
 ---
 name: security
-description: Review implementation for security vulnerabilities and best practices. Checks input validation, injection prevention, auth/authz, secrets handling. Use after implementation before merge.
+description: Review implementation for security vulnerabilities and best practices. Checks input validation, injection prevention, auth/authz, secrets handling. Use after code review before merge.
 allowed-tools: Read, Glob, Grep
+user-invocable: true
 ---
 
 # Security Review Skill
 
 ## Purpose
+
 Review implementation for security vulnerabilities before approval. Produce pass/fail report with findings and recommendations.
+
+**Key Input**: Spec group at `.claude/specs/groups/<spec-group-id>/`
+
+## Usage
+
+```
+/security <spec-group-id>                   # Security review all changes for spec group
+/security <spec-group-id> <atomic-spec-id>  # Review specific atomic spec implementation
+```
 
 ## When to Use
 
-Mandatory for:
+**Mandatory for**:
 - Any feature handling user input
 - Authentication or authorization changes
 - API endpoints or data access
@@ -20,21 +31,52 @@ Mandatory for:
 - External API calls
 - Cryptographic operations
 
-Optional for:
+**Optional for**:
 - Pure UI changes with no data handling
 - Documentation updates
 - Test-only changes
 
+## Review Pipeline Position
+
+```
+Implementation → Unify → Code Review → Security Review → Merge
+                                            ↑
+                                        You are here
+```
+
+Security review runs AFTER code review because:
+- Quality issues should be fixed first
+- Clean code is easier to security-review
+- Separation of concerns (quality vs security)
+
+## Prerequisites
+
+Before security review, verify:
+
+1. **Spec group exists** at `.claude/specs/groups/<spec-group-id>/`
+2. **Code review passed** - `convergence.code_review_passed: true` in manifest
+3. **All atomic specs implemented** - status is `implemented`
+
+If prerequisites not met → STOP and run `/code-review` first.
+
 ## Security Review Process
 
-### Step 1: Load Spec and Implementation
+### Step 1: Load Spec Group and Implementation Evidence
 
 ```bash
-# Load spec to understand requirements
-cat .claude/specs/active/<slug>.md
+# Load manifest
+cat .claude/specs/groups/<spec-group-id>/manifest.json
 
-# Find implementation files
-grep -r "class\|function\|const" src/ --include="*.ts" -l
+# Verify code review passed
+# convergence.code_review_passed: true
+
+# Load spec for context
+cat .claude/specs/groups/<spec-group-id>/spec.md
+
+# List atomic specs
+ls .claude/specs/groups/<spec-group-id>/atomic/
+
+# Build file list from Implementation Evidence in each atomic spec
 ```
 
 Identify:
@@ -83,6 +125,7 @@ login(email, password);
 ```markdown
 ### Finding 1: Missing Input Validation (High)
 - **File**: src/api/auth.ts:42
+- **Atomic Spec**: as-002
 - **Issue**: Email not validated before use
 - **Risk**: Injection attacks, malformed data
 - **Recommendation**: Add Zod schema validation
@@ -131,18 +174,6 @@ Verify:
 - [ ] If necessary, use `execFile` with array args (not `exec`)
 - [ ] Whitelist validation for any user-controlled values
 
-**Good**:
-```typescript
-// Safe - no shell, array args
-execFile("convert", ["-resize", "100x100", inputPath, outputPath]);
-```
-
-**Bad**:
-```typescript
-// Command injection vulnerable
-exec(`convert -resize 100x100 ${inputPath} ${outputPath}`);
-```
-
 #### XSS (Cross-Site Scripting)
 ```bash
 # Find HTML rendering
@@ -154,18 +185,6 @@ Verify:
 - [ ] No `dangerouslySetInnerHTML` with user content
 - [ ] Framework escaping used (React, Vue auto-escape)
 - [ ] Content Security Policy headers set
-
-**Good**:
-```tsx
-// React auto-escapes
-<div>{userInput}</div>
-```
-
-**Bad**:
-```tsx
-// XSS vulnerable
-<div dangerouslySetInnerHTML={{ __html: userInput }} />
-```
 
 ### Step 4: Authentication & Authorization Review
 
@@ -186,25 +205,6 @@ grep -r "router\.\|app\.\|@Get\|@Post" src/ --include="*.ts"
 - [ ] Tokens validated on every request
 - [ ] Session management secure (httpOnly cookies, SameSite)
 
-**Good**:
-```typescript
-// Auth required
-@Get("/profile")
-@UseGuards(AuthGuard)
-async getProfile(@CurrentUser() user: User) {
-  return user.profile;
-}
-```
-
-**Bad**:
-```typescript
-// No auth - anyone can access
-@Get("/profile")
-async getProfile(@Query("userId") userId: string) {
-  return db.getProfile(userId);
-}
-```
-
 ### Step 5: Secrets & Sensitive Data Review
 
 Check secrets are not exposed.
@@ -223,29 +223,6 @@ grep -r "\".*secret.*\"\|'.*secret.*'" src/ --include="*.ts"
 - [ ] Secrets not logged
 - [ ] Secrets not sent to client
 - [ ] PII (Personally Identifiable Information) encrypted at rest
-
-**Good**:
-```typescript
-// Secret from environment
-const apiKey = process.env.API_KEY;
-
-// PII encrypted
-const user = await db.user.create({
-  data: {
-    email: email,
-    ssn: encrypt(ssn) // Encrypted before storage
-  }
-});
-```
-
-**Bad**:
-```typescript
-// Hardcoded secret
-const apiKey = "sk_live_abc123def456";
-
-// PII logged
-console.log(`User SSN: ${user.ssn}`);
-```
 
 ### Step 6: Data Protection Review
 
@@ -266,18 +243,6 @@ Verify:
 - [ ] No PII in logs (emails, SSNs, credit cards)
 - [ ] No passwords or tokens in logs
 - [ ] Error messages don't leak sensitive info
-
-**Good**:
-```typescript
-// Safe logging
-logger.info("User login successful", { userId: user.id });
-```
-
-**Bad**:
-```typescript
-// Sensitive data in logs
-logger.info("User logged in", { email: user.email, password: user.password });
-```
 
 ### Step 7: Dependency Security Review
 
@@ -302,15 +267,38 @@ npm audit --audit-level=high
 Aggregate findings into security report.
 
 ```markdown
-# Security Review Report: <Task Name>
+# Security Review Report: <spec-group-id>
 
-**Date**: 2026-01-02 17:00
+**Date**: 2026-01-14
 **Reviewer**: security-reviewer
-**Spec**: .claude/specs/active/logout-button.md
+**Spec Group**: .claude/specs/groups/<spec-group-id>/
 
 ## Summary: ✅ PASS
 
 No critical or high-severity issues found. 1 medium-severity recommendation.
+
+---
+
+## Per Atomic Spec Review
+
+### as-001: Logout Button UI
+- **Files**: src/components/UserMenu.tsx
+- **Security**: ✅ No security concerns (pure UI)
+
+### as-002: Token Clearing
+- **Files**: src/services/auth-service.ts
+- **Security**: ✅ Pass
+- **Notes**: Token properly cleared from localStorage
+
+### as-003: Post-Logout Redirect
+- **Files**: src/router/auth-router.ts
+- **Security**: ✅ Pass
+- **Notes**: Redirect uses hardcoded path (no open redirect)
+
+### as-004: Error Handling
+- **Files**: src/services/auth-service.ts
+- **Security**: ⚠️ 1 Medium finding
+- **Notes**: Error message could be more specific
 
 ---
 
@@ -320,19 +308,10 @@ No critical or high-severity issues found. 1 medium-severity recommendation.
 
 #### Finding 1: Weak Error Message
 - **File**: src/services/auth-service.ts:47
+- **Atomic Spec**: as-004
 - **Issue**: Error message "Logout failed. Please try again." doesn't indicate cause
 - **Risk**: Medium - User confusion, but no security impact
 - **Recommendation**: Add specific error codes without leaking sensitive info
-```typescript
-// Recommended
-catch (error) {
-  if (error.code === 'NETWORK_ERROR') {
-    throw new Error('Unable to connect. Check your network.');
-  } else {
-    throw new Error('Logout failed. Please try again.');
-  }
-}
-```
 
 ---
 
@@ -392,6 +371,7 @@ If critical or high-severity issues found:
 
 ### Finding 1: SQL Injection Vulnerability (Critical)
 - **File**: src/api/users.ts:34
+- **Atomic Spec**: as-002
 - **Issue**: User input directly concatenated into SQL query
 - **Risk**: CRITICAL - Attacker can access/modify entire database
 - **POC**: `userId = "1 OR 1=1--"` returns all users
@@ -407,24 +387,30 @@ const user = await db.query(
 **Action**: STOP - Fix critical issues before proceeding.
 ```
 
-Status levels:
+**Severity levels**:
 - **Critical**: Immediate data breach or system compromise risk
 - **High**: Significant security risk, should be fixed before merge
 - **Medium**: Security concern, should be addressed soon
 - **Low**: Best practice improvement, nice to have
 
-### Step 10: Record Security Approval
+### Step 10: Update Manifest
 
-Add to spec's Decision & Work Log:
+Update manifest.json with security review status:
 
-```markdown
-## Decision & Work Log
-
-- 2026-01-02 17:00: Security review completed
-  - Status: PASS
-  - Findings: 0 critical, 0 high, 1 medium
-  - Reviewer: security-reviewer subagent
-  - Approval: Can proceed to merge
+```json
+{
+  "convergence": {
+    "security_review_passed": true
+  },
+  "decision_log": [
+    {
+      "timestamp": "<ISO timestamp>",
+      "actor": "agent",
+      "action": "security_review_complete",
+      "details": "0 critical, 0 high, 1 medium - PASS"
+    }
+  ]
+}
 ```
 
 ## Common Vulnerabilities to Check
@@ -444,15 +430,15 @@ Add to spec's Decision & Work Log:
 
 ## Integration with Other Skills
 
-After security review:
+**Before security review**:
+- Run `/unify` to ensure spec-impl-test convergence
+- Run `/code-review` for code quality review
+
+**After security review**:
 - If PASS with UI changes → Proceed to `/browser-test`
 - If PASS with public API → Trigger `/docs` for documentation
 - If PASS (simple change, no UI, no public API) → Ready for commit
-- If FAIL → Use `/implement` to fix issues, then re-review
-
-Before security review:
-- Run `/unify` to ensure spec-impl-test convergence
-- Run `/code-review` for code quality review
+- If FAIL → Use `/implement` to fix issues, then re-run `/security`
 
 **Documentation trigger**: If the implementation adds or modifies public APIs, user-facing features, or configuration options, dispatch the documenter subagent after security passes.
 
@@ -460,24 +446,22 @@ Before security review:
 
 ### Example 1: Pass with No Findings
 
-**Input**: Logout button implementation (no user input, no data access)
+**Input**: Logout button implementation (spec group sg-logout-button)
 
 **Security Review**:
-- Input validation: N/A (no user input)
-- Injection: N/A (no queries)
-- Auth: ✅ Endpoint authenticated
-- Secrets: ✅ None exposed
-- Data protection: ✅ Token cleared
+- as-001: N/A (pure UI)
+- as-002: ✅ Token cleared properly
+- as-003: ✅ Hardcoded redirect (safe)
+- as-004: ✅ Error handling safe
 
 **Output**: ✅ PASS - No findings, ready for merge
 
 ### Example 2: Fail - SQL Injection
 
-**Input**: User search endpoint with SQL injection
+**Input**: User search endpoint (spec group sg-user-search)
 
 **Security Review**:
-- Input validation: ❌ No validation
-- Injection: ❌ CRITICAL - SQL injection in search query
+- as-001: ❌ CRITICAL - SQL injection in search query
 
 **Output**:
 ```markdown
@@ -485,6 +469,7 @@ Before security review:
 
 **Finding**: User input directly in SQL query
 **File**: src/api/search.ts:12
+**Atomic Spec**: as-001
 **Fix**: Use parameterized query
 
 DO NOT MERGE until fixed.
@@ -494,19 +479,19 @@ DO NOT MERGE until fixed.
 
 ### Example 3: Pass with Recommendations
 
-**Input**: Login endpoint with weak password requirements
+**Input**: Login endpoint (spec group sg-user-login)
 
 **Security Review**:
-- Input validation: ⚠️  Medium - Min password length is 6 (recommend 8)
-- Injection: ✅ Pass
-- Auth: ✅ Pass
-- Secrets: ✅ Pass
+- as-001: ⚠️ Medium - Min password length is 6 (recommend 8)
+- as-002: ✅ Pass
+- as-003: ✅ Pass
 
 **Output**:
 ```markdown
 ✅ PASS with recommendations
 
 **Finding (Medium)**: Weak password requirements
+**Atomic Spec**: as-001
 **Recommendation**: Increase minimum password length to 8 characters
 
 Can proceed to merge, but recommend addressing finding in future iteration.

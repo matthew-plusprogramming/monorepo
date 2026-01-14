@@ -1,0 +1,74 @@
+{
+  "id": "sg-example-logout",
+  "title": "Logout Feature for Dashboard",
+  "prd": {
+    "source": "google-docs",
+    "document_id": "1abc123xyz",
+    "version": "v1",
+    "last_sync": "2026-01-14T10:00:00Z",
+    "url": "https://docs.google.com/document/d/1abc123xyz"
+  },
+  "review_state": "APPROVED",
+  "work_state": "PLAN_READY",
+  "updated_by": "user",
+  "created_at": "2026-01-14T09:00:00Z",
+  "updated_at": "2026-01-14T12:00:00Z",
+  "requirements": {
+    "count": 4,
+    "source": "prd"
+  },
+  "atomic_specs": {
+    "count": 4,
+    "coverage": "100%",
+    "enforcement_status": "passing",
+    "last_enforced": "2026-01-14T11:30:00Z"
+  },
+  "convergence": {
+    "spec_complete": true,
+    "all_acs_implemented": false,
+    "all_tests_passing": false,
+    "unifier_passed": false,
+    "code_review_passed": false,
+    "security_review_passed": false,
+    "browser_tests_passed": null,
+    "docs_generated": null
+  },
+  "decision_log": [
+    {
+      "timestamp": "2026-01-14T09:00:00Z",
+      "actor": "agent",
+      "action": "spec_group_created",
+      "details": "Created from PRD sync"
+    },
+    {
+      "timestamp": "2026-01-14T09:30:00Z",
+      "actor": "agent",
+      "action": "requirements_extracted",
+      "details": "4 requirements extracted from PRD v1"
+    },
+    {
+      "timestamp": "2026-01-14T10:00:00Z",
+      "actor": "agent",
+      "action": "spec_authored",
+      "details": "spec.md created with 6 ACs"
+    },
+    {
+      "timestamp": "2026-01-14T10:30:00Z",
+      "actor": "agent",
+      "action": "atomized",
+      "details": "Decomposed into 4 atomic specs"
+    },
+    {
+      "timestamp": "2026-01-14T11:30:00Z",
+      "actor": "agent",
+      "action": "enforcement_passed",
+      "details": "All atomic specs meet criteria"
+    },
+    {
+      "timestamp": "2026-01-14T12:00:00Z",
+      "actor": "user",
+      "action": "approved",
+      "details": "User approved spec group for implementation"
+    }
+  ]
+}

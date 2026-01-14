@@ -1,109 +1,141 @@
 ---
 name: implement
-description: Implement code changes based on approved specifications. Executes task list from spec, gathers evidence, and escalates if implementation reveals spec gaps. Use after spec approval.
+description: Implement code changes based on approved atomic specs. Executes one atomic spec at a time, gathers evidence, and escalates if implementation reveals spec gaps. Use after spec group approval.
 allowed-tools: Read, Write, Edit, Glob, Grep, Bash, Task
+user-invocable: true
 ---
 
 # Implementation Skill
 
 ## Purpose
-Execute implementation tasks from approved specs with full traceability to requirements.
+
+Execute implementation from approved atomic specs with full traceability to requirements.
+
+**Key Input**: Atomic specs from `.claude/specs/groups/<spec-group-id>/atomic/`
+
+## Usage
+
+```
+/implement <spec-group-id>                    # Implement all atomic specs in order
+/implement <spec-group-id> <atomic-spec-id>   # Implement specific atomic spec
+/implement <spec-group-id> --parallel         # Dispatch parallel implementers per atomic spec
+```
 
 ## Prerequisites
 
 Before using this skill, verify:
 
-1. **Spec exists** in `.claude/specs/active/`
-2. **Spec status** is `approved` (check frontmatter or Decision & Work Log)
-3. **For MasterSpec**: All workstream specs merged and validated
-4. **Open questions** are resolved or explicitly deferred
+1. **Spec group exists** at `.claude/specs/groups/<spec-group-id>/`
+2. **review_state** is `APPROVED` in manifest.json
+3. **Atomic specs exist** in `atomic/` directory
+4. **Enforcement passed** (`atomic_specs.enforcement_status: "passing"`)
+5. **Open questions** are resolved or explicitly deferred
 
 If prerequisites not met → STOP and resolve before implementing.
 
 ## Implementation Process
 
-### Step 1: Load and Verify Spec
+### Step 1: Load and Verify Spec Group
 
-```bash
-# Read the spec
-cat .claude/specs/active/<slug>.md
-
-# Check status
-grep "^status:" .claude/specs/active/<slug>.md
+```
+Read: .claude/specs/groups/<spec-group-id>/manifest.json
+Read: .claude/specs/groups/<spec-group-id>/requirements.md
+Read: .claude/specs/groups/<spec-group-id>/spec.md
+List: .claude/specs/groups/<spec-group-id>/atomic/*.md
 ```
 
-Verify:
-- Status is `approved`
-- Task list is present
-- Acceptance criteria are clear
+Verify in manifest.json:
+- `review_state` is `APPROVED`
+- `atomic_specs.enforcement_status` is `passing`
 - No blocking open questions
 
-### Step 2: Understand the Codebase
+### Step 2: List Atomic Specs
 
-Before making changes:
-
-```bash
-# Find relevant files
-glob "**/*.ts" | grep <keyword>
-
-# Understand existing patterns
-grep -r "class <Pattern>" --include="*.ts"
-
-# Check existing tests
-glob "**/*.test.ts" | grep <related>
+```
+.claude/specs/groups/<spec-group-id>/atomic/
+├── as-001-logout-button-ui.md
+├── as-002-token-clearing.md
+├── as-003-post-logout-redirect.md
+└── as-004-error-handling.md
 ```
 
-Study:
-- Existing code structure
-- Naming conventions
+Each atomic spec is independently implementable. Execute in order (as-001, as-002, etc.).
+
+### Step 3: Understand the Codebase
+
+Before making changes, study existing patterns:
+- File structure and naming conventions
 - Error handling patterns
 - Testing approaches
 
-### Step 3: Execute Task List in Order
+### Step 4: Execute Atomic Specs in Order
 
-For each task in the spec's task list:
+For each atomic spec:
 
-#### 3a. Mark Task as In Progress
-Update spec:
-```markdown
-- [→] Task 1: Add logout button to UserMenu component
+#### 4a. Mark Atomic Spec as In Progress
+
+Update atomic spec frontmatter:
+```yaml
+status: implementing
 ```
 
-(Use `[→]` to indicate in-progress)
+Update manifest.json:
+```json
+{
+  "work_state": "IMPLEMENTING"
+}
+```
 
-#### 3b. Implement the Task
+#### 4b. Read Atomic Spec
+
+From the atomic spec file, extract:
+- Description (single behavior to implement)
+- Acceptance criteria
+- Test strategy
+- Deployment notes
+
+#### 4c. Implement the Atomic Spec
+
 Follow spec requirements exactly:
 - Use existing patterns from codebase
 - Maintain naming conventions
 - Include error handling as specified
-- Add comments only where logic is non-obvious
+- Add comments linking to AC numbers
 
-#### 3c. Run Relevant Tests
+#### 4d. Run Relevant Tests
+
 ```bash
-# Run tests related to this change
-npm test -- <test-file>
-
-# Or run all tests if unsure
-npm test
+npm test -- <related-test>
 ```
 
-#### 3d. Mark Task Complete
-Update spec:
+#### 4e. Fill Implementation Evidence
+
+Update the atomic spec's Implementation Evidence section:
 ```markdown
-- [x] Task 1: Add logout button to UserMenu component
+## Implementation Evidence
+
+| File | Line | Description |
+|------|------|-------------|
+| src/services/auth-service.ts | 67 | logout() method clears token |
+| src/components/UserMenu.tsx | 42 | Logout button component |
 ```
 
-#### 3e. Log Evidence
-Add to spec's Execution section (or Decision & Work Log):
+#### 4f. Mark Atomic Spec Complete
+
+Update atomic spec frontmatter:
+```yaml
+status: implemented
+```
+
+Add to atomic spec Decision Log:
 ```markdown
-## Execution Log
+## Decision Log
 
-- 2026-01-02 14:30: Task 1 complete - Added logout button to UserMenu.tsx:47
-  - Tests passing: user-menu.test.ts (3 tests)
-  - Evidence: Button renders with correct aria-label
+- `2026-01-14T10:30:00Z`: Created from spec.md decomposition
+- `2026-01-14T14:30:00Z`: Implementation complete - auth-service.ts:67
 ```
 
-### Step 4: Handle Spec Deviations
+### Step 5: Handle Spec Deviations
 
 If you discover during implementation:
 
@@ -151,9 +183,9 @@ Found a more efficient or clearer way to achieve the requirement.
 
 **Never silently deviate from the spec.**
 
-### Step 5: Validate Implementation
+### Step 6: Validate Implementation
 
-After all tasks complete:
+After all atomic specs complete:
 
 ```bash
 # Run full test suite
@@ -172,23 +204,48 @@ Ensure:
 - Build succeeds
 - No console errors introduced
 
-### Step 6: Update Spec Status
+### Step 7: Update Manifest
 
-Mark implementation complete:
+Update manifest.json with implementation complete:
 
-```yaml
----
-status: approved
-implementation_status: complete
----
+```json
+{
+  "work_state": "VERIFYING",
+  "convergence": {
+    "all_acs_implemented": true
+  },
+  "decision_log": [
+    // ... existing entries ...
+    {
+      "timestamp": "<ISO timestamp>",
+      "actor": "agent",
+      "action": "implementation_complete",
+      "details": "All 4 atomic specs implemented, tests passing"
+    }
+  ]
+}
 ```
 
-Add final entry to Decision & Work Log:
+### Step 8: Report Completion
+
 ```markdown
-- 2026-01-02 15:45: Implementation complete
-  - All 6 tasks executed
-  - Tests passing (12 tests total)
-  - Ready for unifier validation
+## Implementation Complete ✅
+
+**Spec Group**: <spec-group-id>
+**Atomic Specs**: 4/4 complete
+
+**Evidence**:
+- as-001: src/components/UserMenu.tsx:42
+- as-002: src/services/auth-service.ts:67
+- as-003: src/router/auth-router.ts:23
+- as-004: src/services/auth-service.ts:78
+
+**Tests**: All passing
+**Build**: Successful
+
+**Next Steps**:
+1. Run `/test <spec-group-id>` to ensure test coverage (if not done in parallel)
+2. Run `/unify <spec-group-id>` to validate convergence
 ```
 
 ## Parallel Execution with Test Writer

@@ -138,7 +138,13 @@ const createLambdaResources = (
     runtime: 'nodejs22.x',
     memorySize: 256,
     timeout: 10,
-    environment: {},
+    environment: {
+      variables: {
+        JWT_SECRET: process.env.JWT_SECRET ?? '',
+        PEPPER: process.env.PEPPER ?? '',
+        APP_ENV: process.env.APP_ENV ?? '',
+      },
+    },
     role: iamRole.arn,
     region,
     loggingConfig: {

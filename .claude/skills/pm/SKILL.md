@@ -1,21 +1,55 @@
 ---
 name: pm
 description: Product manager skill for interviewing users to gather requirements, clarify ambiguities, refine iterations, and gather feedback on features. Use at the start of any task requiring a spec, or when gathering user feedback on implementations.
-allowed-tools: Read, Write, Edit, AskUserQuestion
+allowed-tools: Read, Write, Edit, Glob, AskUserQuestion
+user-invocable: true
 ---
 
 # Product Manager Skill
 
 ## Purpose
+
 Act as a product manager to thoroughly understand user needs, gather structured requirements, and ensure alignment before spec authoring or implementation.
+
+**Key Output**: Creates a spec group with `requirements.md` that feeds into `/spec` and `/atomize`.
+
+## Usage
+
+```
+/pm                           # Start new discovery interview, create spec group
+/pm <spec-group-id>           # Add requirements to existing spec group
+/pm feedback <spec-group-id>  # Gather feedback on implementation
+/pm refine <spec-group-id>    # Refine existing requirements based on new info
+```
 
 ## When to Use This Skill
 
-- **Initial discovery**: Starting a new task that needs a spec (TaskSpec or ProblemBrief)
+- **Initial discovery**: Starting a new task that needs a spec (creates spec group)
 - **Clarification**: User request is vague or has multiple interpretations
-- **Refinement**: Spec draft exists but has open questions or ambiguities
+- **Refinement**: Spec group exists but has open questions or ambiguities
 - **Feedback collection**: Implementation complete, gathering user reactions
 - **Iteration planning**: Deciding what to build next or how to improve existing features
+
+## Output: Spec Group with requirements.md
+
+Unlike inline requirements documents, `/pm` creates a **spec group directory** with a structured `requirements.md` file:
+
+```
+.claude/specs/groups/sg-<feature-slug>/
+├── manifest.json      # Created by /pm
+└── requirements.md    # Created by /pm
+```
+
+After `/pm` completes, the flow continues:
+```
+/pm → requirements.md
+  ↓
+/spec → spec.md
+  ↓
+/atomize → atomic/*.md
+  ↓
+/enforce → validation
+```
 
 ## Interview Flows
 
@@ -168,55 +202,155 @@ Use this when deciding what to build in the next iteration.
 
 ## Output Formats
 
-### Discovery Output: Requirements Document
+### Discovery Output: Spec Group + requirements.md
 
-After initial discovery, produce a structured requirements document:
+After initial discovery, create a spec group directory and write `requirements.md`:
 
+**Step 1: Create spec group directory**
+```
+.claude/specs/groups/sg-<feature-slug>/
+```
+
+**Step 2: Create manifest.json**
+```json
+{
+  "id": "sg-<feature-slug>",
+  "title": "<Feature Name>",
+  "prd": null,
+  "review_state": "DRAFT",
+  "work_state": "PLAN_READY",
+  "updated_by": "agent",
+  "created_at": "<ISO timestamp>",
+  "updated_at": "<ISO timestamp>",
+  "requirements": {
+    "count": <N>,
+    "source": "pm-interview"
+  },
+  "decision_log": [
+    {
+      "timestamp": "<ISO timestamp>",
+      "actor": "agent",
+      "action": "spec_group_created",
+      "details": "Created from PM interview"
+    }
+  ]
+}
+```
+
+**Step 3: Create requirements.md**
 ```markdown
-# Requirements: <Feature Name>
+---
+spec_group: sg-<feature-slug>
+source: pm-interview
+prd_version: null
+last_updated: <YYYY-MM-DD>
+---
+
+# Requirements
+
+## Source
+
+- **Origin**: PM Interview
+- **Date**: <YYYY-MM-DD>
+- **Interviewee**: User
 
 ## Problem Statement
-<Concise statement of the problem>
+
+<Concise statement of the problem being solved>
 
 ## Goals
+
 - Goal 1: <What we want to achieve>
 - Goal 2: <What we want to achieve>
 
-## Non-goals
+## Non-Goals
+
 - Non-goal 1: <What we explicitly won't do>
-- Non-goal 2: <What we explicitly won't do>
 
 ## Success Criteria
-- Criterion 1: <Measurable indicator of success>
-- Criterion 2: <Measurable indicator of success>
 
-## Requirements (EARS Format)
-- **WHEN** <condition>, **THEN** the system shall <behavior>
-- **WHEN** <condition>, **THEN** the system shall <behavior>
+- [ ] Criterion 1: <Measurable indicator of success>
+- [ ] Criterion 2: <Measurable indicator of success>
+
+## Requirements
+
+### REQ-001: <Requirement Title>
+
+**Statement**: <Clear description of what the system must do>
+
+**EARS Format**:
+- WHEN <condition/trigger>
+- THE SYSTEM SHALL <required behavior>
+- AND <additional behavior if any>
+
+**Rationale**: <Why this requirement exists>
+
+**Priority**: Must Have | Should Have | Nice to Have
+
+**Constraints**: <Any limitations on implementation>
+
+**Assumptions**: <What we're assuming to be true>
+
+---
+
+### REQ-002: <Requirement Title>
+
+**Statement**: <Description>
+
+**EARS Format**:
+- WHEN <trigger>
+- THE SYSTEM SHALL <behavior>
+
+**Rationale**: <Why>
+
+**Priority**: <Priority>
+
+---
 
 ## Constraints
-- Constraint 1: <Limitation or boundary>
-- Constraint 2: <Limitation or boundary>
+
+- **Technical**: <e.g., Must work on all supported browsers>
+- **Business**: <e.g., Must launch before deadline>
+- **Other**: <Additional constraints>
+
+## Assumptions
+
+- **Assumption 1**: <Statement> — Impact if wrong: <impact>
+- **Assumption 2**: <Statement> — Impact if wrong: <impact>
 
 ## Edge Cases
-- Edge case 1: <Scenario and desired behavior>
-- Edge case 2: <Scenario and desired behavior>
+
+- **Edge case 1**: <Scenario> → Expected behavior: <behavior>
+- **Edge case 2**: <Scenario> → Expected behavior: <behavior>
 
 ## Open Questions
-- Q1: <Question>? (Priority: high/medium/low)
-- Q2: <Question>? (Priority: high/medium/low)
+
+- [ ] **Q1**: <Question>? — Priority: high/medium/low
+- [ ] **Q2**: <Question>? — Priority: high/medium/low
+- [x] **Q3**: <Resolved question> → **Answer**: <resolution>
 
 ## Priorities
+
 **Must-have (v1)**:
-- Feature 1
-- Feature 2
+- REQ-001: <title>
+- REQ-002: <title>
 
 **Nice-to-have (v2)**:
-- Feature 3
-- Feature 4
+- REQ-003: <title>
 
 **Deferred**:
-- Feature 5
+- <Future consideration>
+
+## Traceability
+
+| Requirement | Atomic Specs | Status |
+|-------------|--------------|--------|
+| REQ-001 | (pending /atomize) | TBD |
+| REQ-002 | (pending /atomize) | TBD |
+
+## Change Log
+
+- `<ISO timestamp>`: Initial requirements from PM interview
 ```
 
 ### Clarification Output: Decision Record
@@ -337,19 +471,54 @@ AskUserQuestion({
 })
 ```
 
-## Integration with Spec Skills
+## Integration with Spec Group Workflow
 
-After completing PM discovery, hand off to `/spec` skill:
+After completing PM discovery, the spec group is ready for the next steps:
+
+### Handoff to /spec
 
 ```markdown
-## Requirements Gathered
+## Requirements Gathered ✅
 
-<Requirements document from PM interview>
+Spec group created: `sg-<feature-slug>`
+Location: `.claude/specs/groups/sg-<feature-slug>/`
 
-**Next Action**: Use `/spec` skill to author <TaskSpec|WorkstreamSpec|ProblemBrief> based on these requirements.
+Files created:
+- `manifest.json` — Spec group metadata (review_state: DRAFT)
+- `requirements.md` — <N> requirements in EARS format
+
+**Next Steps**:
+1. Review requirements: `cat .claude/specs/groups/sg-<feature-slug>/requirements.md`
+2. Run `/spec sg-<feature-slug>` to create spec.md
+3. Run `/atomize sg-<feature-slug>` to decompose into atomic specs
+4. Run `/enforce sg-<feature-slug>` to validate atomicity
+5. User approves → implementation begins
 ```
 
-The spec-author can then reference the requirements document when creating the formal spec.
+### Linking to External PRD
+
+If the requirements came from a user interview but should be linked to an external PRD:
+
+```
+/prd link sg-<feature-slug> <google-doc-id>
+```
+
+This will:
+1. Update `manifest.json` with PRD reference
+2. Mark requirements as needing sync verification
+3. Enable `/prd push` to send discoveries back to the PRD
+
+### State After /pm Completes
+
+```json
+{
+  "review_state": "DRAFT",     // Needs user review
+  "work_state": "PLAN_READY",  // Ready for /spec
+  "updated_by": "agent"        // Agent created, so DRAFT
+}
+```
+
+User can review and approve requirements before proceeding to `/spec`.
 
 ## Examples
 

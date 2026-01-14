@@ -1,72 +1,98 @@
 ---
 name: unify
-description: Validate spec-implementation-test alignment and convergence. Checks spec completeness, implementation conformance, test coverage, and contract consistency. Use after implementation and tests are complete.
+description: Validate spec-implementation-test alignment and convergence for spec groups. Checks spec completeness, atomic spec coverage, implementation evidence, test evidence, and traceability. Use after implementation and tests are complete.
 allowed-tools: Read, Glob, Grep, Bash, Task
+user-invocable: true
 ---
 
 # Unify Skill
 
 ## Purpose
-Validate that implementation and tests conform to the spec. Ensure convergence before approval and merge.
+
+Validate that implementation and tests conform to the spec group's atomic specs. Ensure convergence before approval and merge.
+
+**Key Input**: Spec group at `.claude/specs/groups/<spec-group-id>/`
+
+## Usage
+
+```
+/unify <spec-group-id>          # Validate full spec group convergence
+/unify <spec-group-id> --quick  # Quick check (skip deep validation)
+```
 
 ## Convergence Criteria
 
-A task is **converged** when:
-1. **Spec is complete** - All required sections present, open questions resolved
-2. **Implementation aligns** - Code matches spec requirements exactly
-3. **Tests pass** - All tests passing, coverage adequate
-4. **Contracts valid** - (For MasterSpec) Contracts consistent across workstreams
+A spec group is **converged** when:
+1. **Requirements complete** - All REQ-XXX requirements present with EARS format
+2. **Spec complete** - spec.md has all required sections
+3. **Atomic specs complete** - All atomic specs have implementation and test evidence
+4. **Traceability intact** - REQ → atomic spec → implementation → test chain is complete
+5. **Tests pass** - All tests passing, coverage adequate
+6. **Contracts valid** - (For MasterSpec) Contracts consistent across workstreams
 
 If any criterion fails → Task is **not converged** → Iteration needed.
 
 ## Validation Process
 
-### Step 1: Load Spec
+### Step 1: Load Spec Group
+
 ```bash
-cat .claude/specs/active/<slug>.md
+# Load manifest
+cat .claude/specs/groups/<spec-group-id>/manifest.json
+
+# Load requirements
+cat .claude/specs/groups/<spec-group-id>/requirements.md
+
+# Load spec
+cat .claude/specs/groups/<spec-group-id>/spec.md
+
+# List atomic specs
+ls .claude/specs/groups/<spec-group-id>/atomic/
 ```
 
-Read:
-- Acceptance criteria
-- Requirements (EARS format)
-- Task list
-- Test plan
-- Decision & Work Log
+Verify in manifest.json:
+- `review_state` is `APPROVED`
+- `atomic_specs.enforcement_status` is `passing`
+- `work_state` is `VERIFYING`
 
-### Step 2: Spec Completeness Check
+### Step 2: Requirements Completeness Check
 
-#### For TaskSpec
-Verify:
-- [ ] Context and Goal present
-- [ ] Requirements in EARS format
-- [ ] Acceptance criteria are testable
-- [ ] Design notes (if non-trivial)
-- [ ] Task list with clear outcomes
-- [ ] Test plan maps ACs to tests
-- [ ] Decision & Work Log has approval entry
-- [ ] No unresolved blocking open questions
-
-#### For WorkstreamSpec
-Verify all sections from template:
-- [ ] Context, Goals/Non-goals
-- [ ] Atomic testable requirements
-- [ ] Core flows documented
-- [ ] At least one sequence diagram
+Verify requirements.md:
+- [ ] Problem statement present
+- [ ] Goals and non-goals defined
+- [ ] REQ-XXX requirements in EARS format
+- [ ] Each requirement has rationale and priority
+- [ ] Constraints and assumptions documented
 - [ ] Edge cases identified
-- [ ] Interfaces & data model defined
-- [ ] Security considerations addressed
-- [ ] Task list with dependencies
-- [ ] Testing strategy defined
 - [ ] Open questions resolved or deferred
-- [ ] Decision & Work Log complete
 
-#### For MasterSpec
-Verify:
-- [ ] All workstream specs linked
-- [ ] Contract registry complete
-- [ ] Dependency graph is acyclic
-- [ ] No cross-workstream conflicts
-- [ ] All gates passed
+**Output**: Requirements completeness report
+
+```markdown
+## Requirements Completeness: ✅ Pass
+
+- Problem statement: Present
+- Goals: 3 defined
+- Requirements: 4 in EARS format (REQ-001 through REQ-004)
+- All high priority questions resolved
+- No blocking open questions
+```
+
+### Step 3: Spec Completeness Check
+
+Verify spec.md:
+- [ ] Context (references requirements.md)
+- [ ] Goals/Non-goals (consistent with requirements.md)
+- [ ] Requirements Summary (references, doesn't duplicate)
+- [ ] Acceptance Criteria (mapped to requirements)
+- [ ] Core Flows documented
+- [ ] At least one sequence diagram
+- [ ] Edge cases from requirements addressed
+- [ ] Interfaces & Data Model (if applicable)
+- [ ] Security considerations
+- [ ] Task list with dependencies
+- [ ] Test plan mapping ACs to test cases
+- [ ] Open questions resolved
 
 **Output**: Spec completeness report
 
@@ -74,80 +100,104 @@ Verify:
 ## Spec Completeness: ✅ Pass
 
 - All required sections present
-- 4 acceptance criteria defined (all testable)
-- 6 tasks in task list (all completed)
-- No blocking open questions
-- Approval recorded: 2026-01-02
+- 8 acceptance criteria (mapped to REQ-001 through REQ-004)
+- 1 sequence diagram for logout flow
+- Security considerations addressed
+- All open questions resolved
 ```
 
-### Step 3: Implementation Alignment Check
+### Step 4: Atomic Spec Validation
 
-Verify implementation matches spec requirements.
-
-#### Approach
-For each requirement/AC:
-1. Identify implementation location (from task list evidence)
-2. Read implementation code
-3. Verify behavior matches spec
-4. Check error handling matches spec edge cases
+For each atomic spec in `atomic/`:
 
 ```bash
-# Find implemented files
-grep -r "logout" src/ --include="*.ts" -l
+# Read atomic spec
+cat .claude/specs/groups/<spec-group-id>/atomic/as-001-logout-button-ui.md
+```
 
-# Read implementation
+Verify each atomic spec:
+- [ ] `status` is `implemented`
+- [ ] Requirements refs present (REQ-XXX)
+- [ ] Acceptance criteria defined
+- [ ] Implementation Evidence section filled
+- [ ] Test Evidence section filled
+- [ ] Decision Log has completion entry
+
+**Output**: Atomic spec coverage report
+
+```markdown
+## Atomic Spec Coverage: ✅ Pass
+
+| Atomic Spec | Status | Impl Evidence | Test Evidence |
+|-------------|--------|---------------|---------------|
+| as-001 | implemented | ✅ 2 files | ✅ 2 tests |
+| as-002 | implemented | ✅ 1 file | ✅ 2 tests |
+| as-003 | implemented | ✅ 1 file | ✅ 2 tests |
+| as-004 | implemented | ✅ 2 files | ✅ 2 tests |
+
+**All 4 atomic specs have complete evidence**
+```
+
+### Step 5: Traceability Validation
+
+Verify complete chain: REQ → Atomic Spec → Implementation → Test
+
+```markdown
+## Traceability Matrix
+
+| Requirement | Atomic Specs | Implementation | Tests |
+|-------------|--------------|----------------|-------|
+| REQ-001 | as-001 | UserMenu.tsx:15 | user-menu.test.ts:12 |
+| REQ-002 | as-002 | auth-service.ts:67 | auth-service.test.ts:24 |
+| REQ-003 | as-003 | auth-router.ts:23 | auth-router.test.ts:18 |
+| REQ-004 | as-004 | auth-service.ts:72 | auth-service.test.ts:35 |
+
+**Coverage**: 100% of requirements traced to atomic specs, implementation, and tests
+```
+
+### Step 6: Implementation Alignment Check
+
+Verify implementation matches atomic spec requirements.
+
+```bash
+# For each atomic spec, verify implementation evidence
+# Read the files listed in Implementation Evidence
 cat src/services/auth-service.ts
 ```
 
-#### Alignment Checklist
-- [ ] All requirements have corresponding implementation
-- [ ] Interfaces match spec definitions
-- [ ] Error handling matches spec edge cases
-- [ ] No undocumented functionality (features not in spec)
-- [ ] Data models match spec
-- [ ] API contracts match spec
+For each atomic spec AC:
+- [ ] Implementation exists at stated location
+- [ ] Behavior matches AC description
+- [ ] Error handling matches edge cases
+- [ ] No undocumented functionality
 
 **Output**: Implementation alignment report
 
 ```markdown
 ## Implementation Alignment: ✅ Pass
 
-- AC1.1: ✅ Token cleared in AuthService.logout():42
-- AC1.2: ✅ Redirect to /login in Router.onAuthChange():58
-- AC1.3: ✅ Toast shown in UserMenu.handleLogout():31
-- AC2.1: ✅ Error handling in AuthService.logout():47
+**as-001**: Logout Button UI
+- AC1 ✅ Button rendered in UserMenu (UserMenu.tsx:15)
+- AC2 ✅ Button triggers logout (UserMenu.tsx:18)
+
+**as-002**: Token Clearing
+- AC1 ✅ Token cleared from localStorage (auth-service.ts:67)
+- AC2 ✅ Server session invalidated (auth-service.ts:70)
+
+**as-003**: Post-Logout Redirect
+- AC1 ✅ Redirect to /login (auth-router.ts:23)
+- AC2 ✅ Confirmation message shown (auth-router.ts:28)
+
+**as-004**: Error Handling
+- AC1 ✅ Error message displayed (auth-service.ts:72)
+- AC2 ✅ User stays logged in on error (auth-service.ts:75)
 
 **No undocumented features detected**
 ```
 
-#### Common Misalignments
+### Step 7: Test Coverage Check
 
-**Extra features**:
-```markdown
-❌ Found feature not in spec:
-  - File: src/services/auth-service.ts:65
-  - Feature: Auto-retry on network failure
-  - **Action**: Remove or add to spec and get approval
-```
-
-**Missing requirements**:
-```markdown
-❌ Requirement AC2.3 not implemented:
-  - AC2.3: Retry button appears on error
-  - **Action**: Implement missing requirement
-```
-
-**Behavioral deviation**:
-```markdown
-❌ Behavior differs from spec:
-  - Spec: "redirect to /login"
-  - Implementation: "redirect to /login?error=logged_out"
-  - **Action**: Match spec exactly or propose amendment
-```
-
-### Step 4: Test Coverage Check
-
-Verify tests cover all acceptance criteria and pass.
+Verify tests cover all atomic spec ACs and pass.
 
 ```bash
 # Run tests
@@ -157,264 +207,212 @@ npm test
 npm test -- --coverage
 ```
 
-#### Coverage Checklist
-- [ ] Every acceptance criterion has at least one test
-- [ ] Tests verify spec requirements (not implementation details)
-- [ ] All tests passing
-- [ ] No flaky tests (run 3x to confirm)
-- [ ] Coverage meets standards (typically 80%+)
+For each atomic spec:
+- [ ] Every AC has at least one test
+- [ ] Test references atomic spec ID and AC
+- [ ] Test passes
+- [ ] Test validates behavior (not implementation)
 
 **Output**: Test coverage report
 
 ```markdown
 ## Test Coverage: ✅ Pass
 
-| AC | Test | Status |
-|----|------|--------|
-| AC1.1 | auth-service.test.ts:12 | ✅ Pass |
-| AC1.2 | auth-router.test.ts:24 | ✅ Pass |
-| AC1.3 | user-menu.test.ts:35 | ✅ Pass |
-| AC2.1 | auth-service.test.ts:28 | ✅ Pass |
+**Per Atomic Spec**:
+| Atomic Spec | AC | Test | Status |
+|-------------|-----|------|--------|
+| as-001 | AC1 | user-menu.test.ts:12 | ✅ Pass |
+| as-001 | AC2 | user-menu.test.ts:20 | ✅ Pass |
+| as-002 | AC1 | auth-service.test.ts:24 | ✅ Pass |
+| as-002 | AC2 | auth-service.test.ts:35 | ✅ Pass |
+| as-003 | AC1 | auth-router.test.ts:18 | ✅ Pass |
+| as-003 | AC2 | auth-router.test.ts:28 | ✅ Pass |
+| as-004 | AC1 | auth-service.test.ts:45 | ✅ Pass |
+| as-004 | AC2 | auth-service.test.ts:55 | ✅ Pass |
 
-**Coverage**: 12 tests total, 100% AC coverage, 94% line coverage
+**Summary**: 8 tests total, 100% AC coverage, 94% line coverage
 ```
 
-#### Common Coverage Issues
-
-**Missing test**:
-```markdown
-❌ AC2.3 has no test:
-  - AC2.3: Retry button appears on error
-  - **Action**: Add test in user-menu.test.ts
-```
-
-**Failing test**:
-```markdown
-❌ Test failing:
-  - Test: auth-service.test.ts:28
-  - Error: Expected null, got "test-token"
-  - **Action**: Fix implementation or fix test
-```
-
-**Low coverage**:
-```markdown
-⚠️  Coverage below standard:
-  - Current: 72% line coverage
-  - Required: 80%
-  - **Action**: Add tests for uncovered branches
-```
-
-### Step 5: Contract Validation (MasterSpec Only)
+### Step 8: Contract Validation (MasterSpec Only)
 
 For multi-workstream efforts, validate contracts.
 
 ```bash
-# Load MasterSpec
-cat .claude/specs/active/<slug>/master.md
-
-# Check contract registry
-grep -A 5 "^## Contract Registry" .claude/specs/active/<slug>/master.md
+# Check contract registry in manifest
+grep -A 10 "contracts" .claude/specs/groups/<spec-group-id>/manifest.json
 ```
 
-#### Contract Checklist
-- [ ] All contracts registered in registry
-- [ ] No duplicate contract IDs
-- [ ] Contract owners match workstreams
-- [ ] Contract versions consistent
-- [ ] Implementations match contract interfaces
+Verify:
+- All contracts registered
+- No duplicate contract IDs
+- Implementations match contract interfaces
+- No dependency cycles
 
-**Output**: Contract validation report
+### Step 9: Generate Convergence Report
 
-```markdown
-## Contract Validation: ✅ Pass
-
-| Contract ID | Owner | Implementation | Status |
-|-------------|-------|----------------|--------|
-| contract-websocket-api | ws-1 | src/websocket/server.ts | ✅ Match |
-| contract-notification-api | ws-3 | src/services/notifications.ts | ✅ Match |
-
-**No conflicts detected**
-```
-
-#### Common Contract Issues
-
-**Interface mismatch**:
-```markdown
-❌ Contract implementation mismatch:
-  - Contract: contract-websocket-api (ws-1)
-  - Expected: `connect(userId: string): Promise<WebSocket>`
-  - Found: `connect(userId: number): Promise<WebSocket>`
-  - **Action**: Fix implementation to match contract or update contract
-```
-
-**Dependency cycle**:
-```markdown
-❌ Dependency cycle detected:
-  - ws-1 depends on ws-2
-  - ws-2 depends on ws-3
-  - ws-3 depends on ws-1
-  - **Action**: Restructure to break cycle
-```
-
-### Step 6: Generate Convergence Report
-
-Aggregate all checks into single convergence report.
+Aggregate all checks:
 
 ```markdown
-# Convergence Report: <Task Name>
+# Convergence Report: <spec-group-id>
 
-**Date**: 2026-01-02 16:30
-**Spec**: .claude/specs/active/logout-button.md
+**Date**: 2026-01-14 16:30
+**Spec Group**: .claude/specs/groups/<spec-group-id>/
 
 ## Summary: ✅ CONVERGED
 
-All validation checks passed. Ready for approval and merge.
+All validation checks passed. Ready for code review.
 
 ---
 
 ## Validation Results
 
-### Spec Completeness: ✅ Pass
-- All required sections present
-- 4 acceptance criteria (all testable)
-- 6 tasks completed
-- No blocking open questions
-- Approval: 2026-01-02
+### Requirements: ✅ Pass
+- 4 requirements in EARS format
+- All high priority questions resolved
 
-### Implementation Alignment: ✅ Pass
-- All 4 ACs implemented correctly
+### Spec: ✅ Pass
+- All sections present
+- 8 acceptance criteria
+- 1 sequence diagram
+
+### Atomic Specs: ✅ Pass
+- 4 atomic specs, all implemented
+- Implementation evidence complete
+- Test evidence complete
+
+### Traceability: ✅ Pass
+- 100% coverage: REQ → atomic spec → impl → test
+
+### Implementation: ✅ Pass
+- All ACs implemented per atomic specs
 - No undocumented features
-- Error handling matches spec
-- Interfaces match spec definitions
 
-### Test Coverage: ✅ Pass
-- 12 tests total
+### Tests: ✅ Pass
+- 8 tests, all passing
 - 100% AC coverage
-- All tests passing
 - 94% line coverage
-
-### Overall Status: CONVERGED ✅
-
-**Next Steps**:
-1. Run security review (if applicable)
-2. Run browser tests (if UI changes)
-3. Propose commit
 
 ---
 
 ## Evidence
 
-**Implementation files**:
-- src/services/auth-service.ts (logout method)
-- src/components/UserMenu.tsx (logout button)
-- src/router/auth-router.ts (redirect logic)
+**Files Modified**:
+- src/services/auth-service.ts
+- src/components/UserMenu.tsx
+- src/router/auth-router.ts
 
-**Test files**:
+**Test Files**:
 - src/services/__tests__/auth-service.test.ts (4 tests)
-- src/components/__tests__/user-menu.test.ts (3 tests)
+- src/components/__tests__/user-menu.test.ts (2 tests)
 - src/router/__tests__/auth-router.test.ts (2 tests)
-- tests/integration/logout-flow.test.ts (3 tests)
 
-**Test run**:
+**Test Output**:
 ```
 PASS  src/services/__tests__/auth-service.test.ts
 PASS  src/components/__tests__/user-menu.test.ts
 PASS  src/router/__tests__/auth-router.test.ts
-PASS  tests/integration/logout-flow.test.ts
 
-Tests: 12 passed, 12 total
-Coverage: 94% statements, 92% branches, 96% functions, 95% lines
-```
+Tests: 8 passed, 8 total
+Coverage: 94% statements
 ```
 
-### Step 7: Handle Non-Convergence
+---
 
-If validation fails, identify specific gaps and recommend iterations.
+## Next Steps
+
+1. Run `/code-review <spec-group-id>` for code quality review
+2. Run `/security <spec-group-id>` for security review
+3. Browser tests (if UI changes)
+4. Ready for commit
+```
+
+### Step 10: Update Manifest
+
+Update manifest.json with convergence status:
+
+```json
+{
+  "work_state": "READY_TO_MERGE",
+  "convergence": {
+    "spec_complete": true,
+    "all_acs_implemented": true,
+    "all_tests_written": true,
+    "all_tests_passing": true,
+    "test_coverage": "94%",
+    "traceability_complete": true,
+    "code_review_passed": false,
+    "security_review_passed": false
+  },
+  "decision_log": [
+    {
+      "timestamp": "<ISO timestamp>",
+      "actor": "agent",
+      "action": "convergence_validated",
+      "details": "All 4 atomic specs converged, 8 tests passing"
+    }
+  ]
+}
+```
+
+### Step 11: Handle Non-Convergence
+
+If validation fails, identify specific gaps:
 
 ```markdown
-# Convergence Report: <Task Name>
+# Convergence Report: <spec-group-id>
 
 ## Summary: ❌ NOT CONVERGED
 
-Issues found in implementation alignment and test coverage.
+Issues found. Implementation iteration required.
 
 ---
 
 ## Issues
 
-### Issue 1: Missing Implementation (Priority: High)
-- **AC2.3**: Retry button appears on error
-- **Status**: Not implemented
-- **Action**: Implement retry button in UserMenu component
+### Issue 1: Missing Implementation Evidence (Priority: High)
+- **Atomic Spec**: as-003
+- **Problem**: Implementation Evidence section empty
+- **Action**: Fill evidence in as-003-post-logout-redirect.md
 
 ### Issue 2: Test Failing (Priority: High)
-- **Test**: auth-service.test.ts:28
+- **Atomic Spec**: as-002
+- **Test**: auth-service.test.ts:35
 - **Error**: Expected null, got "test-token"
-- **Action**: Fix token clearing logic in AuthService.logout()
+- **Action**: Fix token clearing logic or fix test
 
-### Issue 3: Low Coverage (Priority: Medium)
-- **Current**: 72% line coverage
-- **Required**: 80%
-- **Action**: Add tests for error paths
+### Issue 3: Broken Traceability (Priority: Medium)
+- **Requirement**: REQ-003
+- **Problem**: No atomic spec references REQ-003
+- **Action**: Update as-003 to reference REQ-003
 
 ---
 
 ## Recommendations
 
-1. **Iteration 1**: Implement AC2.3 retry button
-2. **Iteration 2**: Fix token clearing bug
-3. **Iteration 3**: Add error path tests
+**Iteration 1**:
+1. Fill Implementation Evidence in as-003
+2. Fix failing test for as-002
+3. Update REQ-003 reference in as-003
 
-**Estimated effort**: 1-2 hours
-
-After fixes, re-run unifier to validate convergence.
+After fixes, re-run `/unify <spec-group-id>` to validate.
 ```
-
-### Step 8: Iteration Loop
-
-If not converged, route to appropriate fix:
-
-```javascript
-// Spec gap → Update spec
-if (issue.type === "spec_gap") {
-  useSkill("/spec"); // Amend spec with user approval
-}
-
-// Implementation bug → Fix implementation
-if (issue.type === "impl_bug") {
-  useSkill("/implement"); // Fix and re-test
-}
-
-// Missing test → Add test
-if (issue.type === "missing_test") {
-  useSkill("/test"); // Write missing test
-}
-
-// Re-validate
-useSkill("/unify"); // Run convergence check again
-```
-
-**Iteration cap**: Maximum 3 iterations before escalating to user.
 
 ## Convergence Gates
 
-### TaskSpec Gates
-- [ ] Spec complete and approved
-- [ ] All ACs implemented
+### Spec Group Gates
+- [ ] Requirements complete (EARS format)
+- [ ] Spec complete with all sections
+- [ ] Atomic specs all `status: implemented`
+- [ ] Implementation Evidence filled in all atomic specs
+- [ ] Test Evidence filled in all atomic specs
+- [ ] Traceability 100% (REQ → atomic spec → impl → test)
 - [ ] All tests passing
 - [ ] Coverage ≥ 80%
 - [ ] No undocumented features
 
-### WorkstreamSpec Gates
-All TaskSpec gates plus:
-- [ ] Sequence diagrams match implementation
-- [ ] Interfaces defined and implemented
-- [ ] Security considerations addressed
-- [ ] Workstream reflection complete
-
 ### MasterSpec Gates
-All WorkstreamSpec gates plus:
-- [ ] All workstream specs converged
+All spec group gates plus:
+- [ ] All workstream spec groups converged
 - [ ] Contract registry validated
 - [ ] No cross-workstream conflicts
 - [ ] Dependency graph acyclic
@@ -423,71 +421,77 @@ All WorkstreamSpec gates plus:
 ## Integration with Other Skills
 
 After convergence, the review chain is:
-1. `/code-review` - Code quality review (always)
-2. `/security` - Security review (always)
-3. `/browser-test` - UI validation (if UI changes)
-4. `/docs` - Documentation generation (if public API)
+1. `/code-review <spec-group-id>` - Code quality review (always)
+2. `/security <spec-group-id>` - Security review (always)
+3. `/browser-test <spec-group-id>` - UI validation (if UI changes)
+4. `/docs <spec-group-id>` - Documentation generation (if public API)
 5. Commit
 
 **Next step after unify passes**: Dispatch `/code-review`
 
 If not converged:
-- Use `/spec`, `/implement`, or `/test` to address gaps
+- Use `/implement` to fill missing evidence
+- Use `/test` to fix failing tests
 - Re-run `/unify` after fixes
 
 ## Examples
 
-### Example 1: Converged TaskSpec
+### Example 1: Converged Spec Group
 
-**Input**: TaskSpec for logout button (all ACs implemented, tests passing)
-
-**Unifier Process**:
-1. Spec completeness: ✅ All sections present
-2. Implementation alignment: ✅ All 4 ACs implemented
-3. Test coverage: ✅ 12 tests, all passing, 94% coverage
-
-**Output**: CONVERGED ✅ - Ready for security review
-
-### Example 2: Non-Converged WorkstreamSpec
-
-**Input**: WorkstreamSpec for WebSocket server (missing edge case test)
+**Input**: Spec group sg-logout-button (all atomic specs complete)
 
 **Unifier Process**:
-1. Spec completeness: ✅ Pass
-2. Implementation alignment: ✅ Pass
-3. Test coverage: ❌ Fail - No test for connection timeout edge case
+1. Requirements: ✅ 4 REQ-XXX in EARS format
+2. Spec: ✅ All sections present
+3. Atomic specs: ✅ 4/4 implemented with evidence
+4. Traceability: ✅ 100% coverage
+5. Implementation: ✅ All ACs implemented
+6. Tests: ✅ 8 tests passing, 94% coverage
+
+**Output**: CONVERGED ✅ - Ready for code review
+
+### Example 2: Non-Converged Spec Group
+
+**Input**: Spec group sg-dark-mode (missing test evidence)
+
+**Unifier Process**:
+1. Requirements: ✅ Pass
+2. Spec: ✅ Pass
+3. Atomic specs: ❌ as-002 missing Test Evidence
+4. Tests: ❌ 1 test failing
 
 **Output**:
 ```markdown
 ❌ NOT CONVERGED
 
-**Issue**: Missing test for connection timeout (Edge Case #3)
-**Action**: Add test in websocket-server.test.ts
-**Iteration 1**: Write timeout test
+**Issues**:
+- as-002: Missing Test Evidence section
+- as-002: Test auth-service.test.ts:35 failing
+
+**Action**: Fill Test Evidence, fix failing test
+**Iteration 1**: Run /test to fix
 ```
 
-After test added → Re-run unifier → CONVERGED ✅
+After test fixed → Re-run unifier → CONVERGED ✅
 
-### Example 3: MasterSpec Contract Conflict
+### Example 3: Traceability Gap
 
-**Input**: MasterSpec with 3 workstreams
+**Input**: Spec group with broken traceability
 
 **Unifier Process**:
-1. Spec completeness: ✅ Pass
-2. Implementation alignment: ✅ Pass (per-workstream)
-3. Test coverage: ✅ Pass
-4. Contract validation: ❌ Fail - Interface mismatch between ws-1 and ws-2
+1. Requirements: ✅ 4 requirements
+2. Atomic specs: 3 atomic specs
+3. Traceability: ❌ REQ-004 has no atomic spec
 
 **Output**:
 ```markdown
 ❌ NOT CONVERGED
 
-**Issue**: Contract interface mismatch
-  - ws-1 implements: `send(data: Buffer)`
-  - ws-2 expects: `send(data: string)`
+**Issue**: REQ-004 "Error Handling" has no atomic spec
 
-**Action**: Update ws-1 to match contract or amend contract
-**Iteration 1**: Fix interface to accept string
+**Action**: Either:
+- Add as-004-error-handling.md for REQ-004
+- Update existing atomic spec to reference REQ-004
+
+**Iteration 1**: Run /atomize to create missing atomic spec
 ```
-
-After fix → Re-run unifier → CONVERGED ✅

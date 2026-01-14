@@ -2,14 +2,44 @@
 name: spec
 description: Author specifications (TaskSpec for small-medium tasks, WorkstreamSpec for complex single-workstream tasks, or coordinate MasterSpec creation for multi-workstream efforts). Use after PM requirements gathering or when refining existing specs.
 allowed-tools: Read, Write, Edit, Glob, Grep, Task
+user-invocable: true
 ---
 
 # Spec Author Skill
 
 ## Purpose
+
 Create specifications that serve as the authoritative contract for implementation. Specs document requirements, design decisions, task breakdowns, and test plans.
 
+**Key Output**: Creates `spec.md` in a spec group, reading from `requirements.md`.
+
+## Usage
+
+```
+/spec <spec-group-id>           # Create spec.md from requirements.md in spec group
+/spec refine <spec-group-id>    # Refine existing spec based on feedback
+```
+
+## Prerequisites
+
+Before running `/spec`:
+1. Spec group must exist at `.claude/specs/groups/<spec-group-id>/`
+2. `requirements.md` must exist (from `/pm` or `/prd sync`)
+3. `manifest.json` must exist with valid metadata
+
+## Output Location
+
+All specs are written to the spec group directory:
+```
+.claude/specs/groups/<spec-group-id>/
+├── manifest.json      # Updated by /spec
+├── requirements.md    # Input (from /pm or /prd)
+└── spec.md           # Output (created by /spec)
+```
+
 ## Spec Tiers
+
+The complexity of the spec is determined by the requirements, but **all specs output to `spec.md`** in the spec group.
 
 ### TaskSpec (Light) - For Small to Medium Tasks
 Use for:
@@ -20,7 +50,7 @@ Use for:
 
 **Sections**:
 - Context & Goal
-- Requirements (EARS format)
+- Requirements Summary (references requirements.md)
 - Acceptance Criteria
 - Design Notes (optional)
 - Task List
@@ -38,7 +68,7 @@ Use for:
 **Sections**:
 - Context
 - Goals / Non-goals
-- Requirements (atomic, testable)
+- Requirements Summary (references requirements.md)
 - Core Flows
 - Sequence Diagrams (Mermaid)
 - Edge Cases
@@ -58,45 +88,57 @@ Use for:
 - Complex dependencies and contracts
 - Requires orchestration and integration
 
-**Approach**: Use Task tool to dispatch spec-author subagents for each workstream, then merge.
+**Approach**: Use `/orchestrate` skill which creates separate spec groups per workstream.
 
-## Process: TaskSpec Creation
+## Process: Spec Creation in Spec Group
 
-### Step 1: Load Template
-```bash
-cp .claude/templates/task-spec.template.md .claude/specs/active/<date>-<slug>.md
+### Step 1: Validate Spec Group
+
+```
+Read: .claude/specs/groups/<spec-group-id>/manifest.json
+Read: .claude/specs/groups/<spec-group-id>/requirements.md
 ```
 
-### Step 2: Fill Context & Goal
-From PM requirements document:
+Verify:
+- Spec group exists
+- `requirements.md` has REQ-XXX requirements
+- `manifest.json` has valid metadata
+
+### Step 2: Read Requirements
+
+From `requirements.md`, extract:
+- Problem statement
+- Goals and non-goals
+- REQ-XXX requirements in EARS format
+- Constraints and assumptions
+- Open questions
+
+### Step 3: Fill Context & Goal
+
+From `requirements.md`:
 - Summarize the problem and motivation
 - State the clear goal and success criteria
 
-### Step 3: Write Requirements (EARS Format)
-Transform PM requirements into EARS format:
+### Step 4: Reference Requirements
 
-**EARS Pattern**:
-- **WHEN** <trigger or condition>
-- **THEN** the system shall <required behavior>
-- **AND** <additional required behavior>
+**Do NOT duplicate requirements** — reference `requirements.md`:
 
-Example:
 ```markdown
-## Requirements
+## Requirements Summary
 
-- **WHEN** the user clicks the logout button
-- **THEN** the system shall clear the authentication token
-- **AND** redirect the user to the login page
-- **AND** display a confirmation message "You have been logged out"
+See `requirements.md` for full EARS-format requirements.
 
-- **WHEN** logout fails due to network error
-- **THEN** the system shall display an error message
-- **AND** keep the user logged in
-- **AND** allow retry
+| ID | Title | Priority |
+|----|-------|----------|
+| REQ-001 | User-initiated logout | Must Have |
+| REQ-002 | Token clearing | Must Have |
+| REQ-003 | Post-logout redirect | Must Have |
+| REQ-004 | Error handling | Must Have |
 ```
 
-### Step 4: Define Acceptance Criteria
-Extract testable criteria from requirements:
+### Step 5: Define Acceptance Criteria
+
+Map requirements to testable acceptance criteria:
 
 ```markdown
 ## Acceptance Criteria
@@ -173,26 +215,69 @@ Map each acceptance criterion to test cases:
 ```
 
 ### Step 8: Record Initial Decision
+
 Add to Decision & Work Log:
 
 ```markdown
 ## Decision & Work Log
 
-- 2026-01-02: Spec created based on PM requirements
-- 2026-01-02: Decision - Use toast for confirmation (consistent with existing patterns)
+- 2026-01-14: Spec created from requirements.md
+- 2026-01-14: Decision - Use toast for confirmation (consistent with existing patterns)
 ```
 
-### Step 9: Update Status
-Set status to `draft`, ready for user approval.
+### Step 9: Write spec.md
 
-## Process: WorkstreamSpec Creation
-
-### Step 1: Load Template
-```bash
-cp .claude/templates/workstream-spec.template.md .claude/specs/active/<slug>/ws-<id>.md
+Save to spec group:
+```
+.claude/specs/groups/<spec-group-id>/spec.md
 ```
 
-### Step 2: Complete All Required Sections
+### Step 10: Update manifest.json
+
+Update the spec group manifest:
+
+```json
+{
+  "convergence": {
+    "spec_complete": true
+  },
+  "decision_log": [
+    // ... existing entries ...
+    {
+      "timestamp": "<ISO timestamp>",
+      "actor": "agent",
+      "action": "spec_authored",
+      "details": "spec.md created with X ACs, Y tasks"
+    }
+  ]
+}
+```
+
+### Step 11: Report Completion
+
+```markdown
+## Spec Created ✅
+
+**Spec Group**: <spec-group-id>
+**Location**: .claude/specs/groups/<spec-group-id>/spec.md
+
+**Summary**:
+- X acceptance criteria mapped to requirements
+- Y tasks identified
+- Z open questions
+
+**Next Steps**:
+1. Review spec: `.claude/specs/groups/<spec-group-id>/spec.md`
+2. Run `/atomize <spec-group-id>` to decompose into atomic specs
+3. Run `/enforce <spec-group-id>` to validate atomicity
+```
+
+## Process: Complex Specs (WorkstreamSpec-level detail)
+
+For complex features requiring sequence diagrams and interface definitions:
+
+### Additional Sections Required
+
 Follow the template structure:
 1. **Context**: Background and motivation
 2. **Goals / Non-goals**: Explicit boundaries
@@ -436,12 +521,50 @@ I've created a TaskSpec for adding the logout button.
 May I proceed with implementation?
 ```
 
-## Integration with Other Skills
+## Integration with Spec Group Workflow
 
-After spec approval:
-- Use `/implement` skill to execute implementation
-- Use `/test` skill to write tests (can run in parallel with implementation)
-- Use `/unify` skill to validate spec-impl-test alignment before merge
+After spec creation:
+
+```
+/pm → requirements.md
+  ↓
+/spec → spec.md (YOU ARE HERE)
+  ↓
+/atomize → atomic/*.md
+  ↓
+/enforce → validation
+  ↓
+User approves → review_state: APPROVED
+  ↓
+/implement + /test (parallel, per atomic spec)
+  ↓
+/unify → convergence validation
+  ↓
+/code-review + /security
+  ↓
+Merge
+```
+
+### State After /spec Completes
+
+```json
+{
+  "review_state": "DRAFT",        // Still needs user review
+  "work_state": "PLAN_READY",     // Ready for atomization
+  "convergence": {
+    "spec_complete": true         // Spec authored
+  }
+}
+```
+
+### Handoff to /atomize
+
+After `/spec` creates `spec.md`:
+1. User reviews spec
+2. Run `/atomize <spec-group-id>` to decompose into atomic specs
+3. Run `/enforce <spec-group-id>` to validate atomicity
+4. User approves → `review_state: APPROVED`
+5. Implementation begins
 
 ## Examples
 

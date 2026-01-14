@@ -24,14 +24,21 @@ Optional for:
 
 ## Browser Testing Process
 
-### Step 1: Load Spec and Identify UI Criteria
+### Step 1: Load Spec Group and Identify UI Criteria
 
 ```bash
-# Load spec
-cat .claude/specs/active/<slug>.md
+# Load spec group
+cat .claude/specs/groups/<spec-group-id>/manifest.json
+cat .claude/specs/groups/<spec-group-id>/spec.md
+
+# List atomic specs
+ls .claude/specs/groups/<spec-group-id>/atomic/
+
+# Read atomic specs for UI-related acceptance criteria
+cat .claude/specs/groups/<spec-group-id>/atomic/as-001-*.md
 ```
 
-Extract UI-specific acceptance criteria:
+Extract UI-specific acceptance criteria from atomic specs:
 - User interactions (button clicks, form submissions)
 - Visual feedback (toasts, modals, error messages)
 - Navigation (redirects, route changes)
@@ -39,10 +46,12 @@ Extract UI-specific acceptance criteria:
 
 Example:
 ```markdown
-## UI Acceptance Criteria (from spec)
-- AC1.3: Confirmation toast displayed after logout
-- AC2.3: Retry button appears on network error
-- AC1.2: User redirected to /login page
+## UI Acceptance Criteria (from atomic specs)
+- as-001 AC1: Logout button visible in UserMenu
+- as-001 AC2: Clicking logout triggers logout flow
+- as-003 AC1: User redirected to /login page
+- as-004 AC1: Confirmation toast displayed after logout
+- as-004 AC2: Error message shown on network failure
 ```
 
 ### Step 2: Get Browser Context
@@ -73,12 +82,14 @@ navigate({
 
 ### Step 4: Execute UI Test Cases
 
-For each UI acceptance criterion, execute a test case.
+For each UI acceptance criterion in atomic specs, execute a test case.
 
 #### Test Case Structure
 
 ```markdown
-**Test Case**: AC1.3 - Confirmation toast after logout
+**Test Case**: as-004 AC1 - Confirmation toast after logout
+
+**Atomic Spec**: as-004 (Error Handling & Feedback)
 
 **Steps**:
 1. Navigate to /dashboard
@@ -227,27 +238,47 @@ Create test results document:
 **Date**: 2026-01-02 17:30
 **Environment**: http://localhost:3000
 **Browser**: Chrome
+**Spec Group**: .claude/specs/groups/<spec-group-id>/
 
 ---
 
-## Test Cases
+## Test Cases by Atomic Spec
 
-### TC1: Logout Button Click (AC1.1, AC1.2)
+### as-001: Logout Button UI
+
+#### TC1: Logout Button Click (as-001 AC1, AC2)
 **Status**: ✅ PASS
 
 **Steps**:
 1. ✅ Navigated to http://localhost:3000/dashboard
 2. ✅ Found logout button (ref_1)
 3. ✅ Clicked logout button
-4. ✅ Verified redirect to /login
+4. ✅ Verified logout flow initiated
 
 **Evidence**: screenshot-001.png, screenshot-002.png
 
-**Result**: User successfully logged out and redirected
+**Result**: Logout button renders and triggers logout
 
 ---
 
-### TC2: Confirmation Toast (AC1.3)
+### as-003: Post-Logout Redirect
+
+#### TC2: Redirect to Login (as-003 AC1)
+**Status**: ✅ PASS
+
+**Steps**:
+1. ✅ Clicked logout button
+2. ✅ Verified redirect to /login
+
+**Evidence**: screenshot-003.png
+
+**Result**: User redirected to login page
+
+---
+
+### as-004: Error Handling & Feedback
+
+#### TC3: Confirmation Toast (as-004 AC1)
 **Status**: ✅ PASS
 
 **Steps**:
@@ -255,13 +286,11 @@ Create test results document:
 2. ✅ Toast appeared with message "You have been logged out"
 3. ✅ Toast auto-dismissed after 3 seconds
 
-**Evidence**: screenshot-003.png
+**Evidence**: screenshot-004.png
 
 **Result**: Confirmation toast displayed correctly
 
----
-
-### TC3: Retry Button on Error (AC2.3)
+#### TC4: Retry Button on Error (as-004 AC2)
 **Status**: ❌ FAIL
 
 **Steps**:
@@ -269,7 +298,7 @@ Create test results document:
 2. ✅ Clicked logout button
 3. ❌ Expected retry button, but only error message shown
 
-**Evidence**: screenshot-004.png
+**Evidence**: screenshot-005.png
 
 **Result**: FAILURE - Retry button not rendered
 
@@ -279,17 +308,54 @@ Create test results document:
 
 ## Summary
 
-**Passed**: 2/3 (67%)
-**Failed**: 1/3 (33%)
+**Atomic Specs Tested**: 3 (as-001, as-003, as-004)
 
-**Blocker**: TC3 failure blocks merge - retry button required per spec AC2.3
+**Per Atomic Spec**:
+- as-001: ✅ 1/1 pass
+- as-003: ✅ 1/1 pass
+- as-004: ⚠️ 1/2 pass (1 fail)
+
+**Overall**: 3/4 (75%)
+
+**Blocker**: TC4 failure blocks merge - retry button required per as-004 AC2
 
 **Action**: Fix retry button implementation, re-run browser tests
 ```
 
-### Step 9: Update Spec with Browser Test Evidence
+### Step 9: Update Manifest and Atomic Specs with Browser Test Evidence
 
-Add results to spec:
+Update `manifest.json` with browser test status:
+
+```json
+{
+  "convergence": {
+    "browser_tested": true  // or false if blocking failures
+  },
+  "decision_log": [
+    {
+      "timestamp": "<ISO timestamp>",
+      "actor": "agent",
+      "action": "browser_test_complete",
+      "details": "3/4 pass - 1 blocking failure in as-004 AC2"
+    }
+  ]
+}
+```
+
+Add browser test evidence to atomic specs:
+
+```markdown
+## Browser Test Evidence
+
+| AC | Test Case | Status | Evidence |
+|----|-----------|--------|----------|
+| AC1 | Toast displayed | ✅ Pass | screenshot-004.png |
+| AC2 | Retry button | ❌ Fail | screenshot-005.png |
+
+**Browser Test Status**: ⚠️ 1/2 pass
+```
+
+Summary in spec group:
 
 ```markdown
 ## Browser Test Results
@@ -297,14 +363,14 @@ Add results to spec:
 **Date**: 2026-01-02 17:30
 **Environment**: localhost:3000
 
-| AC | Test Case | Status | Evidence |
-|----|-----------|--------|----------|
-| AC1.1 | Logout clears auth | ✅ Pass | screenshot-001.png |
-| AC1.2 | Redirect to /login | ✅ Pass | screenshot-002.png |
-| AC1.3 | Confirmation toast | ✅ Pass | screenshot-003.png |
-| AC2.3 | Retry button | ❌ Fail | screenshot-004.png |
+| Atomic Spec | AC | Test Case | Status | Evidence |
+|-------------|-----|-----------|--------|----------|
+| as-001 | AC1 | Logout button | ✅ Pass | screenshot-001.png |
+| as-003 | AC1 | Redirect to /login | ✅ Pass | screenshot-003.png |
+| as-004 | AC1 | Confirmation toast | ✅ Pass | screenshot-004.png |
+| as-004 | AC2 | Retry button | ❌ Fail | screenshot-005.png |
 
-**Overall**: 3/4 pass (75%) - 1 blocking failure
+**Overall**: 3/4 pass (75%) - 1 blocking failure in as-004
 ```
 
 ### Step 10: Handle Test Failures
@@ -492,11 +558,14 @@ Before browser testing:
 
 ### Example: Logout Feature Browser Tests
 
-**Spec ACs**:
-- AC1.1: Logout clears token
-- AC1.2: Redirect to /login
-- AC1.3: Confirmation toast
-- AC2.3: Retry button on error
+**Spec Group**: sg-logout-button
+
+**Atomic Spec UI ACs**:
+- as-001 AC1: Logout button visible
+- as-001 AC2: Click triggers logout
+- as-003 AC1: Redirect to /login
+- as-004 AC1: Confirmation toast
+- as-004 AC2: Retry button on error
 
 **Test Suite**:
 
@@ -537,11 +606,16 @@ await computer({ action: "wait", duration: 1, tabId });
 // Verify error message
 find({ query: "error message", tabId }); // Found ✅
 
-// Verify retry button (AC2.3)
+// Verify retry button (as-004 AC2)
 find({ query: "retry button", tabId }); // Not found ❌
 computer({ action: "screenshot", tabId }); // Evidence
 
 // Result: FAIL - Retry button missing
 ```
 
-**Output**: 3/4 ACs pass, 1 blocking failure (retry button missing)
+**Output**:
+- as-001: ✅ 2/2 ACs pass
+- as-003: ✅ 1/1 AC pass
+- as-004: ⚠️ 1/2 ACs pass (retry button missing)
+
+**Overall**: 4/5 ACs pass, 1 blocking failure in as-004 AC2

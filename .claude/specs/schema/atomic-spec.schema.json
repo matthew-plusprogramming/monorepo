@@ -1,0 +1,97 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "AtomicSpec",
+  "description": "An independently testable, deployable, and reversible unit of work",
+  "type": "object",
+  "required": ["id", "title", "requirements_refs", "description", "acceptance_criteria", "atomicity_justification"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^as-[0-9]{3}-[a-z0-9-]+$",
+      "description": "Unique identifier (as-001-<slug>)"
+    },
+    "title": {
+      "type": "string",
+      "description": "Short descriptive title"
+    },
+    "requirements_refs": {
+      "type": "array",
+      "items": { "type": "string", "pattern": "^REQ-[0-9]+$" },
+      "minItems": 1,
+      "description": "Which requirements this atomic spec fulfills"
+    },
+    "parent_spec_section": {
+      "type": "string",
+      "description": "Reference to section in spec.md this was decomposed from"
+    },
+    "description": {
+      "type": "string",
+      "description": "Single testable behavior this spec covers"
+    },
+    "acceptance_criteria": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "pattern": "^AC[0-9]+\\.[0-9]+$" },
+          "criterion": { "type": "string" },
+          "testable": { "type": "boolean", "default": true }
+        },
+        "required": ["id", "criterion"]
+      },
+      "minItems": 1
+    },
+    "test_strategy": {
+      "type": "string",
+      "description": "How this will be tested in isolation"
+    },
+    "deployment_notes": {
+      "type": "string",
+      "description": "Any deployment considerations for this unit"
+    },
+    "rollback_strategy": {
+      "type": "string",
+      "description": "How to reverse this change safely"
+    },
+    "atomicity_justification": {
+      "type": "object",
+      "description": "Why this is at the right level of atomicity",
+      "properties": {
+        "independently_testable": { "type": "string" },
+        "independently_deployable": { "type": "string" },
+        "independently_reviewable": { "type": "string" },
+        "independently_reversible": { "type": "string" }
+      },
+      "required": ["independently_testable", "independently_deployable", "independently_reviewable", "independently_reversible"]
+    },
+    "status": {
+      "type": "string",
+      "enum": ["pending", "implementing", "implemented", "tested", "verified"],
+      "default": "pending"
+    },
+    "implementation_evidence": {
+      "type": "array",
+      "description": "Links to code implementing this spec",
+      "items": {
+        "type": "object",
+        "properties": {
+          "file": { "type": "string" },
+          "line": { "type": "integer" },
+          "description": { "type": "string" }
+        }
+      }
+    },
+    "test_evidence": {
+      "type": "array",
+      "description": "Links to tests verifying this spec",
+      "items": {
+        "type": "object",
+        "properties": {
+          "file": { "type": "string" },
+          "test_name": { "type": "string" },
+          "ac_refs": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    }
+  }
+}

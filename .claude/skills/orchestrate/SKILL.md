@@ -23,11 +23,15 @@ Use this skill when:
 
 ## Orchestration Flow
 
-### 1. Load MasterSpec
+### 1. Load MasterSpec and Spec Group
 
 ```bash
-# Load approved MasterSpec
-cat .claude/specs/active/<slug>/master.md
+# Load approved MasterSpec spec group
+cat .claude/specs/groups/<master-spec-group-id>/manifest.json
+cat .claude/specs/groups/<master-spec-group-id>/spec.md
+
+# List workstream spec groups
+ls .claude/specs/groups/<master-spec-group-id>/workstreams/
 ```
 
 **Extract**:
@@ -36,6 +40,7 @@ cat .claude/specs/active/<slug>/master.md
 - Contract Registry
 - Dependency Graph
 - Worktree Allocation Strategy (if present)
+- Atomic specs for each workstream
 
 ### 2. Invoke Facilitator for Worktree Allocation
 
@@ -45,19 +50,19 @@ If MasterSpec doesn't have worktree allocation strategy, dispatch facilitator to
 Task({
   description: 'Allocate worktrees for MasterSpec',
   prompt: `
-Analyze the MasterSpec at .claude/specs/active/<slug>/master.md and determine worktree allocation.
+Analyze the MasterSpec spec group at .claude/specs/groups/<master-spec-group-id>/ and determine worktree allocation.
 
-**Workstreams**:
-- ws-1: <title> (dependencies: <deps>)
-- ws-2: <title> (dependencies: <deps>)
-- ws-3: <title> (dependencies: <deps>)
+**Workstreams** (each has its own spec group with atomic specs):
+- ws-1: <title> (dependencies: <deps>) - spec group at workstreams/ws-1/
+- ws-2: <title> (dependencies: <deps>) - spec group at workstreams/ws-2/
+- ws-3: <title> (dependencies: <deps>) - spec group at workstreams/ws-3/
 
 **Your task**:
 1. Analyze dependency graph
 2. Identify independent workstreams (separate worktrees)
 3. Identify tightly coupled workstreams (shared worktrees)
 4. Apply allocation heuristics (see facilitator agent guidelines)
-5. Document allocation strategy in MasterSpec
+5. Document allocation strategy in MasterSpec manifest.json
 6. Initialize session.json with worktree_allocation
   `,
   subagent_type: 'facilitator',
@@ -164,7 +169,8 @@ You are implementing workstream ws-1.
 
 1. **Working Directory**: All operations MUST occur in the worktree path above
 2. **Isolation**: Do NOT modify files in the main worktree
-3. **Spec Location**: .claude/specs/active/<slug>/ws-1.md
+3. **Spec Group Location**: .claude/specs/groups/<master-spec-group-id>/workstreams/ws-1/
+4. **Atomic Specs**: Execute atomic specs in order (as-001, as-002, etc.)
 
 ${
   ws1.sharedWorktree
@@ -177,7 +183,8 @@ Coordinate with test-writer: you implement, they test (parallel execution)
 }
 
 ## YOUR TASK
-Implement WorkstreamSpec ws-1 following standard implementation process.
+Implement all atomic specs in ws-1 spec group following standard implementation process.
+Fill Implementation Evidence in each atomic spec as you complete them.
   `,
   subagent_type: 'implementer',
   run_in_background: true,
@@ -196,7 +203,12 @@ You are writing tests for workstream ws-1.
 **Workstream**: ws-1 (Backend API)
 
 ## YOUR TASK
-Write tests for all acceptance criteria in ws-1 spec.
+Write tests for all acceptance criteria in ws-1 atomic specs.
+Fill Test Evidence in each atomic spec as you complete them.
+Test names should reference atomic spec ID and AC (e.g., "should X (as-001 AC1)").
+
+**Spec Group**: .claude/specs/groups/<master-spec-group-id>/workstreams/ws-1/
+**Atomic Specs**: .claude/specs/groups/<master-spec-group-id>/workstreams/ws-1/atomic/
   `,
   subagent_type: 'test-writer',
   run_in_background: true,
@@ -244,16 +256,19 @@ Validate convergence for workstream ws-1.
 
 **Worktree**: worktree-1
 **Path**: /Users/matthewlin/Desktop/Personal Projects/engineering-assistant-ws-1
-**Spec**: .claude/specs/active/<slug>/ws-1.md
+**Spec Group**: .claude/specs/groups/<master-spec-group-id>/workstreams/ws-1/
 
 ## VALIDATION REQUIREMENTS
 
-- All tasks complete
-- All ACs implemented
+- All atomic specs have status: implemented
+- All atomic spec ACs have Implementation Evidence
+- All atomic spec ACs have Test Evidence
 - All tests passing
+- Traceability chain complete (REQ → atomic spec → impl → test)
 - Contract registry validated (if ws-1 owns contracts)
 
 Produce convergence report with CONVERGED or NOT_CONVERGED status.
+Update manifest.json convergence gates.
   `,
   subagent_type: 'unifier',
 });
@@ -327,15 +342,16 @@ fi
 git add .
 git commit -m "feat(ws-1): implement Backend API
 
-Implements WorkstreamSpec ws-1 from <slug>
+Implements workstream ws-1 from <master-spec-group-id>
 
-Acceptance Criteria:
-- AC1.1: <criterion> ✅
-- AC1.2: <criterion> ✅
+Atomic Specs:
+- as-001: <title> ✅
+- as-002: <title> ✅
+- as-003: <title> ✅
 
 Tests: 15 passing
 Coverage: 92%
-Convergence: PASSED
+Convergence: PASSED (all atomic specs complete)
 Security: PASSED
 
 🤖 Generated with Claude Code
@@ -347,8 +363,9 @@ cd /Users/matthewlin/Desktop/Personal\ Projects/engineering-assistant
 # Merge with --no-ff
 git merge --no-ff feature/ws-1-backend-api -m "Merge ws-1: Backend API
 
-Implements WorkstreamSpec ws-1
+Implements workstream ws-1 spec group
 
+Atomic Specs: 3 complete
 Contracts Provided:
 - contract-backend-api: src/api/server.ts
 
@@ -510,11 +527,13 @@ Update after:
 
 Orchestrator task complete when:
 
+- ✅ All workstream spec groups converged (all atomic specs implemented + tested)
 - ✅ All workstreams merged to main
 - ✅ All worktrees cleaned up
 - ✅ Integration tests passing
 - ✅ No merge conflicts remain
-- ✅ MasterSpec Decision & Work Log updated
+- ✅ MasterSpec manifest.json shows all convergence gates passed
+- ✅ Full traceability chain validated for each workstream
 
 ## Example Session
 

@@ -17,6 +17,15 @@ Improve code quality without changing behavior. Make code more maintainable, rea
 - **Dependency updates**: Major version upgrades require code changes
 - **Performance optimization**: Code needs optimization without feature changes
 - **Post-merge cleanup**: Feature landed but left structural debt
+- **Post-implementation cleanup**: Spec group completed, code quality improvements identified
+
+## Relationship to Spec Groups
+
+Unlike implementation (`/implement`) which follows spec groups, refactoring uses **test suite as contract**. However:
+
+- **Post-spec refactoring**: After a spec group completes, `/code-review` may identify quality improvements. These become refactor tasks (separate from original spec).
+- **Context preservation**: If refactoring targets code from a recent spec group, note the spec group ID for traceability.
+- **No spec required**: Refactoring doesn't need a spec group - the test suite IS the specification.
 
 ## Key Principle: Test Suite is Contract
 
@@ -163,11 +172,14 @@ npm test -- --json | jq '.numFailedTests' # Must be 0
 ```markdown
 ## Refactoring Log
 
+**Related Spec Group** (if applicable): sg-order-processing
+
 ### Change 1: Extract validation logic
 
 - **Files**: src/services/order.ts
 - **Pattern**: Extract Method
-- **Rationale**: 50-line method violated SRP
+- **Rationale**: 50-line method violated SRP (identified in /code-review)
+- **Atomic Specs Affected**: as-001, as-002 (test evidence still valid)
 - **Tests**: 147 passing ✓
 - **Commit**: abc123
 
@@ -176,6 +188,7 @@ npm test -- --json | jq '.numFailedTests' # Must be 0
 - **Files**: src/services/order.ts, src/di/container.ts
 - **Pattern**: Dependency Injection
 - **Rationale**: Enable testing without real database
+- **Atomic Specs Affected**: None (infrastructure change)
 - **Tests**: 147 passing ✓
 - **Commit**: def456
 ```
@@ -205,6 +218,7 @@ npm test -- --coverage
 ## Refactoring Complete
 
 **Scope**: Tech debt in authentication services
+**Related Spec Group** (if applicable): sg-logout-button
 **Files Modified**: 4
 **Commits**: 6
 
@@ -224,6 +238,8 @@ npm test -- --coverage
 4. Removed dead code (3 unused methods)
 
 **Behavior Changes**: None (all tests pass unchanged)
+
+**Atomic Spec Impact**: None (all Test Evidence in as-001, as-002, as-003 still valid)
 ```
 
 ## Rules
@@ -315,7 +331,14 @@ Recommendation: Option 1 with careful review
 - Use `/code-review` to validate quality improvements
 - Use `/security` if changes touch security-sensitive code
 
-Refactoring is typically standalone - not part of feature workflow.
+**Spec group context** (when applicable):
+
+- If refactoring code from a recent spec group:
+  - Note the spec group ID in refactoring log for traceability
+  - Verify atomic spec test evidence still passes after refactoring
+  - Do NOT update atomic specs (refactoring doesn't change behavior)
+
+Refactoring is typically standalone - not part of feature workflow. However, it may follow a spec group when code review identifies quality improvements.
 
 ## Constraints
 

@@ -21,15 +21,16 @@ Route to quick execution without formal spec:
 - **Estimated effort**: < 30 minutes
 - **No spec needed**: Changes are self-documenting
 
-### Medium (oneoff-spec / TaskSpec)
-Route to TaskSpec workflow:
+### Medium (oneoff-spec / Spec Group)
+Route to spec group workflow:
 - 2-5 files impacted
 - Single feature or enhancement with clear boundaries
 - Bug fix requiring investigation across multiple files
 - Adding new endpoint, component, or module
 - Clear scope, single workstream
 - **Estimated effort**: 30 minutes - 4 hours
-- **Needs light spec**: Requirements, acceptance criteria, task list
+- **Needs spec group**: requirements.md, spec.md, atomic specs
+- **Spec location**: `.claude/specs/groups/<spec-group-id>/`
 
 ### Large (orchestrator / MasterSpec)
 Route to multi-workstream orchestration with git worktrees:
@@ -40,19 +41,20 @@ Route to multi-workstream orchestration with git worktrees:
 - Requires parallel execution by multiple subagents
 - Complex coordination and integration needs
 - **Estimated effort**: 4+ hours
-- **Needs full spec**: ProblemBrief → WorkstreamSpecs → MasterSpec
+- **Needs MasterSpec with workstream spec groups**: Each workstream gets its own spec group with atomic specs
+- **Spec structure**: `.claude/specs/groups/<master-spec-group-id>/` with workstream subdirectories
 - **Parallel execution**: Workstreams execute in isolated git worktrees
 - **Dependency orchestration**: Facilitator manages merge order based on dependencies
 
 ## Routing Process
 
 ### Step 1: Load Context
-If the user references an existing spec:
+If the user references an existing spec group:
 ```bash
-# Check for active spec
-ls .claude/specs/active/<slug>.md 2>/dev/null
+# Check for active spec group
+ls .claude/specs/groups/<spec-group-id>/manifest.json 2>/dev/null
 ```
-Load the spec and continue from its current state.
+Load the spec group and continue from its current state based on `review_state` and `work_state`.
 
 ### Step 2: Analyze Scope
 Use Glob and Grep to understand impact:
@@ -135,12 +137,18 @@ If user explicitly requests a workflow:
 - "Write a full spec first" → oneoff-spec or orchestrator
 - Honor user preference and note in rationale
 
-### Existing Spec
-If `.claude/specs/active/<slug>.md` exists:
-- Check its `status` field
-- If `status: draft` → Continue spec authoring
-- If `status: approved` → Route to implementation
-- If `status: complete` → Suggest archiving or new task
+### Existing Spec Group
+If `.claude/specs/groups/<spec-group-id>/manifest.json` exists:
+- Check `review_state` and `work_state` fields in manifest
+- **review_state**:
+  - `DRAFT` → Continue spec authoring or atomization
+  - `REVIEWED` → Awaiting user approval
+  - `APPROVED` → Route to implementation
+- **work_state**:
+  - `PLAN_READY` → Ready for implementation
+  - `IMPLEMENTING` → Continue implementation
+  - `VERIFYING` → Run unify validation
+  - `READY_TO_MERGE` → Proceed to code review, security review
 
 ## Output Format
 
@@ -164,8 +172,8 @@ Always output a clear routing decision:
 
 After routing:
 - **oneoff-vibe**: Proceed directly to implementation
-- **oneoff-spec**: Use `/pm` to gather requirements, then `/spec` to author TaskSpec
-- **orchestrator**: Use `/pm` to create ProblemBrief, then `/spec` to coordinate WorkstreamSpecs
+- **oneoff-spec**: Use `/pm` to gather requirements → `/spec` to create spec group → `/atomize` to create atomic specs → `/enforce` to validate atomicity → User approval → `/implement` + `/test` → `/unify` → `/code-review` → `/security`
+- **orchestrator**: Use `/pm` to create ProblemBrief → `/spec` to create MasterSpec with workstream spec groups → For each workstream: `/atomize` + `/enforce` → User approval → Facilitator orchestrates parallel execution
 
 ## Examples
 

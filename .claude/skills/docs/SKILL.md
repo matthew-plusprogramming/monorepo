@@ -121,10 +121,18 @@ What this component depends on and why.
 ### Step 1: Identify Scope
 
 ```bash
-# Check what was implemented
-cat .claude/specs/active/<slug>.md
+# Check what was implemented from spec group
+cat .claude/specs/groups/<spec-group-id>/manifest.json
+cat .claude/specs/groups/<spec-group-id>/spec.md
 
-# Find modified files
+# List atomic specs for implementation details
+ls .claude/specs/groups/<spec-group-id>/atomic/
+
+# Read atomic specs for Implementation Evidence (exact files/lines changed)
+cat .claude/specs/groups/<spec-group-id>/atomic/as-001-*.md
+
+# Find modified files from Implementation Evidence
+# Or use git diff
 git diff --name-only main..HEAD
 
 # Identify public interfaces
@@ -199,15 +207,27 @@ npx tsc --noEmit docs/examples/*.ts
 npx prettier --check docs/**/*.md
 ```
 
-### Step 6: Update Spec Status
+### Step 6: Update Manifest
 
-```yaml
----
-documentation_status: complete
----
+Update `manifest.json` with documentation status:
+
+```json
+{
+  "convergence": {
+    "documentation_complete": true
+  },
+  "decision_log": [
+    {
+      "timestamp": "<ISO timestamp>",
+      "actor": "agent",
+      "action": "documentation_complete",
+      "details": "API docs + user guide created, 3 examples verified"
+    }
+  ]
+}
 ```
 
-Add documentation log:
+Add documentation log to spec group:
 
 ```markdown
 ## Documentation Log
@@ -215,6 +235,7 @@ Add documentation log:
 - 2026-01-08: Documentation complete
   - API docs: docs/api/services/auth.md
   - User guide: docs/guides/authentication.md
+  - Atomic specs documented: as-001, as-002, as-003
   - Examples verified: 3 code samples tested
 ```
 
@@ -269,7 +290,12 @@ to the login page. Any cached credentials are cleared.
 ```markdown
 ## Documentation Complete
 
-**Spec**: .claude/specs/active/<slug>.md
+**Spec Group**: .claude/specs/groups/<spec-group-id>/
+
+**Atomic Specs Documented**:
+- as-001: Logout Button UI
+- as-002: Token Clearing
+- as-003: Post-Logout Redirect
 
 **Artifacts Created**:
 - docs/api/services/auth.md (API reference)
@@ -284,6 +310,8 @@ to the login page. Any cached credentials are cleared.
 - Code examples: verified
 - Links: verified
 - Formatting: consistent
+
+**Manifest Updated**: convergence.documentation_complete: true
 ```
 
 ## Integration with Other Skills
