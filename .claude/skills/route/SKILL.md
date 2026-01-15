@@ -1,6 +1,6 @@
 ---
 name: route
-description: Analyze task complexity and route to appropriate workflow (oneoff-vibe for small changes, oneoff-spec for medium tasks, orchestrator for large multi-workstream efforts). Use when starting any new task to determine the right approach.
+description: Analyze task complexity and route to appropriate workflow. Defaults to oneoff-spec (specs are cheap, bugs are expensive). Use oneoff-vibe only for truly trivial changes or explicit user override. Use orchestrator for large multi-workstream efforts.
 allowed-tools: Read, Glob, Grep
 ---
 
@@ -11,26 +11,46 @@ Analyze the user request and determine the appropriate workflow path based on ta
 
 ## Complexity Heuristics
 
-### Small (oneoff-vibe)
-Route to quick execution without formal spec:
-- Single file change or very localized modification
-- Bug fix with clear location and obvious solution
-- Documentation update or README change
-- Configuration change (environment, settings)
-- Typo fixes or simple refactoring
-- **Estimated effort**: < 30 minutes
-- **No spec needed**: Changes are self-documenting
+> **Default to specs.** Use oneoff-spec unless the task is truly trivial OR the user explicitly requests to skip specs.
 
-### Medium (oneoff-spec / Spec Group)
-Route to spec group workflow:
-- 2-5 files impacted
-- Single feature or enhancement with clear boundaries
-- Bug fix requiring investigation across multiple files
-- Adding new endpoint, component, or module
-- Clear scope, single workstream
-- **Estimated effort**: 30 minutes - 4 hours
+### Trivial (oneoff-vibe)
+Route to quick execution **only when**:
+
+**Truly trivial changes** (all must apply):
+- Single-line or few-character fix (typo, off-by-one, missing semicolon)
+- Zero ambiguity about what to change
+- No behavioral impact beyond the obvious fix
+- No tests needed or test change is equally trivial
+
+**Examples of truly trivial**:
+- Fix typo in README: "teh" → "the"
+- Fix obvious syntax error
+- Update version number in config
+- Add missing import that's causing a build error
+- Comment clarification
+
+**User explicitly requests vibe**:
+- User says: "just do it", "vibe", "skip the spec", "don't need a spec", "quick fix"
+- Honor the request but note in rationale
+
+**NOT trivial (use oneoff-spec instead)**:
+- Bug fix requiring investigation
+- "Simple" feature additions (even small ones have edge cases)
+- Documentation updates with new content (not just typo fixes)
+- Configuration changes affecting behavior
+- Any change where you'd want to verify acceptance criteria
+
+### Standard (oneoff-spec / Spec Group) — THE DEFAULT
+Route to spec group workflow for **most tasks**:
+- Any feature addition, enhancement, or new functionality
+- Bug fixes (even "simple" ones benefit from AC definition)
+- Refactoring with defined goals
+- Documentation with new content
+- API changes
+- UI changes
 - **Needs spec group**: requirements.md, spec.md, atomic specs
 - **Spec location**: `.claude/specs/groups/<spec-group-id>/`
+- **Why default**: Specs create accountability, testability, and prevent scope creep
 
 ### Large (orchestrator / MasterSpec)
 Route to multi-workstream orchestration with git worktrees:
@@ -126,16 +146,17 @@ echo "{\"timestamp\": \"$(date -Iseconds)\", \"workflow\": \"oneoff-spec\", \"ra
 ## Edge Cases
 
 ### Ambiguous Complexity
-When a task could be either medium or large:
-- **Default to oneoff-spec** (safer than vibe, less overhead than orchestrator)
+When uncertain about task size:
+- **Default to oneoff-spec** — specs are cheap, debugging without specs is expensive
+- If task seems trivial but has any ambiguity → oneoff-spec
 - Can escalate to orchestrator if spec reveals hidden complexity
-- Better to discover scope during spec phase than during implementation
+- Better to "over-spec" a simple task than "under-spec" a complex one
 
 ### User Override
 If user explicitly requests a workflow:
-- "Just make the change" → oneoff-vibe (even if medium complexity)
+- "Just do it", "vibe", "quick fix", "skip spec" → oneoff-vibe (honor request, note in rationale)
 - "Write a full spec first" → oneoff-spec or orchestrator
-- Honor user preference and note in rationale
+- User preference always wins, but default assumption is: user wants quality (specs)
 
 ### Existing Spec Group
 If `.claude/specs/groups/<spec-group-id>/manifest.json` exists:
@@ -177,22 +198,36 @@ After routing:
 
 ## Examples
 
-### Example 1: Small Task (No Delegation)
-**Request**: "Fix the typo in README.md line 42"
+### Example 1: Truly Trivial (oneoff-vibe)
+**Request**: "Fix the typo in README.md line 42: 'teh' should be 'the'"
 
 **Routing**:
 - workflow: oneoff-vibe
-- rationale: Single file, single line change with no side effects
-- estimated_scope: small
-- delegation: none (trivial change)
+- rationale: Single character fix, zero ambiguity, no behavioral impact
+- estimated_scope: trivial
+- delegation: none
 - next_action: Make the edit directly
 
-### Example 2: Medium Task (Parallel Delegation)
+### Example 2: Seems Simple But Gets Spec (oneoff-spec)
+**Request**: "Add a loading spinner to the submit button"
+
+**Routing**:
+- workflow: oneoff-spec
+- rationale: Seems simple but has decisions: spinner placement, when to show/hide, error states, accessibility. Spec ensures we don't miss edge cases.
+- estimated_scope: small-medium
+- estimated_files: 2-3 (component, styles, tests)
+- delegation:
+  - parallel_subtasks:
+    - implementation: implementer
+    - tests: test-writer
+- next_action: Use `/pm` to clarify loading states and error handling
+
+### Example 3: Standard Feature (oneoff-spec)
 **Request**: "Add a logout button to the user dashboard"
 
 **Routing**:
 - workflow: oneoff-spec
-- rationale: Requires UI component, event handler, API call, state management (3-4 files). Need to clarify placement, behavior on logout, error handling.
+- rationale: Requires UI component, event handler, API call, state management. Need to clarify placement, behavior on logout, error handling.
 - estimated_scope: medium
 - estimated_files: 4 (component, handler, API client, tests)
 - delegation:
@@ -203,7 +238,7 @@ After routing:
     - spec approval must complete before implementation
 - next_action: Use `/pm` to gather UI/UX requirements
 
-### Example 3: Large Task (Full Orchestration)
+### Example 4: Large Task (Full Orchestration)
 **Request**: "Implement real-time notifications across the application"
 
 **Routing**:
@@ -225,7 +260,7 @@ After routing:
   - exploration_needed: true (investigate WebSocket library options)
 - next_action: Use `/pm` to create ProblemBrief, dispatch Explore subagent for WebSocket research
 
-### Example 4: Exploration-First (Delegation for Research)
+### Example 5: Exploration-First (Delegation for Research)
 **Request**: "Improve performance of the search feature"
 
 **Routing**:
@@ -240,3 +275,15 @@ After routing:
   - sequential_dependencies:
     - exploration must complete before spec authoring
 - next_action: Dispatch Explore subagent to profile current search implementation
+
+### Example 6: User Requests Vibe (Override)
+**Request**: "Just add a console.log to debug this, don't need a spec"
+
+**Routing**:
+- workflow: oneoff-vibe
+- rationale: User explicitly requested to skip spec ("don't need a spec"). Honoring user preference.
+- estimated_scope: trivial
+- delegation: none
+- next_action: Make the change directly
+
+**Note**: Without the explicit override, even a "simple" debug statement might warrant a spec if it's part of a larger investigation.

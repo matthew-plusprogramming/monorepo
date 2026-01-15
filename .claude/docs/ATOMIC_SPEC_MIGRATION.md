@@ -665,9 +665,27 @@ State-based routing:
 Key changes:
 - MasterSpec is now a spec group with workstream subdirectories
 - Each workstream has its own spec group with atomic specs
+- **Atomize + Enforce per workstream**: Before dispatching implementers, orchestrate now calls `/atomize` and `/enforce` for each workstream to create and validate atomic specs
+- **Enforcement gate**: Implementation is blocked until atomicity enforcement passes
 - Implementer/test-writer prompts reference spec groups and atomic specs
 - Convergence validation checks atomic spec evidence and traceability
 - Merge commits reference atomic specs completed
+
+Orchestration flow (14 steps):
+1. Load MasterSpec
+2. Allocate worktrees
+3. Create worktrees
+4. Evaluate workstream readiness
+5. **Atomize + Enforce each workstream** (CRITICAL - ensures traceability chain)
+6. Dispatch implementers/test-writers
+7. Monitor completion
+8. Run convergence validation
+9. Run security review
+10. Process merge queue
+11. Unblock dependent workstreams
+12. Repeat for all workstreams
+13. Cleanup worktrees
+14. Final integration validation
 
 MasterSpec structure:
 ```
@@ -695,6 +713,8 @@ MasterSpec structure:
 Key changes:
 - Loads MasterSpec spec group at `.claude/specs/groups/<master-spec-group-id>/`
 - Each workstream has its own spec group with atomic/ directory
+- **Calls `/atomize` + `/enforce` before dispatching implementers** (ensures atomic specs exist and are valid)
+- **Gates implementation on enforcement passing** (no implementation until atomicity validated)
 - Implementer prompts include spec group location and atomic spec execution order
 - Convergence evaluation reads from workstream manifest.json
 - Merge prerequisites include atomic spec evidence validation

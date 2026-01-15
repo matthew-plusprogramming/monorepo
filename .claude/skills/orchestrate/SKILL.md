@@ -147,7 +147,91 @@ For each workstream, determine if ready to start:
 }
 ```
 
-### 5. Dispatch Implementers and Test-Writers
+### 5. Atomize and Enforce Each Workstream (CRITICAL)
+
+**Before dispatching implementers**, each workstream spec must be atomized and validated. This step ensures the unified vision traceability chain (REQ → atomic spec → impl → test).
+
+For each workstream (can run in parallel for independent workstreams):
+
+```javascript
+// Step 5a: Atomize workstream spec
+Task({
+  description: 'Atomize ws-1 spec',
+  prompt: `
+Run /atomize for workstream ws-1.
+
+**Spec Group**: .claude/specs/groups/<master-spec-group-id>/workstreams/ws-1/
+**Input**: spec.md (WorkstreamSpec)
+**Output**: atomic/as-001-*.md, atomic/as-002-*.md, etc.
+
+Decompose the workstream spec into atomic specs following atomicity criteria:
+- Each atomic spec is independently testable
+- Each atomic spec is independently deployable
+- Each atomic spec is independently reviewable
+- Each atomic spec is independently reversible
+
+Update manifest.json with atomic_specs.count and atomic_specs.coverage.
+  `,
+  subagent_type: 'atomizer',
+});
+
+// Step 5b: Enforce atomicity validation
+Task({
+  description: 'Enforce atomicity for ws-1',
+  prompt: `
+Run /enforce for workstream ws-1.
+
+**Spec Group**: .claude/specs/groups/<master-spec-group-id>/workstreams/ws-1/
+**Atomic Specs**: .claude/specs/groups/<master-spec-group-id>/workstreams/ws-1/atomic/
+
+Validate each atomic spec against atomicity criteria:
+- NOT TOO_COARSE: Single behavior, single test suite, independent rollback
+- NOT TOO_GRANULAR: Can test alone, can deploy alone, is a behavior not a code fragment
+
+Also validate:
+- Every REQ-XXX is covered by at least one atomic spec
+- Requirements coverage >= 100%
+
+Update manifest.json with enforcement_status: PASSING or FAILING.
+  `,
+  subagent_type: 'atomicity-enforcer',
+});
+```
+
+**Gate Implementation on Enforcement**:
+
+```javascript
+// Check enforcement status before proceeding
+const manifest = JSON.parse(fs.readFileSync('.claude/specs/groups/<id>/workstreams/ws-1/manifest.json'));
+
+if (manifest.enforcement_status !== 'PASSING') {
+  // Do NOT dispatch implementers
+  // Either iterate with /atomize --refine or escalate to user
+  throw new Error(`ws-1 atomicity enforcement failed: ${manifest.enforcement_issues}`);
+}
+
+// Only proceed to implementation if enforcement passes
+```
+
+**Update session.json**:
+
+```json
+{
+  "workstream_execution": {
+    "workstreams": [
+      {
+        "id": "ws-1",
+        "status": "atomized",
+        "atomic_specs_count": 4,
+        "enforcement_status": "PASSING",
+        "ready_for_implementation": true
+      }
+    ]
+  }
+}
+```
+
+### 6. Dispatch Implementers and Test-Writers
 
 For each **ready** workstream, dispatch implementer and test-writer in parallel:
 
@@ -230,7 +314,7 @@ Test names should reference atomic spec ID and AC (e.g., "should X (as-001 AC1)"
 }
 ```
 
-### 6. Monitor Subagent Completion
+### 7. Monitor Subagent Completion
 
 Poll background tasks for completion:
 
@@ -242,7 +326,7 @@ const ws1TestsResult = TaskOutput({ task_id: ws1Tests.task_id, block: true });
 // Both complete → Ready for convergence validation
 ```
 
-### 7. Run Convergence Validation
+### 8. Run Convergence Validation
 
 Dispatch unifier to validate workstream:
 
@@ -284,7 +368,7 @@ Update manifest.json convergence gates.
 - Iteration count < 3 → Fix issues, re-run unifier
 - Iteration count >= 3 → Escalate to user
 
-### 8. Run Security Review
+### 9. Run Security Review
 
 ```javascript
 Task({
@@ -311,7 +395,7 @@ Check: OWASP Top 10, input validation, auth/authz, secrets handling.
 - Block merge
 - Escalate to user with findings
 
-### 9. Process Merge Queue
+### 10. Process Merge Queue
 
 For each workstream in merge queue (FIFO, respecting dependencies):
 
@@ -392,7 +476,7 @@ git push origin main
 }
 ```
 
-### 10. Unblock Dependent Workstreams
+### 11. Unblock Dependent Workstreams
 
 After ws-1 merges, evaluate dependent workstreams:
 
@@ -422,20 +506,22 @@ ws-2: ready (dependency satisfied) → Dispatch implementer to worktree-2
 ws-4: ready (dependency satisfied, shares worktree-1 with ws-1) → Dispatch test-writer to worktree-1
 ```
 
-### 11. Repeat for All Workstreams
+### 12. Repeat for All Workstreams
 
 Continue cycle for each workstream:
 
-1. Monitor completion
-2. Run convergence validation
-3. Run security review
-4. Add to merge queue
-5. Merge to main
-6. Unblock dependents
+1. Atomize and enforce (step 5)
+2. Dispatch implementers/test-writers (step 6)
+3. Monitor completion (step 7)
+4. Run convergence validation (step 8)
+5. Run security review (step 9)
+6. Add to merge queue (step 10)
+7. Merge to main
+8. Unblock dependents (step 11)
 
 Until all workstreams merged.
 
-### 12. Cleanup Worktrees
+### 13. Cleanup Worktrees
 
 After all workstreams merged:
 
@@ -464,7 +550,7 @@ git worktree list  # Should only show main worktree
 }
 ```
 
-### 13. Final Integration Validation
+### 14. Final Integration Validation
 
 After all workstreams merged, run final validation:
 
@@ -550,12 +636,15 @@ Orchestrator task complete when:
 1. Load MasterSpec ✅
 2. Allocate worktrees (3 separate) ✅
 3. Create worktrees ✅
-4. Dispatch ws-1 (ready) ✅
-5. ws-1 converges → Merge ✅
-6. Unblock ws-2, ws-3 ✅
-7. Dispatch ws-2, ws-3 (parallel) ✅
-8. ws-2 converges → Merge ✅
-9. ws-3 converges → Merge ✅
-10. Cleanup worktrees ✅
-11. Final validation ✅
-12. Complete ✅
+4. Evaluate readiness (ws-1 ready, ws-2/ws-3 blocked) ✅
+5. Atomize + enforce ws-1 ✅
+6. Dispatch ws-1 implementer/test-writer ✅
+7. ws-1 converges → Merge ✅
+8. Unblock ws-2, ws-3 ✅
+9. Atomize + enforce ws-2, ws-3 (parallel) ✅
+10. Dispatch ws-2, ws-3 (parallel) ✅
+11. ws-2 converges → Merge ✅
+12. ws-3 converges → Merge ✅
+13. Cleanup worktrees ✅
+14. Final validation ✅
+15. Complete ✅
