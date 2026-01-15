@@ -1,4 +1,7 @@
-import '@dotenvx/dotenvx/config';
+// Note: Environment variables are loaded externally:
+// - Local dev: via dotenvx-run in npm scripts (see package.json)
+// - Lambda: via Lambda environment configuration (set at deploy time)
+// Do NOT import @dotenvx/dotenvx/config here - it breaks Lambda runtime
 
 import cors from 'cors';
 import express from 'express';

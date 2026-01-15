@@ -143,6 +143,7 @@ const createLambdaResources = (
         JWT_SECRET: process.env.JWT_SECRET ?? '',
         PEPPER: process.env.PEPPER ?? '',
         APP_ENV: process.env.APP_ENV ?? '',
+        PORT: '3000', // Required by app validation, though Lambda doesn't use it
       },
     },
     role: iamRole.arn,
@@ -165,7 +166,39 @@ const createLambdaResources = (
   return { lambdaFunction, lambdaUrl };
 };
 
+/**
+ * Validate that required Lambda environment variables are not empty strings.
+ * This catches cases where env vars are defined but have empty values.
+ */
+const validateLambdaEnvironment = (): void => {
+  const requiredEnvVars = [
+    { name: 'JWT_SECRET', description: 'JWT signing secret' },
+    { name: 'PEPPER', description: 'Password hashing pepper' },
+  ];
+
+  const emptyVars = requiredEnvVars.filter(
+    ({ name }) => process.env[name] === '',
+  );
+
+  if (emptyVars.length > 0) {
+    const varNames = emptyVars.map(({ name }) => name).join(', ');
+    const details = emptyVars
+      .map(({ name, description }) => `  - ${name}: ${description}`)
+      .join('\n');
+
+    throw new Error(
+      `Lambda environment variables are empty: ${varNames}\n\n` +
+        `The following required secrets have empty values:\n${details}\n\n` +
+        `These secrets should be defined in apps/node-server/.env.{stage}.\n` +
+        `Ensure the values are set and the file is properly decrypted during CDK synthesis.`,
+    );
+  }
+};
+
 export const generateApiLambda = (scope: Construct, region: string): void => {
+  // Validate secrets before creating Lambda resource
+  validateLambdaEnvironment();
+
   const assumeRole = createAssumeRoleDocument(scope);
   const callerIdentity = new DataAwsCallerIdentity(
     scope,

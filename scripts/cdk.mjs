@@ -93,52 +93,100 @@ const DEPLOYMENT_GROUPS = {
 // ============================================================================
 
 /**
- * Load environment variables from .env file using dotenvx
+ * Load environment variables from .env files using dotenvx
  * Handles encrypted files and provides helpful error messages
+ *
+ * Loads two env files:
+ * 1. cdk/platform-cdk/.env.{stage} - AWS/infra config (loaded first, takes precedence)
+ * 2. apps/node-server/.env.{stage} - App secrets (JWT_SECRET, PEPPER, etc.)
  */
 const loadEnv = async (stage) => {
-  const envFile = join(CDK_ROOT, `.env.${stage}`);
+  const cdkEnvFile = join(CDK_ROOT, `.env.${stage}`);
+  const nodeServerEnvFile = join(REPO_ROOT, 'apps', 'node-server', `.env.${stage}`);
 
-  if (!existsSync(envFile)) {
-    throw new Error(`Environment file not found: ${envFile}`);
+  // Validate both env files exist
+  if (!existsSync(cdkEnvFile)) {
+    throw new Error(`CDK environment file not found: ${cdkEnvFile}`);
+  }
+
+  if (!existsSync(nodeServerEnvFile)) {
+    throw new Error(
+      `Node server environment file not found: ${nodeServerEnvFile}\n` +
+      `Lambda deployment requires app secrets (JWT_SECRET, PEPPER) from this file.\n` +
+      `Create ${nodeServerEnvFile} with the required secrets.`
+    );
   }
 
   // Dynamically import dotenvx
   const { config } = await import('@dotenvx/dotenvx');
 
-  const result = config({ path: envFile });
+  // Load CDK env file first (these take precedence)
+  const cdkResult = config({ path: cdkEnvFile });
 
-  if (result.error) {
-    const errorMsg = result.error.message || String(result.error);
+  if (cdkResult.error) {
+    const errorMsg = cdkResult.error.message || String(cdkResult.error);
+    handleDotenvxError(errorMsg, CDK_ROOT);
+    throw new Error(`Failed to load CDK environment: ${errorMsg}`);
+  }
 
-    // Check for missing private key
-    if (/MISSING_PRIVATE_KEY|DOTENV_PRIVATE_KEY/i.test(errorMsg)) {
-      const envKeysPath = join(CDK_ROOT, '.env.keys');
-      const hasEnvKeys = existsSync(envKeysPath);
-      const inWorktree = process.cwd().includes('.worktrees');
+  // Load node-server env file second (override: false means CDK values take precedence)
+  const nodeServerResult = config({ path: nodeServerEnvFile, override: false });
 
-      console.error(`\n${LOG_PREFIX} dotenvx reported missing private key(s).`);
-
-      if (!hasEnvKeys && inWorktree) {
-        console.error(`${LOG_PREFIX} This looks like a worktree missing .env.keys.`);
-        console.error(`${LOG_PREFIX} Run: node .claude/scripts/sync-worktree-env-keys.mjs`);
-      } else if (!hasEnvKeys) {
-        console.error(`${LOG_PREFIX} No .env.keys file found next to the env file.`);
-        console.error(`${LOG_PREFIX} Add .env.keys or re-encrypt envs with your own key.`);
-      } else {
-        console.error(`${LOG_PREFIX} Verify the DOTENV_PRIVATE_KEY values in .env.keys match the encrypted env files.`);
-      }
-    }
-
-    throw new Error(`Failed to load environment: ${errorMsg}`);
+  if (nodeServerResult.error) {
+    const errorMsg = nodeServerResult.error.message || String(nodeServerResult.error);
+    handleDotenvxError(errorMsg, join(REPO_ROOT, 'apps', 'node-server'));
+    throw new Error(`Failed to load node-server environment: ${errorMsg}`);
   }
 
   // Validate required variables
   if (!process.env.AWS_REGION) {
-    throw new Error('AWS_REGION is not set. Check your .env file.');
+    throw new Error('AWS_REGION is not set. Check your CDK .env file.');
   }
 
-  return result.parsed || {};
+  // Validate Lambda secrets
+  validateLambdaSecrets();
+
+  return { ...cdkResult.parsed, ...nodeServerResult.parsed };
+};
+
+/**
+ * Handle dotenvx errors with helpful messages
+ */
+const handleDotenvxError = (errorMsg, envDir) => {
+  if (/MISSING_PRIVATE_KEY|DOTENV_PRIVATE_KEY/i.test(errorMsg)) {
+    const envKeysPath = join(envDir, '.env.keys');
+    const hasEnvKeys = existsSync(envKeysPath);
+    const inWorktree = process.cwd().includes('.worktrees');
+
+    console.error(`\n${LOG_PREFIX} dotenvx reported missing private key(s).`);
+
+    if (!hasEnvKeys && inWorktree) {
+      console.error(`${LOG_PREFIX} This looks like a worktree missing .env.keys.`);
+      console.error(`${LOG_PREFIX} Run: node .claude/scripts/sync-worktree-env-keys.mjs`);
+    } else if (!hasEnvKeys) {
+      console.error(`${LOG_PREFIX} No .env.keys file found at ${envKeysPath}.`);
+      console.error(`${LOG_PREFIX} Add .env.keys or re-encrypt envs with your own key.`);
+    } else {
+      console.error(`${LOG_PREFIX} Verify the DOTENV_PRIVATE_KEY values in .env.keys match the encrypted env files.`);
+    }
+  }
+};
+
+/**
+ * Validate that required Lambda secrets are present in process.env
+ * Called after loading both env files
+ */
+const validateLambdaSecrets = () => {
+  const requiredSecrets = ['JWT_SECRET', 'PEPPER'];
+  const missing = requiredSecrets.filter((secret) => !process.env[secret]);
+
+  if (missing.length > 0) {
+    throw new Error(
+      `Missing required Lambda secrets: ${missing.join(', ')}\n` +
+      `These secrets should be defined in apps/node-server/.env.{stage}.\n` +
+      `Add the missing secrets and encrypt with: npx dotenvx encrypt -f apps/node-server/.env.{stage}`
+    );
+  }
 };
 
 // ============================================================================
