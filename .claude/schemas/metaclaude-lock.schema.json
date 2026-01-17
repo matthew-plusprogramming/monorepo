@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "metaclaude-lock.schema.json",
+  "title": "MetaClaude Lock File",
+  "description": "Tracks installed artifact versions for deterministic syncs",
+  "type": "object",
+  "required": ["lock_version", "synced_at", "source_commit", "installed"],
+  "properties": {
+    "lock_version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+    "synced_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "source_commit": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{40}$",
+      "description": "Full commit hash of source at sync time"
+    },
+    "registry_version": {
+      "type": "string",
+      "description": "Version of registry at sync time"
+    },
+    "installed": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["version", "hash", "installed_at"],
+        "properties": {
+          "version": { "type": "string" },
+          "hash": { "type": "string" },
+          "installed_at": { "type": "string", "format": "date-time" },
+          "local_hash": {
+            "type": "string",
+            "description": "Current hash of local file (for drift detection)"
+          },
+          "previous": {
+            "type": "object",
+            "properties": {
+              "version": { "type": "string" },
+              "hash": { "type": "string" },
+              "backup_path": { "type": "string" }
+            }
+          }
+        }
+      }
+    }
+  }
+}

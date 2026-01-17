@@ -1,0 +1,80 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "projects.schema.json",
+  "title": "MetaClaude Projects Configuration",
+  "description": "Central configuration for all projects consuming agentic artifacts",
+  "type": "object",
+  "required": ["version", "projects"],
+  "properties": {
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "description": "Schema version"
+    },
+    "defaults": {
+      "type": "object",
+      "description": "Default values inherited by all projects",
+      "properties": {
+        "base_dir": {
+          "type": "string",
+          "default": "..",
+          "description": "Default parent directory for projects (relative to metaclaude repo)"
+        },
+        "bundle": {
+          "type": "string",
+          "description": "Default bundle if not specified per-project"
+        }
+      }
+    },
+    "projects": {
+      "type": "object",
+      "description": "Map of project name to configuration",
+      "additionalProperties": {
+        "$ref": "#/$defs/projectConfig"
+      }
+    }
+  },
+  "$defs": {
+    "projectConfig": {
+      "type": "object",
+      "description": "Configuration for a single project",
+      "properties": {
+        "path": {
+          "type": "string",
+          "description": "Override path (absolute or relative to metaclaude repo). If omitted, uses {base_dir}/{project-name}"
+        },
+        "bundle": {
+          "type": "string",
+          "description": "Bundle name from registry (inherits from defaults if omitted)"
+        },
+        "additional": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Additional artifacts beyond the bundle"
+        },
+        "excluded": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Artifacts to exclude from the bundle"
+        },
+        "pinned": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string",
+            "pattern": "^\\d+\\.\\d+\\.\\d+@[a-f0-9]{8}$"
+          },
+          "description": "Artifacts pinned to specific version@hash"
+        },
+        "protected": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Paths that should never be overwritten during sync"
+        },
+        "project_section": {
+          "type": "string",
+          "description": "Path to project-specific CLAUDE.md content (relative to metaclaude repo)"
+        }
+      }
+    }
+  }
+}

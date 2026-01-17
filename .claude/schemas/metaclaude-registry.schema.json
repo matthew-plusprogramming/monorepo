@@ -1,0 +1,114 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "metaclaude-registry.schema.json",
+  "title": "MetaClaude Registry",
+  "description": "Central registry of agentic artifacts with versions and hashes",
+  "type": "object",
+  "required": ["registry_version", "updated_at", "artifacts"],
+  "properties": {
+    "registry_version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "description": "Semantic version of the registry format"
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp of last update"
+    },
+    "artifacts": {
+      "type": "object",
+      "properties": {
+        "core": {
+          "type": "object",
+          "description": "Core artifacts that must be identical across all repos",
+          "additionalProperties": { "$ref": "#/$defs/artifact" }
+        },
+        "agents": {
+          "type": "object",
+          "description": "Agent definitions",
+          "additionalProperties": { "$ref": "#/$defs/artifact" }
+        },
+        "skills": {
+          "type": "object",
+          "description": "Skill definitions",
+          "additionalProperties": { "$ref": "#/$defs/artifact" }
+        },
+        "templates": {
+          "type": "object",
+          "description": "Spec and document templates",
+          "additionalProperties": { "$ref": "#/$defs/artifact" }
+        },
+        "scripts": {
+          "type": "object",
+          "description": "Utility scripts",
+          "additionalProperties": { "$ref": "#/$defs/artifact" }
+        },
+        "schemas": {
+          "type": "object",
+          "description": "JSON schemas for validation",
+          "additionalProperties": { "$ref": "#/$defs/artifact" }
+        }
+      }
+    },
+    "bundles": {
+      "type": "object",
+      "description": "Named collections of artifacts for easy adoption",
+      "additionalProperties": { "$ref": "#/$defs/bundle" }
+    }
+  },
+  "$defs": {
+    "artifact": {
+      "type": "object",
+      "required": ["version", "hash", "path"],
+      "properties": {
+        "version": {
+          "type": "string",
+          "pattern": "^\\d+\\.\\d+\\.\\d+$",
+          "description": "Semantic version"
+        },
+        "hash": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{8}$",
+          "description": "First 8 chars of content SHA-256"
+        },
+        "path": {
+          "type": "string",
+          "description": "Relative path from repo root"
+        },
+        "description": {
+          "type": "string",
+          "description": "Human-readable description"
+        },
+        "dependencies": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Other artifacts this depends on"
+        },
+        "breaking_changes": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Version: description of breaking changes"
+        }
+      }
+    },
+    "bundle": {
+      "type": "object",
+      "required": ["description", "includes"],
+      "properties": {
+        "description": {
+          "type": "string"
+        },
+        "extends": {
+          "type": "string",
+          "description": "Name of bundle to extend"
+        },
+        "includes": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Artifact paths to include"
+        }
+      }
+    }
+  }
+}

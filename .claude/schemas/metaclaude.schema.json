@@ -1,0 +1,115 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "metaclaude.schema.json",
+  "title": "MetaClaude Consumer Manifest",
+  "description": "Configuration for a repository consuming agentic artifacts",
+  "type": "object",
+  "required": ["metaclaude_version", "source", "dependencies"],
+  "properties": {
+    "metaclaude_version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "description": "Version of metaclaude manifest format"
+    },
+    "source": {
+      "type": "object",
+      "required": ["type", "path"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["local", "git"],
+          "description": "How to access the source repository"
+        },
+        "path": {
+          "type": "string",
+          "description": "Path to source repo (local path or git URL)"
+        },
+        "ref": {
+          "type": "string",
+          "default": "main",
+          "description": "Git ref to use (branch, tag, commit)"
+        },
+        "registry_path": {
+          "type": "string",
+          "default": ".claude/metaclaude-registry.json",
+          "description": "Path to registry within source repo"
+        }
+      }
+    },
+    "dependencies": {
+      "type": "object",
+      "properties": {
+        "bundle": {
+          "type": "string",
+          "description": "Name of bundle to use as base"
+        },
+        "pinned": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string",
+            "pattern": "^\\d+\\.\\d+\\.\\d+@[a-f0-9]{8}$"
+          },
+          "description": "Artifacts pinned to specific version@hash"
+        },
+        "additional": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Additional artifacts beyond bundle"
+        },
+        "excluded": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Artifacts to exclude from bundle"
+        }
+      }
+    },
+    "local": {
+      "type": "object",
+      "properties": {
+        "protected": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Paths that should never be overwritten"
+        },
+        "custom_agents": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Paths to repo-specific agents"
+        },
+        "custom_skills": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Paths to repo-specific skills"
+        }
+      }
+    },
+    "project": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Project name for CLAUDE.md"
+        },
+        "claude_md_project_path": {
+          "type": "string",
+          "description": "Path to project-specific CLAUDE.md section"
+        }
+      }
+    },
+    "hooks": {
+      "type": "object",
+      "properties": {
+        "pre_sync": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Commands to run before sync"
+        },
+        "post_sync": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Commands to run after sync"
+        }
+      }
+    }
+  }
+}
