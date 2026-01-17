@@ -66,6 +66,29 @@ Route to multi-workstream orchestration with git worktrees:
 - **Parallel execution**: Workstreams execute in isolated git worktrees
 - **Dependency orchestration**: Facilitator manages merge order based on dependencies
 
+### Refactor (refactor workflow)
+Route to refactor workflow for code quality improvements:
+- Explicit refactoring requests ("refactor this", "clean up", "improve code quality")
+- Tech debt reduction tasks
+- Pattern migration requests ("migrate from X to Y pattern")
+- Code consolidation or deduplication
+- Architecture improvements without feature changes
+- **Key constraint**: Behavior must be preserved (no feature changes)
+- **Needs**: Clear scope definition, before/after patterns, test verification
+- **Uses**: `/refactor` skill with Refactorer subagent
+- **Validation**: Tests must pass before and after (behavior preservation proof)
+
+**Refactor triggers** (route to refactor when ANY apply):
+- User says: "refactor", "clean up", "improve code quality", "reduce tech debt"
+- User says: "migrate to <pattern>", "consolidate", "deduplicate"
+- Request focuses on code structure without changing behavior
+- Request mentions: "maintainability", "readability", "consistency"
+
+**NOT refactor** (route to oneoff-spec instead):
+- "Refactor and add feature X" → oneoff-spec (behavior changes)
+- "Clean up and fix this bug" → oneoff-spec (behavior changes)
+- Unclear if behavior should change → oneoff-spec (spec clarifies intent)
+
 ## Routing Process
 
 ### Step 1: Load Context
@@ -119,7 +142,7 @@ Count impacted files and assess complexity:
 Produce a routing decision with delegation plan:
 
 ```yaml
-workflow: oneoff-vibe | oneoff-spec | orchestrator
+workflow: oneoff-vibe | oneoff-spec | orchestrator | refactor
 rationale: <Brief explanation of why this workflow was chosen>
 estimated_scope: small | medium | large
 estimated_files: <N>
@@ -189,12 +212,31 @@ Always output a clear routing decision:
 **Next Action**: Use `/pm` skill to interview user about endpoint requirements, then create TaskSpec.
 ```
 
+For refactor workflows, include behavior preservation note:
+
+```markdown
+## Routing Decision
+
+**Workflow**: refactor
+
+**Rationale**: Explicit refactoring request to migrate to repository pattern. No behavior changes - code reorganization only.
+
+**Estimated Scope**: medium
+
+**Estimated Files**: 4 (service, repository, interface, tests)
+
+**Behavior Preservation**: Tests must pass before and after refactoring.
+
+**Next Action**: Use `/refactor` skill to define scope and patterns.
+```
+
 ## Integration with Other Skills
 
 After routing:
 - **oneoff-vibe**: Proceed directly to implementation
 - **oneoff-spec**: Use `/pm` to gather requirements → (optional) `/prd draft` to write PRD to Google Docs → `/spec` to create spec group → `/atomize` to create atomic specs → `/enforce` to validate atomicity → User approval → `/implement` + `/test` → `/unify` → `/code-review` → `/security` → (if PRD exists) `/prd push` to sync discoveries
 - **orchestrator**: Use `/pm` to create ProblemBrief → (optional) `/prd draft` for stakeholder PRD → `/spec` to create MasterSpec with workstream spec groups → For each workstream: `/atomize` + `/enforce` → User approval → Facilitator orchestrates parallel execution → `/prd push` to sync discoveries
+- **refactor**: Use `/refactor` skill → Define scope and patterns → Run tests (baseline) → Execute refactoring → Run tests (verification) → `/code-review` → `/security` (if applicable)
 
 ## Examples
 
@@ -287,3 +329,51 @@ After routing:
 - next_action: Make the change directly
 
 **Note**: Without the explicit override, even a "simple" debug statement might warrant a spec if it's part of a larger investigation.
+
+### Example 7: Refactor Request (refactor workflow)
+**Request**: "Refactor the authentication service to use the repository pattern"
+
+**Routing**:
+- workflow: refactor
+- rationale: Explicit refactoring request with pattern migration goal. No behavior changes expected - restructuring code organization only.
+- estimated_scope: medium
+- estimated_files: 3-5 (service, new repository, tests)
+- delegation:
+  - exploration_needed: true (understand current auth service structure)
+  - parallel_subtasks:
+    - codebase analysis: Explore subagent
+  - sequential_dependencies:
+    - exploration must complete before refactoring
+    - tests must pass before refactoring (baseline)
+    - tests must pass after refactoring (verification)
+- next_action: Use `/refactor` skill to define scope and execute
+
+### Example 8: Tech Debt Reduction (refactor workflow)
+**Request**: "Clean up the utils folder - too much duplicated code"
+
+**Routing**:
+- workflow: refactor
+- rationale: Tech debt reduction request focused on code consolidation. "Clean up" and "duplicated code" are refactor triggers. No feature changes.
+- estimated_scope: small-medium
+- estimated_files: 4-8 (multiple utils files to consolidate)
+- delegation:
+  - exploration_needed: true (identify duplication patterns)
+  - parallel_subtasks:
+    - duplication analysis: Explore subagent
+- next_action: Use `/refactor` skill to identify duplications and consolidate
+
+### Example 9: Refactor with Feature (routes to oneoff-spec, NOT refactor)
+**Request**: "Refactor the payment service and add support for crypto payments"
+
+**Routing**:
+- workflow: oneoff-spec
+- rationale: Although request includes "refactor", it also adds new behavior (crypto payments). Behavior changes require spec workflow for proper requirements and testing. The refactor portion can be part of implementation.
+- estimated_scope: medium-large
+- estimated_files: 5+
+- delegation:
+  - parallel_subtasks:
+    - implementation: implementer
+    - tests: test-writer
+- next_action: Use `/pm` to gather crypto payment requirements, then create TaskSpec
+
+**Note**: Mixed requests (refactor + feature) always route to oneoff-spec because behavior changes need formal specification.

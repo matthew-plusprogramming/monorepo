@@ -94,7 +94,7 @@
           },
           "subagent_type": {
             "type": "string",
-            "enum": ["product-manager", "spec-author", "implementer", "test-writer", "unifier", "security-reviewer", "browser-tester"]
+            "enum": ["explore", "product-manager", "spec-author", "implementer", "test-writer", "unifier", "code-reviewer", "security-reviewer", "documenter", "refactorer", "facilitator", "browser-tester", "prd-author", "prd-reader", "prd-writer", "deployer"]
           },
           "agent_id": {
             "type": "string",

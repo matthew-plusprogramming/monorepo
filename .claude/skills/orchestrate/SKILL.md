@@ -388,12 +388,72 @@ Check: OWASP Top 10, input validation, auth/authz, secrets handling.
 **If PASSED**:
 
 - Update convergence_status.security_reviewed: true
-- Add to merge queue
+- Check if workstream has UI components → Run browser test (step 9a)
+- If no UI → Add to merge queue
 
 **If FAILED (Critical/High severity)**:
 
 - Block merge
 - Escalate to user with findings
+
+### 9a. Run Browser Test (UI Workstreams Only)
+
+For workstreams that include UI components (frontend, components, user-facing features):
+
+```javascript
+// Check if workstream has UI changes
+const hasUIChanges = workstream.tags?.includes('ui') ||
+  workstream.title.toLowerCase().includes('frontend') ||
+  workstream.title.toLowerCase().includes('ui') ||
+  workstream.title.toLowerCase().includes('component');
+
+if (hasUIChanges) {
+  Task({
+    description: 'Browser test for ws-2 in worktree-2',
+    prompt: `
+Run browser-based UI testing for workstream ws-2.
+
+**Worktree**: worktree-2
+**Path**: /Users/matthewlin/Desktop/Personal Projects/engineering-assistant-ws-2
+
+## TEST REQUIREMENTS
+
+1. Navigate to relevant pages where UI changes were made
+2. Verify visual appearance matches acceptance criteria
+3. Test user interactions (clicks, form inputs, navigation)
+4. Capture screenshots as evidence
+5. Verify error states and edge cases
+
+## ACCEPTANCE CRITERIA TO VERIFY
+
+Reference the atomic specs for ws-2 and verify each UI-related AC:
+- Visual elements render correctly
+- Interactions work as specified
+- Error messages display appropriately
+- Responsive behavior (if applicable)
+
+Report PASS or FAIL with evidence (screenshots, interaction logs).
+    `,
+    subagent_type: 'browser-tester',
+  });
+}
+```
+
+**If PASSED**:
+
+- Update convergence_status.browser_tested: true
+- Add to merge queue
+
+**If FAILED**:
+
+- Block merge
+- Report UI issues to user with screenshots
+- Wait for fixes, then re-validate
+
+**If NO UI CHANGES**:
+
+- Skip browser test
+- Add directly to merge queue after security review
 
 ### 10. Process Merge Queue
 
@@ -515,9 +575,10 @@ Continue cycle for each workstream:
 3. Monitor completion (step 7)
 4. Run convergence validation (step 8)
 5. Run security review (step 9)
-6. Add to merge queue (step 10)
-7. Merge to main
-8. Unblock dependents (step 11)
+6. Run browser test if UI workstream (step 9a)
+7. Add to merge queue (step 10)
+8. Merge to main
+9. Unblock dependents (step 11)
 
 Until all workstreams merged.
 
@@ -614,6 +675,7 @@ Update after:
 Orchestrator task complete when:
 
 - ✅ All workstream spec groups converged (all atomic specs implemented + tested)
+- ✅ All UI workstreams browser tested
 - ✅ All workstreams merged to main
 - ✅ All worktrees cleaned up
 - ✅ Integration tests passing
@@ -639,12 +701,12 @@ Orchestrator task complete when:
 4. Evaluate readiness (ws-1 ready, ws-2/ws-3 blocked) ✅
 5. Atomize + enforce ws-1 ✅
 6. Dispatch ws-1 implementer/test-writer ✅
-7. ws-1 converges → Merge ✅
+7. ws-1 converges → Security review ✅ → Merge ✅
 8. Unblock ws-2, ws-3 ✅
 9. Atomize + enforce ws-2, ws-3 (parallel) ✅
 10. Dispatch ws-2, ws-3 (parallel) ✅
-11. ws-2 converges → Merge ✅
-12. ws-3 converges → Merge ✅
+11. ws-2 converges → Security review ✅ → Browser test (UI workstream) ✅ → Merge ✅
+12. ws-3 converges → Security review ✅ → Merge ✅ (no browser test - backend only)
 13. Cleanup worktrees ✅
 14. Final validation ✅
 15. Complete ✅
