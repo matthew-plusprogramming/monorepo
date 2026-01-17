@@ -489,10 +489,12 @@ Files created:
 
 **Next Steps**:
 1. Review requirements: `cat .claude/specs/groups/sg-<feature-slug>/requirements.md`
-2. Run `/spec sg-<feature-slug>` to create spec.md
-3. Run `/atomize sg-<feature-slug>` to decompose into atomic specs
-4. Run `/enforce sg-<feature-slug>` to validate atomicity
-5. User approves → implementation begins
+2. (Optional) Run `/prd draft sg-<feature-slug>` to write PRD to Google Docs for stakeholder review
+3. Run `/spec sg-<feature-slug>` to create spec.md
+4. Run `/atomize sg-<feature-slug>` to decompose into atomic specs
+5. Run `/enforce sg-<feature-slug>` to validate atomicity
+6. User approves → implementation begins
+7. (If PRD exists) Run `/prd push sg-<feature-slug>` to sync implementation discoveries back
 ```
 
 ### Linking to External PRD

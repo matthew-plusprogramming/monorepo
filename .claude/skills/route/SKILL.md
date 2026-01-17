@@ -193,8 +193,8 @@ Always output a clear routing decision:
 
 After routing:
 - **oneoff-vibe**: Proceed directly to implementation
-- **oneoff-spec**: Use `/pm` to gather requirements → `/spec` to create spec group → `/atomize` to create atomic specs → `/enforce` to validate atomicity → User approval → `/implement` + `/test` → `/unify` → `/code-review` → `/security`
-- **orchestrator**: Use `/pm` to create ProblemBrief → `/spec` to create MasterSpec with workstream spec groups → For each workstream: `/atomize` + `/enforce` → User approval → Facilitator orchestrates parallel execution
+- **oneoff-spec**: Use `/pm` to gather requirements → (optional) `/prd draft` to write PRD to Google Docs → `/spec` to create spec group → `/atomize` to create atomic specs → `/enforce` to validate atomicity → User approval → `/implement` + `/test` → `/unify` → `/code-review` → `/security` → (if PRD exists) `/prd push` to sync discoveries
+- **orchestrator**: Use `/pm` to create ProblemBrief → (optional) `/prd draft` for stakeholder PRD → `/spec` to create MasterSpec with workstream spec groups → For each workstream: `/atomize` + `/enforce` → User approval → Facilitator orchestrates parallel execution → `/prd push` to sync discoveries
 
 ## Examples
 

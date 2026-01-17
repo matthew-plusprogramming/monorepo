@@ -323,6 +323,7 @@ Workflow outcomes:
 | `/refactor` | Code quality improvements | Tech debt sprints, post-merge cleanup |
 | `/orchestrate` | Coordinate multi-workstream projects | For large tasks with 3+ workstreams |
 | `/browser-test` | Browser-based UI testing | For UI features, after security review |
+| `/prd` | Create, sync, manage PRDs in Google Docs | Drafting new PRDs or syncing external ones |
 
 ### Specialized Subagents
 
@@ -340,6 +341,9 @@ Workflow outcomes:
 | `refactorer` | opus | Code quality improvements with behavior preservation |
 | `facilitator` | opus | Orchestrate multi-workstream projects with git worktrees |
 | `browser-tester` | opus | Browser-based UI testing |
+| `prd-author` | opus | Author complete PRDs from requirements using template |
+| `prd-reader` | opus | Extract requirements from existing PRDs |
+| `prd-writer` | opus | Push incremental discoveries back to PRDs |
 
 ### Spec is Contract Principle
 
@@ -359,17 +363,17 @@ Request → Route → Delegate to subagent → Synthesize → Commit
 
 #### Medium Task (oneoff-spec)
 ```
-Request → Route → PM Interview → Spec → Approve →
+Request → Route → PM Interview → [Optional: PRD Draft] → Spec → Approve →
   [Parallel: Implement + Test] → Unify → Code Review → Security →
-  [If UI: Browser Test] → [If public API: Docs] → Commit
+  [If UI: Browser Test] → [If public API: Docs] → [If PRD: PRD Push] → Commit
 ```
 
 #### Large Task (orchestrator)
 ```
-Request → Route → PM Interview → ProblemBrief →
+Request → Route → PM Interview → [Optional: PRD Draft] → ProblemBrief →
   [Parallel: WorkstreamSpecs] → MasterSpec → Approve →
   [Parallel per workstream: Implement + Test] →
-  Unify → Code Review → Security → Browser Test → Docs → Commit
+  Unify → Code Review → Security → Browser Test → Docs → [If PRD: PRD Push] → Commit
 ```
 
 ### Persistence

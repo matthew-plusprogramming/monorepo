@@ -210,19 +210,36 @@ allowed-tools: Read, Write, Glob, Task, mcp__google-docs-mcp__readGoogleDoc, mcp
 6. Update "Integration with Workflow" section
 7. Add "PM Skill Relationship" section
 
-### Step 2: Create `prd-author` agent
+### Step 2: Copy all PRD agents
 
-Copy `.claude/agents/prd-author.md` to the target project.
+Copy these agent files to `.claude/agents/`:
+- `prd-author.md` — NEW, authors PRDs from requirements
+- `prd-reader.md` — For `/prd sync`
+- `prd-writer.md` — For `/prd push`
 
 ### Step 3: Verify template exists
 
 Ensure `.claude/templates/prd.template.md` exists with the standard structure.
 
-### Step 4: Verify dependencies
+### Step 4: Update CLAUDE.md
 
-The following must exist:
-- `.claude/agents/prd-reader.md` — For `/prd sync`
-- `.claude/agents/prd-writer.md` — For `/prd push`
+Add PRD skill and agents to the reference tables:
+
+1. Add to **Core Skills** table:
+   ```markdown
+   | `/prd` | Create, sync, manage PRDs in Google Docs | Drafting new PRDs or syncing external ones |
+   ```
+
+2. Add to **Specialized Subagents** table:
+   ```markdown
+   | `prd-author` | opus | Author complete PRDs from requirements using template |
+   | `prd-reader` | opus | Extract requirements from existing PRDs |
+   | `prd-writer` | opus | Push incremental discoveries back to PRDs |
+   ```
+
+### Step 5: Verify other dependencies
+
+The following must also exist:
 - `.claude/skills/pm/SKILL.md` — For PM interviews
 
 ---
@@ -267,14 +284,33 @@ For quick migration, copy these files to the target project:
 ```
 .claude/
 ├── agents/
-│   └── prd-author.md          # NEW - copy this
+│   ├── prd-author.md          # NEW - authors PRDs from requirements
+│   ├── prd-reader.md          # REQUIRED - extracts requirements from PRDs
+│   └── prd-writer.md          # REQUIRED - pushes discoveries back to PRDs
 ├── skills/
 │   └── prd/
 │       └── SKILL.md           # UPDATED - merge or replace
 ├── templates/
-│   └── prd.template.md        # REQUIRED - ensure exists
+│   └── prd.template.md        # REQUIRED - PRD template for prd-author
 └── docs/
     └── 2026-01-17-prd-authoring-updates.md  # This file (optional)
+
+Root:
+└── CLAUDE.md                  # UPDATED - add /prd skill and PRD agents to tables
+```
+
+### CLAUDE.md Updates Required
+
+Add to **Core Skills** table:
+```markdown
+| `/prd` | Create, sync, manage PRDs in Google Docs | Drafting new PRDs or syncing external ones |
+```
+
+Add to **Specialized Subagents** table:
+```markdown
+| `prd-author` | opus | Author complete PRDs from requirements using template |
+| `prd-reader` | opus | Extract requirements from existing PRDs |
+| `prd-writer` | opus | Push incremental discoveries back to PRDs |
 ```
 
 ---
