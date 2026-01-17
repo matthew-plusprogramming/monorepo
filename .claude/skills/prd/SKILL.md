@@ -1,7 +1,7 @@
 ---
 name: prd
-description: Sync PRDs from external sources, extract requirements, manage PRD lifecycle
-allowed-tools: Read, Write, Glob, Task, mcp__google-docs-mcp__readGoogleDoc, mcp__google-docs-mcp__getDocumentInfo, mcp__google-docs-mcp__appendToGoogleDoc
+description: Create, sync, and manage PRDs in Google Docs. Draft new PRDs from PM interviews, sync existing PRDs, and push discoveries back.
+allowed-tools: Read, Write, Glob, Task, mcp__google-docs-mcp__readGoogleDoc, mcp__google-docs-mcp__getDocumentInfo, mcp__google-docs-mcp__appendToGoogleDoc, mcp__google-docs-mcp__insertText, mcp__google-docs-mcp__deleteRange, mcp__google-docs-mcp__createDocument
 user-invocable: true
 ---
 
@@ -9,12 +9,21 @@ user-invocable: true
 
 ## Purpose
 
-Interface with external Product Requirements Documents (PRDs) stored in Google Docs or Notion. Extract requirements, create spec groups, detect drift, and push updates back to the PRD.
+Full lifecycle management for Product Requirements Documents (PRDs):
+- **Create** new PRDs from PM interviews using the standard template
+- **Write** PRDs to Google Docs
+- **Sync** existing PRDs from Google Docs to local spec groups
+- **Push** implementation discoveries back to PRDs
 
 ## Usage
 
 ```
-/prd sync <doc-id-or-url>     # Pull PRD, extract requirements, create spec group
+/prd draft                     # Start PM interview, then draft PRD to Google Doc
+/prd draft <spec-group-id>     # Draft PRD from existing spec group requirements
+/prd write <doc-id>            # Write/overwrite PRD to specified Google Doc
+/prd write <doc-id> <spec-group-id>  # Write specific spec group's PRD to doc
+
+/prd sync <doc-id-or-url>      # Pull PRD, extract requirements, create spec group
 /prd status                    # Show all linked PRDs and their sync state
 /prd status <spec-group-id>    # Show PRD status for specific spec group
 /prd diff <spec-group-id>      # Show differences between local and remote PRD
@@ -23,6 +32,113 @@ Interface with external Product Requirements Documents (PRDs) stored in Google D
 ```
 
 ## Commands
+
+### /prd draft
+
+Creates a new PRD by running a PM interview, then writes to Google Docs using the standard template.
+
+**Process**:
+1. If no spec-group-id provided:
+   - Invoke `/pm` skill to run discovery interview
+   - PM skill creates spec group with `requirements.md`
+2. Prompt user for Google Doc destination:
+   - Create new document
+   - Write to existing document (provide doc ID)
+3. Dispatch `prd-author` agent to:
+   - Read `requirements.md` from spec group
+   - Read PRD template from `.claude/templates/prd.template.md`
+   - Transform requirements into PRD format
+   - Write formatted PRD to Google Doc
+4. Update `manifest.json` with PRD link
+
+**Output**:
+```
+PRD drafted successfully
+
+Title: "AI-Native Engineering Dashboard"
+Spec Group: sg-ai-dashboard
+Document: https://docs.google.com/document/d/1abc.../edit
+
+Sections created:
+  ✓ Overview
+  ✓ Goals (3)
+  ✓ Non-Goals (3)
+  ✓ Requirements (10 in EARS format)
+  ✓ Constraints
+  ✓ Assumptions
+  ✓ Success Criteria
+  ✓ Open Questions (4)
+  ✓ Version History
+
+Status: v1 (DRAFT)
+
+Next steps:
+  1. Review PRD in Google Docs
+  2. Mark as REVIEWED when satisfied
+  3. Run /spec sg-ai-dashboard to create specs
+```
+
+### /prd write
+
+Writes a PRD to a Google Doc using the standard template format. Can create new doc or overwrite existing.
+
+**Input**:
+- `doc-id`: Google Doc ID or "new" to create new document
+- `spec-group-id` (optional): If not provided, uses most recent spec group
+
+**Process**:
+1. Resolve spec group (use provided ID or most recent)
+2. If doc-id is "new":
+   - Will create new Google Doc with title from spec group
+3. Dispatch `prd-author` agent to:
+   - Load spec group's `requirements.md`
+   - Load PRD template
+   - Transform requirements to PRD sections (see mapping below)
+   - Clear existing content if overwriting
+   - Write formatted PRD content to Google Doc
+4. Update manifest with PRD link
+
+**Template Mapping**:
+```
+requirements.md Section    →    PRD Template Section
+─────────────────────────────────────────────────────
+Source + Problem Statement →    Overview
+Goals                      →    Goals
+Non-Goals                  →    Non-Goals
+Requirements (REQ-XXX)     →    Requirements (EARS format preserved)
+Constraints                →    Constraints
+Assumptions                →    Assumptions
+Success Criteria           →    Success Criteria
+Open Questions             →    Open Questions
+Edge Cases                 →    Folded into Requirements or separate section
+Priorities                 →    Requirements Priority field
+                          →    User Stories (generated from requirements)
+                          →    Version History (initialized)
+                          →    EARS Format Reference (appended)
+```
+
+**Output**:
+```
+PRD written to Google Doc
+
+Document: "AI-Native Engineering Dashboard"
+URL: https://docs.google.com/document/d/1abc.../edit
+Action: Created new document (or: Overwrote existing content)
+
+Content:
+  - Overview: 2 paragraphs
+  - Goals: 4 items
+  - Non-Goals: 3 items
+  - Requirements: 10 (all EARS format)
+  - Constraints: 3 categories
+  - Assumptions: 4 with impact analysis
+  - Success Criteria: 6 measurable outcomes
+  - Open Questions: 4 (2 high priority)
+  - User Stories: 7 generated
+  - Version History: v1 initialized
+
+Spec group sg-ai-dashboard linked to document.
+```
 
 ### /prd sync
 
@@ -203,13 +319,20 @@ The `prd-reader` agent can also extract from less structured documents by:
 
 ## Integration with Workflow
 
+### Flow 1: Create New PRD (PM → PRD → Specs)
+
 ```
-/prd sync <doc-id>
+User has idea/request
+    ↓
+/prd draft (or /pm first)
+    ↓
+PM interview gathers requirements
     ↓
 Spec group created with requirements.md
-review_state: DRAFT
     ↓
-User reviews requirements
+PRD written to Google Doc (using template)
+    ↓
+User reviews PRD in Google Docs
     ↓
 /spec (creates spec.md from requirements)
     ↓
@@ -222,6 +345,80 @@ User reviews requirements
 PRD updated, new version as DRAFT
 ```
 
+### Flow 2: Sync Existing PRD (External PRD → Specs)
+
+```
+PRD already exists in Google Docs
+    ↓
+/prd sync <doc-id>
+    ↓
+prd-reader extracts requirements
+    ↓
+Spec group created with requirements.md
+review_state: DRAFT
+    ↓
+User reviews extracted requirements
+    ↓
+/spec (creates spec.md from requirements)
+    ↓
+/atomize
+    ↓
+... implementation ...
+    ↓
+/prd push (if new requirements discovered)
+    ↓
+PRD updated, new version as DRAFT
+```
+
+### PM Skill Relationship
+
+The `/pm` skill and `/prd` skill work together:
+
+| Skill | Purpose | Output |
+|-------|---------|--------|
+| `/pm` | Gather requirements via interview | `requirements.md` in spec group |
+| `/prd draft` | Interview + write PRD to Google Doc | PRD in Google Docs + spec group |
+| `/prd write` | Write existing requirements to PRD | PRD in Google Docs |
+| `/prd sync` | Extract requirements from existing PRD | `requirements.md` in spec group |
+
+**When to use which:**
+- **Starting fresh**: `/prd draft` — runs PM interview then writes PRD
+- **Have requirements, need PRD**: `/prd write <doc-id>` — formats and writes
+- **PRD exists, need local requirements**: `/prd sync <doc-id>` — extracts to local
+- **Just gathering requirements (no PRD yet)**: `/pm` — interview only
+
+## Agents
+
+The `/prd` skill uses three specialized agents:
+
+| Agent | Purpose | Used By |
+|-------|---------|---------|
+| `prd-author` | Authors complete PRDs from requirements using template | `/prd draft`, `/prd write` |
+| `prd-reader` | Extracts requirements from existing PRDs | `/prd sync` |
+| `prd-writer` | Pushes incremental discoveries back to PRDs | `/prd push` |
+
+### Agent Responsibilities
+
+**prd-author** (`.claude/agents/prd-author.md`):
+- Transforms `requirements.md` → full PRD document
+- Follows PRD template structure exactly
+- Writes to Google Docs (create new or overwrite)
+- Generates User Stories from requirements
+- Initializes version history
+
+**prd-reader** (`.claude/agents/prd-reader.md`):
+- Reads external PRDs from Google Docs
+- Extracts requirements, constraints, assumptions
+- Converts prose/user stories to EARS format
+- Creates `requirements.md` in spec group
+
+**prd-writer** (`.claude/agents/prd-writer.md`):
+- Computes diff between local and last-synced state
+- Appends new requirements discovered during implementation
+- Updates assumptions (marks invalidated)
+- Adds implementation notes
+- Increments PRD version
+
 ## Version Detection
 
 The skill attempts to detect PRD versions by:
@@ -232,7 +429,41 @@ The skill attempts to detect PRD versions by:
 
 ## State Transitions
 
-### On /prd sync (new spec group)
+### On /prd draft (new PRD + spec group)
+```json
+{
+  "review_state": "DRAFT",
+  "work_state": "PLAN_READY",
+  "updated_by": "agent",
+  "prd": {
+    "source": "google-docs",
+    "document_id": "...",
+    "version": "v1",
+    "last_sync": "<now>",
+    "created_by": "prd-draft"
+  }
+}
+```
+- Google Doc created/written with PRD content
+- PRD version: v1 (DRAFT)
+- Spec group linked to document
+
+### On /prd write (write to existing doc)
+```json
+{
+  "prd": {
+    "source": "google-docs",
+    "document_id": "...",
+    "version": "v1",
+    "last_sync": "<now>",
+    "created_by": "prd-write"
+  }
+}
+```
+- Existing spec group's `manifest.json` updated with PRD link
+- Google Doc content replaced with formatted PRD
+
+### On /prd sync (new spec group from existing PRD)
 ```json
 {
   "review_state": "DRAFT",
