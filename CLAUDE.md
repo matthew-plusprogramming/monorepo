@@ -314,6 +314,8 @@ Workflow outcomes:
 | `/route` | Analyze task complexity and route to workflow | Start of any new task |
 | `/pm` | Interview user to gather requirements | Before spec authoring, feedback collection |
 | `/spec` | Author specifications (TaskSpec, WorkstreamSpec, MasterSpec) | After requirements gathering |
+| `/atomize` | Decompose high-level specs into atomic specs | After spec authoring, before enforcement |
+| `/enforce` | Validate atomic specs meet atomicity criteria | After atomization, before approval |
 | `/implement` | Implement from approved specs | After spec approval |
 | `/test` | Write tests for acceptance criteria | Parallel with implementation or after |
 | `/unify` | Validate spec-impl-test alignment | After implementation and tests complete |
@@ -324,11 +326,14 @@ Workflow outcomes:
 | `/orchestrate` | Coordinate multi-workstream projects | For large tasks with 3+ workstreams |
 | `/browser-test` | Browser-based UI testing | For UI features, after security review |
 | `/prd` | Create, sync, manage PRDs in Google Docs | Drafting new PRDs or syncing external ones |
+| `/deploy` | Deploy infrastructure via CDKTF | After security review, for infrastructure changes |
 
 ### Specialized Subagents
 
 | Subagent | Model | Purpose |
 |----------|-------|---------|
+| `atomicity-enforcer` | opus | Validate atomic specs meet atomicity criteria |
+| `atomizer` | opus | Decompose specs into atomic specs with single responsibility |
 | `explore` | opus | Investigate questions via web or codebase research; returns structured findings |
 | `product-manager` | opus | Interview users, gather/refine requirements |
 | `spec-author` | opus | Author workstream specs (no code) |
@@ -344,6 +349,7 @@ Workflow outcomes:
 | `prd-author` | opus | Author complete PRDs from requirements using template |
 | `prd-reader` | opus | Extract requirements from existing PRDs |
 | `prd-writer` | opus | Push incremental discoveries back to PRDs |
+| `deployer` | opus | Deployment orchestration for CDKTF infrastructure operations |
 
 ### Spec is Contract Principle
 
