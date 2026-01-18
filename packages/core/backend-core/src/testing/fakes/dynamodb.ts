@@ -5,6 +5,8 @@ import type {
   PutItemCommandOutput,
   QueryCommandInput,
   QueryCommandOutput,
+  ScanCommandInput,
+  ScanCommandOutput,
   UpdateItemCommandInput,
   UpdateItemCommandOutput,
 } from '@aws-sdk/client-dynamodb';
@@ -15,7 +17,10 @@ import {
   type DynamoDbServiceSchema,
 } from '@/services/dynamodb.js';
 
-const operations = ['getItem', 'putItem', 'query', 'updateItem'] as const;
+// Re-export DynamoDbService for tests that need to reference it
+export { DynamoDbService };
+
+const operations = ['getItem', 'putItem', 'query', 'scan', 'updateItem'] as const;
 type OperationName = (typeof operations)[number];
 
 type ResponseEntry<T> =
@@ -26,6 +31,7 @@ type ResponseQueues = {
   readonly getItem: Array<ResponseEntry<GetItemCommandOutput>>;
   readonly putItem: Array<ResponseEntry<PutItemCommandOutput>>;
   readonly query: Array<ResponseEntry<QueryCommandOutput>>;
+  readonly scan: Array<ResponseEntry<ScanCommandOutput>>;
   readonly updateItem: Array<ResponseEntry<UpdateItemCommandOutput>>;
 };
 
@@ -33,6 +39,7 @@ type CallHistory = {
   readonly getItem: Array<GetItemCommandInput>;
   readonly putItem: Array<PutItemCommandInput>;
   readonly query: Array<QueryCommandInput>;
+  readonly scan: Array<ScanCommandInput>;
   readonly updateItem: Array<UpdateItemCommandInput>;
 };
 
@@ -43,6 +50,7 @@ export type DynamoDbServiceFake = {
     (operation: 'getItem', output: GetItemCommandOutput): void;
     (operation: 'putItem', output: PutItemCommandOutput): void;
     (operation: 'query', output: QueryCommandOutput): void;
+    (operation: 'scan', output: ScanCommandOutput): void;
     (operation: 'updateItem', output: UpdateItemCommandOutput): void;
   };
   readonly queueFailure: (operation: OperationName, error: Error) => void;
@@ -74,6 +82,7 @@ export const createDynamoDbServiceFake = (): DynamoDbServiceFake => {
     getItem: [],
     putItem: [],
     query: [],
+    scan: [],
     updateItem: [],
   };
 
@@ -81,6 +90,7 @@ export const createDynamoDbServiceFake = (): DynamoDbServiceFake => {
     getItem: [],
     putItem: [],
     query: [],
+    scan: [],
     updateItem: [],
   };
 
@@ -97,6 +107,10 @@ export const createDynamoDbServiceFake = (): DynamoDbServiceFake => {
       Effect.sync(() => {
         callHistory.query.push(input);
       }).pipe(Effect.flatMap(() => dequeue(responseQueues.query, 'query'))),
+    scan: (input: ScanCommandInput) =>
+      Effect.sync(() => {
+        callHistory.scan.push(input);
+      }).pipe(Effect.flatMap(() => dequeue(responseQueues.scan, 'scan'))),
     updateItem: (input: UpdateItemCommandInput) =>
       Effect.sync(() => {
         callHistory.updateItem.push(input);

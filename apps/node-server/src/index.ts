@@ -3,17 +3,56 @@
 // - Lambda: via Lambda environment configuration (set at deploy time)
 // Do NOT import @dotenvx/dotenvx/config here - it breaks Lambda runtime
 
+import { createServer } from 'node:http';
+
+import cookieParser from 'cookie-parser';
 import cors from 'cors';
+import { Effect } from 'effect';
 import express from 'express';
 import { prettifyError, ZodError } from 'zod';
 
+import {
+  dispatchAgentTaskRequestHandler,
+  getAgentTaskRequestHandler,
+} from '@/handlers/agentDispatch.handler';
+import {
+  getAgentTaskLogsRequestHandler,
+  getAgentTaskStatusRequestHandler,
+  updateAgentTaskStatusRequestHandler,
+} from '@/handlers/agentTaskStatus.handler';
+import { dashboardLoginRequestHandler } from '@/handlers/dashboardLogin.handler';
+import { dashboardLogoutRequestHandler } from '@/handlers/dashboardLogout.handler';
 import { getUserRequestHandler } from '@/handlers/getUser.handler';
+import { getGitHubIssuesRequestHandler } from '@/handlers/githubIssues.handler';
+import { getGitHubPRsRequestHandler } from '@/handlers/githubPRs.handler';
+import { healthRequestHandler } from '@/handlers/health.handler';
 import { heartbeatRequestHandler } from '@/handlers/heartbeat.handler';
 import { loginRequestHandler } from '@/handlers/login.handler';
+import {
+  getProjectRequestHandler,
+  listProjectsRequestHandler,
+} from '@/handlers/projects.handler';
 import { registerRequestHandler } from '@/handlers/register.handler';
+import {
+  getSpecGroupRequestHandler,
+  transitionStateRequestHandler,
+  updateFlagsRequestHandler,
+} from '@/handlers/specGroups.handler';
+import {
+  csrfTokenMiddleware,
+  csrfValidationMiddleware,
+} from '@/middleware/csrf.middleware';
+import { dashboardRateLimitingMiddlewareRequestHandler } from '@/middleware/dashboardRateLimiting.middleware';
+import { dashboardSessionMiddlewareRequestHandler } from '@/middleware/dashboardSession.middleware';
 import { ipRateLimitingMiddlewareRequestHandler } from '@/middleware/ipRateLimiting.middleware';
 import { isAuthenticatedMiddlewareRequestHandler } from '@/middleware/isAuthenticated.middleware';
 import { jsonErrorMiddleware } from '@/middleware/jsonError.middleware';
+import {
+  loggingErrorMiddleware,
+  loggingMiddleware,
+} from '@/middleware/logging.middleware';
+import { webhookAuthMiddleware } from '@/middleware/webhookAuth.middleware';
+import { initializeWebSocket } from '@/services/websocket.service';
 import { EnvironmentSchema } from '@/types/environment';
 
 try {
@@ -29,10 +68,44 @@ try {
 }
 
 const app = express();
-app.use(cors());
+
+// Configure CORS with explicit allowed origins (Security fix: restrict permissive CORS)
+const allowedOriginsEnv = process.env.ALLOWED_ORIGINS;
+const allowedOrigins = allowedOriginsEnv
+  ? allowedOriginsEnv.split(',').map((origin) => origin.trim())
+  : ['http://localhost:3000']; // Default to localhost for development
+
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      // Allow requests with no origin (server-to-server, Postman, etc.)
+      if (!origin) {
+        callback(null, true);
+        return;
+      }
+      if (allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
+    credentials: true, // Required for cookies
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-CSRF-Token'],
+  }),
+);
+app.use(cookieParser());
+app.use(loggingMiddleware);
 app.use(ipRateLimitingMiddlewareRequestHandler);
 app.use(express.json());
 app.use(jsonErrorMiddleware);
+
+// CSRF protection: Set token cookie and validate on state-changing requests
+app.use(csrfTokenMiddleware);
+app.use(csrfValidationMiddleware);
+
+// Health endpoint - no authentication required (AC11.7)
+app.get('/api/health', healthRequestHandler);
 
 app.get(
   '/heartbeat',
@@ -43,6 +116,101 @@ app.post('/register', registerRequestHandler);
 app.post('/login', loginRequestHandler);
 app.get('/user/:identifier', getUserRequestHandler);
 
-app.listen(process.env.PORT);
+// Dashboard authentication endpoints (AS-009)
+app.post(
+  '/api/auth/login',
+  dashboardRateLimitingMiddlewareRequestHandler,
+  dashboardLoginRequestHandler,
+);
+app.post('/api/auth/logout', dashboardLogoutRequestHandler);
+app.get('/api/auth/session', dashboardSessionMiddlewareRequestHandler, (req, res) => {
+  res.json({ authenticated: true });
+});
 
-export { app };
+// Projects endpoints (AS-001)
+app.get(
+  '/api/projects',
+  dashboardSessionMiddlewareRequestHandler,
+  listProjectsRequestHandler,
+);
+app.get(
+  '/api/projects/:id',
+  dashboardSessionMiddlewareRequestHandler,
+  getProjectRequestHandler,
+);
+
+// Spec Groups endpoints (AS-003)
+app.get(
+  '/api/spec-groups/:id',
+  dashboardSessionMiddlewareRequestHandler,
+  getSpecGroupRequestHandler,
+);
+app.post(
+  '/api/spec-groups/:id/transition',
+  dashboardSessionMiddlewareRequestHandler,
+  transitionStateRequestHandler,
+);
+app.put(
+  '/api/spec-groups/:id/flags',
+  dashboardSessionMiddlewareRequestHandler,
+  updateFlagsRequestHandler,
+);
+
+// GitHub Issues endpoint (AS-004)
+app.get(
+  '/api/projects/:id/github/issues',
+  dashboardSessionMiddlewareRequestHandler,
+  getGitHubIssuesRequestHandler,
+);
+
+// GitHub Pull Requests endpoint (AS-005)
+app.get(
+  '/api/projects/:id/github/pulls',
+  dashboardSessionMiddlewareRequestHandler,
+  getGitHubPRsRequestHandler,
+);
+
+// Agent Dispatch endpoints (AS-006)
+app.post(
+  '/api/spec-groups/:id/dispatch',
+  dashboardSessionMiddlewareRequestHandler,
+  dispatchAgentTaskRequestHandler,
+);
+app.get(
+  '/api/agent-tasks/:id',
+  dashboardSessionMiddlewareRequestHandler,
+  getAgentTaskRequestHandler,
+);
+
+// Agent Task Status endpoints (AS-007)
+// POST /api/agent-tasks/:id/status - Update task status (agent callback, webhook auth required)
+// Security fix: Added HMAC webhook authentication to prevent unauthorized status updates
+app.post('/api/agent-tasks/:id/status', webhookAuthMiddleware, updateAgentTaskStatusRequestHandler);
+// GET /api/agent-tasks/:id/status - Get task status (polling fallback, AC7.7)
+app.get(
+  '/api/agent-tasks/:id/status',
+  dashboardSessionMiddlewareRequestHandler,
+  getAgentTaskStatusRequestHandler,
+);
+// GET /api/agent-tasks/:id/logs - Get task logs (AC7.4)
+app.get(
+  '/api/agent-tasks/:id/logs',
+  dashboardSessionMiddlewareRequestHandler,
+  getAgentTaskLogsRequestHandler,
+);
+
+// Error logging middleware - captures errors for structured logging (AC12.7)
+app.use(loggingErrorMiddleware);
+
+// Create HTTP server and initialize WebSocket (AS-007)
+const server = createServer(app);
+
+// Initialize WebSocket server for real-time agent status updates (AC7.2)
+Effect.runSync(initializeWebSocket(server, { path: '/ws/agent-status' }));
+
+server.listen(process.env.PORT, () => {
+  console.log(`Server listening on port ${process.env.PORT}`);
+  console.log(`WebSocket available at ws://localhost:${process.env.PORT}/ws/agent-status`);
+});
+
+export { app, server };

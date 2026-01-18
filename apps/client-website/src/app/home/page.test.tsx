@@ -1,10 +1,11 @@
 import { render, screen, waitFor } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi, beforeEach } from 'vitest';
 
 const mockReplace = vi.fn();
+const mockPush = vi.fn();
 
 type NavigationMock = {
-  useRouter: () => { replace: typeof mockReplace };
+  useRouter: () => { replace: typeof mockReplace; push: typeof mockPush };
 };
 
 vi.mock(
@@ -12,19 +13,34 @@ vi.mock(
   (): NavigationMock => ({
     useRouter: () => ({
       replace: mockReplace,
+      push: mockPush,
     }),
   }),
 );
 
-import { useUserStore } from '@/stores/userStore';
+// Mock the dashboard session check API
+const mockCheckSession = vi.fn();
+vi.mock('@/lib/api/dashboardAuth', () => ({
+  checkDashboardSession: () => mockCheckSession(),
+  dashboardLogout: vi.fn().mockResolvedValue({ success: true, message: 'Logged out' }),
+}));
+
+import { useDashboardAuthStore } from '@/stores/dashboardAuthStore';
 
 import HomePage from './page';
 
 describe('HomePage', () => {
+  beforeEach(() => {
+    mockReplace.mockClear();
+    mockPush.mockClear();
+    mockCheckSession.mockClear();
+  });
+
   it('redirects unauthenticated users to /login', async () => {
     // Arrange
-    useUserStore.getState().clearToken();
-    useUserStore.getState().setHasHydrated(true);
+    mockCheckSession.mockResolvedValue({ authenticated: false });
+    useDashboardAuthStore.getState().setAuthenticated(false);
+    useDashboardAuthStore.getState().setHasHydrated(true);
 
     render(<HomePage />);
 
@@ -35,15 +51,32 @@ describe('HomePage', () => {
     expect(screen.queryByText(/welcome home/i)).toBeNull();
   });
 
-  it('renders protected content when a token exists', async () => {
+  it('renders protected content when session is authenticated', async () => {
     // Arrange
-    useUserStore.getState().setToken('stored-token');
-    useUserStore.getState().setHasHydrated(true);
+    mockCheckSession.mockResolvedValue({ authenticated: true });
+    useDashboardAuthStore.getState().setAuthenticated(true);
+    useDashboardAuthStore.getState().setHasHydrated(true);
 
     render(<HomePage />);
 
     // Act & Assert
-    expect(await screen.findByText(/welcome home/i)).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText(/welcome home/i)).toBeInTheDocument();
+    });
     expect(mockReplace).not.toHaveBeenCalled();
+  });
+
+  it('displays logout button when authenticated', async () => {
+    // Arrange
+    mockCheckSession.mockResolvedValue({ authenticated: true });
+    useDashboardAuthStore.getState().setAuthenticated(true);
+    useDashboardAuthStore.getState().setHasHydrated(true);
+
+    render(<HomePage />);
+
+    // Act & Assert
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /logout/i })).toBeInTheDocument();
+    });
   });
 });

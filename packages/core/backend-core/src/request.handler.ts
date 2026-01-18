@@ -50,7 +50,12 @@ export const generateRequestHandler = <R, E extends Error>({
       ] of Object.entries(statusCodesToErrors)) {
         Effect.try({
           try: () => {
-            if (error instanceof errorType) {
+            // Check both instanceof and _tag for Effect's Data.TaggedError
+            // For tagged errors, check if the error's _tag matches the errorType's name
+            const isMatch =
+              error instanceof errorType ||
+              ('_tag' in error && error._tag === errorType.name);
+            if (isMatch) {
               if (shouldObfuscate(req, error)) {
                 res.status(obfuscatedErrorStatus).send(obfuscatedErrorMessage);
               } else {

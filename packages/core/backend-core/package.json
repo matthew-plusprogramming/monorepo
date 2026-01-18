@@ -21,6 +21,26 @@
     "./testing": {
       "types": "./dist/testing/index.d.ts",
       "import": "./dist/testing/index.js"
+    },
+    "./spec-groups": {
+      "types": "./dist/spec-groups/index.d.ts",
+      "import": "./dist/spec-groups/index.js"
+    },
+    "./github": {
+      "types": "./dist/github/index.d.ts",
+      "import": "./dist/github/index.js"
+    },
+    "./prds": {
+      "types": "./dist/prds/index.d.ts",
+      "import": "./dist/prds/index.js"
+    },
+    "./agent-tasks": {
+      "types": "./dist/agent-tasks/index.d.ts",
+      "import": "./dist/agent-tasks/index.js"
+    },
+    "./projects": {
+      "types": "./dist/projects/index.d.ts",
+      "import": "./dist/projects/index.js"
     }
   },
   "scripts": {

@@ -1,0 +1,74 @@
+@use '@/app/globals.scss' as *;
+
+// Responsive Grid Component
+// AC10.1: Mobile layout (< 768px): single column, stacked panels
+// AC10.2: Tablet layout (768px - 1024px): two column grid
+// AC10.3: Desktop layout (> 1024px): three column grid with sidebar
+
+$grid-gap: clamp(1rem, 2vw, 1.5rem);
+
+.responsiveGrid {
+  display: grid;
+  gap: $grid-gap;
+  width: 100%;
+
+  // Desktop: three column grid with sidebar (> 1024px)
+  // Default state (mobile-first means desktop is the enhanced state)
+  grid-template-columns: repeat(3, 1fr);
+
+  // Tablet: two column grid (768px - 1024px)
+  @include respond(laptop) {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  // Mobile: single column, stacked panels (< 768px)
+  @include respond(tablet) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.responsiveGridWithSidebar {
+  display: grid;
+  gap: $grid-gap;
+  width: 100%;
+
+  // Desktop: three column grid with sidebar (> 1024px)
+  grid-template-columns: minmax(200px, 1fr) repeat(2, minmax(0, 2fr));
+  grid-template-areas: 'sidebar main main';
+
+  // Tablet: two column grid (768px - 1024px)
+  @include respond(laptop) {
+    grid-template-columns: repeat(2, 1fr);
+    grid-template-areas: none;
+  }
+
+  // Mobile: single column, stacked panels (< 768px)
+  @include respond(tablet) {
+    grid-template-columns: 1fr;
+    grid-template-areas: none;
+  }
+}
+
+.sidebar {
+  grid-area: sidebar;
+
+  @include respond(laptop) {
+    grid-area: auto;
+  }
+}
+
+.mainContent {
+  grid-column: span 2;
+
+  @include respond(laptop) {
+    grid-column: span 1;
+  }
+}
+
+// Panel styles for stacked content
+.panel {
+  padding: clamp(1rem, 2vw, 1.5rem);
+  border-radius: 0.75rem;
+  background: var(--background-color);
+  box-shadow: 0 4px 12px color-mix(in oklch, var(--secondary-color) 8%, transparent);
+}

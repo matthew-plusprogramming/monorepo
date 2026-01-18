@@ -3,7 +3,10 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
-import type { LoginPayload } from '@/lib/api/login';
+import type {
+  DashboardLoginPayload,
+  DashboardLoginResponse,
+} from '@/lib/api/dashboardAuth';
 
 import type * as HooksModule from './hooks';
 
@@ -11,9 +14,9 @@ const mockPush = vi.fn();
 const mockMutateAsync = vi.fn();
 
 const createLoginMutationMock = (): UseMutationResult<
-  string,
+  DashboardLoginResponse,
   Error,
-  LoginPayload
+  DashboardLoginPayload
 > => ({
   context: undefined,
   data: undefined,
@@ -55,23 +58,19 @@ vi.mock('./hooks', async (): Promise<typeof HooksModule> => {
   };
 });
 
-import { useUserStore } from '@/stores/userStore';
+import { useDashboardAuthStore } from '@/stores/dashboardAuthStore';
 
 import LoginPage from './page';
 
 describe('LoginPage', () => {
-  it('stores the token and redirects to /home after login success', async () => {
+  it('sets authenticated state and redirects to /home after login success', async () => {
     // Arrange
-    mockMutateAsync.mockResolvedValueOnce('token-123');
+    mockMutateAsync.mockResolvedValueOnce({ success: true, message: 'Login successful' });
     const user = userEvent.setup();
 
     render(<LoginPage />);
 
     // Act
-    await user.type(
-      screen.getByLabelText(/email address/i),
-      'user@example.com',
-    );
     await user.type(screen.getByLabelText(/password/i), 'password123');
     await user.click(screen.getByRole('button', { name: /sign in/i }));
 
@@ -79,8 +78,8 @@ describe('LoginPage', () => {
     await waitFor(() => {
       expect(mockMutateAsync).toHaveBeenCalled();
     });
-    expect(useUserStore.getState().token).toBe('token-123');
-    expect(localStorage.getItem('client-user-store')).toContain('token-123');
+    expect(useDashboardAuthStore.getState().isAuthenticated).toBe(true);
+    expect(localStorage.getItem('dashboard-auth-store')).toContain('"isAuthenticated":true');
 
     await waitFor(() => {
       expect(mockPush).toHaveBeenCalledWith('/home');

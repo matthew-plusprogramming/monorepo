@@ -1,10 +1,18 @@
 @use 'sass:map';
 
+// Breakpoints aligned with AC10.1-10.3 requirements
+// - Mobile: < 768px (single column, stacked panels)
+// - Tablet: 768px - 1024px (two column grid)
+// - Desktop: > 1024px (three column grid with sidebar)
 $breakpoints: (
-  laptop: 1024px,
-  tablet: 720px,
+  desktop: 1024px,
+  laptop: 1024px, // Alias for backwards compatibility
+  tablet: 768px,
   mobile: 375px,
 );
+
+// Touch target minimum size (AC10.4)
+$touch-target-min: 44px;
 
 @mixin respond($key) {
   $size: map.get($breakpoints, $key);
@@ -49,6 +57,21 @@ $breakpoints: (
   padding: clamp(2rem, 2vw, 4rem) clamp(1rem, 20vw, 25vw);
 }
 
+// Touch-friendly target mixin (AC10.4)
+// Ensures minimum 44x44px touch targets on mobile
+@mixin touch-target {
+  min-width: $touch-target-min;
+  min-height: $touch-target-min;
+}
+
+// Responsive container mixin
+@mixin responsive-container {
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 clamp(1rem, 4vw, 2rem);
+}
+
 :root {
   // Colors
   --primary-color: #7a5db8;
@@ -66,12 +89,13 @@ $breakpoints: (
   --transition-medium: 150ms;
   --transition-slow: 200ms;
 
-  // Typography
+  // Typography (AC10.7: minimum 16px base font size for mobile readability)
   font-family: Inter, sans-serif;
   font-optical-sizing: auto;
   font-weight: 400;
   font-style: normal;
   font-synthesis: none;
+  font-size: 16px; // AC10.7: Minimum readable font size without zooming
   line-height: 1.5;
   color: var(--text-color);
   text-rendering: optimizelegibility;

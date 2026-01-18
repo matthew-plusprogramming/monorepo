@@ -5,6 +5,8 @@ import type {
   PutItemCommandOutput,
   QueryCommandInput,
   QueryCommandOutput,
+  ScanCommandInput,
+  ScanCommandOutput,
   UpdateItemCommandInput,
   UpdateItemCommandOutput,
 } from '@aws-sdk/client-dynamodb';
@@ -22,6 +24,10 @@ export type DynamoDbServiceSchema = {
   readonly query: (
     input: QueryCommandInput,
   ) => Effect.Effect<QueryCommandOutput, Error>;
+
+  readonly scan: (
+    input: ScanCommandInput,
+  ) => Effect.Effect<ScanCommandOutput, Error>;
 
   readonly updateItem: (
     input: UpdateItemCommandInput,

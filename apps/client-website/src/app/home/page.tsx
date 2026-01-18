@@ -1,14 +1,31 @@
 'use client';
 
-import { Navbar, PageCardShell } from '@ui/components';
+import { Button, Navbar, PageCardShell } from '@ui/components';
+import { useRouter } from 'next/navigation';
 import type { JSX } from 'react';
 
-import { useProtectedPage } from '@/hooks/useProtectedPage';
+import { useProtectedDashboard } from '@/hooks/useProtectedDashboard';
+import { dashboardLogout } from '@/lib/api/dashboardAuth';
+import { useDashboardAuthStore } from '@/stores/dashboardAuthStore';
 
 const HomePage = (): JSX.Element | null => {
-  const { canRender } = useProtectedPage();
+  const { canRender, isLoading } = useProtectedDashboard();
+  const router = useRouter();
+  const logout = useDashboardAuthStore((state) => state.logout);
 
-  if (!canRender) {
+  const handleLogout = async (): Promise<void> => {
+    try {
+      await dashboardLogout();
+      logout();
+      router.push('/login');
+    } catch {
+      // Still clear local state and redirect on error
+      logout();
+      router.push('/login');
+    }
+  };
+
+  if (isLoading || !canRender) {
     return null;
   }
 
@@ -23,7 +40,14 @@ const HomePage = (): JSX.Element | null => {
       subtitle="You are signed in. This private space will soon grow into your project control room, keeping auth state intact between refreshes."
       title="Welcome home"
     >
-      <></>
+      <Button
+        displayStyle="secondary"
+        clickStyle="3d"
+        type="button"
+        onClick={handleLogout}
+      >
+        Logout
+      </Button>
     </PageCardShell>
   );
 };

@@ -1,0 +1,194 @@
+@use '@/app/globals.scss' as *;
+
+// Responsive Table Component (AC10.6)
+// Tables scroll horizontally on mobile rather than breaking layout
+
+.tableWrapper {
+  overflow-x: auto;
+  width: 100%;
+
+  // Smooth scrolling on touch devices
+  -webkit-overflow-scrolling: touch;
+
+  // Hide scrollbar on desktop, show on mobile
+  scrollbar-width: thin;
+  scrollbar-color: var(--muted-color) transparent;
+
+  &::-webkit-scrollbar {
+    height: 6px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: var(--muted-color);
+    border-radius: 3px;
+  }
+}
+
+// Shadow indicators for horizontal scroll
+.tableWrapperWithShadows {
+  position: relative;
+
+  &::before,
+  &::after {
+    content: '';
+    position: absolute;
+    z-index: 1;
+    top: 0;
+
+    width: 24px;
+    height: 100%;
+
+    pointer-events: none;
+
+    transition: opacity var(--transition-fast) ease;
+  }
+
+  &::before {
+    left: 0;
+    background: linear-gradient(to right, var(--background-color) 0%, transparent 100%);
+    opacity: 0;
+  }
+
+  &::after {
+    right: 0;
+    background: linear-gradient(to left, var(--background-color) 0%, transparent 100%);
+    opacity: 0;
+  }
+
+  &.canScrollLeft::before {
+    opacity: 1;
+  }
+
+  &.canScrollRight::after {
+    opacity: 1;
+  }
+}
+
+.table {
+  width: 100%;
+  min-width: max-content;
+
+  border-collapse: collapse;
+  border-spacing: 0;
+
+  // Ensure table doesn't shrink below content
+  table-layout: auto;
+}
+
+// Base cell styles
+.th,
+.td {
+  padding: 0.75rem 1rem;
+
+  text-align: left;
+  white-space: nowrap;
+
+  // First column sticks on mobile
+  &:first-child {
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    background: var(--background-color);
+  }
+}
+
+.th {
+  font-weight: 600;
+  color: var(--text-color);
+  border-bottom: 2px solid color-mix(in oklch, var(--muted-color) 30%, transparent);
+  background: var(--background-color);
+}
+
+.td {
+  border-bottom: 1px solid color-mix(in oklch, var(--muted-color) 20%, transparent);
+}
+
+// Row hover effect
+.tr {
+  transition: background var(--transition-fast) ease;
+
+  &:hover {
+    background: color-mix(in oklch, var(--primary-color) 5%, transparent);
+  }
+}
+
+// Touch-friendly interactive cells (AC10.4)
+.cellButton {
+  @include touch-target;
+
+  cursor: pointer;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 0.5rem;
+  border: none;
+  border-radius: 0.25rem;
+
+  color: var(--primary-color);
+
+  background: transparent;
+
+  transition: background var(--transition-fast) ease;
+
+  &:hover,
+  &:focus-visible {
+    background: color-mix(in oklch, var(--primary-color) 10%, transparent);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--primary-color);
+    outline-offset: 2px;
+  }
+}
+
+// Compact table variant for dense data
+.compactTable {
+  .th,
+  .td {
+    padding: 0.5rem 0.75rem;
+    font-size: 0.875rem;
+  }
+}
+
+// Striped rows variant
+.stripedTable {
+  .tr:nth-child(even) {
+    background: color-mix(in oklch, var(--muted-color) 5%, transparent);
+  }
+}
+
+// Mobile-specific styles
+@include respond(tablet) {
+  .tableWrapper {
+    margin: 0 -1rem;
+    padding: 0 1rem;
+  }
+
+  .th,
+  .td {
+    padding: 0.625rem 0.75rem;
+  }
+
+  // Show horizontal scroll indicator on mobile
+  .tableWrapper::after {
+    content: '';
+    position: absolute;
+    right: 0;
+    bottom: 0;
+
+    display: block;
+
+    width: 32px;
+    height: 100%;
+
+    background: linear-gradient(to right, transparent 0%, var(--background-color) 100%);
+
+    pointer-events: none;
+  }
+}

@@ -3,7 +3,6 @@
 import { type JSX } from 'react';
 
 import { Button, Toast } from '@ui/components';
-import Link from 'next/link';
 import type { UseFormRegisterReturn } from 'react-hook-form';
 import { useForm } from 'react-hook-form';
 
@@ -15,7 +14,7 @@ type FieldProps = {
   id: keyof LoginFormValues;
   label: string;
   placeholder: string;
-  type: 'email' | 'password';
+  type: 'password';
   registration: UseFormRegisterReturn;
   error?: string;
 };
@@ -80,7 +79,7 @@ const FormActions = ({
         clickStyle="3d"
         type="submit"
       >
-        {isSubmitting ? 'Signing you in…' : 'Sign in'}
+        {isSubmitting ? 'Signing you in...' : 'Sign in'}
       </Button>
     </div>
   );
@@ -93,7 +92,6 @@ const LoginForm = (): JSX.Element => {
     formState: { errors, isSubmitting },
   } = useForm<LoginFormValues>({
     defaultValues: {
-      email: '',
       password: '',
     },
   });
@@ -122,11 +120,6 @@ const LoginForm = (): JSX.Element => {
           />
         ))}
 
-        <p className={styles.supportText}>
-          Forgot your password? Reset links are on the way once authentication
-          is connected.
-        </p>
-
         <FormActions
           errorMessage={loginMutation.error?.message}
           isSubmitting={isBusy}
@@ -145,15 +138,11 @@ const LoginPage = (): JSX.Element => {
     <div className={styles.page}>
       <div className={styles.card}>
         <div className={styles.header}>
-          <h1>Welcome back</h1>
-          <p>Sign in to continue building your next idea.</p>
+          <h1>Dashboard Login</h1>
+          <p>Enter your password to access the dashboard.</p>
         </div>
 
         <LoginForm />
-
-        <Link className={styles.utilityLink} href="/signup">
-          Need an account? Start building
-        </Link>
       </div>
     </div>
   );

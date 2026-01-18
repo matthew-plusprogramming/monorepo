@@ -8,6 +8,8 @@ import {
   type PutItemCommandOutput,
   QueryCommand,
   type QueryCommandOutput,
+  ScanCommand,
+  type ScanCommandOutput,
   UpdateItemCommand,
   type UpdateItemCommandOutput,
 } from '@aws-sdk/client-dynamodb';
@@ -66,6 +68,13 @@ const makeDynamoDbService = (): Effect.Effect<
       query: (input): Effect.Effect<QueryCommandOutput, Error> => {
         return Effect.tryPromise({
           try: () => client.send(new QueryCommand(input)),
+          // TODO: Check what error types we can make
+          catch: normalizeAwsError,
+        });
+      },
+      scan: (input): Effect.Effect<ScanCommandOutput, Error> => {
+        return Effect.tryPromise({
+          try: () => client.send(new ScanCommand(input)),
           // TODO: Check what error types we can make
           catch: normalizeAwsError,
         });

@@ -12,6 +12,13 @@ export const EnvironmentSchema = z.object({
   APP_ENV: z.string().default('development'),
   APP_VERSION: z.string().default('0.0.0'),
   DEBUG: z.string().optional(),
+  // Dashboard password authentication (AS-009)
+  PASSWORD_HASH: z.string({ error: 'PASSWORD_HASH is required' }),
+  SESSION_SECRET: z.string({ error: 'SESSION_SECRET is required' }),
+  SESSION_EXPIRY_HOURS: z.coerce.number().positive().default(24),
+  // Security settings
+  ALLOWED_ORIGINS: z.string().optional(), // Comma-separated list of allowed origins
+  WEBHOOK_SECRET: z.string({ error: 'WEBHOOK_SECRET is required for agent callbacks' }),
 });
 
 export type Environment = z.infer<typeof EnvironmentSchema>;

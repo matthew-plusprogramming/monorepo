@@ -6,11 +6,15 @@ import { useMutation, type UseMutationResult } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import type { RegisterOptions, SubmitHandler } from 'react-hook-form';
 
-import { login, type LoginPayload } from '@/lib/api/login';
-import { useUserStore } from '@/stores/userStore';
+import {
+  dashboardLogin,
+  type DashboardLoginPayload,
+  type DashboardLoginResponse,
+} from '@/lib/api/dashboardAuth';
+import { useDashboardAuthStore } from '@/stores/dashboardAuthStore';
 
+// Dashboard login form values - password only (AS-009)
 export type LoginFormValues = {
-  email: string;
   password: string;
 };
 
@@ -18,49 +22,30 @@ export type LoginFieldConfig = {
   id: keyof LoginFormValues;
   label: string;
   placeholder: string;
-  type: 'email' | 'password';
+  type: 'password';
   rules: RegisterOptions<LoginFormValues, keyof LoginFormValues>;
 };
 
-const emailPattern =
-  /^[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)*$/i;
-
+// Dashboard login uses password-only (AS-009)
 export const loginFieldConfigs: LoginFieldConfig[] = [
-  {
-    id: 'email',
-    label: 'Email address',
-    placeholder: 'you@domain.com',
-    type: 'email',
-    rules: {
-      required: 'Email is required',
-      pattern: {
-        value: emailPattern,
-        message: 'Enter a valid email address',
-      },
-    },
-  },
   {
     id: 'password',
     label: 'Password',
-    placeholder: '••••••••',
+    placeholder: 'Enter dashboard password',
     type: 'password',
     rules: {
       required: 'Password is required',
-      minLength: {
-        value: 8,
-        message: 'Use at least 8 characters',
-      },
     },
   },
 ];
 
 export const useLoginMutation = (): UseMutationResult<
-  string,
+  DashboardLoginResponse,
   Error,
-  LoginPayload
+  DashboardLoginPayload
 > => {
-  return useMutation<string, Error, LoginPayload>({
-    mutationFn: login,
+  return useMutation<DashboardLoginResponse, Error, DashboardLoginPayload>({
+    mutationFn: dashboardLogin,
   });
 };
 
@@ -77,7 +62,7 @@ export const useLoginFlow = (
   useLoginMutationHook: UseLoginMutationHook = useLoginMutation,
 ): LoginFlowResult => {
   const router = useRouter();
-  const setToken = useUserStore((state) => state.setToken);
+  const setAuthenticated = useDashboardAuthStore((state) => state.setAuthenticated);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const loginMutation = useLoginMutationHook();
 
@@ -85,13 +70,12 @@ export const useLoginFlow = (
     setToastMessage(null);
 
     try {
-      const token = await loginMutation.mutateAsync({
-        identifier: values.email,
+      await loginMutation.mutateAsync({
         password: values.password,
       });
 
-      setToken(token);
-      setToastMessage('Signed in. Redirecting you home.');
+      setAuthenticated(true);
+      setToastMessage('Signed in. Redirecting to dashboard.');
       router.push('/home');
     } catch {
       setToastMessage(null);

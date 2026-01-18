@@ -1,0 +1,222 @@
+@use '@/app/globals.scss' as *;
+
+// Mobile Navigation Component (AC10.5)
+// Navigation collapses to hamburger menu on mobile
+
+$hamburger-size: 44px; // AC10.4: Touch target minimum
+$hamburger-bar-height: 3px;
+$hamburger-bar-gap: 5px;
+$hamburger-bar-width: 24px;
+$menu-transition: var(--transition-medium);
+
+// Hamburger button - always visible on mobile, hidden on desktop
+.hamburgerButton {
+  @include touch-target;
+
+  cursor: pointer;
+
+  display: none;
+  align-items: center;
+  justify-content: center;
+
+  padding: 0;
+  border: none;
+
+  background: transparent;
+
+  transition: opacity $menu-transition ease;
+
+  // Show only on mobile/tablet
+  @include respond(tablet) {
+    display: flex;
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--primary-color);
+    outline-offset: 2px;
+    border-radius: 0.25rem;
+  }
+}
+
+.hamburgerIcon {
+  position: relative;
+
+  display: flex;
+  flex-direction: column;
+  gap: $hamburger-bar-gap;
+  align-items: center;
+  justify-content: center;
+
+  width: $hamburger-bar-width;
+  height: ($hamburger-bar-height * 3) + ($hamburger-bar-gap * 2);
+}
+
+.hamburgerBar {
+  width: 100%;
+  height: $hamburger-bar-height;
+
+  background: var(--text-color);
+  border-radius: 2px;
+
+  transition:
+    transform $menu-transition ease,
+    opacity $menu-transition ease;
+}
+
+// Animated hamburger to X transformation
+.hamburgerButton[aria-expanded='true'] {
+  .hamburgerBar:nth-child(1) {
+    transform: translateY(calc($hamburger-bar-height + $hamburger-bar-gap)) rotate(45deg);
+  }
+
+  .hamburgerBar:nth-child(2) {
+    opacity: 0;
+  }
+
+  .hamburgerBar:nth-child(3) {
+    transform: translateY(calc(-1 * ($hamburger-bar-height + $hamburger-bar-gap))) rotate(-45deg);
+  }
+}
+
+// Mobile menu overlay
+.mobileMenuOverlay {
+  position: fixed;
+  z-index: 999;
+  inset: 0;
+
+  background: rgb(0 0 0 / 50%);
+  opacity: 0;
+
+  transition: opacity $menu-transition ease;
+  pointer-events: none;
+
+  &.open {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
+
+// Mobile menu panel
+.mobileMenu {
+  position: fixed;
+  z-index: 1000;
+  top: 0;
+  right: 0;
+
+  display: flex;
+  flex-direction: column;
+
+  width: min(280px, 80vw);
+  height: 100%;
+  padding: 1.5rem;
+
+  background: var(--background-color);
+  box-shadow: -4px 0 24px rgb(0 0 0 / 15%);
+
+  transform: translateX(100%);
+
+  transition: transform $menu-transition ease;
+
+  &.open {
+    transform: translateX(0);
+  }
+}
+
+.mobileMenuHeader {
+  @include flex-row(0.75rem, space-between);
+
+  margin-bottom: 1.5rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid color-mix(in oklch, var(--muted-color) 30%, transparent);
+}
+
+.closeButton {
+  @include touch-target;
+
+  cursor: pointer;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 0;
+  border: none;
+
+  font-size: 1.5rem;
+  color: var(--text-color);
+
+  background: transparent;
+
+  transition: opacity $menu-transition ease;
+
+  &:hover,
+  &:focus-visible {
+    opacity: 0.7;
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--primary-color);
+    outline-offset: 2px;
+    border-radius: 0.25rem;
+  }
+}
+
+.mobileMenuNav {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 0.5rem;
+
+  margin: 0;
+  padding: 0;
+
+  list-style: none;
+}
+
+.mobileMenuLink {
+  @include touch-target;
+
+  display: flex;
+  align-items: center;
+
+  padding: 0.75rem 1rem;
+  border-radius: 0.5rem;
+
+  font-weight: 500;
+  color: var(--text-color);
+  text-decoration: none;
+
+  transition:
+    background $menu-transition ease,
+    color $menu-transition ease;
+
+  &:hover,
+  &:focus-visible {
+    background: color-mix(in oklch, var(--primary-color) 10%, transparent);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--primary-color);
+    outline-offset: -2px;
+  }
+}
+
+.mobileMenuActions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+
+  margin-top: auto;
+  padding-top: 1rem;
+  border-top: 1px solid color-mix(in oklch, var(--muted-color) 30%, transparent);
+}
+
+// Desktop navigation container - shows inline links, hides on mobile
+.desktopNav {
+  display: flex;
+  align-items: center;
+
+  @include respond(tablet) {
+    display: none;
+  }
+}
