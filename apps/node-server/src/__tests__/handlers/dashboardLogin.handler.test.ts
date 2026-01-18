@@ -119,6 +119,9 @@ describe('dashboardLoginRequestHandler', () => {
     });
     const mockRes = createMockResponse();
     (req as unknown as { res: typeof mockRes.res }).res = mockRes.res;
+    (req as unknown as { socket: { remoteAddress: string } }).socket = {
+      remoteAddress: '127.0.0.1',
+    };
 
     const handler = await importDashboardLoginHandler();
     const compareMock = getCompareMock();
@@ -130,7 +133,7 @@ describe('dashboardLoginRequestHandler', () => {
     // Assert
     expect(mockRes.res.status).toHaveBeenCalledWith(HTTP_RESPONSE.OK);
     expect(mockRes.cookies).toHaveProperty('dashboard_session');
-    const sessionCookie = mockRes.cookies['dashboard_session'];
+    const sessionCookie = mockRes.cookies['dashboard_session']!;
     expect(sessionCookie.options.httpOnly).toBe(true);
     expect(sessionCookie.options.path).toBe('/');
   });

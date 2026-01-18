@@ -66,7 +66,7 @@ describe('dashboardSessionMiddleware', () => {
       const token = createSessionToken(TEST_SESSION_SECRET);
       const after = Date.now();
 
-      const timestamp = parseInt(token.split(':')[0], 10);
+      const timestamp = parseInt(token.split(':')[0]!, 10);
       expect(timestamp).toBeGreaterThanOrEqual(before);
       expect(timestamp).toBeLessThanOrEqual(after);
     });

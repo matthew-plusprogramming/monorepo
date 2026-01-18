@@ -95,10 +95,14 @@ const dashboardLoginHandler = (
 
     // Create session token and set cookie
     const sessionSecret = process.env.SESSION_SECRET;
-    const sessionExpiryHours = parseInt(
-      process.env.SESSION_EXPIRY_HOURS ?? '24',
-      10,
-    );
+    if (!sessionSecret) {
+      return yield* new InternalServerError({
+        message: 'SESSION_SECRET not configured',
+        cause: undefined,
+      });
+    }
+
+    const sessionExpiryHours = process.env.SESSION_EXPIRY_HOURS ?? 24;
 
     const sessionToken = createSessionToken(sessionSecret);
     const cookieOptions = getSessionCookieOptions(sessionExpiryHours);

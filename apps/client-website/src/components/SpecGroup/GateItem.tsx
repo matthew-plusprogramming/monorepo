@@ -62,7 +62,7 @@ const PendingIcon = (): JSX.Element => (
 const NAIcon = (): JSX.Element => (
   <svg
     aria-hidden="true"
-    className={classnames(styles.statusIcon, styles.statusIconNA)}
+    className={classnames(styles.statusIcon, styles.statusIconNa)}
     fill="currentColor"
     viewBox="0 0 20 20"
     xmlns="http://www.w3.org/2000/svg"
@@ -131,7 +131,7 @@ const getStatusAriaLabel = (status: GateStatus): string => {
  */
 const GateDetailItem = ({ detail }: { detail: GateDetail }): JSX.Element => {
   const severityClass = detail.severity
-    ? styles[`detailSeverity${detail.severity.charAt(0).toUpperCase()}${detail.severity.slice(1)}`]
+    ? styles[`detailSeverity${detail.severity.charAt(0).toUpperCase()}${detail.severity.slice(1)}` as keyof typeof styles]
     : undefined;
 
   return (
@@ -178,7 +178,7 @@ export const GateItem = ({
   const hasDetails = gate.details && gate.details.length > 0;
   const isClickable = hasDetails || gate.status === 'failed';
 
-  const statusClass = styles[`gateStatus${gate.status.charAt(0).toUpperCase()}${gate.status.slice(1)}`];
+  const statusClass = styles[`gateStatus${gate.status.charAt(0).toUpperCase()}${gate.status.slice(1)}` as keyof typeof styles];
 
   const handleKeyDown = (event: React.KeyboardEvent): void => {
     if (event.key === 'Enter' || event.key === ' ') {

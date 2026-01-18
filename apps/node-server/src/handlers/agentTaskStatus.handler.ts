@@ -55,14 +55,8 @@ type GetLogsResponse = {
  * Handler for POST /api/agent-tasks/:id/status
  * Updates task status and broadcasts to WebSocket clients (AC7.2, AC7.3).
  */
-const updateStatusHandler = (
-  input: handlerInput,
-): Effect.Effect<
-  StatusUpdateResponse,
-  AgentTaskNotFoundError | InternalServerError | ZodError,
-  AgentTaskRepository
-> => {
-  return Effect.gen(function* () {
+const updateStatusHandler = (input: handlerInput) =>
+  Effect.gen(function* () {
     const req = yield* input;
     const taskId = req.params.id as string;
 
@@ -87,20 +81,13 @@ const updateStatusHandler = (
       status,
     };
   });
-};
 
 /**
  * Handler for GET /api/agent-tasks/:id/status
  * Gets current task status for polling fallback (AC7.7).
  */
-const getStatusHandler = (
-  input: handlerInput,
-): Effect.Effect<
-  GetStatusResponse,
-  InternalServerError,
-  AgentTaskRepository
-> => {
-  return Effect.gen(function* () {
+const getStatusHandler = (input: handlerInput) =>
+  Effect.gen(function* () {
     const req = yield* input;
     const taskId = req.params.id as string;
 
@@ -113,20 +100,13 @@ const getStatusHandler = (
 
     return { status: maybeStatus.value };
   });
-};
 
 /**
  * Handler for GET /api/agent-tasks/:id/logs
  * Gets task logs for expandable section (AC7.4).
  */
-const getLogsHandler = (
-  input: handlerInput,
-): Effect.Effect<
-  GetLogsResponse,
-  AgentTaskNotFoundError | InternalServerError,
-  AgentTaskRepository
-> => {
-  return Effect.gen(function* () {
+const getLogsHandler = (input: handlerInput) =>
+  Effect.gen(function* () {
     const req = yield* input;
     const taskId = req.params.id as string;
 
@@ -148,7 +128,6 @@ const getLogsHandler = (
       logs,
     };
   });
-};
 
 /**
  * Exported request handlers.

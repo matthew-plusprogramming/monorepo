@@ -15,6 +15,7 @@ import {
   dashboardLogout,
   checkDashboardSession,
 } from '@/lib/api/dashboardAuth';
+import { loginFieldConfigs } from '@/app/login/hooks';
 
 // Mock fetch for API calls
 const mockFetch = vi.fn();
@@ -140,21 +141,19 @@ describe('Dashboard Authentication API (AS-009)', () => {
 
 describe('Login Form Validation (AS-009)', () => {
   it('validates password is required', () => {
-    const { loginFieldConfigs } = require('@/app/login/hooks');
     const passwordConfig = loginFieldConfigs.find(
       (c: { id: string }) => c.id === 'password',
     );
 
     expect(passwordConfig).toBeDefined();
-    expect(passwordConfig.rules.required).toBe('Password is required');
+    expect(passwordConfig!.rules.required).toBe('Password is required');
   });
 
   it('has password field type', () => {
-    const { loginFieldConfigs } = require('@/app/login/hooks');
     const passwordConfig = loginFieldConfigs.find(
       (c: { id: string }) => c.id === 'password',
     );
 
-    expect(passwordConfig.type).toBe('password');
+    expect(passwordConfig!.type).toBe('password');
   });
 });

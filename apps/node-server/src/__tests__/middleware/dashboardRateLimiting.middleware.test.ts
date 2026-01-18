@@ -17,8 +17,8 @@ import {
 vi.mock('@/clients/cdkOutputs', () => makeCdkOutputsStub());
 
 vi.mock('@/services/logger.service', async () => {
-  const { createLoggerServiceFake, LoggerService } =
-    await import('@packages/backend-core/testing');
+  const { createLoggerServiceFake } = await import('@packages/backend-core/testing');
+  const { LoggerService } = await import('@packages/backend-core');
   const fake = createLoggerServiceFake();
   return {
     LoggerService,

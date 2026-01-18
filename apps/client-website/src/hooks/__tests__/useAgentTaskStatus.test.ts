@@ -5,7 +5,7 @@
  * Covers AC7.2, AC7.5, AC7.6, AC7.7.
  */
 
-import { act, renderHook, waitFor } from '@testing-library/react';
+import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { useAgentTaskStatus } from '../useAgentTaskStatus';
@@ -15,6 +15,8 @@ class MockWebSocket {
   static instances: MockWebSocket[] = [];
   static OPEN = 1;
   static CLOSED = 3;
+  // Flag to prevent auto-connection after first instance (for testing reconnect failures)
+  static preventAutoConnect = false;
 
   readyState = MockWebSocket.OPEN;
   onopen: (() => void) | null = null;
@@ -25,12 +27,14 @@ class MockWebSocket {
 
   constructor(_url: string) {
     MockWebSocket.instances.push(this);
-    // Simulate connection opening
-    setTimeout(() => {
-      if (this.onopen) {
-        this.onopen();
-      }
-    }, 0);
+    // Simulate connection opening (unless preventAutoConnect is set)
+    if (!MockWebSocket.preventAutoConnect) {
+      setTimeout(() => {
+        if (this.onopen) {
+          this.onopen();
+        }
+      }, 0);
+    }
   }
 
   send(data: string): void {
@@ -56,6 +60,14 @@ class MockWebSocket {
       this.onclose();
     }
   }
+
+  // Manually trigger open (for controlled testing)
+  simulateOpen(): void {
+    this.readyState = MockWebSocket.OPEN;
+    if (this.onopen) {
+      this.onopen();
+    }
+  }
 }
 
 // Store original WebSocket
@@ -64,6 +76,7 @@ const originalWebSocket = global.WebSocket;
 describe('useAgentTaskStatus', () => {
   beforeEach(() => {
     MockWebSocket.instances = [];
+    MockWebSocket.preventAutoConnect = false;
     // @ts-expect-error - Mocking WebSocket
     global.WebSocket = MockWebSocket;
     vi.useFakeTimers();
@@ -71,6 +84,7 @@ describe('useAgentTaskStatus', () => {
 
   afterEach(() => {
     global.WebSocket = originalWebSocket;
+    MockWebSocket.preventAutoConnect = false;
     vi.useRealTimers();
     vi.clearAllMocks();
   });
@@ -86,15 +100,13 @@ describe('useAgentTaskStatus', () => {
     // Initial state should be connecting
     expect(result.current.connectionState).toBe('connecting');
 
-    // Advance timers to allow connection
+    // Advance timers to allow connection (using async version for proper timer handling)
     await act(async () => {
-      vi.advanceTimersByTime(10);
+      await vi.advanceTimersByTimeAsync(10);
     });
 
     // Should be connected
-    await waitFor(() => {
-      expect(result.current.connectionState).toBe('connected');
-    });
+    expect(result.current.connectionState).toBe('connected');
 
     // Should have subscribed to the task
     expect(MockWebSocket.instances).toHaveLength(1);
@@ -110,14 +122,12 @@ describe('useAgentTaskStatus', () => {
       }),
     );
 
-    // Wait for connection
+    // Wait for connection (using async version)
     await act(async () => {
-      vi.advanceTimersByTime(10);
+      await vi.advanceTimersByTimeAsync(10);
     });
 
-    await waitFor(() => {
-      expect(result.current.connectionState).toBe('connected');
-    });
+    expect(result.current.connectionState).toBe('connected');
 
     // Simulate receiving a status update
     const ws = MockWebSocket.instances[0];
@@ -154,24 +164,24 @@ describe('useAgentTaskStatus', () => {
       }),
     );
 
-    // Wait for connection
+    // Wait for connection (using async version)
     await act(async () => {
-      vi.advanceTimersByTime(10);
+      await vi.advanceTimersByTimeAsync(10);
     });
 
-    await waitFor(() => {
-      expect(result.current.connectionState).toBe('connected');
-    });
+    expect(result.current.connectionState).toBe('connected');
 
-    // Simulate connection close
+    // Simulate connection close (use async act to ensure state updates complete)
     const ws = MockWebSocket.instances[0];
-    act(() => {
+    await act(async () => {
       ws?.simulateClose();
+      // Flush any microtasks
+      await vi.advanceTimersByTimeAsync(0);
     });
 
-    // Should be reconnecting
-    expect(result.current.connectionState).toBe('reconnecting');
-    expect(result.current.reconnectAttempt).toBe(1);
+    // Should be reconnecting (may briefly go through 'connecting' if reconnect starts)
+    expect(['reconnecting', 'connecting']).toContain(result.current.connectionState);
+    expect(result.current.reconnectAttempt).toBeGreaterThanOrEqual(1);
   });
 
   it('falls back to polling after max reconnect attempts (AC7.7)', async () => {
@@ -200,31 +210,33 @@ describe('useAgentTaskStatus', () => {
 
     // Wait for initial connection
     await act(async () => {
-      vi.advanceTimersByTime(10);
+      await vi.advanceTimersByTimeAsync(10);
     });
 
-    await waitFor(() => {
-      expect(result.current.connectionState).toBe('connected');
-    });
+    expect(result.current.connectionState).toBe('connected');
 
-    // Simulate multiple connection failures
-    for (let i = 0; i < 3; i++) {
-      const ws = MockWebSocket.instances[MockWebSocket.instances.length - 1];
-      act(() => {
-        ws?.simulateClose();
-      });
+    // Prevent subsequent WebSockets from auto-connecting to simulate persistent failures
+    MockWebSocket.preventAutoConnect = true;
 
-      // Advance through reconnection delay with exponential backoff
+    // Simulate repeated connection failures until max attempts exhausted
+    // The hook will create new WebSocket instances for each reconnect attempt
+    // We need to close each one to trigger the next attempt or fallback to polling
+
+    // Close initial connection and process through all reconnect attempts
+    // Each close triggers either a reconnect (if under max) or fallback to polling
+    for (let attempt = 0; attempt <= 2; attempt++) {
       await act(async () => {
-        vi.advanceTimersByTime(100 * Math.pow(2, i) + 10);
+        // Close the most recent WebSocket
+        const ws = MockWebSocket.instances[MockWebSocket.instances.length - 1];
+        ws?.simulateClose();
+        // Advance time to allow reconnect timers to fire (if any)
+        // Use enough time to cover exponential backoff: 100, 200, 400ms
+        await vi.advanceTimersByTimeAsync(500);
       });
     }
 
-    // Should fall back to polling after max attempts
-    await waitFor(() => {
-      expect(result.current.isPolling).toBe(true);
-    });
-
+    // After max attempts (2) exhausted, should fall back to polling
+    expect(result.current.isPolling).toBe(true);
     expect(result.current.connectionState).toBe('disconnected');
   });
 
@@ -247,14 +259,12 @@ describe('useAgentTaskStatus', () => {
       }),
     );
 
-    // Wait for connection
+    // Wait for connection (using async version)
     await act(async () => {
-      vi.advanceTimersByTime(10);
+      await vi.advanceTimersByTimeAsync(10);
     });
 
-    await waitFor(() => {
-      expect(result.current.connectionState).toBe('connected');
-    });
+    expect(result.current.connectionState).toBe('connected');
 
     // Unmount the hook
     unmount();

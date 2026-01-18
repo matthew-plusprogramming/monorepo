@@ -71,14 +71,8 @@ type GetSpecGroupResponse = {
 /**
  * Handler for GET /api/spec-groups/:id
  */
-const getSpecGroupHandler = (
-  input: handlerInput,
-): Effect.Effect<
-  GetSpecGroupResponse,
-  SpecGroupNotFoundError | InternalServerError,
-  SpecGroupRepository
-> => {
-  return Effect.gen(function* () {
+const getSpecGroupHandler = (input: handlerInput) =>
+  Effect.gen(function* () {
     const req = yield* input;
     const id = req.params.id as string;
 
@@ -102,23 +96,12 @@ const getSpecGroupHandler = (
       availableTransitions,
     };
   });
-};
 
 /**
  * Handler for POST /api/spec-groups/:id/transition
  */
-const transitionStateHandler = (
-  input: handlerInput,
-): Effect.Effect<
-  GetSpecGroupResponse,
-  | SpecGroupNotFoundError
-  | InvalidStateTransitionError
-  | SpecGroupConflictError
-  | InternalServerError
-  | ZodError,
-  SpecGroupRepository
-> => {
-  return Effect.gen(function* () {
+const transitionStateHandler = (input: handlerInput) =>
+  Effect.gen(function* () {
     const req = yield* input;
     const id = req.params.id as string;
 
@@ -145,19 +128,12 @@ const transitionStateHandler = (
       availableTransitions,
     };
   });
-};
 
 /**
  * Handler for PUT /api/spec-groups/:id/flags
  */
-const updateFlagsHandler = (
-  input: handlerInput,
-): Effect.Effect<
-  GetSpecGroupResponse,
-  SpecGroupNotFoundError | InternalServerError | ZodError,
-  SpecGroupRepository
-> => {
-  return Effect.gen(function* () {
+const updateFlagsHandler = (input: handlerInput) =>
+  Effect.gen(function* () {
     const req = yield* input;
     const id = req.params.id as string;
 
@@ -175,7 +151,6 @@ const updateFlagsHandler = (
       availableTransitions,
     };
   });
-};
 
 /**
  * Exported request handlers.

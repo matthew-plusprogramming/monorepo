@@ -59,19 +59,8 @@ type GetAgentTaskResponse = {
  * AC6.3: Webhook payload includes spec group ID, action type, and context
  * AC6.7: Dispatch attempt logged to AgentTasks table
  */
-const dispatchHandler = (
-  input: handlerInput,
-): Effect.Effect<
-  DispatchResponse,
-  | SpecGroupNotFoundError
-  | WebhookDispatchError
-  | WebhookTimeoutError
-  | WebhookNotConfiguredError
-  | InternalServerError
-  | ZodError,
-  SpecGroupRepository | AgentTaskRepository | WebhookService
-> => {
-  return Effect.gen(function* () {
+const dispatchHandler = (input: handlerInput) =>
+  Effect.gen(function* () {
     const req = yield* input;
     const specGroupId = req.params.id as string;
 
@@ -129,20 +118,37 @@ const dispatchHandler = (
         })),
         Effect.tapError(() =>
           // Update task status on failure
-          taskRepo.updateStatus({
-            taskId,
-            status: AgentTaskStatus.FAILED,
-            errorMessage: 'Webhook dispatch failed',
-          }),
+          taskRepo
+            .updateStatus({
+              taskId,
+              status: AgentTaskStatus.FAILED,
+              errorMessage: 'Webhook dispatch failed',
+            })
+            .pipe(
+              Effect.catchTag('AgentTaskNotFoundError', () =>
+                Effect.void,
+              ),
+            ),
         ),
       );
 
     // Update task status to dispatched
-    const updatedTask = yield* taskRepo.updateStatus({
-      taskId,
-      status: AgentTaskStatus.DISPATCHED,
-      responseStatus: dispatchResult.responseStatus,
-    });
+    const updatedTask = yield* taskRepo
+      .updateStatus({
+        taskId,
+        status: AgentTaskStatus.DISPATCHED,
+        responseStatus: dispatchResult.responseStatus,
+      })
+      .pipe(
+        Effect.catchTag('AgentTaskNotFoundError', () =>
+          Effect.fail(
+            new InternalServerError({
+              message: `Task ${taskId} not found after creation`,
+              cause: undefined,
+            }),
+          ),
+        ),
+      );
 
     const actionLabel = action === AgentAction.IMPLEMENT ? 'Implementation' : 'Test';
 
@@ -151,19 +157,12 @@ const dispatchHandler = (
       message: `${actionLabel} task dispatched successfully`,
     };
   });
-};
 
 /**
  * Handler for GET /api/agent-tasks/:id
  */
-const getAgentTaskHandler = (
-  input: handlerInput,
-): Effect.Effect<
-  GetAgentTaskResponse,
-  AgentTaskNotFoundError | InternalServerError,
-  AgentTaskRepository
-> => {
-  return Effect.gen(function* () {
+const getAgentTaskHandler = (input: handlerInput) =>
+  Effect.gen(function* () {
     const req = yield* input;
     const taskId = req.params.id as string;
 
@@ -181,7 +180,6 @@ const getAgentTaskHandler = (
       task: maybeTask.value,
     };
   });
-};
 
 /**
  * Exported request handlers.

@@ -27,14 +27,15 @@ const agentTaskRepoModule = vi.hoisted(
 
 vi.mock('@/clients/cdkOutputs', () => makeCdkOutputsStub());
 
-vi.mock('@/services/websocket.service', () => ({
-  broadcastTaskStatus: vi.fn().mockReturnValue({
-    pipe: () => ({ pipe: () => ({}) }),
-  }),
-  getWebSocketManager: vi.fn().mockReturnValue({
-    broadcastTaskStatusUpdate: vi.fn(),
-  }),
-}));
+vi.mock('@/services/websocket.service', async () => {
+  const { Effect } = await import('effect');
+  return {
+    broadcastTaskStatus: vi.fn().mockImplementation(() => Effect.void),
+    getWebSocketManager: vi.fn().mockReturnValue({
+      broadcastTaskStatusUpdate: vi.fn(),
+    }),
+  };
+});
 
 vi.mock('@/layers/app.layer', async () => {
   const { createAgentTaskRepoFake } = await import(

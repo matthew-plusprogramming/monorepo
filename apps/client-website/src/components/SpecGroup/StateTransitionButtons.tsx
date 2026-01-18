@@ -115,7 +115,7 @@ const SpinnerIcon = (): JSX.Element => (
  * - Shows tooltip explaining why button is disabled
  */
 export const StateTransitionButtons = ({
-  currentState,
+  currentState: _currentState,
   availableTransitions,
   gates,
   onTransition,

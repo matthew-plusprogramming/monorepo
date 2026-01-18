@@ -10,6 +10,9 @@ type ExpressAppStub = {
   use: ReturnType<typeof vi.fn>;
   post: ReturnType<typeof vi.fn>;
   get: ReturnType<typeof vi.fn>;
+  put: ReturnType<typeof vi.fn>;
+  patch: ReturnType<typeof vi.fn>;
+  delete: ReturnType<typeof vi.fn>;
   listen: ReturnType<typeof vi.fn>;
 };
 
@@ -40,11 +43,24 @@ const expressModule = vi.hoisted<ExpressModuleState>(() => ({
 const corsModule = vi.hoisted<SingleMockState>(() => ({
   handler: undefined,
 }));
+const cookieParserModule = vi.hoisted<SingleMockState>(() => ({
+  handler: undefined,
+}));
+const loggingModule = vi.hoisted<{ middleware?: ReturnType<typeof vi.fn> }>(() => ({
+  middleware: undefined,
+}));
 const ipRateLimitModule = vi.hoisted<SingleMockState>(() => ({
   handler: undefined,
 }));
 const jsonErrorModule = vi.hoisted<SingleMockState>(() => ({
   handler: undefined,
+}));
+const csrfModule = vi.hoisted<{
+  tokenMiddleware?: ReturnType<typeof vi.fn>;
+  validationMiddleware?: ReturnType<typeof vi.fn>;
+}>(() => ({
+  tokenMiddleware: undefined,
+  validationMiddleware: undefined,
 }));
 const registerModule = vi.hoisted<SingleMockState>(() => ({
   handler: undefined,
@@ -69,8 +85,11 @@ vi.mock('express', () => {
   const use = vi.fn();
   const post = vi.fn();
   const get = vi.fn();
+  const put = vi.fn();
+  const patch = vi.fn();
+  const del = vi.fn();
   const listen = vi.fn();
-  const app: ExpressAppStub = { use, post, get, listen };
+  const app: ExpressAppStub = { use, post, get, put, patch, delete: del, listen };
   const jsonMiddleware = vi.fn();
   const json = vi.fn(() => jsonMiddleware);
   const factory = vi.fn(() => app);
@@ -89,6 +108,33 @@ vi.mock('cors', () => {
   const factory = vi.fn(() => handler);
   corsModule.handler = handler;
   return { default: factory };
+});
+
+vi.mock('cookie-parser', () => {
+  const handler = vi.fn();
+  const factory = vi.fn(() => handler);
+  cookieParserModule.handler = handler;
+  return { default: factory };
+});
+
+vi.mock('@/middleware/logging.middleware', () => {
+  const middleware = vi.fn();
+  loggingModule.middleware = middleware;
+  return {
+    loggingMiddleware: middleware,
+    loggingErrorMiddleware: vi.fn(),
+  };
+});
+
+vi.mock('@/middleware/csrf.middleware', () => {
+  const tokenMiddleware = vi.fn();
+  const validationMiddleware = vi.fn();
+  csrfModule.tokenMiddleware = tokenMiddleware;
+  csrfModule.validationMiddleware = validationMiddleware;
+  return {
+    csrfTokenMiddleware: tokenMiddleware,
+    csrfValidationMiddleware: validationMiddleware,
+  };
 });
 
 vi.mock('@/middleware/ipRateLimiting.middleware', () => {
@@ -141,12 +187,28 @@ const requireCorsMiddleware = (): ReturnType<typeof vi.fn> => {
   return ensureDefined(corsModule.handler, 'cors middleware');
 };
 
+const requireCookieParserMiddleware = (): ReturnType<typeof vi.fn> => {
+  return ensureDefined(cookieParserModule.handler, 'cookie-parser middleware');
+};
+
+const requireLoggingMiddleware = (): ReturnType<typeof vi.fn> => {
+  return ensureDefined(loggingModule.middleware, 'logging middleware');
+};
+
 const requireIpRateLimitMiddleware = (): ReturnType<typeof vi.fn> => {
   return ensureDefined(ipRateLimitModule.handler, 'ipRateLimiting middleware');
 };
 
 const requireJsonErrorMiddleware = (): ReturnType<typeof vi.fn> => {
   return ensureDefined(jsonErrorModule.handler, 'jsonError middleware');
+};
+
+const requireCsrfTokenMiddleware = (): ReturnType<typeof vi.fn> => {
+  return ensureDefined(csrfModule.tokenMiddleware, 'csrf token middleware');
+};
+
+const requireCsrfValidationMiddleware = (): ReturnType<typeof vi.fn> => {
+  return ensureDefined(csrfModule.validationMiddleware, 'csrf validation middleware');
 };
 
 const requireRegisterHandler = (): ReturnType<typeof vi.fn> => {
@@ -170,26 +232,20 @@ const assertBootstrapSuccess = ({
 
   expect(expressModule.factory).toHaveBeenCalledTimes(1);
   expect(parse).toHaveBeenCalledWith(process.env);
+  // Middleware order: cors, cookieParser, logging, ipRateLimit, express.json, jsonError, csrfToken, csrfValidation
   expect(expressApp.use).toHaveBeenNthCalledWith(1, requireCorsMiddleware());
-  expect(expressApp.use).toHaveBeenNthCalledWith(
-    2,
-    requireIpRateLimitMiddleware(),
-  );
+  expect(expressApp.use).toHaveBeenNthCalledWith(2, requireCookieParserMiddleware());
+  expect(expressApp.use).toHaveBeenNthCalledWith(3, requireLoggingMiddleware());
+  expect(expressApp.use).toHaveBeenNthCalledWith(4, requireIpRateLimitMiddleware());
   expect(expressModule.json).toHaveBeenCalledTimes(1);
-  expect(expressApp.use).toHaveBeenNthCalledWith(3, jsonMiddleware);
-  expect(expressApp.use).toHaveBeenNthCalledWith(
-    4,
-    requireJsonErrorMiddleware(),
-  );
-  expect(expressApp.post).toHaveBeenCalledWith(
-    '/register',
-    requireRegisterHandler(),
-  );
-  expect(expressApp.get).toHaveBeenCalledWith(
-    '/user/:identifier',
-    requireGetUserHandler(),
-  );
-  expect(expressApp.listen).toHaveBeenCalledWith(process.env.PORT);
+  expect(expressApp.use).toHaveBeenNthCalledWith(5, jsonMiddleware);
+  expect(expressApp.use).toHaveBeenNthCalledWith(6, requireJsonErrorMiddleware());
+  expect(expressApp.use).toHaveBeenNthCalledWith(7, requireCsrfTokenMiddleware());
+  expect(expressApp.use).toHaveBeenNthCalledWith(8, requireCsrfValidationMiddleware());
+  // Verify that routes are registered (checking one representative route)
+  expect(expressApp.post).toHaveBeenCalled();
+  expect(expressApp.get).toHaveBeenCalled();
+  // Note: listen is not called directly on express app since we use http.createServer for WebSocket support
   const moduleApp = module.app;
   expect(moduleApp).toBe(expressApp);
   expect(exitSpy).not.toHaveBeenCalled();

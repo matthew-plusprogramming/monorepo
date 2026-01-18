@@ -121,10 +121,7 @@ const dashboardSessionMiddlewareHandler = (
       });
     }
 
-    const sessionExpiryHours = parseInt(
-      process.env.SESSION_EXPIRY_HOURS ?? '24',
-      10,
-    );
+    const sessionExpiryHours = process.env.SESSION_EXPIRY_HOURS ?? 24;
 
     if (!validateSessionToken(sessionToken, sessionSecret, sessionExpiryHours)) {
       return yield* new UserNotAuthenticatedError({

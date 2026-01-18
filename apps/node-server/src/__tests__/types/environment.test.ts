@@ -10,6 +10,9 @@ describe('EnvironmentSchema', () => {
     PEPPER: 'pepper',
     PORT: '3000',
     JWT_SECRET: 'jwt-secret',
+    PASSWORD_HASH: '$2a$10$test-password-hash',
+    SESSION_SECRET: 'test-session-secret',
+    WEBHOOK_SECRET: 'test-webhook-secret',
   } as const;
 
   it('parses valid environment variables and coerces PORT to a number', () => {
@@ -27,6 +30,7 @@ describe('EnvironmentSchema', () => {
         PORT: 3000,
         APP_ENV: 'development',
         APP_VERSION: '0.0.0',
+        SESSION_EXPIRY_HOURS: 24,
       });
     }
   });
