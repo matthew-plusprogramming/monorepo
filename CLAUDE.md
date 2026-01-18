@@ -326,7 +326,6 @@ Workflow outcomes:
 | `/orchestrate` | Coordinate multi-workstream projects | For large tasks with 3+ workstreams |
 | `/browser-test` | Browser-based UI testing | For UI features, after security review |
 | `/prd` | Create, sync, manage PRDs in Google Docs | Drafting new PRDs or syncing external ones |
-| `/deploy` | Deploy infrastructure via CDKTF | After security review, for infrastructure changes |
 
 ### Specialized Subagents
 
@@ -349,7 +348,6 @@ Workflow outcomes:
 | `prd-author` | opus | Author complete PRDs from requirements using template |
 | `prd-reader` | opus | Extract requirements from existing PRDs |
 | `prd-writer` | opus | Push incremental discoveries back to PRDs |
-| `deployer` | opus | Deployment orchestration for CDKTF infrastructure operations |
 
 ### Spec is Contract Principle
 
