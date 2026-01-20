@@ -4,6 +4,22 @@ description: Test writing subagent specialized in creating tests from spec accep
 tools: Read, Write, Edit, Glob, Grep, Bash
 model: opus
 skills: test
+hooks:
+  PostToolUse:
+    - matcher: "Edit|Write"
+      hooks:
+        - type: command
+          command: "npx prettier --write $CLAUDE_FILE_PATHS 2>/dev/null || true"
+        - type: command
+          command: "[[ \"$CLAUDE_FILE_PATHS\" == *.ts ]] || [[ \"$CLAUDE_FILE_PATHS\" == *.tsx ]] && node .claude/scripts/workspace-tsc.mjs \"$CLAUDE_FILE_PATHS\" 2>&1 | head -20 || true"
+        - type: command
+          command: "[[ \"$CLAUDE_FILE_PATHS\" == *.ts ]] || [[ \"$CLAUDE_FILE_PATHS\" == *.tsx ]] || [[ \"$CLAUDE_FILE_PATHS\" == *.js ]] || [[ \"$CLAUDE_FILE_PATHS\" == *.jsx ]] && node .claude/scripts/workspace-eslint.mjs \"$CLAUDE_FILE_PATHS\" 2>&1 | head -20 || true"
+  Stop:
+    - hooks:
+        - type: command
+          command: "npm run lint 2>&1 | head -30 || true"
+        - type: command
+          command: "npm test 2>&1 | head -30 || true"
 ---
 
 # Test Writer Subagent
@@ -187,23 +203,51 @@ describe("AuthService logout", () => {
 });
 ```
 
-### 8. Run Tests and Verify
+### 8. Run Exit Validation (MANDATORY)
+
+**Before reporting completion, ALL exit validations MUST pass.**
+
+The `exit_validation: [lint, test]` in frontmatter mandates these checks:
 
 ```bash
-# Run tests
+# 1. Lint - Ensure test code style compliance
+npm run lint
+# Must pass with 0 errors (warnings acceptable)
+
+# 2. Test - Confirm all tests pass
 npm test
+# All tests must pass, no failures or skipped
 
-# Run with coverage
+# Additional verification
 npm test -- --coverage
+# Coverage should be ≥ 80%
 
-# Run specific file
+# Run specific file to isolate issues
 npm test -- auth-service.test.ts
 ```
 
-Ensure:
+**Execution order matters**: Run lint first, then tests. Fix issues before proceeding.
+
+**If any validation fails**:
+1. Identify the failure cause
+2. Fix the issue in your test code
+3. Re-run the failing validation
+4. If tests fail due to implementation issues (not test issues), report to orchestrator
+
+**Ensure**:
 - All tests passing
 - Coverage ≥ 80%
 - No flaky tests (run 3x to confirm)
+
+**Include validation results in completion report**:
+```markdown
+## Exit Validation Results
+
+| Check | Status | Details |
+|-------|--------|---------|
+| lint | PASS | 0 errors |
+| test | PASS | 12 tests, 100% passing, 94% coverage |
+```
 
 ### 9. Update Spec with Coverage
 

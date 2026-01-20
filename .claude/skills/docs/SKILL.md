@@ -241,6 +241,65 @@ Add documentation log to spec group:
 
 ## Documentation Standards
 
+### Required Documentation Categories
+
+Assess which categories apply to the project, then generate documentation for each applicable category.
+
+| Category | When Required | Contents |
+|----------|---------------|----------|
+| **High-Level Overview** | All projects | Project purpose, quick start, workspace listing |
+| **System Architecture** | Multi-component projects | Data flow diagrams, service boundaries, component relationships |
+| **API Documentation - Public** | Projects with public APIs | Endpoints, authentication, request/response examples, error codes |
+| **API Documentation - Internal** | Projects with internal APIs | Internal endpoints, service-to-service contracts |
+| **Operations Guide** | Production systems | Deployment procedures, monitoring, troubleshooting, emergency procedures |
+| **Frontend Documentation** | UI projects | Component overview, state management, routing, key patterns |
+| **Setup/Installation** | All projects | Environment setup, dependencies, local development |
+| **Contributing Guide** | Shared/open projects | Branch strategy, PR process, code review expectations |
+
+**Conditional Requirements**:
+- **Frontend docs depth**: For backend-heavy projects, frontend docs can be lighter. For frontend-heavy or balanced projects, frontend docs should match backend docs depth.
+- **"If applicable" rule**: A category is required only if the project has that component (e.g., no API docs needed if no API exists)
+
+### Documentation Patterns
+
+Follow these established patterns based on documentation type:
+
+**README Structure**:
+- Quick Start
+- Scripts/Commands
+- Environment/Configuration
+- Project Structure (if complex)
+- Troubleshooting
+
+**API Documentation Pattern**:
+- Table of contents
+- Security/Authentication section
+- Environment variables table
+- Endpoints grouped by resource
+- Request/response examples for each endpoint
+- WebSocket documentation if applicable
+- Error handling reference
+
+**Operations Guide Pattern**:
+- Quick reference table at top
+- Step-by-step procedures
+- Troubleshooting section with common issues
+- Emergency procedures
+- Configuration reference
+
+**Documentation Index Pattern**:
+- Serve as table of contents with categorized links
+- Include terminology glossary for project-specific terms
+- Cross-link related documents with "See Also" sections
+
+### Formatting Conventions
+
+- H1 for title only, H2 for major sections
+- Tables for structured data (env vars, endpoints, commands)
+- Code blocks with language specifiers
+- No emojis in documentation
+- "See Also" sections for cross-references
+
 ### Code Examples Must Work
 
 Every code example must:

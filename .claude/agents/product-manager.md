@@ -4,6 +4,12 @@ description: Product manager subagent specialized in interviewing users to gathe
 tools: Read, Write, Edit, AskUserQuestion
 model: opus
 skills: pm
+hooks:
+  PostToolUse:
+    - matcher: "Edit|Write"
+      hooks:
+        - type: command
+          command: "npx prettier --write $CLAUDE_FILE_PATHS 2>/dev/null || true"
 ---
 
 # Product Manager Subagent
@@ -283,11 +289,43 @@ You've succeeded when:
 - Don't author specs yourself (hand off to spec-author)
 - Don't get technical too early (focus on "what" not "how")
 
+### 6. Output Validation (Required)
+
+Before reporting completion, validate the created requirements document.
+
+**Required elements checklist**:
+- [ ] All required sections present:
+  - `## Problem Statement`
+  - `## Goals`
+  - `## Non-goals` (or explicitly marked as none)
+  - `## Success Criteria`
+  - `## Requirements (EARS Format)`
+  - `## Constraints`
+  - `## Edge Cases`
+  - `## Open Questions`
+  - `## Priorities`
+- [ ] Requirements use EARS format:
+  - Each requirement has `**WHEN**` trigger condition
+  - Each requirement has `**THEN**` system behavior
+  - Optional `**AND**` for additional behaviors
+- [ ] Requirements have REQ-XXX numbering (e.g., REQ-001, REQ-002)
+- [ ] Open Questions have priority labels (high/medium/low)
+- [ ] Priorities section separates must-have from nice-to-have
+- [ ] No placeholder text remaining (e.g., `<Feature Name>`, `...`)
+
+**Validation command** (if spec group exists):
+```bash
+node .claude/scripts/spec-schema-validate.mjs .claude/specs/groups/<spec-group-id>/requirements.md
+```
+
+If validation fails, fix issues before handing off to spec-author.
+
 ## Completion
 
 When you're done, deliver:
 1. **Requirements document** with all sections filled
 2. **Confirmation** from user that requirements are accurate
-3. **Handoff note** to spec-author with next steps
+3. **Validation passed** for requirements document structure
+4. **Handoff note** to spec-author with next steps
 
 Then end your session - spec authoring is the next agent's responsibility.

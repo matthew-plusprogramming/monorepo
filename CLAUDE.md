@@ -393,10 +393,25 @@ All artifacts are stored in `.claude/`:
 │   └── archive/         # Completed specs
 ├── context/
 │   └── session.json     # Session state
-├── scripts/             # Code quality checks (project-specific)
+├── scripts/             # Validation scripts for hooks
 ├── templates/           # Spec templates
+├── docs/                # System documentation
 └── settings.json        # Hooks configuration
 ```
+
+### Validation Hooks
+
+PostToolUse hooks run automatically after Edit/Write operations to catch issues early. Key hooks include:
+
+| Hook | Trigger | Purpose |
+|------|---------|---------|
+| `typescript-typecheck` | `.ts/.tsx` | Type checking via workspace-aware tsc |
+| `eslint-check` | `.ts/.tsx/.js/.jsx` | Linting via workspace-aware ESLint |
+| `spec-schema-validate` | `.claude/specs/**/*.md` | JSON schema validation for specs |
+| `manifest-validate` | `manifest.json` | Spec-group manifest validation |
+| `template-validate` | `.claude/templates/*` | Template structure validation |
+
+Hooks warn but don't block (graceful degradation). For full documentation, see `.claude/docs/HOOKS.md`.
 
 ### Parallel Execution
 

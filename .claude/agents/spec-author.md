@@ -4,6 +4,14 @@ description: Spec authoring subagent specialized in creating WorkstreamSpecs fro
 tools: Read, Write, Edit, Glob, Grep
 model: opus
 skills: spec
+hooks:
+  PostToolUse:
+    - matcher: "Edit|Write"
+      hooks:
+        - type: command
+          command: "[[ \"$CLAUDE_FILE_PATHS\" == *\".claude/specs/\"*\".md\" ]] && node .claude/scripts/spec-validate.mjs $CLAUDE_FILE_PATHS 2>&1 || true"
+        - type: command
+          command: "[[ \"$CLAUDE_FILE_PATHS\" == *\".claude/specs/\"*\".md\" ]] && node .claude/scripts/spec-schema-validate.mjs \"$CLAUDE_FILE_PATHS\" 2>&1 | head -20 || true"
 ---
 
 # Spec Author Subagent
@@ -141,7 +149,41 @@ Before delivering, verify:
 - Contracts registered (if applicable)
 - No TBD or TODO left unresolved
 
-### 8. Deliver Spec
+### 8. Output Validation (Required)
+
+Before reporting completion, validate the created spec file.
+
+**Run schema validation**:
+```bash
+node .claude/scripts/spec-schema-validate.mjs <spec-file-path>
+```
+
+**Required elements checklist** (14 sections from template):
+- [ ] YAML frontmatter with required fields: `id`, `title`, `owner`, `scope`, `dependencies`, `contracts`, `status`, `implementation_status`
+- [ ] `id` follows pattern `ws-<id>` for workstream specs
+- [ ] `status` is `draft` (initial state)
+- [ ] All 14 template sections present:
+  1. `## Context`
+  2. `## Goals / Non-goals`
+  3. `## Requirements`
+  4. `## Core Flows`
+  5. `## Sequence Diagram(s)` (with at least one Mermaid diagram)
+  6. `## Edge Cases`
+  7. `## Interfaces & Data Model`
+  8. `## Security`
+  9. `## Additional Considerations`
+  10. `## Task List`
+  11. `## Testing`
+  12. `## Open Questions`
+  13. `## Workstream Reflection`
+  14. `## Decision & Work Log`
+- [ ] Requirements use EARS format (WHEN/THEN/AND)
+- [ ] No placeholder text remaining (e.g., `<condition>`, `<behavior>`)
+- [ ] Contracts defined if `contracts` frontmatter is non-empty
+
+If validation fails, fix issues before delivering. Do not hand off specs with validation errors.
+
+### 9. Deliver Spec
 
 Save spec to:
 - **For single workstream**: `.claude/specs/active/<slug>.md`

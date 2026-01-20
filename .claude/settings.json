@@ -5,6 +5,48 @@
         "matcher": "Edit|Write",
         "hooks": [
           {
+            "_source": "metaclaude",
+            "_id": "json-validate",
+            "type": "command",
+            "command": "[[ \"$CLAUDE_FILE_PATHS\" == *.json ]] && [[ \"$CLAUDE_FILE_PATHS\" != *tsconfig* ]] && node -e \"JSON.parse(require('fs').readFileSync('$CLAUDE_FILE_PATHS'))\" 2>&1 || true"
+          },
+          {
+            "_source": "metaclaude",
+            "_id": "claude-md-drift",
+            "type": "command",
+            "command": "[[ \"$CLAUDE_FILE_PATHS\" == *CLAUDE.md ]] && node .claude/scripts/verify-claude-md-base.mjs \"$(dirname \"$CLAUDE_FILE_PATHS\")\" 2>&1 | head -10 || true"
+          },
+          {
+            "_source": "metaclaude",
+            "_id": "manifest-validate",
+            "type": "command",
+            "command": "[[ \"$CLAUDE_FILE_PATHS\" == *manifest.json ]] && node .claude/scripts/validate-manifest.mjs \"$CLAUDE_FILE_PATHS\" 2>&1 || true"
+          },
+          {
+            "_source": "metaclaude",
+            "_id": "template-validate",
+            "type": "command",
+            "command": "[[ \"$CLAUDE_FILE_PATHS\" == *\".claude/templates/\"* ]] && node .claude/scripts/template-validate.mjs \"$CLAUDE_FILE_PATHS\" 2>&1 || true"
+          },
+          {
+            "_source": "metaclaude",
+            "_id": "registry-hash-verify",
+            "type": "command",
+            "command": "[[ \"$CLAUDE_FILE_PATHS\" == *\".claude/\"* ]] && [[ \"$CLAUDE_FILE_PATHS\" != *\".claude/context/\"* ]] && node .claude/scripts/compute-hashes.mjs --verify 2>&1 | head -5 || true"
+          },
+          {
+            "_source": "metaclaude",
+            "_id": "agent-frontmatter-validate",
+            "type": "command",
+            "command": "[[ \"$CLAUDE_FILE_PATHS\" == *\".claude/agents/\"*\".md\" ]] && node .claude/scripts/validate-agent-frontmatter.mjs $CLAUDE_FILE_PATHS 2>&1 || true"
+          },
+          {
+            "_source": "metaclaude",
+            "_id": "skill-frontmatter-validate",
+            "type": "command",
+            "command": "[[ \"$CLAUDE_FILE_PATHS\" == *\"SKILL.md\" ]] && node .claude/scripts/validate-skill-frontmatter.mjs $CLAUDE_FILE_PATHS 2>&1 || true"
+          },
+          {
             "type": "command",
             "command": "npx prettier --write $CLAUDE_FILE_PATHS 2>/dev/null || true"
           }
@@ -14,6 +56,12 @@
     "Stop": [
       {
         "hooks": [
+          {
+            "_source": "metaclaude",
+            "_id": "session-log",
+            "type": "command",
+            "command": "echo \"Session ended at $(date)\" >> .claude/context/session.log 2>/dev/null || true"
+          },
           {
             "type": "command",
             "command": "echo \"Session ended at $(date)\" >> .claude/context/session.log 2>/dev/null || true"

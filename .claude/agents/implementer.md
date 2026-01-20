@@ -4,6 +4,24 @@ description: Implementation subagent specialized in executing code from approved
 tools: Read, Write, Edit, Glob, Grep, Bash
 model: opus
 skills: implement
+hooks:
+  PostToolUse:
+    - matcher: "Edit|Write"
+      hooks:
+        - type: command
+          command: "npx prettier --write $CLAUDE_FILE_PATHS 2>/dev/null || true"
+        - type: command
+          command: "[[ \"$CLAUDE_FILE_PATHS\" == *.ts ]] || [[ \"$CLAUDE_FILE_PATHS\" == *.tsx ]] && node .claude/scripts/workspace-tsc.mjs \"$CLAUDE_FILE_PATHS\" 2>&1 | head -20 || true"
+        - type: command
+          command: "[[ \"$CLAUDE_FILE_PATHS\" == *.ts ]] || [[ \"$CLAUDE_FILE_PATHS\" == *.tsx ]] || [[ \"$CLAUDE_FILE_PATHS\" == *.js ]] || [[ \"$CLAUDE_FILE_PATHS\" == *.jsx ]] && node .claude/scripts/workspace-eslint.mjs \"$CLAUDE_FILE_PATHS\" 2>&1 | head -20 || true"
+  Stop:
+    - hooks:
+        - type: command
+          command: "npm run lint 2>&1 | head -30 || true"
+        - type: command
+          command: "npm run build 2>&1 | head -30 || true"
+        - type: command
+          command: "npm test 2>&1 | head -30 || true"
 ---
 
 # Implementer Subagent
@@ -139,22 +157,46 @@ Follow these rules:
 - Assume unstated requirements
 - Make breaking changes not in spec
 
-### 6. Run Validation
+### 6. Run Exit Validation (MANDATORY)
 
-After all tasks complete:
+**Before reporting completion, ALL exit validations MUST pass.**
+
+The `exit_validation: [lint, build, test]` in frontmatter mandates these checks:
 
 ```bash
-# Run full test suite
-npm test
-
-# Check lint
+# 1. Lint - Ensure code style compliance
 npm run lint
+# Must pass with 0 errors (warnings acceptable)
 
-# Build
+# 2. Build - Verify TypeScript compilation
 npm run build
+# Must compile successfully with no errors
+
+# 3. Test - Confirm all tests pass
+npm test
+# All tests must pass, no failures or skipped
 ```
 
-All must pass.
+**Execution order matters**: Run in sequence (lint -> build -> test). Fix issues before proceeding.
+
+**If any validation fails**:
+1. Identify the failure cause
+2. Fix the issue (if within spec scope)
+3. Re-run the failing validation
+4. If issue is outside spec scope, escalate to orchestrator
+
+**Include validation results in completion report**:
+```markdown
+## Exit Validation Results
+
+| Check | Status | Details                 |
+| ----- | ------ | ----------------------- |
+| lint  | PASS   | 0 errors, 2 warnings    |
+| build | PASS   | Compiled in 4.2s        |
+| test  | PASS   | 147 tests, 100% passing |
+```
+
+All must pass before proceeding.
 
 ### 7. Update Spec Status
 
