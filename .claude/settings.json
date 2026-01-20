@@ -47,6 +47,30 @@
             "command": "node .claude/scripts/hook-wrapper.mjs '*SKILL.md' 'node .claude/scripts/validate-skill-frontmatter.mjs {{file}}'"
           },
           {
+            "_source": "metaclaude",
+            "_id": "typescript-typecheck",
+            "type": "command",
+            "command": "node .claude/scripts/hook-wrapper.mjs '*.ts,*.tsx' 'node .claude/scripts/workspace-tsc.mjs {{file}}'"
+          },
+          {
+            "_source": "metaclaude",
+            "_id": "eslint-check",
+            "type": "command",
+            "command": "node .claude/scripts/hook-wrapper.mjs '*.ts,*.tsx,*.js,*.jsx' 'node .claude/scripts/workspace-eslint.mjs {{file}}'"
+          },
+          {
+            "_source": "metaclaude",
+            "_id": "spec-schema-validate",
+            "type": "command",
+            "command": "node .claude/scripts/hook-wrapper.mjs '.claude/specs/**/*.md' 'node .claude/scripts/spec-schema-validate.mjs {{file}}'"
+          },
+          {
+            "_source": "metaclaude",
+            "_id": "spec-validate",
+            "type": "command",
+            "command": "node .claude/scripts/hook-wrapper.mjs '.claude/specs/**/*.md' 'node .claude/scripts/spec-validate.mjs {{file}}'"
+          },
+          {
             "type": "command",
             "command": "npx prettier --write $CLAUDE_FILE_PATHS 2>/dev/null || true"
           }
