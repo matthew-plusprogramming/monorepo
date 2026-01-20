@@ -33,11 +33,9 @@ async function readStdin() {
 }
 
 /**
- * Simple glob pattern matching (no external dependencies)
- * Supports: *, **, and literal characters
+ * Convert a single glob pattern to regex string
  */
-function matchesPattern(filePath, pattern) {
-  // Convert glob pattern to regex
+function globToRegex(pattern) {
   let regexStr = '';
   let i = 0;
 
@@ -68,12 +66,35 @@ function matchesPattern(filePath, pattern) {
     }
   }
 
-  // Pattern can match:
-  // 1. The entire path
-  // 2. The end of the path (for patterns like *.json)
-  // 3. A suffix after / (for patterns like .claude/agents/*.md)
-  const regex = new RegExp('(^|/)' + regexStr + '$');
-  return regex.test(filePath);
+  return regexStr;
+}
+
+/**
+ * Simple glob pattern matching (no external dependencies)
+ * Supports: *, **, literal characters, and comma-separated OR patterns
+ *
+ * Examples:
+ *   - "*.ts" matches files ending in .ts
+ *   - "*.ts,*.tsx" matches files ending in .ts OR .tsx
+ *   - ".claude/**" matches any file under .claude/
+ */
+function matchesPattern(filePath, pattern) {
+  // Support comma-separated patterns (OR logic)
+  const patterns = pattern.split(',').map(p => p.trim());
+
+  for (const p of patterns) {
+    const regexStr = globToRegex(p);
+    // Pattern can match:
+    // 1. The entire path
+    // 2. The end of the path (for patterns like *.json)
+    // 3. A suffix after / (for patterns like .claude/agents/*.md)
+    const regex = new RegExp('(^|/)' + regexStr + '$');
+    if (regex.test(filePath)) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 async function main() {

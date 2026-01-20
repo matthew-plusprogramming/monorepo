@@ -9,11 +9,11 @@ hooks:
     - matcher: "Edit|Write"
       hooks:
         - type: command
-          command: "npx prettier --write $CLAUDE_FILE_PATHS 2>/dev/null || true"
+          command: "node .claude/scripts/hook-wrapper.mjs '*.ts,*.tsx,*.js,*.jsx,*.json,*.md' 'npx prettier --write {{file}} 2>/dev/null'"
         - type: command
-          command: "[[ \"$CLAUDE_FILE_PATHS\" == *.ts ]] || [[ \"$CLAUDE_FILE_PATHS\" == *.tsx ]] && node .claude/scripts/workspace-tsc.mjs \"$CLAUDE_FILE_PATHS\" 2>&1 | head -20 || true"
+          command: "node .claude/scripts/hook-wrapper.mjs '*.ts,*.tsx' 'node .claude/scripts/workspace-tsc.mjs {{file}} 2>&1 | head -20'"
         - type: command
-          command: "[[ \"$CLAUDE_FILE_PATHS\" == *.ts ]] || [[ \"$CLAUDE_FILE_PATHS\" == *.tsx ]] || [[ \"$CLAUDE_FILE_PATHS\" == *.js ]] || [[ \"$CLAUDE_FILE_PATHS\" == *.jsx ]] && node .claude/scripts/workspace-eslint.mjs \"$CLAUDE_FILE_PATHS\" 2>&1 | head -20 || true"
+          command: "node .claude/scripts/hook-wrapper.mjs '*.ts,*.tsx,*.js,*.jsx' 'node .claude/scripts/workspace-eslint.mjs {{file}} 2>&1 | head -20'"
   Stop:
     - hooks:
         - type: command

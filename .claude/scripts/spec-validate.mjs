@@ -11,7 +11,7 @@
  * Usage:
  *   node spec-validate.mjs <file1.md> [file2.md ...]
  *
- * The script accepts file paths as arguments (from $CLAUDE_FILE_PATHS).
+ * The script accepts file paths as arguments (passed via hook-wrapper.mjs).
  *
  * Exit codes:
  *   0 - All files pass validation

@@ -9,7 +9,7 @@ hooks:
     - matcher: "Edit|Write"
       hooks:
         - type: command
-          command: "npx prettier --write $CLAUDE_FILE_PATHS 2>/dev/null || true"
+          command: "node .claude/scripts/hook-wrapper.mjs '*.ts,*.tsx,*.js,*.jsx,*.json,*.md' 'npx prettier --write {{file}} 2>/dev/null'"
 ---
 
 # Product Manager Subagent

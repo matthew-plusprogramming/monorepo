@@ -9,9 +9,9 @@ hooks:
     - matcher: "Edit|Write"
       hooks:
         - type: command
-          command: "[[ \"$CLAUDE_FILE_PATHS\" == *\".claude/specs/\"*\".md\" ]] && node .claude/scripts/spec-validate.mjs $CLAUDE_FILE_PATHS 2>&1 || true"
+          command: "node .claude/scripts/hook-wrapper.mjs '.claude/specs/**/*.md' 'node .claude/scripts/spec-validate.mjs {{file}}'"
         - type: command
-          command: "[[ \"$CLAUDE_FILE_PATHS\" == *\".claude/specs/\"*\".md\" ]] && node .claude/scripts/spec-schema-validate.mjs \"$CLAUDE_FILE_PATHS\" 2>&1 | head -20 || true"
+          command: "node .claude/scripts/hook-wrapper.mjs '.claude/specs/**/*.md' 'node .claude/scripts/spec-schema-validate.mjs {{file}} 2>&1 | head -20'"
 ---
 
 # Spec Author Subagent
