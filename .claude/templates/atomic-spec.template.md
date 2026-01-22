@@ -4,6 +4,12 @@ title: <Atomic Spec Title>
 spec_group: sg-<parent-group>
 requirements_refs: [REQ-001]
 status: pending
+
+# Supersession Metadata (optional - set when this spec is superseded)
+# status: superseded                        # Set to 'superseded' when replaced by newer spec
+# superseded_by: <spec-group-id>            # ID of the spec group that supersedes this one
+# supersession_date: <YYYY-MM-DD>           # Date when supersession occurred
+# supersession_reason: "<explanation>"      # Brief explanation of why spec was superseded
 ---
 
 # <Title>
@@ -37,28 +43,28 @@ status: pending
 
 ## Atomicity Justification
 
-| Criterion | Justification |
-|-----------|---------------|
-| **Independently Testable** | <Why you can write a test for just this> |
-| **Independently Deployable** | <Why this can ship alone> |
+| Criterion                    | Justification                                                |
+| ---------------------------- | ------------------------------------------------------------ |
+| **Independently Testable**   | <Why you can write a test for just this>                     |
+| **Independently Deployable** | <Why this can ship alone>                                    |
 | **Independently Reviewable** | <Why a reviewer can understand this without sibling context> |
-| **Independently Reversible** | <Why you can roll back just this> |
+| **Independently Reversible** | <Why you can roll back just this>                            |
 
 ## Implementation Evidence
 
 _Filled by implementer agent after implementation._
 
 | File | Line | Description |
-|------|------|-------------|
-| | | |
+| ---- | ---- | ----------- |
+|      |      |             |
 
 ## Test Evidence
 
 _Filled by test-writer agent after tests written._
 
 | Test File | Test Name | ACs Covered |
-|-----------|-----------|-------------|
-| | | |
+| --------- | --------- | ----------- |
+|           |           |             |
 
 ## Decision Log
 

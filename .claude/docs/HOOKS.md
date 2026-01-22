@@ -156,6 +156,15 @@ The wrapper:
 | `skill-frontmatter-validate` | `*SKILL.md`             | `validate-skill-frontmatter.mjs` | Skill frontmatter schema validation              |
 | `spec-schema-validate`       | `.claude/specs/**/*.md` | `spec-schema-validate.mjs`       | JSON schema validation for specs                 |
 | `spec-validate`              | `.claude/specs/**/*.md` | `spec-validate.mjs`              | Spec markdown structure validation               |
+| `progress-heartbeat-check`   | `.claude/specs/**`      | `progress-heartbeat-check.mjs`   | Enforce progress logging (warn 15min, block 3x)  |
+| `registry-artifact-validate` | `*artifacts.json`       | `registry-artifact-validate.mjs` | Validate artifact registry schema and semantics  |
+| `superseded-artifact-warn`   | `.claude/specs/**/*.md` | `superseded-artifact-warn.mjs`   | Warn when reading superseded specs               |
+
+### PostToolUse Hooks (Read)
+
+| Hook ID                    | Trigger Pattern         | Script                         | Purpose                            |
+| -------------------------- | ----------------------- | ------------------------------ | ---------------------------------- |
+| `superseded-artifact-warn` | `.claude/specs/**/*.md` | `superseded-artifact-warn.mjs` | Warn when reading superseded specs |
 
 ### Stop Hooks
 
@@ -285,6 +294,49 @@ All validation scripts are located in `.claude/scripts/`.
 2. Checks for required sections based on spec type
 3. Validates section formatting and content structure
 4. Reports structural issues (missing sections, malformed content)
+
+### progress-heartbeat-check.mjs
+
+**Purpose**: Enforce progress logging during spec implementation.
+
+**Behavior**:
+
+1. Finds the spec group containing the edited file
+2. Reads `manifest.json` to check `last_progress_update` timestamp
+3. If stale (>15 minutes), increments `heartbeat_warnings` counter
+4. At 3 warnings, blocks further edits until progress is logged
+5. When progress is logged, resets `heartbeat_warnings` to 0
+
+**Key Constants**:
+
+- Stale threshold: 15 minutes
+- Warning limit: 3 (then blocks)
+
+### registry-artifact-validate.mjs
+
+**Purpose**: Validate artifact registry JSON against schema with semantic checks.
+
+**Behavior**:
+
+1. Loads `artifacts.json` and validates against `schema.json`
+2. Checks for duplicate spec group IDs
+3. Validates supersession relationships are bidirectional
+4. Detects circular supersession chains
+5. Verifies referenced paths exist
+
+### superseded-artifact-warn.mjs
+
+**Purpose**: Warn when reading specs marked as superseded.
+
+**Behavior**:
+
+1. Parses YAML frontmatter from spec file
+2. Checks for `status: superseded` field
+3. If superseded, emits warning with:
+   - `superseded_by` - the replacing spec ID
+   - `supersession_date` - when it was superseded
+   - `supersession_reason` - why it was replaced
+4. Graceful - always exits 0, warns but doesn't block
 
 ---
 

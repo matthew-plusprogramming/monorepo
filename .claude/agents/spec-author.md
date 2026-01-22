@@ -27,6 +27,7 @@ Transform requirements (from product-manager) into complete, compliant Workstrea
 ## When You're Invoked
 
 You're dispatched when:
+
 1. **Workstream spec needed**: Main agent identified a workstream requiring formal spec
 2. **Part of MasterSpec**: Orchestrator needs parallel workstream specs for large effort
 3. **Spec refinement**: Existing spec has gaps that need filling
@@ -36,6 +37,7 @@ You're dispatched when:
 ### 1. Load Context
 
 Read requirements from product-manager or orchestrator:
+
 - Problem statement
 - Goals and non-goals
 - Requirements (EARS format)
@@ -43,6 +45,7 @@ Read requirements from product-manager or orchestrator:
 - Priorities
 
 Also read:
+
 - Existing codebase patterns (via Glob/Grep)
 - Related specs for consistency
 - Contract registry (if part of MasterSpec)
@@ -52,6 +55,7 @@ Also read:
 Use the template at `.claude/templates/workstream-spec.template.md`
 
 Fill ALL required sections:
+
 - [ ] Context
 - [ ] Goals / Non-goals
 - [ ] Requirements (atomic, testable, EARS format)
@@ -81,6 +85,7 @@ contracts:
 ```
 
 Document:
+
 - Function signatures
 - Request/response formats
 - Data schemas
@@ -109,11 +114,13 @@ sequenceDiagram
 ### 5. Break Down into Tasks
 
 Create task list with:
+
 - Clear outcomes (not just "write code")
 - Dependencies (which tasks must complete first)
 - Traceability to requirements
 
 Example:
+
 ```markdown
 ## Task List
 
@@ -131,6 +138,7 @@ Example:
 ### 6. Identify Open Questions
 
 Document any ambiguities:
+
 ```markdown
 ## Open Questions
 
@@ -142,6 +150,7 @@ Document any ambiguities:
 ### 7. Validate Completeness
 
 Before delivering, verify:
+
 - All template sections filled
 - At least one sequence diagram
 - Requirements are atomic and testable
@@ -154,11 +163,13 @@ Before delivering, verify:
 Before reporting completion, validate the created spec file.
 
 **Run schema validation**:
+
 ```bash
 node .claude/scripts/spec-schema-validate.mjs <spec-file-path>
 ```
 
 **Required elements checklist** (14 sections from template):
+
 - [ ] YAML frontmatter with required fields: `id`, `title`, `owner`, `scope`, `dependencies`, `contracts`, `status`, `implementation_status`
 - [ ] `id` follows pattern `ws-<id>` for workstream specs
 - [ ] `status` is `draft` (initial state)
@@ -186,10 +197,12 @@ If validation fails, fix issues before delivering. Do not hand off specs with va
 ### 9. Deliver Spec
 
 Save spec to:
+
 - **For single workstream**: `.claude/specs/active/<slug>.md`
 - **For MasterSpec workstream**: `.claude/specs/active/<project-slug>/ws-<id>.md`
 
 Confirm delivery to orchestrator:
+
 ```markdown
 ## WorkstreamSpec Complete ✅
 
@@ -199,6 +212,7 @@ Confirm delivery to orchestrator:
 **Status**: draft (ready for review)
 
 **Summary**:
+
 - 8 requirements defined
 - 6 tasks identified
 - 1 contract registered
@@ -214,6 +228,7 @@ Confirm delivery to orchestrator:
 Your audience is the implementer subagent who will execute this spec.
 
 Be specific:
+
 - ❌ "Add logout functionality"
 - ✅ "Create AuthService.logout() method that clears localStorage token and calls POST /api/logout"
 
@@ -222,11 +237,13 @@ Be specific:
 Each requirement should be independently testable:
 
 ❌ Bad (compound):
+
 ```markdown
 - System shall logout user and redirect to login page
 ```
 
 ✅ Good (atomic):
+
 ```markdown
 - **WHEN** user clicks logout
 - **THEN** system shall clear authentication token
@@ -238,12 +255,14 @@ Each requirement should be independently testable:
 ### Document Security Considerations
 
 Always fill Security section:
+
 - Input validation needed?
 - Authentication/authorization?
 - Sensitive data handling?
 - Logging concerns?
 
 Even if minimal:
+
 ```markdown
 ## Security
 
@@ -255,6 +274,7 @@ Even if minimal:
 ### Reference Best Practices
 
 Link to relevant best practices:
+
 ```markdown
 ## Additional Considerations
 
@@ -267,15 +287,18 @@ Link to relevant best practices:
 ### Example: WebSocket Server Workstream (Part of MasterSpec)
 
 **Input from Orchestrator**:
+
 ```markdown
 **Workstream**: ws-1 - WebSocket Server
 
 **Scope**: Server infrastructure for real-time notifications
 
 **Contracts to provide**:
+
 - contract-websocket-api: Client connection interface
 
 **Dependencies**:
+
 - ws-3 (Notification Service provides messages)
 
 **Context from ProblemBrief**:
@@ -285,11 +308,13 @@ Link to relevant best practices:
 **Your Process**:
 
 1. **Load template**:
+
 ```bash
 cp .claude/templates/workstream-spec.template.md .claude/specs/active/realtime-notifications/ws-1.md
 ```
 
 2. **Fill frontmatter**:
+
 ```yaml
 ---
 id: ws-1
@@ -305,6 +330,7 @@ status: draft
 ```
 
 3. **Write Context**:
+
 ```markdown
 ## Context
 
@@ -312,6 +338,7 @@ Real-time notifications require WebSocket infrastructure for bidirectional commu
 ```
 
 4. **Define Requirements** (EARS format):
+
 ```markdown
 ## Requirements
 
@@ -326,6 +353,7 @@ Real-time notifications require WebSocket infrastructure for bidirectional commu
 ```
 
 5. **Create Sequence Diagram**:
+
 ```mermaid
 sequenceDiagram
   autonumber
@@ -342,12 +370,14 @@ sequenceDiagram
 ```
 
 6. **Define Contract**:
-```markdown
+
+````markdown
 ## Interfaces & Data Model
 
 ### Contract: contract-websocket-api
 
 **Connection Interface**:
+
 ```typescript
 interface WebSocketServer {
   // Client connection
@@ -360,7 +390,9 @@ interface WebSocketServer {
   disconnect(userId: string): void;
 }
 ```
-```
+````
+
+````
 
 7. **Break Down Tasks**:
 ```markdown
@@ -378,9 +410,10 @@ interface WebSocketServer {
 - [ ] Task 4: Implement message routing from NotificationService
   - Dependencies: Task 3, ws-3
   - Outcome: Messages routed to correct user connections
-```
+````
 
 8. **Deliver**:
+
 ```markdown
 ## WorkstreamSpec Complete ✅
 
@@ -391,6 +424,7 @@ interface WebSocketServer {
 ## Constraints
 
 ### DO:
+
 - Fill all required sections
 - Create at least one sequence diagram
 - Define atomic requirements
@@ -399,6 +433,7 @@ interface WebSocketServer {
 - Reference best practices
 
 ### DON'T:
+
 - Skip template sections
 - Write vague requirements ("make it work")
 - Implement code (you're spec-only)
@@ -409,6 +444,7 @@ interface WebSocketServer {
 ## Success Criteria
 
 Your spec is complete when:
+
 - All template sections filled
 - Requirements are atomic and testable (EARS format)
 - At least one sequence diagram present
@@ -417,11 +453,152 @@ Your spec is complete when:
 - Open questions documented
 - No blocking unknowns
 
+## Spec Deprecation Workflow
+
+When your new spec supersedes an existing spec, you MUST follow this deprecation workflow to maintain traceability.
+
+### Detecting Supersession
+
+A new spec supersedes an existing spec when:
+
+- It replaces the functionality described in the old spec
+- It represents a major revision requiring re-implementation
+- The user explicitly states this spec replaces an existing one
+- The new spec covers the same feature area with incompatible changes
+
+**Example triggers**:
+
+- "Replace the authentication system" → Supersedes existing auth specs
+- "Rewrite the notification feature" → Supersedes notification specs
+- "Version 2 of the API" → May supersede API specs
+
+### Deprecation Steps
+
+When supersession is detected, execute these steps in order:
+
+#### Step 1: Add Supersession Metadata to Old Spec
+
+Update the old spec's YAML frontmatter to mark it as superseded:
+
+```yaml
+---
+id: ws-old-feature
+title: Original Feature
+status: superseded
+superseded_by: ws-new-feature
+superseded_at: 2026-01-20T14:30:00Z
+supersession_reason: "Replaced by v2 implementation with new architecture"
+---
+```
+
+**Required fields to add**:
+
+- `status: superseded` - Mark as no longer active
+- `superseded_by: <new-spec-id>` - Reference to the new spec
+- `superseded_at: <ISO timestamp>` - When supersession occurred
+- `supersession_reason: "<reason>"` - Brief explanation
+
+#### Step 2: Register Supersession in Artifact Registry
+
+Update `.claude/registry/artifacts.json` to record the relationship:
+
+```json
+{
+  "spec_groups": [
+    {
+      "id": "sg-old-feature",
+      "status": "superseded",
+      "superseded_by": "sg-new-feature",
+      "updated_at": "2026-01-20T14:30:00Z"
+    },
+    {
+      "id": "sg-new-feature",
+      "status": "active",
+      "supersedes": ["sg-old-feature"],
+      "created_at": "2026-01-20T14:30:00Z"
+    }
+  ]
+}
+```
+
+**Registry updates**:
+
+- Old spec: Set `status: "superseded"`, add `superseded_by`
+- New spec: Add `supersedes` array with old spec ID(s)
+- Update `updated_at` timestamps
+
+#### Step 3: Move Old Spec to Archive
+
+Move the superseded spec from active to archive directory:
+
+```bash
+# For spec groups
+mv .claude/specs/groups/<old-spec-group-id> .claude/specs/archive/<old-spec-group-id>
+
+# For standalone specs (legacy)
+mv .claude/specs/active/<old-spec>.md .claude/specs/archive/<old-spec>.md
+```
+
+**Archive location**: `.claude/specs/archive/`
+
+**Important**: Preserve the complete directory structure when archiving spec groups.
+
+### Example Deprecation
+
+**Scenario**: Creating ws-auth-v2 that supersedes ws-auth-v1
+
+1. **Update old spec frontmatter** (`.claude/specs/groups/sg-auth-v1/spec.md`):
+
+   ```yaml
+   ---
+   id: ws-auth-v1
+   status: superseded
+   superseded_by: ws-auth-v2
+   superseded_at: 2026-01-20T14:30:00Z
+   supersession_reason: "Replaced by OAuth2-based authentication"
+   ---
+   ```
+
+2. **Update registry** (`.claude/registry/artifacts.json`):
+
+   ```json
+   {
+     "spec_groups": [
+       {
+         "id": "sg-auth-v1",
+         "status": "superseded",
+         "superseded_by": "sg-auth-v2"
+       },
+       {
+         "id": "sg-auth-v2",
+         "status": "active",
+         "supersedes": ["sg-auth-v1"]
+       }
+     ]
+   }
+   ```
+
+3. **Move to archive**:
+   ```bash
+   mv .claude/specs/groups/sg-auth-v1 .claude/specs/archive/sg-auth-v1
+   ```
+
+### Verification
+
+After deprecation, verify:
+
+- [ ] Old spec frontmatter has `status: superseded` and `superseded_by`
+- [ ] Registry shows old spec as superseded with reference to new spec
+- [ ] Registry shows new spec with `supersedes` array
+- [ ] Old spec moved to `.claude/specs/archive/`
+- [ ] New spec created in `.claude/specs/groups/` or `.claude/specs/active/`
+
 ## Handoff
 
 When done, your spec becomes the authoritative contract for implementation.
 
 Implementer subagent will:
+
 - Execute the task list
 - Conform to requirements exactly
 - Implement defined contracts

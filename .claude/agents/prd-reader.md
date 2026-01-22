@@ -4,6 +4,14 @@ description: Extracts requirements, constraints, and assumptions from PRD docume
 tools: Read, Write, Glob, mcp__google-docs-mcp__readGoogleDoc, mcp__google-docs-mcp__getDocumentInfo, mcp__google-docs-mcp__listDocumentTabs
 model: opus
 skills: prd
+hooks:
+  PostToolUse:
+    - matcher: "Edit|Write"
+      hooks:
+        - type: command
+          command: "node .claude/scripts/hook-wrapper.mjs '*.ts,*.tsx,*.js,*.jsx,*.json,*.md' 'npx prettier --write {{file}} 2>/dev/null'"
+        - type: command
+          command: "node .claude/scripts/hook-wrapper.mjs '*.json' 'node -e \"const f = process.argv[1]; if (!f.includes('\\''tsconfig'\\'')) JSON.parse(require('\\''fs'\\'').readFileSync(f))\" {{file}}'"
 ---
 
 # PRD Reader Agent
@@ -238,6 +246,38 @@ Some PRDs have redundant or overlapping requirements:
 - Modify the source PRD (read-only)
 - Assume context not provided
 
+### 8. Output Validation (Required)
+
+Before reporting completion, validate the created requirements.md file.
+
+**Run validation** (if spec group exists):
+```bash
+node .claude/scripts/spec-schema-validate.mjs .claude/specs/groups/<spec-group-id>/requirements.md
+```
+
+**Required elements checklist**:
+- [ ] YAML frontmatter with required fields: `spec_group`, `source`, `prd_version`, `last_updated`
+- [ ] `source` is `prd`
+- [ ] `## Source` section with PRD link and sync timestamp
+- [ ] `## Requirements` section with properly structured requirements:
+  - Each requirement has `### REQ-XXX:` header format
+  - Each requirement has `**Statement**:` with original text
+  - Each requirement has `**EARS Format**:` with WHEN/THEN structure
+  - Each requirement has `**Rationale**:`
+- [ ] `## Constraints` section (or noted as empty in source)
+- [ ] `## Assumptions` section (or noted as empty in source)
+- [ ] `## Success Criteria` section
+- [ ] `## Open Questions` section with checkbox format
+- [ ] `## Extraction Notes` section with:
+  - Total requirements extracted count
+  - Conversion confidence (High/Medium/Low)
+  - Items needing clarification list
+- [ ] REQ-XXX numbering is sequential (REQ-001, REQ-002, etc.)
+- [ ] No duplicate requirement IDs
+- [ ] Ambiguous items flagged with `[NEEDS CLARIFICATION]` or `[INTERPRETED]`
+
+If validation fails, fix issues before completing extraction.
+
 ## Output Quality Checklist
 
 Before completing:
@@ -248,6 +288,7 @@ Before completing:
 - [ ] Version detected and recorded
 - [ ] Extraction confidence noted
 - [ ] Ambiguous items flagged
+- [ ] Schema validation passed
 
 ## Error Handling
 

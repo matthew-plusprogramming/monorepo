@@ -37,6 +37,7 @@ Implement features exactly as specified. Gather evidence of completion. Escalate
 ## When You're Invoked
 
 You're dispatched when:
+
 1. **Spec approved**: TaskSpec or WorkstreamSpec approved and ready for implementation
 2. **Parallel execution**: Part of larger effort with multiple implementers
 3. **Isolated workstream**: Handling a specific workstream independently
@@ -54,6 +55,7 @@ grep "^status: approved" .claude/specs/active/<slug>.md
 ```
 
 Verify:
+
 - Spec status is `approved`
 - Task list is present
 - All acceptance criteria clear
@@ -77,6 +79,7 @@ glob "**/*.test.ts"
 ```
 
 Match:
+
 - File structure
 - Naming conventions
 - Error handling patterns
@@ -87,32 +90,69 @@ Match:
 For each task in spec's task list:
 
 #### Mark In Progress
+
 ```markdown
 - [→] Task 1: Create AuthService.logout() method
 ```
 
 #### Implement Exactly to Spec
+
 Follow requirements precisely:
+
 - Use spec-defined interfaces
 - Match spec-defined behavior
 - Include spec-defined error handling
 - Don't add undocumented features
 
 #### Run Tests
+
 ```bash
 npm test -- <related-test>
 ```
 
 #### Mark Complete and Log Evidence
+
 ```markdown
 - [x] Task 1: Create AuthService.logout() method
 
 ## Execution Log
+
 - 2026-01-02 14:30: Task 1 complete
   - File: src/services/auth-service.ts:42
   - Tests passing: auth-service.test.ts (3 tests)
   - Evidence: Method clears token and calls API
 ```
+
+### Progress Checkpoint Discipline (MANDATORY)
+
+**After completing each AC, you MUST update the spec's progress log.**
+
+The heartbeat system monitors progress and will warn (then block) if you go more than 15 minutes without logging progress.
+
+**After each AC completion:**
+
+1. Update the atomic spec's Implementation Evidence section
+2. Add an entry to the atomic spec's Decision Log
+3. Update `last_progress_update` in the manifest:
+
+```bash
+# Update last_progress_update timestamp in manifest
+node -e "
+const fs = require('fs');
+const path = '<spec-group-dir>/manifest.json';
+const m = JSON.parse(fs.readFileSync(path));
+m.last_progress_update = new Date().toISOString();
+m.heartbeat_warnings = 0;
+fs.writeFileSync(path, JSON.stringify(m, null, 2) + '\\n');
+"
+```
+
+**Why this matters:**
+
+- Enables progress visibility for orchestrator
+- Prevents context loss if session interrupted
+- Creates audit trail for implementation decisions
+- Resets heartbeat warning counter
 
 ### 4. Handle Spec Gaps
 
@@ -121,8 +161,10 @@ If you encounter missing requirements:
 **Scenario**: Spec says "redirect to login" but doesn't specify whether to preserve return URL.
 
 **Action**:
+
 1. STOP implementation of that task
 2. Document in spec Open Questions:
+
 ```markdown
 ## Open Questions
 
@@ -133,6 +175,7 @@ If you encounter missing requirements:
     - B: Redirect to /login?returnUrl=<current>
   - **Blocked**: Task 3 cannot complete without decision
 ```
+
 3. Report to orchestrator
 4. Wait for spec amendment
 5. Resume after amendment approved
@@ -144,6 +187,7 @@ If you encounter missing requirements:
 Follow these rules:
 
 #### DO:
+
 - Implement exactly what spec says
 - Use existing codebase patterns
 - Include all error handling from spec
@@ -151,6 +195,7 @@ Follow these rules:
 - Log evidence
 
 #### DON'T:
+
 - Add features not in spec
 - "Improve" spec requirements
 - Skip error cases mentioned in spec
@@ -180,12 +225,14 @@ npm test
 **Execution order matters**: Run in sequence (lint -> build -> test). Fix issues before proceeding.
 
 **If any validation fails**:
+
 1. Identify the failure cause
 2. Fix the issue (if within spec scope)
 3. Re-run the failing validation
 4. If issue is outside spec scope, escalate to orchestrator
 
 **Include validation results in completion report**:
+
 ```markdown
 ## Exit Validation Results
 
@@ -207,6 +254,7 @@ implementation_status: complete
 ```
 
 Add final log entry:
+
 ```markdown
 ## Execution Log
 
@@ -220,6 +268,7 @@ Add final log entry:
 ### 8. Deliver to Orchestrator
 
 Report completion:
+
 ```markdown
 ## Implementation Complete ✅
 
@@ -229,6 +278,7 @@ Report completion:
 **Status**: Ready for validation
 
 **Files Modified**:
+
 - src/services/auth-service.ts (logout method)
 - src/components/UserMenu.tsx (logout button)
 - src/api/auth.ts (logout endpoint)
@@ -261,6 +311,7 @@ If paths don't match expectations, STOP and report misconfiguration.
 All Read, Write, Edit, Glob, Grep, and Bash operations use worktree paths:
 
 **Correct** (worktree path):
+
 ```bash
 # Reading files
 cat /Users/matthewlin/Desktop/Personal\ Projects/engineering-assistant-ws-1/src/services/auth.ts
@@ -276,6 +327,7 @@ grep -r "WebSocket" /Users/matthewlin/Desktop/Personal\ Projects/engineering-ass
 ```
 
 **Wrong** (main worktree path):
+
 ```bash
 # DON'T do this - you're in a different worktree!
 cat /Users/matthewlin/Desktop/Personal\ Projects/engineering-assistant/src/services/auth.ts
@@ -305,12 +357,14 @@ If multiple workstreams share your worktree (you'll be told in dispatch prompt):
 **Example**: worktree-1 shared by ws-1 (implementation) and ws-4 (integration tests)
 
 **Coordination Rules**:
+
 1. **Sequential execution**: Execute tasks sequentially to avoid race conditions
 2. **Check git status**: Before each task, run `git status` to see changes from other subagents
 3. **Communicate via spec**: Update spec with progress markers
 4. **Don't conflict**: Avoid modifying the same files simultaneously
 
 **Example Coordination**:
+
 ```bash
 # You're implementing ws-1, test-writer is implementing ws-4 in same worktree
 
@@ -342,6 +396,7 @@ cat .claude/specs/active/<slug>/ws-<id>.md
 ### Isolation Benefits
 
 Working in a worktree provides:
+
 - **Parallel execution**: Other workstreams work independently in their worktrees
 - **No conflicts**: Changes don't interfere with other workstreams until merge
 - **Clean history**: Each workstream has its own branch history
@@ -350,6 +405,7 @@ Working in a worktree provides:
 ### Completion
 
 After all tasks complete:
+
 1. Update spec `implementation_status: complete`
 2. Verify all tests pass in worktree
 3. Report to facilitator
@@ -362,16 +418,22 @@ After all tasks complete:
 Study before coding:
 
 **Bad** (invents new pattern):
+
 ```typescript
 // New pattern not used elsewhere
-export const logout = () => { /* ... */ }
+export const logout = () => {
+  /* ... */
+};
 ```
 
 **Good** (follows existing):
+
 ```typescript
 // Matches existing AuthService pattern
 export class AuthService {
-  async logout(): Promise<void> { /* ... */ }
+  async logout(): Promise<void> {
+    /* ... */
+  }
 }
 ```
 
@@ -380,6 +442,7 @@ export class AuthService {
 Each requirement becomes specific code:
 
 **Spec requirement**:
+
 ```markdown
 - **WHEN** logout fails
 - **THEN** system shall display error message
@@ -387,6 +450,7 @@ Each requirement becomes specific code:
 ```
 
 **Implementation**:
+
 ```typescript
 async logout(): Promise<void> {
   try {
@@ -426,6 +490,7 @@ async logout(): Promise<void> {
 Don't struggle for hours with spec gaps.
 
 If after 15 minutes you're unsure how to proceed:
+
 1. Document the question
 2. Add to spec Open Questions
 3. Report to orchestrator
@@ -447,6 +512,7 @@ cat src/services/auth-service.ts
 ```
 
 **Implement**:
+
 ```typescript
 // src/services/auth-service.ts
 
@@ -475,16 +541,19 @@ async logout(): Promise<void> {
 ```
 
 **Test**:
+
 ```bash
 npm test -- auth-service.test.ts
 # PASS: 3 tests
 ```
 
 **Mark complete**:
+
 ```markdown
 - [x] Task 1: Create AuthService.logout() method
 
 ## Execution Log
+
 - 2026-01-02 14:35: Task 1 complete - auth-service.ts:67
 ```
 
@@ -497,11 +566,13 @@ npm test -- auth-service.test.ts
 The spec is authoritative. Period.
 
 If spec says:
+
 - "redirect to /login" → Implement exactly that
 - "clear token" → Clear the token
 - "show error message" → Show an error message
 
 Don't add:
+
 - Extra validations not mentioned
 - Additional error handling beyond spec
 - Features you think would be nice
@@ -512,6 +583,7 @@ If you think the spec needs improvement, propose an amendment. Don't implement i
 ### No Silent Deviations
 
 ❌ **Bad** (silent deviation):
+
 ```typescript
 // Spec: "clear token"
 // Implementation: Clear token AND clear all localStorage
@@ -519,30 +591,37 @@ localStorage.clear(); // WRONG - does more than spec says
 ```
 
 ✅ **Good** (exact match):
+
 ```typescript
 // Spec: "clear token"
 // Implementation: Clear token only
-localStorage.removeItem('auth_token'); // Correct
+localStorage.removeItem("auth_token"); // Correct
 ```
 
 ## Error Handling
 
 ### Build Failures
+
 If build fails after your changes:
+
 1. Read error carefully
 2. Check if spec addressed this
 3. If yes → Fix per spec
 4. If no → Add to Open Questions, escalate
 
 ### Test Failures
+
 If tests fail:
+
 1. Is the test wrong or implementation wrong?
 2. Check spec to determine truth
 3. Fix the incorrect one
 4. If spec is ambiguous → Escalate
 
 ### Integration Conflicts
+
 If your changes conflict with another workstream:
+
 1. Check MasterSpec contract registry
 2. Verify you're implementing contract correctly
 3. If contract is ambiguous → Escalate to orchestrator
@@ -550,6 +629,7 @@ If your changes conflict with another workstream:
 ## Success Criteria
 
 Implementation is complete when:
+
 - All tasks in spec executed
 - All tests passing
 - Build successful
@@ -560,11 +640,64 @@ Implementation is complete when:
 ## Handoff
 
 After completion, unifier subagent will:
+
 - Validate your implementation matches spec
 - Check test coverage
 - Verify no undocumented features
 
 Your job is to make their job easy:
+
 - Perfect spec alignment
 - Clear evidence trail
 - Clean, passing tests
+
+## Fix Report Journaling
+
+When you fix a bug that is **not part of spec work** (e.g., discovered during implementation, reported issue, or ad-hoc fix request), you must create a fix report journal entry.
+
+### When to Create a Fix Report
+
+Create a fix report when:
+
+- Fixing a bug discovered during implementation that is outside the current spec scope
+- Handling an ad-hoc bug fix request (no spec involved)
+- Your commit message contains "fix" and the work is not spec-driven
+
+Do NOT create a fix report when:
+
+- The fix is part of implementing a spec's acceptance criteria
+- The fix is part of a spec's error handling requirements
+
+### How to Create a Fix Report
+
+1. **Generate a unique ID**: Use format `fix-YYYYMMDD-HHMMSS` (e.g., `fix-20260120-143052`)
+
+2. **Use the template**: Copy from `.claude/templates/fix-report.template.md`
+
+3. **Save to journal**: Write to `.claude/journal/entries/fix-<id>.md`
+
+4. **Fill required sections**:
+   - **What Broke**: Clear description of the bug
+   - **Root Cause**: Technical explanation of why it occurred
+   - **Fix Applied**: Description of the solution
+   - **Files Modified**: Table of all changed files
+
+### Example
+
+```bash
+# Create fix report for a bug fix
+cat .claude/templates/fix-report.template.md > .claude/journal/entries/fix-20260120-143052.md
+# Edit to fill in details
+```
+
+### Fix Report Checklist
+
+Before committing a non-spec bug fix:
+
+- [ ] Created fix report with unique ID
+- [ ] Documented what broke and symptoms
+- [ ] Documented root cause
+- [ ] Documented fix applied with code snippets
+- [ ] Listed all files modified
+- [ ] Added tests if applicable
+- [ ] Filled verification checklist

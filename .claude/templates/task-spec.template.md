@@ -4,27 +4,38 @@ title: <Task Title>
 date: <YYYY-MM-DD>
 status: draft
 implementation_status: not_started
+
+# Supersession Metadata (optional - set when this spec is superseded)
+# status: superseded                        # Set to 'superseded' when replaced by newer spec
+# superseded_by: <spec-group-id>            # ID of the spec group that supersedes this one
+# supersession_date: <YYYY-MM-DD>           # Date when supersession occurred
+# supersession_reason: "<explanation>"      # Brief explanation of why spec was superseded
 ---
 
 # <Task Title>
 
 ## Context
+
 Brief background and motivation for this task.
 
 ## Goal
+
 Clear statement of what success looks like.
 
 ## Requirements (EARS Format)
+
 - **WHEN** <trigger condition>
 - **THEN** the system shall <required behavior>
 - **AND** <additional required behavior>
 
 ## Acceptance Criteria
+
 - AC1.1: <Testable criterion that can be verified>
 - AC1.2: <Testable criterion that can be verified>
 - AC2.1: <Testable criterion that can be verified>
 
 ## Design Notes
+
 Brief architecture notes, key design decisions, or approach.
 
 Optional sequence diagram for non-trivial flows:
@@ -39,11 +50,13 @@ sequenceDiagram
 ```
 
 ## Task List
+
 - [ ] Task 1: <Concrete outcome with clear completion criteria>
 - [ ] Task 2: <Concrete outcome with clear completion criteria>
 - [ ] Task 3: <Concrete outcome with clear completion criteria>
 
 ## Test Plan
+
 Map each acceptance criterion to specific test cases:
 
 - AC1.1 → `__tests__/<file>.test.ts`: "should <behavior>"
@@ -51,6 +64,7 @@ Map each acceptance criterion to specific test cases:
 - AC2.1 → `__tests__/<file>.test.ts`: "should <behavior>"
 
 ## Decision & Work Log
+
 - <YYYY-MM-DD>: <Decision or approval recorded here>
 - <YYYY-MM-DD>: Work started
 - <YYYY-MM-DD>: Implementation complete

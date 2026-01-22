@@ -52,7 +52,13 @@
     },
     "work_state": {
       "type": "string",
-      "enum": ["PLAN_READY", "IMPLEMENTING", "VERIFYING", "READY_TO_MERGE", "MERGED"],
+      "enum": [
+        "PLAN_READY",
+        "IMPLEMENTING",
+        "VERIFYING",
+        "READY_TO_MERGE",
+        "MERGED"
+      ],
       "description": "Where is the implementation? PLAN_READY=not started, IMPLEMENTING=in progress, VERIFYING=gates running, READY_TO_MERGE=all gates passed, MERGED=done"
     },
     "updated_by": {
@@ -116,8 +122,14 @@
         "unifier_passed": { "type": "boolean" },
         "code_review_passed": { "type": "boolean" },
         "security_review_passed": { "type": "boolean" },
-        "browser_tests_passed": { "type": ["boolean", "null"], "description": "null if not applicable" },
-        "docs_generated": { "type": ["boolean", "null"], "description": "null if not applicable" }
+        "browser_tests_passed": {
+          "type": ["boolean", "null"],
+          "description": "null if not applicable"
+        },
+        "docs_generated": {
+          "type": ["boolean", "null"],
+          "description": "null if not applicable"
+        }
       }
     },
     "decision_log": {
@@ -127,12 +139,84 @@
         "type": "object",
         "properties": {
           "timestamp": { "type": "string", "format": "date-time" },
-          "actor": { "type": "string", "enum": ["user", "agent"] },
+          "actor": {
+            "type": "string",
+            "enum": [
+              "user",
+              "agent",
+              "atomizer",
+              "implementer",
+              "unifier",
+              "enforcer",
+              "test-writer",
+              "refactorer",
+              "code-reviewer",
+              "security-reviewer",
+              "facilitator"
+            ]
+          },
           "action": { "type": "string" },
           "details": { "type": "string" }
         },
         "required": ["timestamp", "actor", "action"]
       }
+    },
+    "last_progress_update": {
+      "type": ["string", "null"],
+      "format": "date-time",
+      "description": "ISO timestamp of last progress update. Used by heartbeat system to detect stale work."
+    },
+    "heartbeat_warnings": {
+      "type": "integer",
+      "minimum": 0,
+      "default": 0,
+      "description": "Count of consecutive heartbeat warnings issued. Resets to 0 when progress is logged."
+    },
+    "session_ref": {
+      "type": ["object", "null"],
+      "description": "Cross-session persistence reference for recovery",
+      "properties": {
+        "session_id": {
+          "type": "string",
+          "description": "UUID of the session that last worked on this spec group"
+        },
+        "last_checkpoint": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp of last persisted checkpoint"
+        },
+        "last_atomic_spec": {
+          "type": "string",
+          "pattern": "^as-[0-9]{3}(-[a-z0-9-]+)?$",
+          "description": "ID of the last completed atomic spec"
+        },
+        "checkpoint_phase": {
+          "type": "string",
+          "enum": [
+            "pm_interview",
+            "spec_authoring",
+            "atomizing",
+            "enforcing",
+            "investigating",
+            "awaiting_approval",
+            "implementing",
+            "testing",
+            "verifying",
+            "reviewing",
+            "complete"
+          ],
+          "description": "Phase at last checkpoint"
+        },
+        "checkpoint_state": {
+          "type": "string",
+          "enum": ["clean", "in_progress", "interrupted"],
+          "description": "State at checkpoint: clean=between phases, in_progress=mid-work, interrupted=abnormal termination"
+        }
+      }
+    },
+    "last_session_id": {
+      "type": ["string", "null"],
+      "description": "UUID of the last session that modified this spec group"
     }
   }
 }

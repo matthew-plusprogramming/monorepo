@@ -1,0 +1,285 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Session",
+  "description": "Session state tracking for Claude Code orchestration, including active work, phase checkpoints, and subagent task tracking",
+  "type": "object",
+  "required": [
+    "version",
+    "updated_at",
+    "active_work",
+    "phase_checkpoint",
+    "subagent_tasks",
+    "history"
+  ],
+  "properties": {
+    "version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+      "description": "Semantic version of the session schema format"
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp of last session update"
+    },
+    "active_work": {
+      "type": ["object", "null"],
+      "description": "Currently active work context. Null when no work is in progress.",
+      "properties": {
+        "spec_group_id": {
+          "type": "string",
+          "pattern": "^sg-[a-z0-9-]+$",
+          "description": "Reference to the spec group being worked on (sg-<slug>)"
+        },
+        "workflow": {
+          "type": "string",
+          "enum": [
+            "oneoff-vibe",
+            "oneoff-spec",
+            "orchestrator",
+            "refactor",
+            "journal-only"
+          ],
+          "description": "The workflow type determined by /route"
+        },
+        "current_phase": {
+          "type": "string",
+          "enum": [
+            "pm_interview",
+            "spec_authoring",
+            "atomizing",
+            "enforcing",
+            "investigating",
+            "awaiting_approval",
+            "implementing",
+            "testing",
+            "verifying",
+            "reviewing",
+            "complete"
+          ],
+          "description": "Current phase in the workflow lifecycle"
+        },
+        "objective": {
+          "type": "string",
+          "description": "Human-readable description of the work objective"
+        }
+      },
+      "required": ["spec_group_id", "workflow", "current_phase", "objective"]
+    },
+    "phase_checkpoint": {
+      "type": ["object", "null"],
+      "description": "Detailed checkpoint state for the current phase. Null when no work is active.",
+      "properties": {
+        "phase": {
+          "type": "string",
+          "enum": [
+            "pm_interview",
+            "spec_authoring",
+            "atomizing",
+            "enforcing",
+            "investigating",
+            "awaiting_approval",
+            "implementing",
+            "testing",
+            "verifying",
+            "reviewing",
+            "complete"
+          ],
+          "description": "Phase this checkpoint represents (should match active_work.current_phase)"
+        },
+        "atomic_specs_completed": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^as-[0-9]{3}(-[a-z0-9-]+)?$",
+            "description": "Atomic spec ID (as-NNN or as-NNN-slug)"
+          },
+          "description": "List of atomic spec IDs that have been completed"
+        },
+        "atomic_specs_pending": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^as-[0-9]{3}(-[a-z0-9-]+)?$",
+            "description": "Atomic spec ID (as-NNN or as-NNN-slug)"
+          },
+          "description": "List of atomic spec IDs still pending implementation"
+        },
+        "next_actions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Ordered list of next concrete actions to take"
+        }
+      },
+      "required": ["phase"]
+    },
+    "subagent_tasks": {
+      "type": "object",
+      "description": "Tracking of subagent task dispatches and completions",
+      "properties": {
+        "in_flight": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/subagent_task"
+          },
+          "description": "Currently executing subagent tasks"
+        },
+        "completed_this_session": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/subagent_task"
+          },
+          "description": "Subagent tasks completed in this session"
+        }
+      },
+      "required": ["in_flight", "completed_this_session"]
+    },
+    "history": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/history_entry"
+      },
+      "description": "Historical log of session state changes and significant events"
+    }
+  },
+  "$defs": {
+    "subagent_task": {
+      "type": "object",
+      "description": "A subagent task dispatch record",
+      "properties": {
+        "task_id": {
+          "type": "string",
+          "description": "Unique identifier for this task dispatch"
+        },
+        "subagent_type": {
+          "type": "string",
+          "enum": [
+            "explore",
+            "product-manager",
+            "spec-author",
+            "atomizer",
+            "atomicity-enforcer",
+            "interface-investigator",
+            "implementer",
+            "test-writer",
+            "unifier",
+            "code-reviewer",
+            "security-reviewer",
+            "documenter",
+            "refactorer",
+            "facilitator",
+            "browser-tester",
+            "prd-author",
+            "prd-reader",
+            "prd-writer"
+          ],
+          "description": "Type of subagent dispatched"
+        },
+        "description": {
+          "type": "string",
+          "description": "Human-readable description of the task"
+        },
+        "dispatched_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "ISO 8601 timestamp when task was dispatched"
+        },
+        "completed_at": {
+          "type": ["string", "null"],
+          "format": "date-time",
+          "description": "ISO 8601 timestamp when task completed. Null if in flight."
+        },
+        "status": {
+          "type": "string",
+          "enum": ["in_flight", "completed", "failed", "cancelled"],
+          "description": "Current status of the task"
+        },
+        "result_summary": {
+          "type": ["string", "null"],
+          "description": "Brief summary of task result. Null if not yet completed."
+        },
+        "spec_group_id": {
+          "type": ["string", "null"],
+          "pattern": "^sg-[a-z0-9-]+$",
+          "description": "Associated spec group if applicable"
+        },
+        "atomic_spec_id": {
+          "type": ["string", "null"],
+          "pattern": "^as-[0-9]{3}(-[a-z0-9-]+)?$",
+          "description": "Associated atomic spec if applicable"
+        }
+      },
+      "required": [
+        "task_id",
+        "subagent_type",
+        "description",
+        "dispatched_at",
+        "status"
+      ]
+    },
+    "history_entry": {
+      "type": "object",
+      "description": "A historical record of a session event",
+      "properties": {
+        "timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "description": "ISO 8601 timestamp of the event"
+        },
+        "event_type": {
+          "type": "string",
+          "enum": [
+            "session_start",
+            "session_resume",
+            "work_started",
+            "phase_transition",
+            "subagent_dispatched",
+            "subagent_completed",
+            "checkpoint_saved",
+            "work_completed",
+            "work_abandoned",
+            "error_occurred"
+          ],
+          "description": "Type of event that occurred"
+        },
+        "details": {
+          "type": "object",
+          "description": "Event-specific details",
+          "properties": {
+            "from_phase": {
+              "type": "string",
+              "description": "Previous phase (for phase_transition events)"
+            },
+            "to_phase": {
+              "type": "string",
+              "description": "New phase (for phase_transition events)"
+            },
+            "spec_group_id": {
+              "type": "string",
+              "description": "Associated spec group ID"
+            },
+            "task_id": {
+              "type": "string",
+              "description": "Associated task ID (for subagent events)"
+            },
+            "subagent_type": {
+              "type": "string",
+              "description": "Subagent type (for subagent events)"
+            },
+            "error_message": {
+              "type": "string",
+              "description": "Error message (for error_occurred events)"
+            },
+            "message": {
+              "type": "string",
+              "description": "Human-readable description of the event"
+            }
+          }
+        }
+      },
+      "required": ["timestamp", "event_type"]
+    }
+  }
+}

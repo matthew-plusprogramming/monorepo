@@ -2,6 +2,17 @@
   "hooks": {
     "PostToolUse": [
       {
+        "matcher": "Read",
+        "hooks": [
+          {
+            "_source": "metaclaude",
+            "_id": "superseded-artifact-warn",
+            "type": "command",
+            "command": "node .claude/scripts/hook-wrapper.mjs '.claude/specs/**/*.md' 'node .claude/scripts/superseded-artifact-warn.mjs {{file}}'"
+          }
+        ]
+      },
+      {
         "matcher": "Edit|Write",
         "hooks": [
           {
@@ -71,6 +82,24 @@
             "command": "node .claude/scripts/hook-wrapper.mjs '.claude/specs/**/*.md' 'node .claude/scripts/spec-validate.mjs {{file}}'"
           },
           {
+            "_source": "metaclaude",
+            "_id": "registry-artifact-validate",
+            "type": "command",
+            "command": "node .claude/scripts/hook-wrapper.mjs '.claude/registry/artifacts.json' 'node .claude/scripts/registry-artifact-validate.mjs {{file}}'"
+          },
+          {
+            "_source": "metaclaude",
+            "_id": "progress-heartbeat-check",
+            "type": "command",
+            "command": "node .claude/scripts/hook-wrapper.mjs '.claude/specs/**' 'node .claude/scripts/progress-heartbeat-check.mjs {{file}}'"
+          },
+          {
+            "_source": "metaclaude",
+            "_id": "session-state-validate",
+            "type": "command",
+            "command": "node .claude/scripts/session-validate.mjs"
+          },
+          {
             "type": "command",
             "command": "npx prettier --write $CLAUDE_FILE_PATHS 2>/dev/null || true"
           }
@@ -85,6 +114,12 @@
             "_id": "session-log",
             "type": "command",
             "command": "echo \"Session ended at $(date)\" >> .claude/context/session.log 2>/dev/null || true"
+          },
+          {
+            "_source": "metaclaude",
+            "_id": "session-state-finalize",
+            "type": "command",
+            "command": "node -e \"const fs=require('fs');const p='.claude/context/session.json';if(fs.existsSync(p)){const s=JSON.parse(fs.readFileSync(p));if(s.active_work){s.phase_checkpoint.checkpoint_state='interrupted';s.updated_at=new Date().toISOString();fs.writeFileSync(p,JSON.stringify(s,null,2))}}\" 2>/dev/null || true"
           },
           {
             "type": "command",

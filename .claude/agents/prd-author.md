@@ -403,11 +403,50 @@ Recommendations:
 - Write without confirming document destination
 - Leave manifest unupdated after write
 
+### 17. Output Validation (Required)
+
+Before reporting completion, validate the PRD structure.
+
+**Required elements checklist** (from prd.template.md):
+- [ ] YAML frontmatter with required fields: `id`, `title`, `version`, `state`, `author`, `date`, `last_updated`
+- [ ] `id` follows pattern `prd-<slug>`
+- [ ] `version` follows pattern `v1.0`, `v1.1`, etc.
+- [ ] `state` is one of: `draft`, `reviewed`, `approved`
+- [ ] All 12 numbered sections present:
+  1. `## 1. Problem Statement`
+  2. `## 2. Product Intent`
+  3. `## 3. Requirements` (with Functional and Non-Functional subsections)
+  4. `## 4. Constraints` (Technical, Business, Regulatory subsections)
+  5. `## 5. Assumptions` (with impact analysis table)
+  6. `## 6. Tradeoffs` (with decision table)
+  7. `## 7. User Experience` (Target Users, User Flows, UX Requirements)
+  8. `## 8. Scope` (In Scope, Out of Scope, Future Considerations)
+  9. `## 9. Risks & Mitigations` (with risk table)
+  10. `## 10. Success Criteria` (Metrics and Acceptance Criteria)
+  11. `## 11. Rollout & Monitoring`
+  12. `## 12. Open Questions` (with status table)
+- [ ] `## Version History` table present and initialized
+- [ ] `## Linked Artifacts` section present
+- [ ] `## Approval` table present
+- [ ] Requirements have ID format (R1, R2, NF1, NF2, etc.)
+- [ ] Requirements have priority (High/Med/Low)
+- [ ] Assumptions have confidence level and validation method
+- [ ] No placeholder text remaining (e.g., `<Requirement text>`, `<name>`)
+
+**Template validation command**:
+```bash
+node .claude/scripts/template-validate.mjs .claude/templates/prd.template.md
+```
+
+If the PRD is written locally before pushing to Google Docs, also validate the local copy structure.
+
+If validation fails, fix issues before completing. Do not deliver PRDs with missing required sections.
+
 ## Quality Checklist
 
 Before completing, verify:
 
-- [ ] All template sections present
+- [ ] All template sections present (validated above)
 - [ ] Every requirement has EARS format
 - [ ] Every requirement has priority
 - [ ] Every assumption has impact analysis

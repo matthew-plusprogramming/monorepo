@@ -35,6 +35,30 @@ If prerequisites not met → STOP and resolve before implementing.
 
 ## Implementation Process
 
+### Step 0: Load Session Context
+
+Check for existing session state to enable resuming mid-implementation:
+
+```bash
+# Check session checkpoint
+cat .claude/context/session.json | jq '.phase_checkpoint'
+```
+
+If `atomic_specs_pending` has values, use those as the implementation queue instead of starting fresh. This enables cross-session recovery if implementation was interrupted.
+
+```json
+{
+  "phase_checkpoint": {
+    "phase": "implementing",
+    "atomic_specs_pending": ["as-003", "as-004"],
+    "atomic_specs_complete": ["as-001", "as-002"],
+    "last_completed": "as-002"
+  }
+}
+```
+
+If no checkpoint exists or `phase` is not `implementing`, proceed with full atomic spec list from Step 2.
+
 ### Step 1: Load and Verify Spec Group
 
 ```
@@ -45,6 +69,7 @@ List: .claude/specs/groups/<spec-group-id>/atomic/*.md
 ```
 
 Verify in manifest.json:
+
 - `review_state` is `APPROVED`
 - `atomic_specs.enforcement_status` is `passing`
 - No blocking open questions
@@ -64,6 +89,7 @@ Each atomic spec is independently implementable. Execute in order (as-001, as-00
 ### Step 3: Understand the Codebase
 
 Before making changes, study existing patterns:
+
 - File structure and naming conventions
 - Error handling patterns
 - Testing approaches
@@ -75,20 +101,30 @@ For each atomic spec:
 #### 4a. Mark Atomic Spec as In Progress
 
 Update atomic spec frontmatter:
+
 ```yaml
 status: implementing
 ```
 
 Update manifest.json:
+
 ```json
 {
   "work_state": "IMPLEMENTING"
 }
 ```
 
+Update session checkpoint to track implementation phase:
+
+```bash
+# Update session checkpoint
+node .claude/scripts/session-checkpoint.mjs transition-phase implementing
+```
+
 #### 4b. Read Atomic Spec
 
 From the atomic spec file, extract:
+
 - Description (single behavior to implement)
 - Acceptance criteria
 - Test strategy
@@ -97,6 +133,7 @@ From the atomic spec file, extract:
 #### 4c. Implement the Atomic Spec
 
 Follow spec requirements exactly:
+
 - Use existing patterns from codebase
 - Maintain naming conventions
 - Include error handling as specified
@@ -111,23 +148,26 @@ npm test -- <related-test>
 #### 4e. Fill Implementation Evidence
 
 Update the atomic spec's Implementation Evidence section:
+
 ```markdown
 ## Implementation Evidence
 
-| File | Line | Description |
-|------|------|-------------|
-| src/services/auth-service.ts | 67 | logout() method clears token |
-| src/components/UserMenu.tsx | 42 | Logout button component |
+| File                         | Line | Description                  |
+| ---------------------------- | ---- | ---------------------------- |
+| src/services/auth-service.ts | 67   | logout() method clears token |
+| src/components/UserMenu.tsx  | 42   | Logout button component      |
 ```
 
 #### 4f. Mark Atomic Spec Complete
 
 Update atomic spec frontmatter:
+
 ```yaml
 status: implemented
 ```
 
 Add to atomic spec Decision Log:
+
 ```markdown
 ## Decision Log
 
@@ -135,16 +175,30 @@ Add to atomic spec Decision Log:
 - `2026-01-14T14:30:00Z`: Implementation complete - auth-service.ts:67
 ```
 
+#### 4g. Update Session Checkpoint
+
+After each atomic spec completion, update session state for cross-session recovery:
+
+```bash
+# Mark atomic spec complete in session
+node .claude/scripts/session-checkpoint.mjs complete-atomic-spec <atomic_spec_id>
+```
+
+This ensures that if the session ends unexpectedly, the next session can resume from the correct atomic spec.
+
 ### Step 5: Handle Spec Deviations
 
 If you discover during implementation:
 
 #### Scenario A: Missing Requirement
+
 Spec doesn't cover a necessary case.
 
 **Action**:
+
 1. STOP implementation
 2. Document in spec's Open Questions:
+
 ```markdown
 ## Open Questions
 
@@ -152,30 +206,37 @@ Spec doesn't cover a necessary case.
   - Discovered during implementation
   - Need user decision before proceeding
 ```
+
 3. Ask user for guidance
 4. Update spec with decision
 5. Resume implementation
 
 #### Scenario B: Invalid Assumption
+
 Spec assumes something that's not true in the codebase.
 
 **Action**:
+
 1. STOP implementation
 2. Document in spec's Decision & Work Log:
+
 ```markdown
 - 2026-01-02: **Issue** - Spec assumes AuthService.logout() exists, but it doesn't
 - **Proposed amendment**: Add AuthService.logout() method to task list
 - **Status**: Awaiting approval
 ```
+
 3. Propose spec amendment
 4. Get user approval
 5. Update spec
 6. Resume implementation
 
 #### Scenario C: Better Approach Discovered
+
 Found a more efficient or clearer way to achieve the requirement.
 
 **Action**:
+
 1. Evaluate: Does this change the **behavior** or just the **implementation**?
 2. If behavior unchanged → Proceed (implementation detail)
 3. If behavior changes → Propose spec amendment with rationale
@@ -199,6 +260,7 @@ npm run build
 ```
 
 Ensure:
+
 - All tests passing
 - No lint errors
 - Build succeeds
@@ -222,8 +284,22 @@ Update manifest.json with implementation complete:
       "action": "implementation_complete",
       "details": "All 4 atomic specs implemented, tests passing"
     }
-  ]
+  ],
+  "session_ref": {
+    "session_id": "<current-session-uuid>",
+    "last_checkpoint": "<ISO-timestamp>",
+    "last_atomic_spec": "<last-completed-as-id>",
+    "checkpoint_phase": "implementing",
+    "checkpoint_state": "clean"
+  }
 }
+```
+
+Transition to verifying phase for cross-session tracking:
+
+```bash
+# Transition to verifying phase
+node .claude/scripts/session-checkpoint.mjs transition-phase verifying
 ```
 
 ### Step 8: Report Completion
@@ -235,6 +311,7 @@ Update manifest.json with implementation complete:
 **Atomic Specs**: 4/4 complete
 
 **Evidence**:
+
 - as-001: src/components/UserMenu.tsx:42
 - as-002: src/services/auth-service.ts:67
 - as-003: src/router/auth-router.ts:23
@@ -244,6 +321,7 @@ Update manifest.json with implementation complete:
 **Build**: Successful
 
 **Next Steps**:
+
 1. Run `/test <spec-group-id>` to ensure test coverage (if not done in parallel)
 2. Run `/unify <spec-group-id>` to validate convergence
 ```
@@ -253,11 +331,13 @@ Update manifest.json with implementation complete:
 For larger tasks, implementation and test writing can run in parallel.
 
 ### When to Parallelize
+
 - Multiple independent tasks in task list
 - Clear acceptance criteria for each task
 - Low coupling between tasks
 
 ### How to Parallelize
+
 Use Task tool to dispatch subagents:
 
 ```javascript
@@ -274,8 +354,8 @@ Task({
   Do NOT implement tests - test-writer will handle that.
 
   Follow spec requirements exactly. Escalate if spec gaps discovered.`,
-  subagent_type: "implementer"
-})
+  subagent_type: "implementer",
+});
 
 // Dispatch test-writer subagent in parallel
 Task({
@@ -285,11 +365,12 @@ Task({
   Map each AC to specific test cases.
   Follow AAA pattern.
   Tests will initially fail until implementation complete.`,
-  subagent_type: "test-writer"
-})
+  subagent_type: "test-writer",
+});
 ```
 
 Main agent retains integration responsibility:
+
 - Collect outputs from both subagents
 - Ensure tests pass with implementation
 - Run unifier to validate alignment
@@ -297,6 +378,7 @@ Main agent retains integration responsibility:
 ## Spec Conformance Rules
 
 ### DO:
+
 - Follow spec requirements exactly
 - Use existing codebase patterns
 - Ask user when spec is unclear
@@ -305,6 +387,7 @@ Main agent retains integration responsibility:
 - Run tests after each task
 
 ### DON'T:
+
 - Add features not in spec
 - Deviate from specified behavior
 - Assume unstated requirements
@@ -315,9 +398,11 @@ Main agent retains integration responsibility:
 ## Integration with Other Skills
 
 After implementation:
+
 - Use `/unify` to validate spec-impl-test alignment
 
 **After unify passes, the review chain is**:
+
 1. `/code-review` - Code quality review (always)
 2. `/security` - Security review (always)
 3. `/browser-test` - UI validation (if UI changes)
@@ -327,30 +412,35 @@ After implementation:
 ## Error Handling
 
 ### Build Failures
+
 ```bash
 npm run build
 # Error: ...
 ```
 
 **Action**:
+
 1. Read error message carefully
 2. Check if spec anticipated this (Security section, Edge Cases)
 3. If spec covers it → Implement as specified
 4. If spec doesn't cover it → Add to Open Questions, get guidance
 
 ### Test Failures
+
 ```bash
 npm test
 # FAIL: expected X, got Y
 ```
 
 **Action**:
+
 1. Determine if test or implementation is wrong
 2. If test is wrong → Fix test to match spec
 3. If implementation is wrong → Fix implementation to match spec
 4. If spec is wrong → Propose spec amendment
 
 ### Merge Conflicts
+
 If working in parallel with other workstreams:
 
 ```bash
@@ -359,6 +449,7 @@ git pull origin main
 ```
 
 **Action**:
+
 1. Check MasterSpec contract registry
 2. Verify your implementation matches contract interface
 3. Resolve conflict favoring contract definition
@@ -371,6 +462,7 @@ git pull origin main
 **Spec**: TaskSpec for logout button (AC1.1: Clear token)
 
 **Implementation**:
+
 ```typescript
 // src/services/auth.service.ts
 
@@ -392,6 +484,7 @@ async logout(): Promise<void> {
 ```
 
 **Evidence**:
+
 - Task marked complete in spec
 - Tests passing: `auth-service.test.ts` (2 tests)
 - AC1.1 verified: Token cleared from localStorage
@@ -399,10 +492,12 @@ async logout(): Promise<void> {
 ### Example 2: Discovering Spec Gap
 
 **During implementation**, discovered:
+
 - Spec says "redirect to login page"
 - But doesn't specify: Should we preserve the return URL for after re-login?
 
 **Action**:
+
 ```markdown
 ## Open Questions
 
@@ -422,24 +517,25 @@ async logout(): Promise<void> {
 **Scenario**: MasterSpec with 3 workstreams
 
 **Main agent**:
+
 ```javascript
 // Dispatch implementers for each workstream
 const ws1 = Task({
   description: "Implement WebSocket Server (ws-1)",
   prompt: "Implement workstream ws-1 from master spec...",
-  subagent_type: "implementer"
+  subagent_type: "implementer",
 });
 
 const ws2 = Task({
   description: "Implement Frontend Client (ws-2)",
   prompt: "Implement workstream ws-2 from master spec...",
-  subagent_type: "implementer"
+  subagent_type: "implementer",
 });
 
 const ws3 = Task({
   description: "Implement Notification Service (ws-3)",
   prompt: "Implement workstream ws-3 from master spec...",
-  subagent_type: "implementer"
+  subagent_type: "implementer",
 });
 
 // Wait for all to complete
