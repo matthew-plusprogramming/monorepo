@@ -24,7 +24,7 @@
     "@ui/components": "*",
     "@tanstack/react-query": "^5.90.16",
     "framer-motion": "^12.25.0",
-    "next": "^16.1.1",
+    "next": "^16.1.5",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
     "react-hook-form": "^7.70.0",
