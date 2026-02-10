@@ -114,13 +114,13 @@ async function main() {
   try {
     const stdinContent = await readStdin();
     if (!stdinContent.trim()) {
-      // No stdin, exit silently (graceful degradation)
-      process.exit(0);
+      // Missing input is an error
+      process.exit(1);
     }
     inputData = JSON.parse(stdinContent);
   } catch (e) {
-    // Invalid JSON or no input, exit silently
-    process.exit(0);
+    // Malformed input is an error
+    process.exit(1);
   }
 
   // Extract file path from tool_input
@@ -159,22 +159,34 @@ async function main() {
   });
 
   child.on('close', (code) => {
-    // Output results (limited to avoid flooding)
+    // Output results to stderr (limited to avoid flooding)
     const output = (stdout + stderr).trim();
     if (output) {
-      const lines = output.split('\n').slice(0, 20);
-      console.log(lines.join('\n'));
-      if (output.split('\n').length > 20) {
-        console.log('... (output truncated)');
+      const lines = output.split('\n');
+      const maxLines = 50;
+      const headLines = 10;
+      const tailLines = 40;
+
+      if (lines.length <= maxLines) {
+        // Show everything if under the limit
+        console.error(lines.join('\n'));
+      } else {
+        // Show head + tail with indicator of skipped lines
+        const head = lines.slice(0, headLines);
+        const tail = lines.slice(-tailLines);
+        const skipped = lines.length - headLines - tailLines;
+        console.error(head.join('\n'));
+        console.error(`\n... (${skipped} lines omitted) ...\n`);
+        console.error(tail.join('\n'));
       }
     }
-    // Always exit 0 for graceful degradation (hooks shouldn't block)
-    process.exit(0);
+    // Exit with code 2 if the command failed, 0 otherwise
+    process.exit(code !== 0 ? 2 : 0);
   });
 
   child.on('error', (err) => {
-    // Silently handle errors (graceful degradation)
-    process.exit(0);
+    console.error(`Hook command error: ${err.message}`);
+    process.exit(2);
   });
 }
 

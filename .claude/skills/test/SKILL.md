@@ -35,29 +35,32 @@ If prerequisites not met → STOP and resolve before writing tests.
 ## Testing Philosophy
 
 ### Tests Verify Atomic Spec, Not Implementation
+
 - Tests should validate **what** the system does (behavior)
 - Not **how** it does it (implementation details)
 - If implementation changes but behavior stays the same, tests should still pass
 
 ### One Test Per Acceptance Criterion (Minimum)
+
 - Each AC in each atomic spec gets at least one test
 - Complex ACs may need multiple tests
 - Test name references atomic spec ID and AC for traceability
 
 ### AAA Pattern (Arrange-Act-Assert)
+
 Always structure tests with comments:
 
 ```typescript
-it("should clear token on logout (as-002 AC1)", () => {
+it('should clear token on logout (as-002 AC1)', () => {
   // Arrange
   const authService = new AuthService();
-  authService.setToken("test-token");
+  authService.setToken('test-token');
 
   // Act
   authService.logout();
 
   // Assert
-  expect(localStorage.getItem("auth_token")).toBeNull();
+  expect(localStorage.getItem('auth_token')).toBeNull();
 });
 ```
 
@@ -74,6 +77,7 @@ ls .claude/specs/groups/<spec-group-id>/atomic/
 ```
 
 Verify:
+
 - `review_state` is `APPROVED`
 - `atomic_specs.enforcement_status` is `passing`
 - No blocking open questions
@@ -88,6 +92,7 @@ cat .claude/specs/groups/<spec-group-id>/atomic/as-001-logout-button-ui.md
 ```
 
 Extract from each atomic spec:
+
 - Acceptance criteria (AC1, AC2, etc.)
 - Test strategy section
 - Edge cases
@@ -98,13 +103,13 @@ Create test mapping:
 ```markdown
 ## Test Plan
 
-| Atomic Spec | AC | Test File | Test Case |
-|-------------|-----|-----------|-----------|
-| as-001 | AC1 | user-menu.test.ts | "should render logout button" |
-| as-002 | AC1 | auth-service.test.ts | "should clear token on logout" |
-| as-003 | AC1 | auth-router.test.ts | "should redirect to /login" |
-| as-004 | AC1 | auth-service.test.ts | "should show error on failure" |
-| as-004 | AC2 | auth-service.test.ts | "should keep user logged in on error" |
+| Atomic Spec | AC  | Test File            | Test Case                             |
+| ----------- | --- | -------------------- | ------------------------------------- |
+| as-001      | AC1 | user-menu.test.ts    | "should render logout button"         |
+| as-002      | AC1 | auth-service.test.ts | "should clear token on logout"        |
+| as-003      | AC1 | auth-router.test.ts  | "should redirect to /login"           |
+| as-004      | AC1 | auth-service.test.ts | "should show error on failure"        |
+| as-004      | AC2 | auth-service.test.ts | "should keep user logged in on error" |
 ```
 
 ### Step 3: Identify Test Locations
@@ -120,6 +125,7 @@ grep -r "describe.*Auth" --include="*.test.ts"
 ```
 
 Follow project conventions:
+
 - Unit tests: `src/**/__tests__/*.test.ts` or co-located `*.test.ts`
 - Integration tests: `tests/integration/*.test.ts`
 - E2E tests: `tests/e2e/*.test.ts`
@@ -134,6 +140,7 @@ cat src/services/__tests__/auth.test.ts
 ```
 
 Note:
+
 - Test framework (Jest, Vitest, Mocha)
 - Assertion library (expect, assert)
 - Mocking approach (jest.mock, vi.mock)
@@ -146,18 +153,18 @@ For each atomic spec, create tests for all ACs:
 
 ```typescript
 // Reference atomic spec in describe block
-describe("AuthService - as-002: Token Clearing", () => {
-  describe("logout", () => {
-    it("should clear authentication token (as-002 AC1)", () => {
+describe('AuthService - as-002: Token Clearing', () => {
+  describe('logout', () => {
+    it('should clear authentication token (as-002 AC1)', () => {
       // Arrange - Set up test state
       const authService = new AuthService();
-      localStorage.setItem("auth_token", "test-token");
+      localStorage.setItem('auth_token', 'test-token');
 
       // Act - Execute the behavior
       await authService.logout();
 
       // Assert - Verify the outcome
-      expect(localStorage.getItem("auth_token")).toBeNull();
+      expect(localStorage.getItem('auth_token')).toBeNull();
     });
   });
 });
@@ -168,13 +175,14 @@ describe("AuthService - as-002: Token Clearing", () => {
 Prefer in-memory fakes over deep mocking:
 
 **Builder pattern**:
+
 ```typescript
 // test/builders/user.builder.ts
 export class UserBuilder {
   private user: User = {
-    id: "test-id",
-    name: "Test User",
-    email: "test@example.com"
+    id: 'test-id',
+    name: 'Test User',
+    email: 'test@example.com',
   };
 
   withId(id: string): this {
@@ -193,12 +201,11 @@ export class UserBuilder {
 }
 
 // In tests
-const user = new UserBuilder()
-  .withEmail("custom@example.com")
-  .build();
+const user = new UserBuilder().withEmail('custom@example.com').build();
 ```
 
 **Fake implementation**:
+
 ```typescript
 // test/fakes/fake-auth-api.ts
 export class FakeAuthApi implements AuthApi {
@@ -206,7 +213,7 @@ export class FakeAuthApi implements AuthApi {
 
   async logout(): Promise<void> {
     if (this.shouldFail) {
-      throw new Error("Network error");
+      throw new Error('Network error');
     }
     // Success - no-op for fake
   }
@@ -226,10 +233,11 @@ const authService = new AuthService(fakeApi);
 Make tests deterministic by controlling:
 
 **Time**:
+
 ```typescript
 beforeEach(() => {
   jest.useFakeTimers();
-  jest.setSystemTime(new Date("2026-01-14T12:00:00Z"));
+  jest.setSystemTime(new Date('2026-01-14T12:00:00Z'));
 });
 
 afterEach(() => {
@@ -238,16 +246,18 @@ afterEach(() => {
 ```
 
 **Randomness**:
+
 ```typescript
-const mockRandom = jest.spyOn(Math, "random").mockReturnValue(0.5);
+const mockRandom = jest.spyOn(Math, 'random').mockReturnValue(0.5);
 ```
 
 **Network**:
+
 ```typescript
 // Use fakes or mock API responses
 const mockFetch = jest.fn().mockResolvedValue({
   ok: true,
-  json: async () => ({ success: true })
+  json: async () => ({ success: true }),
 });
 global.fetch = mockFetch;
 ```
@@ -266,6 +276,7 @@ npm test -- auth-service.test.ts
 ```
 
 Verify:
+
 - All tests passing
 - Coverage meets project standards (typically 80%+)
 - No flaky tests (run multiple times to confirm)
@@ -277,10 +288,10 @@ For each atomic spec, update its Test Evidence section:
 ```markdown
 ## Test Evidence
 
-| AC | Test File | Line | Test Name | Status |
-|----|-----------|------|-----------|--------|
-| AC1 | src/services/__tests__/auth-service.test.ts | 24 | "should clear token on logout" | ✅ Pass |
-| AC2 | src/services/__tests__/auth-service.test.ts | 35 | "should invalidate server session" | ✅ Pass |
+| AC  | Test File                                   | Line | Test Name                          | Status  |
+| --- | ------------------------------------------- | ---- | ---------------------------------- | ------- |
+| AC1 | src/services/**tests**/auth-service.test.ts | 24   | "should clear token on logout"     | ✅ Pass |
+| AC2 | src/services/**tests**/auth-service.test.ts | 35   | "should invalidate server session" | ✅ Pass |
 ```
 
 Also add to the atomic spec's Decision Log:
@@ -299,8 +310,7 @@ Update manifest.json with test completion:
 ```json
 {
   "convergence": {
-    "all_tests_written": true,
-    "test_coverage": "94%"
+    "all_tests_passing": true
   },
   "decision_log": [
     // ... existing entries ...
@@ -323,6 +333,7 @@ Update manifest.json with test completion:
 **Atomic Specs**: 4/4 tested
 
 **Test Coverage by Atomic Spec**:
+
 - as-001: 2 tests (AC1, AC2)
 - as-002: 2 tests (AC1, AC2)
 - as-003: 2 tests (AC1, AC2)
@@ -333,29 +344,32 @@ Update manifest.json with test completion:
 **Line Coverage**: 94%
 
 **Test Files**:
-- src/services/__tests__/auth-service.test.ts (4 tests)
-- src/components/__tests__/user-menu.test.ts (2 tests)
-- src/router/__tests__/auth-router.test.ts (2 tests)
+
+- src/services/**tests**/auth-service.test.ts (4 tests)
+- src/components/**tests**/user-menu.test.ts (2 tests)
+- src/router/**tests**/auth-router.test.ts (2 tests)
 
 **Next Steps**:
+
 1. Run `/unify <spec-group-id>` to validate convergence
 ```
 
 ## Testing Guidelines
 
 ### Unit Test Guidelines
+
 Test individual units in isolation:
 
 ```typescript
 // Good - Unit test for AuthService
-it("should clear token on logout (as-002 AC1)", () => {
+it('should clear token on logout (as-002 AC1)', () => {
   const authService = new AuthService(fakeApi);
   authService.logout();
   expect(authService.getToken()).toBeNull();
 });
 
 // Bad - Integration test disguised as unit test
-it("should clear token on logout", () => {
+it('should clear token on logout', () => {
   const authService = new AuthService(); // Uses real API
   authService.logout(); // Makes real network call
   expect(authService.getToken()).toBeNull(); // Flaky!
@@ -363,11 +377,12 @@ it("should clear token on logout", () => {
 ```
 
 ### Integration Test Guidelines
+
 Test interactions between units:
 
 ```typescript
 // Integration test for full logout flow
-it("should complete full logout flow (as-001 to as-004)", async () => {
+it('should complete full logout flow (as-001 to as-004)', async () => {
   // Arrange - Real dependencies
   const api = new AuthApi(testConfig);
   const authService = new AuthService(api);
@@ -377,17 +392,18 @@ it("should complete full logout flow (as-001 to as-004)", async () => {
   await authService.logout();
 
   // Assert
-  expect(router.currentRoute).toBe("/login");
+  expect(router.currentRoute).toBe('/login');
   expect(authService.isAuthenticated()).toBe(false);
 });
 ```
 
 ### Edge Case Testing
+
 Cover edge cases from atomic spec:
 
 ```typescript
-describe("edge cases", () => {
-  it("should handle logout when already logged out (as-002 edge)", () => {
+describe('edge cases', () => {
+  it('should handle logout when already logged out (as-002 edge)', () => {
     // Arrange
     const authService = new AuthService();
     // User not logged in
@@ -396,7 +412,7 @@ describe("edge cases", () => {
     expect(() => authService.logout()).not.toThrow();
   });
 
-  it("should handle concurrent logout calls (as-002 edge)", async () => {
+  it('should handle concurrent logout calls (as-002 edge)', async () => {
     // Arrange
     const authService = new AuthService();
 
@@ -404,7 +420,7 @@ describe("edge cases", () => {
     await Promise.all([
       authService.logout(),
       authService.logout(),
-      authService.logout()
+      authService.logout(),
     ]);
 
     // Assert - Only one API call made
@@ -414,23 +430,24 @@ describe("edge cases", () => {
 ```
 
 ### Error Path Testing
+
 Test all error conditions per atomic spec:
 
 ```typescript
 // Tests for as-004: Error Handling
-describe("error handling (as-004)", () => {
-  it("should handle network error (as-004 AC1)", async () => {
+describe('error handling (as-004)', () => {
+  it('should handle network error (as-004 AC1)', async () => {
     // Arrange
-    mockApi.post.mockRejectedValue({ code: "NETWORK_ERROR" });
+    mockApi.post.mockRejectedValue({ code: 'NETWORK_ERROR' });
 
     // Act & Assert
-    await expect(authService.logout()).rejects.toThrow("Logout failed");
+    await expect(authService.logout()).rejects.toThrow('Logout failed');
   });
 
-  it("should keep user logged in on error (as-004 AC2)", async () => {
+  it('should keep user logged in on error (as-004 AC2)', async () => {
     // Arrange
-    authService.setToken("test-token");
-    mockApi.post.mockRejectedValue({ code: "NETWORK_ERROR" });
+    authService.setToken('test-token');
+    mockApi.post.mockRejectedValue({ code: 'NETWORK_ERROR' });
 
     // Act
     try {
@@ -440,7 +457,7 @@ describe("error handling (as-004)", () => {
     }
 
     // Assert - Token still present
-    expect(authService.getToken()).toBe("test-token");
+    expect(authService.getToken()).toBe('test-token');
   });
 });
 ```
@@ -450,6 +467,7 @@ describe("error handling (as-004)", () => {
 Tests can be written in parallel with implementation.
 
 ### Approach: TDD-Style
+
 1. Write tests first (they will fail)
 2. Run implementer in parallel
 3. Tests pass as implementation completes
@@ -457,69 +475,78 @@ Tests can be written in parallel with implementation.
 ```javascript
 // Main agent dispatches both
 Task({
-  description: "Write tests for logout",
+  description: 'Write tests for logout',
   prompt: `Write tests for all atomic specs in spec group sg-logout-button.
 
   Location: .claude/specs/groups/sg-logout-button/atomic/
 
   Do NOT implement - test-writer only writes tests.`,
-  subagent_type: "test-writer"
+  subagent_type: 'test-writer',
 });
 
 Task({
-  description: "Implement logout",
+  description: 'Implement logout',
   prompt: `Implement all atomic specs in spec group sg-logout-button.
 
   Location: .claude/specs/groups/sg-logout-button/atomic/
 
   Do NOT write tests - implementer only writes implementation.`,
-  subagent_type: "implementer"
+  subagent_type: 'implementer',
 });
 ```
 
 ### Synchronization Point
+
 After both complete:
+
 - Run tests to verify implementation
 - Use `/unify` to validate alignment
 
 ## Test Anti-Patterns to Avoid
 
 ### Don't Test Implementation Details
+
 ```typescript
 // Bad - Tests implementation
-it("should call localStorage.removeItem", () => {
+it('should call localStorage.removeItem', () => {
   authService.logout();
-  expect(localStorage.removeItem).toHaveBeenCalledWith("auth_token");
+  expect(localStorage.removeItem).toHaveBeenCalledWith('auth_token');
 });
 
 // Good - Tests behavior
-it("should clear token on logout (as-002 AC1)", () => {
+it('should clear token on logout (as-002 AC1)', () => {
   authService.logout();
   expect(authService.getToken()).toBeNull();
 });
 ```
 
 ### Don't Use Deep Mocking
+
 ```typescript
 // Bad - Deep mock
-jest.mock("./auth-service", () => ({
+jest.mock('./auth-service', () => ({
   AuthService: jest.fn().mockImplementation(() => ({
     logout: jest.fn(),
-    getToken: jest.fn()
-  }))
+    getToken: jest.fn(),
+  })),
 }));
 
 // Good - Fake implementation
 class FakeAuthService implements AuthService {
-  logout() { /* simple fake behavior */ }
-  getToken() { return null; }
+  logout() {
+    /* simple fake behavior */
+  }
+  getToken() {
+    return null;
+  }
 }
 ```
 
 ### Don't Write Brittle Tests
+
 ```typescript
 // Bad - Brittle (breaks if message changes)
-expect(error.message).toBe("Logout failed. Please try again.");
+expect(error.message).toBe('Logout failed. Please try again.');
 
 // Good - Flexible (tests intent)
 expect(error.message).toMatch(/logout failed/i);
@@ -528,11 +555,13 @@ expect(error.message).toMatch(/logout failed/i);
 ## Integration with Other Skills
 
 After writing tests:
+
 - Use `/implement` (if not run in parallel) to implement features
 - Use `/unify` to validate spec-test-implementation alignment
 - Tests become evidence in convergence validation
 
 After unify passes, the review chain is:
+
 1. `/code-review` - Code quality review
 2. `/security` - Security review
 3. `/browser-test` - UI validation (if UI changes)
@@ -544,25 +573,28 @@ After unify passes, the review chain is:
 ### Example 1: Unit Test for Atomic Spec as-002
 
 **Atomic spec as-002-token-clearing.md**:
+
 ```markdown
 ## Acceptance Criteria
+
 - AC1: When logout called, clear authentication token from localStorage
 - AC2: When logout called, invalidate server session
 ```
 
 **Test**:
+
 ```typescript
 // src/services/__tests__/auth-service.test.ts
-import { AuthService } from "../auth-service";
-import { FakeAuthApi } from "../../test/fakes/fake-auth-api";
+import { AuthService } from '../auth-service';
+import { FakeAuthApi } from '../../test/fakes/fake-auth-api';
 
-describe("AuthService - as-002: Token Clearing", () => {
-  describe("logout", () => {
-    it("should clear authentication token (as-002 AC1)", async () => {
+describe('AuthService - as-002: Token Clearing', () => {
+  describe('logout', () => {
+    it('should clear authentication token (as-002 AC1)', async () => {
       // Arrange
       const fakeApi = new FakeAuthApi();
       const authService = new AuthService(fakeApi);
-      authService.setToken("test-token-123");
+      authService.setToken('test-token-123');
 
       // Act
       await authService.logout();
@@ -571,7 +603,7 @@ describe("AuthService - as-002: Token Clearing", () => {
       expect(authService.getToken()).toBeNull();
     });
 
-    it("should invalidate server session (as-002 AC2)", async () => {
+    it('should invalidate server session (as-002 AC2)', async () => {
       // Arrange
       const fakeApi = new FakeAuthApi();
       const authService = new AuthService(fakeApi);
@@ -589,6 +621,7 @@ describe("AuthService - as-002: Token Clearing", () => {
 ### Example 2: Integration Test for Multiple Atomic Specs
 
 **Test**:
+
 ```typescript
 // tests/integration/logout-flow.test.ts
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
@@ -615,16 +648,19 @@ describe("Logout flow integration (as-001 to as-003)", () => {
 ### Example 3: Error Path Test
 
 **Atomic spec as-004-error-handling.md**:
+
 ```markdown
 ## Acceptance Criteria
+
 - AC1: When logout API call fails, display error message
 - AC2: When logout fails, user remains logged in (token NOT cleared)
 ```
 
 **Test**:
+
 ```typescript
-describe("error handling (as-004)", () => {
-  it("should display error message on network failure (as-004 AC1)", async () => {
+describe('error handling (as-004)', () => {
+  it('should display error message on network failure (as-004 AC1)', async () => {
     // Arrange
     const fakeApi = new FakeAuthApi();
     fakeApi.setFailure(true);
@@ -634,12 +670,12 @@ describe("error handling (as-004)", () => {
     await expect(authService.logout()).rejects.toThrow(/logout failed/i);
   });
 
-  it("should keep user logged in on error (as-004 AC2)", async () => {
+  it('should keep user logged in on error (as-004 AC2)', async () => {
     // Arrange
     const fakeApi = new FakeAuthApi();
     fakeApi.setFailure(true);
     const authService = new AuthService(fakeApi);
-    authService.setToken("test-token");
+    authService.setToken('test-token');
 
     // Act
     try {
@@ -649,7 +685,7 @@ describe("error handling (as-004)", () => {
     }
 
     // Assert - Token still present
-    expect(authService.getToken()).toBe("test-token");
+    expect(authService.getToken()).toBe('test-token');
   });
 });
 ```

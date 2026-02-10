@@ -10,7 +10,7 @@ status: draft
 
 ## Overview
 
-**PRD Reference**: [<PRD Title>](<link-to-prd>)
+**PRD Reference**: [<PRD Title>](link-to-prd)
 **PRD Version**: v<version>
 **Last Updated**: <YYYY-MM-DD>
 
@@ -27,16 +27,18 @@ This checklist validates critical user paths defined in the PRD using browser-le
 **Description**: <What this critical path validates>
 
 **Preconditions**:
+
 - <Required state before testing>
 - <User role/permissions required>
 
-| Step | Action | Expected Result | Status |
-|------|--------|-----------------|--------|
-| 1 | <User action> | <Expected outcome> | ☐ |
-| 2 | <User action> | <Expected outcome> | ☐ |
-| 3 | <User action> | <Expected outcome> | ☐ |
+| Step | Action        | Expected Result    | Status |
+| ---- | ------------- | ------------------ | ------ |
+| 1    | <User action> | <Expected outcome> | ☐      |
+| 2    | <User action> | <Expected outcome> | ☐      |
+| 3    | <User action> | <Expected outcome> | ☐      |
 
 **Postconditions**:
+
 - <Expected system state after completion>
 
 ---
@@ -46,51 +48,53 @@ This checklist validates critical user paths defined in the PRD using browser-le
 **Description**: <What this critical path validates>
 
 **Preconditions**:
+
 - <Required state before testing>
 
-| Step | Action | Expected Result | Status |
-|------|--------|-----------------|--------|
-| 1 | <User action> | <Expected outcome> | ☐ |
-| 2 | <User action> | <Expected outcome> | ☐ |
+| Step | Action        | Expected Result    | Status |
+| ---- | ------------- | ------------------ | ------ |
+| 1    | <User action> | <Expected outcome> | ☐      |
+| 2    | <User action> | <Expected outcome> | ☐      |
 
 **Postconditions**:
+
 - <Expected system state after completion>
 
 ---
 
 ## Edge Cases & Error Scenarios
 
-| Scenario | Trigger | Expected Behavior | Status |
-|----------|---------|-------------------|--------|
-| <Error scenario> | <How to trigger> | <Expected error handling> | ☐ |
-| <Edge case> | <How to trigger> | <Expected behavior> | ☐ |
+| Scenario         | Trigger          | Expected Behavior         | Status |
+| ---------------- | ---------------- | ------------------------- | ------ |
+| <Error scenario> | <How to trigger> | <Expected error handling> | ☐      |
+| <Edge case>      | <How to trigger> | <Expected behavior>       | ☐      |
 
 ---
 
 ## Environment Requirements
 
-| Requirement | Value |
-|-------------|-------|
-| Browser(s) | <Chrome, Firefox, Safari, etc.> |
-| Viewport | <Desktop, Mobile, Tablet> |
-| Test Data | <Required fixtures or seed data> |
-| Auth State | <Logged in/out, specific user> |
+| Requirement | Value                            |
+| ----------- | -------------------------------- |
+| Browser(s)  | <Chrome, Firefox, Safari, etc.>  |
+| Viewport    | <Desktop, Mobile, Tablet>        |
+| Test Data   | <Required fixtures or seed data> |
+| Auth State  | <Logged in/out, specific user>   |
 
 ---
 
 ## Traceability
 
 | Critical Path | PRD Requirement | Spec Reference |
-|---------------|-----------------|----------------|
-| CP1 | REQ-<id> | as-<spec-id> |
-| CP2 | REQ-<id> | as-<spec-id> |
+| ------------- | --------------- | -------------- |
+| CP1           | REQ-<id>        | as-<spec-id>   |
+| CP2           | REQ-<id>        | as-<spec-id>   |
 
 ---
 
 ## Execution Log
 
-| Date | Executor | Result | Notes |
-|------|----------|--------|-------|
+| Date         | Executor      | Result    | Notes          |
+| ------------ | ------------- | --------- | -------------- |
 | <YYYY-MM-DD> | <Agent/Human> | PASS/FAIL | <Issues found> |
 
 ---
@@ -100,8 +104,8 @@ This checklist validates critical user paths defined in the PRD using browser-le
 _Document any failures discovered during QA execution._
 
 | Date | Critical Path | Failure Description | Issue Created | PRD Feedback |
-|------|---------------|---------------------|---------------|--------------|
-| | | | | |
+| ---- | ------------- | ------------------- | ------------- | ------------ |
+|      |               |                     |               |              |
 
 ---
 

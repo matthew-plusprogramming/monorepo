@@ -343,8 +343,8 @@ Use Task tool to dispatch subagents:
 ```javascript
 // Dispatch implementer subagent
 Task({
-  description: "Implement logout functionality",
-  prompt: `Implement tasks 1-3 from TaskSpec at .claude/specs/active/logout-button.md
+  description: 'Implement logout functionality',
+  prompt: `Implement tasks 1-3 from TaskSpec at .claude/specs/groups/sg-logout-button/spec.md
 
   Focus on:
   - Adding logout button component
@@ -354,18 +354,18 @@ Task({
   Do NOT implement tests - test-writer will handle that.
 
   Follow spec requirements exactly. Escalate if spec gaps discovered.`,
-  subagent_type: "implementer",
+  subagent_type: 'implementer',
 });
 
 // Dispatch test-writer subagent in parallel
 Task({
-  description: "Write tests for logout functionality",
-  prompt: `Write tests for acceptance criteria AC1.1-AC2.3 from TaskSpec at .claude/specs/active/logout-button.md
+  description: 'Write tests for logout functionality',
+  prompt: `Write tests for acceptance criteria AC1.1-AC2.3 from TaskSpec at .claude/specs/groups/sg-logout-button/spec.md
 
   Map each AC to specific test cases.
   Follow AAA pattern.
   Tests will initially fail until implementation complete.`,
-  subagent_type: "test-writer",
+  subagent_type: 'test-writer',
 });
 ```
 
@@ -521,21 +521,21 @@ async logout(): Promise<void> {
 ```javascript
 // Dispatch implementers for each workstream
 const ws1 = Task({
-  description: "Implement WebSocket Server (ws-1)",
-  prompt: "Implement workstream ws-1 from master spec...",
-  subagent_type: "implementer",
+  description: 'Implement WebSocket Server (ws-1)',
+  prompt: 'Implement workstream ws-1 from master spec...',
+  subagent_type: 'implementer',
 });
 
 const ws2 = Task({
-  description: "Implement Frontend Client (ws-2)",
-  prompt: "Implement workstream ws-2 from master spec...",
-  subagent_type: "implementer",
+  description: 'Implement Frontend Client (ws-2)',
+  prompt: 'Implement workstream ws-2 from master spec...',
+  subagent_type: 'implementer',
 });
 
 const ws3 = Task({
-  description: "Implement Notification Service (ws-3)",
-  prompt: "Implement workstream ws-3 from master spec...",
-  subagent_type: "implementer",
+  description: 'Implement Notification Service (ws-3)',
+  prompt: 'Implement workstream ws-3 from master spec...',
+  subagent_type: 'implementer',
 });
 
 // Wait for all to complete

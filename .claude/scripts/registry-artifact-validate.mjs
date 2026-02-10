@@ -296,13 +296,13 @@ function main() {
   const args = process.argv.slice(2);
   const filePath = args[0] ? resolve(args[0]) : DEFAULT_REGISTRY_PATH;
 
-  console.log(`Validating: ${basename(filePath)}`);
+  console.error(`Validating: ${basename(filePath)}`);
 
   const { errors, warnings } = validateRegistry(filePath);
 
   // Print warnings
   for (const warning of warnings) {
-    console.warn(`Warning: ${warning}`);
+    console.error(`Warning: ${warning}`);
   }
 
   // Print errors
@@ -311,7 +311,7 @@ function main() {
   }
 
   if (errors.length === 0) {
-    console.log(`Registry ${basename(filePath)} is valid.`);
+    console.error(`Registry ${basename(filePath)} is valid.`);
   }
 
   if (errors.length > 0) {

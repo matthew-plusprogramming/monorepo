@@ -383,7 +383,7 @@ function validateSpecFile(filePath) {
     return { errors, warnings };
   }
 
-  console.log(`Validating as ${specType}...`);
+  console.error(`Validating as ${specType}...`);
 
   // For markdown files, only validate frontmatter fields
   const frontmatterFields = FRONTMATTER_FIELDS[specType];
@@ -401,9 +401,9 @@ function main() {
   const args = process.argv.slice(2);
 
   if (args.length === 0) {
-    console.log('Usage: spec-schema-validate.mjs <spec-file>');
-    console.log('No file provided, nothing to validate.');
-    process.exit(0);
+    console.error('Usage: spec-schema-validate.mjs <spec-file>');
+    console.error('Error: No file provided.');
+    process.exit(1);
   }
 
   const filePath = resolve(args[0]);
@@ -411,7 +411,7 @@ function main() {
 
   // Print warnings
   for (const warning of warnings) {
-    console.warn(`Warning: ${warning}`);
+    console.error(`Warning: ${warning}`);
   }
 
   // Print errors
@@ -424,7 +424,7 @@ function main() {
     process.exit(1);
   }
 
-  console.log(`Validation passed for ${basename(filePath)}.`);
+  console.error(`Validation passed for ${basename(filePath)}.`);
   process.exit(0);
 }
 

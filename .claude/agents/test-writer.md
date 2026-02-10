@@ -6,7 +6,7 @@ model: opus
 skills: test
 hooks:
   PostToolUse:
-    - matcher: "Edit|Write"
+    - matcher: 'Edit|Write'
       hooks:
         - type: command
           command: "node .claude/scripts/hook-wrapper.mjs '*.ts,*.tsx,*.js,*.jsx,*.json,*.md' 'npx prettier --write {{file}} 2>/dev/null'"
@@ -17,9 +17,9 @@ hooks:
   Stop:
     - hooks:
         - type: command
-          command: "npm run lint 2>&1 | head -30 || true"
+          command: 'npm run lint 2>&1 | head -30 || true'
         - type: command
-          command: "npm test 2>&1 | head -30 || true"
+          command: 'npm test 2>&1 | head -30 || true'
 ---
 
 # Test Writer Subagent
@@ -46,7 +46,7 @@ You're dispatched when:
 
 ```bash
 # Load spec
-cat .claude/specs/active/<slug>.md
+cat .claude/specs/groups/<spec-group-id>/spec.md
 ```
 
 Extract:
@@ -96,12 +96,12 @@ Match:
 Always use Arrange-Act-Assert with comments:
 
 ```typescript
-describe("AuthService", () => {
-  describe("logout (AC1.1)", () => {
-    it("should clear authentication token", async () => {
+describe('AuthService', () => {
+  describe('logout (AC1.1)', () => {
+    it('should clear authentication token', async () => {
       // Arrange - Set up test state
       const authService = new AuthService(fakeApi);
-      authService.setToken("test-token-123");
+      authService.setToken('test-token-123');
 
       // Act - Execute the behavior
       await authService.logout();
@@ -124,7 +124,7 @@ class FakeAuthApi implements AuthApi {
   private shouldFail = false;
 
   async logout(): Promise<void> {
-    if (this.shouldFail) throw new Error("Network error");
+    if (this.shouldFail) throw new Error('Network error');
   }
 
   setFailure(fail: boolean) {
@@ -140,7 +140,7 @@ const authService = new AuthService(fakeApi);
 **Avoid** (deep mock):
 
 ```typescript
-jest.mock("./auth-api", () => ({
+jest.mock('./auth-api', () => ({
   AuthApi: jest.fn(() => ({
     logout: jest.fn(),
   })),
@@ -156,7 +156,7 @@ Control external boundaries:
 ```typescript
 beforeEach(() => {
   jest.useFakeTimers();
-  jest.setSystemTime(new Date("2026-01-02T12:00:00Z"));
+  jest.setSystemTime(new Date('2026-01-02T12:00:00Z'));
 });
 
 afterEach(() => {
@@ -167,7 +167,7 @@ afterEach(() => {
 **Randomness**:
 
 ```typescript
-jest.spyOn(Math, "random").mockReturnValue(0.5);
+jest.spyOn(Math, 'random').mockReturnValue(0.5);
 ```
 
 **Network**:
@@ -221,24 +221,24 @@ fs.writeFileSync(path, JSON.stringify(m, null, 2) + '\\n');
 **Example**:
 
 ```typescript
-describe("AuthService logout", () => {
+describe('AuthService logout', () => {
   // AC1.1: Happy path
-  it("should clear token on successful logout", async () => {
+  it('should clear token on successful logout', async () => {
     // ...
   });
 
   // AC2.1: Error path
-  it("should show error on network failure", async () => {
+  it('should show error on network failure', async () => {
     // ...
   });
 
   // Edge case: Concurrent calls
-  it("should handle concurrent logout calls", async () => {
+  it('should handle concurrent logout calls', async () => {
     // ...
   });
 
   // Edge case: Already logged out
-  it("should handle logout when not logged in", () => {
+  it('should handle logout when not logged in', () => {
     // ...
   });
 });
@@ -315,7 +315,7 @@ Document in spec:
 ```markdown
 ## Tests Complete ✅
 
-**Spec**: .claude/specs/active/<slug>.md
+**Spec**: .claude/specs/groups/<spec-group-id>/spec.md
 **Tests Written**: 12
 **AC Coverage**: 100% (4/4)
 **Line Coverage**: 94%
@@ -329,6 +329,27 @@ Document in spec:
 - tests/integration/logout-flow.test.ts (3 tests)
 
 **Next**: Ready for unifier validation
+```
+
+### Journal Status
+
+| Field            | Value                                             |
+| ---------------- | ------------------------------------------------- |
+| Journal Required | Yes / No                                          |
+| Journal Created  | Yes / No / N/A                                    |
+| Journal Path     | `.claude/journal/entries/<id>.md` or N/A          |
+| Reason           | <Brief explanation if journal was/wasn't created> |
+
+**When to set journal_required to Yes**:
+
+- When fixing bugs outside spec scope (commit contains "fix" without spec context)
+- When fixing test infrastructure issues not part of spec-driven test writing
+- When fixing flaky or broken tests discovered during test writing
+
+If a journal entry was created, mark it in the session:
+
+```bash
+node .claude/scripts/session-checkpoint.mjs journal-created .claude/journal/entries/<journal-id>.md
 ```
 
 ## Worktree Awareness
@@ -441,7 +462,7 @@ The spec is accessible from the worktree at the same relative path:
 
 ```bash
 # Load spec
-cat .claude/specs/active/<slug>/ws-<id>.md
+cat .claude/specs/groups/<spec-group-id>/spec.md
 
 # The .claude/ directory is shared across all worktrees
 ```
@@ -471,17 +492,17 @@ After all tests complete:
 ❌ **Bad** (tests implementation):
 
 ```typescript
-it("should call localStorage.removeItem", () => {
+it('should call localStorage.removeItem', () => {
   authService.logout();
-  expect(localStorage.removeItem).toHaveBeenCalledWith("auth_token");
+  expect(localStorage.removeItem).toHaveBeenCalledWith('auth_token');
 });
 ```
 
 ✅ **Good** (tests behavior):
 
 ```typescript
-it("should clear token on logout (AC1.1)", () => {
-  authService.setToken("test-token");
+it('should clear token on logout (AC1.1)', () => {
+  authService.setToken('test-token');
   authService.logout();
   expect(authService.getToken()).toBeNull();
 });
@@ -494,25 +515,25 @@ Focus each test on one behavior:
 ❌ **Bad** (multiple assertions):
 
 ```typescript
-it("should logout", () => {
+it('should logout', () => {
   authService.logout();
   expect(authService.getToken()).toBeNull(); // AC1.1
-  expect(router.currentRoute).toBe("/login"); // AC1.2
-  expect(toastService.message).toBe("Logged out"); // AC1.3
+  expect(router.currentRoute).toBe('/login'); // AC1.2
+  expect(toastService.message).toBe('Logged out'); // AC1.3
 });
 ```
 
 ✅ **Good** (focused tests):
 
 ```typescript
-it("should clear token (AC1.1)", () => {
+it('should clear token (AC1.1)', () => {
   authService.logout();
   expect(authService.getToken()).toBeNull();
 });
 
-it("should redirect to login (AC1.2)", () => {
+it('should redirect to login (AC1.2)', () => {
   authService.logout();
-  expect(router.currentRoute).toBe("/login");
+  expect(router.currentRoute).toBe('/login');
 });
 ```
 
@@ -522,9 +543,9 @@ it("should redirect to login (AC1.2)", () => {
 // test/builders/user.builder.ts
 export class UserBuilder {
   private user: User = {
-    id: "test-id",
-    name: "Test User",
-    email: "test@example.com",
+    id: 'test-id',
+    name: 'Test User',
+    email: 'test@example.com',
   };
 
   withEmail(email: string): this {
@@ -538,7 +559,7 @@ export class UserBuilder {
 }
 
 // In tests
-const user = new UserBuilder().withEmail("custom@example.com").build();
+const user = new UserBuilder().withEmail('custom@example.com').build();
 ```
 
 ### Reference ACs in Test Names
@@ -581,10 +602,10 @@ touch src/services/__tests__/auth-service.test.ts
 
 ```typescript
 // src/services/__tests__/auth-service.test.ts
-import { AuthService } from "../auth-service";
-import { FakeAuthApi } from "../../test/fakes/fake-auth-api";
+import { AuthService } from '../auth-service';
+import { FakeAuthApi } from '../../test/fakes/fake-auth-api';
 
-describe("AuthService", () => {
+describe('AuthService', () => {
   let authService: AuthService;
   let fakeApi: FakeAuthApi;
 
@@ -593,10 +614,10 @@ describe("AuthService", () => {
     authService = new AuthService(fakeApi);
   });
 
-  describe("logout", () => {
-    it("should clear authentication token (AC1.1)", async () => {
+  describe('logout', () => {
+    it('should clear authentication token (AC1.1)', async () => {
       // Arrange
-      authService.setToken("test-token-123");
+      authService.setToken('test-token-123');
 
       // Act
       await authService.logout();
@@ -605,19 +626,19 @@ describe("AuthService", () => {
       expect(authService.getToken()).toBeNull();
     });
 
-    it("should show error on network failure (AC2.1)", async () => {
+    it('should show error on network failure (AC2.1)', async () => {
       // Arrange
       fakeApi.setFailure(true);
 
       // Act & Assert
       await expect(authService.logout()).rejects.toThrow(
-        "Logout failed. Please try again.",
+        'Logout failed. Please try again.',
       );
     });
 
-    it("should keep user logged in on error (AC2.2)", async () => {
+    it('should keep user logged in on error (AC2.2)', async () => {
       // Arrange
-      authService.setToken("test-token");
+      authService.setToken('test-token');
       fakeApi.setFailure(true);
 
       // Act
@@ -628,7 +649,7 @@ describe("AuthService", () => {
       }
 
       // Assert - Token still present
-      expect(authService.getToken()).toBe("test-token");
+      expect(authService.getToken()).toBe('test-token');
     });
   });
 });

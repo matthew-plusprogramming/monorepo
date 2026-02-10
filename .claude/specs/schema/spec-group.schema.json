@@ -14,33 +14,53 @@
       "type": "string",
       "description": "Human-readable title for the spec group"
     },
+    "description": {
+      "type": "string"
+    },
     "prd": {
       "type": "object",
-      "description": "Link to external PRD (null if local-only)",
+      "description": "Link to PRD document",
       "properties": {
         "source": {
           "type": "string",
-          "enum": ["google-docs", "notion", "local"],
-          "description": "Where the PRD lives"
+          "enum": ["local-file", "git-repo", "google-docs", "notion", "local"],
+          "description": "Where the PRD lives. local-file is the preferred option for in-repo PRDs at .claude/prds/."
         },
         "document_id": {
           "type": "string",
-          "description": "External document ID (for google-docs/notion)"
+          "description": "External document ID (for google-docs/notion) or unique identifier within source system"
         },
         "version": {
           "type": "string",
-          "pattern": "^v[0-9]+$",
-          "description": "PRD version this spec group is tied to (v1, v2, etc.)"
+          "pattern": "^[0-9]+(\\.[0-9]+)*$",
+          "description": "PRD version this spec group is tied to (1, 1.0, 2.0, etc.)"
         },
         "last_sync": {
           "type": "string",
           "format": "date-time",
-          "description": "Last time requirements were synced from PRD"
+          "description": "Last time requirements were synced from PRD source"
         },
         "url": {
           "type": "string",
           "format": "uri",
-          "description": "Direct URL to the PRD document"
+          "description": "Direct URL to the PRD document or repository"
+        },
+        "repo_url": {
+          "type": "string",
+          "description": "URL of the git repository (for git-repo source). Example: git@mac-mini:prds.git"
+        },
+        "branch": {
+          "type": "string",
+          "default": "main",
+          "description": "Git branch name (for git-repo source). Defaults to main."
+        },
+        "file_path": {
+          "type": "string",
+          "description": "Path to the PRD file. For local-file source, use .claude/prds/<slug>/prd.md. For git-repo source, use the path within the repository."
+        },
+        "tag": {
+          "type": "string",
+          "description": "Git tag representing the current PRD version (for git-repo source). Example: prd-project-x-v1.2.0"
         }
       },
       "required": ["source"]
@@ -115,6 +135,7 @@
     "convergence": {
       "type": "object",
       "description": "Convergence gate status",
+      "additionalProperties": false,
       "properties": {
         "spec_complete": { "type": "boolean" },
         "all_acs_implemented": { "type": "boolean" },
@@ -152,7 +173,8 @@
               "refactorer",
               "code-reviewer",
               "security-reviewer",
-              "facilitator"
+              "facilitator",
+              "interface-investigator"
             ]
           },
           "action": { "type": "string" },

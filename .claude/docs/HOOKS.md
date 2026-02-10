@@ -12,7 +12,6 @@ The hooks system provides automated validation that runs after every Edit or Wri
 
 - Immediate feedback on type errors, linting issues, and schema violations
 - Consistent validation across all projects synced from metaclaude-assistant
-- Graceful degradation (hooks warn but don't block)
 - Workspace-aware scripts for monorepo support
 
 ---
@@ -112,8 +111,7 @@ The wrapper:
 2. Extracts `tool_input.file_path`
 3. Checks if the file matches the pattern
 4. If it matches, runs the command with `{{file}}` replaced by the actual file path
-5. Outputs results (limited to 20 lines)
-6. Always exits 0 for graceful degradation
+5. Outputs results (limited to 50 lines)
 
 ### Pattern Syntax
 
@@ -188,8 +186,7 @@ All validation scripts are located in `.claude/scripts/`.
 2. Extracts `tool_input.file_path`
 3. Matches file against provided glob pattern
 4. Executes command with `{{file}}` substituted
-5. Limits output to 20 lines
-6. Always exits 0 (graceful degradation)
+5. Limits output to 50 lines
 
 ### verify-claude-md-base.mjs
 
@@ -336,7 +333,6 @@ All validation scripts are located in `.claude/scripts/`.
    - `superseded_by` - the replacing spec ID
    - `supersession_date` - when it was superseded
    - `supersession_reason` - why it was replaced
-4. Graceful - always exits 0, warns but doesn't block
 
 ---
 
@@ -392,22 +388,22 @@ Create a new script in `.claude/scripts/`:
 
 // .claude/scripts/my-validator.mjs
 
-import { readFileSync } from "fs";
+import { readFileSync } from 'fs';
 
 const filePath = process.argv[2];
 if (!filePath) {
-  console.error("Usage: my-validator.mjs <file>");
+  console.error('Usage: my-validator.mjs <file>');
   process.exit(1);
 }
 
 try {
-  const content = readFileSync(filePath, "utf-8");
+  const content = readFileSync(filePath, 'utf-8');
   // Perform validation
   const errors = [];
   // ...
 
   if (errors.length > 0) {
-    console.error("Validation errors:");
+    console.error('Validation errors:');
     errors.forEach((e) => console.error(`  - ${e}`));
     process.exit(1);
   }
@@ -444,7 +440,7 @@ node .claude/scripts/hook-wrapper.mjs '<pattern>' '<command with {{file}}>'
 
 - `'<pattern>'` - Glob pattern to match files (e.g., `*.ts`, `.claude/agents/*.md`)
 - `'<command>'` - Command to run, with `{{file}}` as placeholder for the file path
-- The wrapper handles stdin parsing, pattern matching, output limiting, and graceful failure
+- The wrapper handles stdin parsing, pattern matching, and output limiting
 
 ### Step 3: Register Script (If Syncing)
 

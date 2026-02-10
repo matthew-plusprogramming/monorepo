@@ -90,8 +90,8 @@ function runTsc(tsconfigPath, targetFile) {
     });
 
     proc.on('error', (err) => {
-      console.warn(`Warning: Failed to run TypeScript: ${err.message}`);
-      resolve({ exitCode: 0, stdout: '', stderr: '' }); // Skip on error
+      console.error(`Error: Failed to run TypeScript: ${err.message}`);
+      resolve({ exitCode: 1, stdout: '', stderr: '' });
     });
   });
 }
@@ -142,37 +142,37 @@ async function main() {
   const args = process.argv.slice(2);
 
   if (args.length === 0) {
-    console.log('Usage: workspace-tsc.mjs <file-path>');
-    console.log('No file provided, nothing to check.');
-    process.exit(0);
+    console.error('Usage: workspace-tsc.mjs <file-path>');
+    console.error('Error: No file provided.');
+    process.exit(1);
   }
 
   const filePath = resolve(args[0]);
 
   if (!existsSync(filePath)) {
-    console.warn(`Warning: File not found: ${filePath}`);
-    process.exit(0);
+    console.error(`Error: File not found: ${filePath}`);
+    process.exit(1);
   }
 
   // Only check TypeScript/JavaScript files
   const ext = filePath.split('.').pop()?.toLowerCase();
   const tsExtensions = ['ts', 'tsx', 'js', 'jsx', 'mts', 'cts', 'mjs', 'cjs'];
   if (!tsExtensions.includes(ext || '')) {
-    console.log(`Skipping non-TypeScript file: ${filePath}`);
-    process.exit(0);
+    console.error(`Error: Not a TypeScript/JavaScript file: ${filePath}`);
+    process.exit(1);
   }
 
   // Find nearest tsconfig
   const tsconfigPath = findNearestTsconfig(filePath);
 
   if (!tsconfigPath) {
-    console.log('No tsconfig.json found in directory hierarchy. Skipping type check.');
-    process.exit(0);
+    console.error('Error: No tsconfig.json found in directory hierarchy.');
+    process.exit(1);
   }
 
-  console.log(`Running TypeScript type check`);
-  console.log(`  tsconfig: ${tsconfigPath}`);
-  console.log(`  File: ${filePath}`);
+  console.error(`Running TypeScript type check`);
+  console.error(`  tsconfig: ${tsconfigPath}`);
+  console.error(`  File: ${filePath}`);
 
   const { exitCode, stdout, stderr } = await runTsc(tsconfigPath, filePath);
 
@@ -180,7 +180,7 @@ async function main() {
   const combinedOutput = (stdout + stderr).trim();
 
   if (exitCode === 0) {
-    console.log('TypeScript type check passed.');
+    console.error('TypeScript type check passed.');
     process.exit(0);
   }
 

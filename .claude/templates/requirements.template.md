@@ -1,7 +1,8 @@
 ---
 spec_group: sg-<group-id>
+description: <One-sentence summary of the requirements>
 source: prd | pm-interview | manual
-prd_version: v1
+prd_version: 1
 last_updated: <YYYY-MM-DD>
 ---
 
@@ -10,7 +11,7 @@ last_updated: <YYYY-MM-DD>
 ## Source
 
 - **Origin**: <PRD link | PM interview | Manual entry>
-- **PRD Version**: <v1, v2, etc. or N/A>
+- **PRD Version**: <1, 2, 1.0, 2.0, etc. or N/A>
 - **Last Synced**: <timestamp or N/A>
 
 ## Requirements
@@ -20,6 +21,7 @@ last_updated: <YYYY-MM-DD>
 **Statement**: <Clear, testable requirement in EARS format>
 
 **EARS Format**:
+
 - WHEN <trigger/condition>
 - THE SYSTEM SHALL <behavior>
 - AND <additional behavior>
@@ -37,6 +39,7 @@ last_updated: <YYYY-MM-DD>
 **Statement**: <Clear, testable requirement>
 
 **EARS Format**:
+
 - WHEN <trigger/condition>
 - THE SYSTEM SHALL <behavior>
 
@@ -46,10 +49,10 @@ last_updated: <YYYY-MM-DD>
 
 ## Traceability
 
-| Requirement | Atomic Specs | Status |
-|-------------|--------------|--------|
-| REQ-001 | as-001-*, as-002-* | Covered |
-| REQ-002 | as-003-* | Covered |
+| Requirement | Atomic Specs       | Status  |
+| ----------- | ------------------ | ------- |
+| REQ-001     | as-001-_, as-002-_ | Covered |
+| REQ-002     | as-003-\*          | Covered |
 
 ## Open Questions
 
@@ -58,5 +61,5 @@ last_updated: <YYYY-MM-DD>
 
 ## Change Log
 
-- `<timestamp>`: Initial requirements extracted from PRD v1
+- `<timestamp>`: Initial requirements extracted from PRD 1
 - `<timestamp>`: REQ-003 added based on user clarification

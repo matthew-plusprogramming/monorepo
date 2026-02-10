@@ -40,6 +40,7 @@ Investigate and surface connection points between different specs, systems, and 
 ## Prerequisites
 
 Before running `/investigate`:
+
 1. At least one spec group must exist
 2. Spec(s) should have defined interfaces, env vars, or API endpoints
 3. For `--cross`, multiple spec groups must exist
@@ -50,13 +51,13 @@ Before running `/investigate`:
 
 Determine what's being investigated:
 
-| Command | Scope |
-|---------|-------|
-| `/investigate sg-logout` | Single spec group + its declared dependencies |
-| `/investigate sg-logout --cross` | sg-logout + all spec groups it touches |
-| `/investigate ms-auth-system` | All workstreams in the master spec |
-| `/investigate --all` | All active specs in `.claude/specs/groups/` |
-| `/investigate sg-a sg-b sg-c` | Exactly those three spec groups |
+| Command                          | Scope                                         |
+| -------------------------------- | --------------------------------------------- |
+| `/investigate sg-logout`         | Single spec group + its declared dependencies |
+| `/investigate sg-logout --cross` | sg-logout + all spec groups it touches        |
+| `/investigate ms-auth-system`    | All workstreams in the master spec            |
+| `/investigate --all`             | All active specs in `.claude/specs/groups/`   |
+| `/investigate sg-a sg-b sg-c`    | Exactly those three spec groups               |
 
 ### 2. Dispatch Interface Investigator
 
@@ -79,6 +80,7 @@ Prompt: |
 ### 3. Generate Investigation Report
 
 Agent produces a structured report with:
+
 - Connection map (inputs/outputs/assumptions per spec)
 - Inconsistencies by severity (Blocker/High/Medium/Low)
 - Decisions required (with options and recommendations)
@@ -225,12 +227,14 @@ Before implementation:
 After `/investigate`:
 
 **If CLEAN:**
+
 - `manifest.json`:
   - `investigation_status`: "clean"
   - `last_investigated`: <timestamp>
 - Ready for implementation
 
 **If ISSUES:**
+
 - `manifest.json`:
   - `investigation_status`: "issues_found"
   - `investigation_blockers`: <count>
@@ -294,13 +298,14 @@ Ensure MasterSpec has workstreams defined in frontmatter.
 
 ## Comparison with /unify
 
-| Aspect | /investigate | /unify |
-|--------|--------------|--------|
-| **When** | Before implementation | After implementation |
-| **What** | Spec-to-spec consistency | Spec-to-implementation alignment |
-| **Focus** | Assumptions, interfaces, contracts | Evidence, tests, traceability |
-| **Blocks** | Implementation | Merge |
+| Aspect     | /investigate                       | /unify                           |
+| ---------- | ---------------------------------- | -------------------------------- |
+| **When**   | Before implementation              | After implementation             |
+| **What**   | Spec-to-spec consistency           | Spec-to-implementation alignment |
+| **Focus**  | Assumptions, interfaces, contracts | Evidence, tests, traceability    |
+| **Blocks** | Implementation                     | Merge                            |
 
 Think of it as:
+
 - `/investigate` = "Do our specs agree with each other?"
 - `/unify` = "Does our code match our specs?"

@@ -13,7 +13,9 @@
  * This script is designed to be called via hook-wrapper.mjs for PostToolUse:Read hooks.
  *
  * Exit codes:
- *   0 - Always (graceful degradation - warns but doesn't block)
+ *   0 - File is not superseded
+ *   1 - No file provided or file not found
+ *   2 - File is superseded (warning emitted)
  *
  * Implements: REQ-013, AC2.5 from sg-doc-traceability
  */
@@ -64,28 +66,23 @@ function checkSuperseded(filePath) {
     return null;
   }
 
-  try {
-    const content = readFileSync(filePath, 'utf-8');
-    const frontmatter = parseFrontmatter(content);
+  const content = readFileSync(filePath, 'utf-8');
+  const frontmatter = parseFrontmatter(content);
 
-    if (!frontmatter) {
-      return null;
-    }
-
-    if (frontmatter.status !== 'superseded') {
-      return null;
-    }
-
-    // Artifact is superseded - gather info for warning
-    return {
-      supersededBy: frontmatter.superseded_by || 'unknown',
-      supersessionDate: frontmatter.supersession_date || 'unknown date',
-      supersessionReason: frontmatter.supersession_reason || null
-    };
-  } catch (error) {
-    // Graceful degradation - if we can't read the file, don't warn
+  if (!frontmatter) {
     return null;
   }
+
+  if (frontmatter.status !== 'superseded') {
+    return null;
+  }
+
+  // Artifact is superseded - gather info for warning
+  return {
+    supersededBy: frontmatter.superseded_by || 'unknown',
+    supersessionDate: frontmatter.supersession_date || 'unknown date',
+    supersessionReason: frontmatter.supersession_reason || null
+  };
 }
 
 /**
@@ -96,6 +93,7 @@ function formatWarning(filePath, info) {
     '========================================',
     'WARNING: SUPERSEDED ARTIFACT',
     '========================================',
+    `File: ${filePath}`,
     `This spec was superseded by ${info.supersededBy} on ${info.supersessionDate}.`,
     'Proceed with caution - this spec may contain outdated information.'
   ];
@@ -113,22 +111,27 @@ function main() {
   const args = process.argv.slice(2);
 
   if (args.length === 0) {
-    // No file provided - this is normal when called via hook-wrapper
-    // and the file doesn't match the pattern
-    process.exit(0);
+    console.error('Error: No file provided.');
+    process.exit(1);
   }
 
   const filePath = args[0];
+
+  if (!existsSync(filePath)) {
+    console.error(`Error: File not found: ${filePath}`);
+    process.exit(1);
+  }
 
   // Check if the file is a superseded artifact
   const supersededInfo = checkSuperseded(filePath);
 
   if (supersededInfo) {
     // Emit warning to stdout (hook-wrapper will display this)
-    console.log(formatWarning(filePath, supersededInfo));
+    console.error(formatWarning(filePath, supersededInfo));
+    process.exit(2);
   }
 
-  // Always exit 0 for graceful degradation
+  // File exists and is not superseded
   process.exit(0);
 }
 

@@ -11,7 +11,7 @@ work_status: plan_ready
 
 ## Overview
 
-**PRD Reference**: [<PRD Title>](<link-to-prd>)
+**PRD Reference**: [<PRD Title>](link-to-prd)
 **PRD Version**: v<version>
 **Created**: <YYYY-MM-DD>
 **Last Updated**: <YYYY-MM-DD>
@@ -22,21 +22,21 @@ work_status: plan_ready
 
 ### Review Dimension
 
-| State | Description | Current |
-|-------|-------------|---------|
-| DRAFT | Specs created, awaiting user review | ☐ |
-| REVIEWED | User has approved spec summary | ☐ |
+| State    | Description                         | Current |
+| -------- | ----------------------------------- | ------- |
+| DRAFT    | Specs created, awaiting user review | ☐       |
+| REVIEWED | User has approved spec summary      | ☐       |
 
 **Current Review Status**: `DRAFT`
 
 ### Work Dimension
 
-| State | Description | Current |
-|-------|-------------|---------|
-| PLAN_READY | Specs approved, ready for implementation | ☐ |
-| IMPLEMENTING | Work in progress | ☐ |
-| VERIFYING | Gates running (tests, reviews) | ☐ |
-| READY_TO_MERGE | All gates passed | ☐ |
+| State          | Description                              | Current |
+| -------------- | ---------------------------------------- | ------- |
+| PLAN_READY     | Specs approved, ready for implementation | ☐       |
+| IMPLEMENTING   | Work in progress                         | ☐       |
+| VERIFYING      | Gates running (tests, reviews)           | ☐       |
+| READY_TO_MERGE | All gates passed                         | ☐       |
 
 **Current Work Status**: `PLAN_READY`
 
@@ -61,21 +61,21 @@ work_status: plan_ready
 
 ## Atomic Specs
 
-| ID | Title | Status | Requirements |
-|----|-------|--------|--------------|
-| as-001-<slug> | <Title> | pending | REQ-001 |
-| as-002-<slug> | <Title> | pending | REQ-002 |
+| ID            | Title   | Status  | Requirements     |
+| ------------- | ------- | ------- | ---------------- |
+| as-001-<slug> | <Title> | pending | REQ-001          |
+| as-002-<slug> | <Title> | pending | REQ-002          |
 | as-003-<slug> | <Title> | pending | REQ-002, REQ-003 |
 
 ---
 
 ## Requirements Coverage
 
-| Requirement | Description | Atomic Specs | Coverage |
-|-------------|-------------|--------------|----------|
-| REQ-001 | <Brief description> | as-001 | Full |
-| REQ-002 | <Brief description> | as-002, as-003 | Full |
-| REQ-003 | <Brief description> | as-003 | Partial |
+| Requirement | Description         | Atomic Specs   | Coverage |
+| ----------- | ------------------- | -------------- | -------- |
+| REQ-001     | <Brief description> | as-001         | Full     |
+| REQ-002     | <Brief description> | as-002, as-003 | Full     |
+| REQ-003     | <Brief description> | as-003         | Partial  |
 
 ---
 
@@ -83,33 +83,33 @@ work_status: plan_ready
 
 ### Internal Dependencies
 
-| Spec | Depends On | Reason |
-|------|------------|--------|
-| as-002 | as-001 | <Why this order> |
+| Spec   | Depends On | Reason           |
+| ------ | ---------- | ---------------- |
+| as-002 | as-001     | <Why this order> |
 
 ### External Dependencies
 
-| Dependency | Type | Status |
-|------------|------|--------|
-| <External service/API> | Required | Available |
-| <Feature flag> | Optional | Not created |
+| Dependency             | Type     | Status      |
+| ---------------------- | -------- | ----------- |
+| <External service/API> | Required | Available   |
+| <Feature flag>         | Optional | Not created |
 
 ---
 
 ## Risk Assessment
 
-| Risk | Impact | Mitigation | Atomic Specs Affected |
-|------|--------|------------|----------------------|
-| <Risk description> | High/Med/Low | <Mitigation strategy> | as-001, as-002 |
+| Risk               | Impact       | Mitigation            | Atomic Specs Affected |
+| ------------------ | ------------ | --------------------- | --------------------- |
+| <Risk description> | High/Med/Low | <Mitigation strategy> | as-001, as-002        |
 
 ---
 
 ## Rollout Strategy
 
-| Phase | Atomic Specs | Criteria for Advancement |
-|-------|--------------|--------------------------|
-| 1 | as-001 | Core functionality verified |
-| 2 | as-002, as-003 | Integration tests passing |
+| Phase | Atomic Specs   | Criteria for Advancement    |
+| ----- | -------------- | --------------------------- |
+| 1     | as-001         | Core functionality verified |
+| 2     | as-002, as-003 | Integration tests passing   |
 
 ---
 
@@ -117,29 +117,29 @@ work_status: plan_ready
 
 _Status of gates required for merge._
 
-| Gate | Status | Notes |
-|------|--------|-------|
-| All specs approved | ☐ | |
-| All ACs implemented | ☐ | |
-| All tests passing (100% AC coverage) | ☐ | |
-| Unifier validation: CONVERGED | ☐ | |
-| Code review: no High/Critical | ☐ | |
-| Security review: no Critical/High | ☐ | |
-| Browser tests passed (if UI) | ☐ | N/A |
-| Documentation generated (if public API) | ☐ | N/A |
+| Gate                                    | Status | Notes |
+| --------------------------------------- | ------ | ----- |
+| All specs approved                      | ☐      |       |
+| All ACs implemented                     | ☐      |       |
+| All tests passing (100% AC coverage)    | ☐      |       |
+| Unifier validation: CONVERGED           | ☐      |       |
+| Code review: no High/Critical           | ☐      |       |
+| Security review: no Critical/High       | ☐      |       |
+| Browser tests passed (if UI)            | ☐      | N/A   |
+| Documentation generated (if public API) | ☐      | N/A   |
 
 ---
 
 ## State Transition Log
 
-| Date | From State | To State | Actor | Notes |
-|------|------------|----------|-------|-------|
-| <YYYY-MM-DD> | — | DRAFT | System | Spec group created |
-| | DRAFT | REVIEWED | User | Summary approved |
-| | — | PLAN_READY | System | Ready for implementation |
-| | PLAN_READY | IMPLEMENTING | System | Work started |
-| | IMPLEMENTING | VERIFYING | System | Implementation complete |
-| | VERIFYING | READY_TO_MERGE | System | All gates passed |
+| Date         | From State   | To State       | Actor  | Notes                    |
+| ------------ | ------------ | -------------- | ------ | ------------------------ |
+| <YYYY-MM-DD> | —            | DRAFT          | System | Spec group created       |
+|              | DRAFT        | REVIEWED       | User   | Summary approved         |
+|              | —            | PLAN_READY     | System | Ready for implementation |
+|              | PLAN_READY   | IMPLEMENTING   | System | Work started             |
+|              | IMPLEMENTING | VERIFYING      | System | Implementation complete  |
+|              | VERIFYING    | READY_TO_MERGE | System | All gates passed         |
 
 ---
 

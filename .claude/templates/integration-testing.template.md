@@ -11,13 +11,14 @@ authority: blocking
 
 ## Overview
 
-**PRD Reference**: [<PRD Title>](<link-to-prd>)
+**PRD Reference**: [<PRD Title>](link-to-prd)
 **PRD Version**: v<version>
 **Last Updated**: <YYYY-MM-DD>
 
 ## Purpose
 
 This document defines black-box integration tests derived from the PRD and documentation. These tests:
+
 - Do NOT read implementation code
 - Validate system behavior against documented intent
 - Override developer confidence
@@ -28,6 +29,7 @@ This document defines black-box integration tests derived from the PRD and docum
 ## Authority Statement
 
 > The Black-Box Integration Testing System has authority to:
+>
 > - Block merges when tests fail
 > - Open incidents when behavior deviates from PRD
 > - Override implementation confidence with empirical evidence
@@ -38,11 +40,11 @@ This document defines black-box integration tests derived from the PRD and docum
 
 ## Documentation Sources
 
-| Source | Location | Version |
-|--------|----------|---------|
-| PRD | <link> | v<version> |
-| Public API Docs | <link> | <version> |
-| Internal Docs | <link> | <version> |
+| Source          | Location | Version    |
+| --------------- | -------- | ---------- |
+| PRD             | <link>   | v<version> |
+| Public API Docs | <link>   | <version>  |
+| Internal Docs   | <link>   | <version>  |
 
 ---
 
@@ -53,12 +55,13 @@ This document defines black-box integration tests derived from the PRD and docum
 **Source**: PRD Section <X.Y> / API Docs <endpoint>
 
 **Contract**:
+
 > <Exact expected behavior quoted or paraphrased from documentation>
 
 **Test Cases**:
 
-| ID | Input | Expected Output | Validates |
-|----|-------|-----------------|-----------|
+| ID    | Input        | Expected Output     | Validates         |
+| ----- | ------------ | ------------------- | ----------------- |
 | BC1.1 | <Input data> | <Expected response> | <Requirement ref> |
 | BC1.2 | <Input data> | <Expected response> | <Requirement ref> |
 
@@ -69,23 +72,24 @@ This document defines black-box integration tests derived from the PRD and docum
 **Source**: PRD Section <X.Y>
 
 **Contract**:
+
 > <Exact expected behavior>
 
 **Test Cases**:
 
-| ID | Input | Expected Output | Validates |
-|----|-------|-----------------|-----------|
+| ID    | Input        | Expected Output     | Validates         |
+| ----- | ------------ | ------------------- | ----------------- |
 | BC2.1 | <Input data> | <Expected response> | <Requirement ref> |
 
 ---
 
 ## Regression Detection
 
-| Behavior | Baseline | Threshold | Action on Violation |
-|----------|----------|-----------|---------------------|
-| <Response time for X> | <N>ms | +20% | Open incident |
-| <Success rate for Y> | 99.9% | <99% | Block merge |
-| <Data integrity for Z> | 100% | <100% | Block merge + incident |
+| Behavior               | Baseline | Threshold | Action on Violation    |
+| ---------------------- | -------- | --------- | ---------------------- |
+| <Response time for X>  | <N>ms    | +20%      | Open incident          |
+| <Success rate for Y>   | 99.9%    | <99%      | Block merge            |
+| <Data integrity for Z> | 100%     | <100%     | Block merge + incident |
 
 ---
 
@@ -93,11 +97,11 @@ This document defines black-box integration tests derived from the PRD and docum
 
 ### Continuous Execution
 
-| Schedule | Scope | Environment |
-|----------|-------|-------------|
-| Every PR | Changed behavioral contracts | Staging |
-| Hourly | All behavioral contracts | Staging |
-| Daily | Full suite + performance | Production-mirror |
+| Schedule | Scope                        | Environment       |
+| -------- | ---------------------------- | ----------------- |
+| Every PR | Changed behavioral contracts | Staging           |
+| Hourly   | All behavioral contracts     | Staging           |
+| Daily    | Full suite + performance     | Production-mirror |
 
 ### Failure Handling
 
@@ -115,10 +119,10 @@ This document defines black-box integration tests derived from the PRD and docum
 
 ## Traceability Matrix
 
-| Requirement | Behavioral Contract | Test IDs | Last Verified |
-|-------------|---------------------|----------|---------------|
-| REQ-001 | BC1 | BC1.1, BC1.2 | <YYYY-MM-DD> |
-| REQ-002 | BC2 | BC2.1 | <YYYY-MM-DD> |
+| Requirement | Behavioral Contract | Test IDs     | Last Verified |
+| ----------- | ------------------- | ------------ | ------------- |
+| REQ-001     | BC1                 | BC1.1, BC1.2 | <YYYY-MM-DD>  |
+| REQ-002     | BC2                 | BC2.1        | <YYYY-MM-DD>  |
 
 ---
 
@@ -126,10 +130,10 @@ This document defines black-box integration tests derived from the PRD and docum
 
 _These assumptions from the PRD are validated by integration tests._
 
-| Assumption | Source | Test Coverage | Monitoring |
-|------------|--------|---------------|------------|
-| <Assumption text> | PRD Section X | BC1.1 | Production metrics |
-| <Assumption text> | PRD Constraints | BC2.1 | Error rate |
+| Assumption        | Source          | Test Coverage | Monitoring         |
+| ----------------- | --------------- | ------------- | ------------------ |
+| <Assumption text> | PRD Section X   | BC1.1         | Production metrics |
+| <Assumption text> | PRD Constraints | BC2.1         | Error rate         |
 
 ---
 
@@ -138,8 +142,8 @@ _These assumptions from the PRD are validated by integration tests._
 _Document behavior regressions and their PRD implications._
 
 | Date | Contract | Violation | Incident | PRD Update Required |
-|------|----------|-----------|----------|---------------------|
-| | | | | |
+| ---- | -------- | --------- | -------- | ------------------- |
+|      |          |           |          |                     |
 
 ---
 

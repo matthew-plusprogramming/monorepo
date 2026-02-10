@@ -6,7 +6,7 @@ model: opus
 skills: spec
 hooks:
   PostToolUse:
-    - matcher: "Edit|Write"
+    - matcher: 'Edit|Write'
       hooks:
         - type: command
           command: "node .claude/scripts/hook-wrapper.mjs '.claude/specs/**/*.md' 'node .claude/scripts/spec-validate.mjs {{file}}'"
@@ -198,15 +198,15 @@ If validation fails, fix issues before delivering. Do not hand off specs with va
 
 Save spec to:
 
-- **For single workstream**: `.claude/specs/active/<slug>.md`
-- **For MasterSpec workstream**: `.claude/specs/active/<project-slug>/ws-<id>.md`
+- **For single workstream**: `.claude/specs/groups/<spec-group-id>/spec.md`
+- **For MasterSpec workstream**: `.claude/specs/groups/<spec-group-id>/spec.md`
 
 Confirm delivery to orchestrator:
 
 ```markdown
 ## WorkstreamSpec Complete ✅
 
-**Spec**: .claude/specs/active/<slug>/ws-<id>.md
+**Spec**: .claude/specs/groups/<spec-group-id>/spec.md
 **ID**: ws-<id>
 **Title**: <Workstream Title>
 **Status**: draft (ready for review)
@@ -310,7 +310,7 @@ Link to relevant best practices:
 1. **Load template**:
 
 ```bash
-cp .claude/templates/workstream-spec.template.md .claude/specs/active/realtime-notifications/ws-1.md
+cp .claude/templates/workstream-spec.template.md .claude/specs/groups/sg-realtime-notifications/spec.md
 ```
 
 2. **Fill frontmatter**:
@@ -417,7 +417,7 @@ interface WebSocketServer {
 ```markdown
 ## WorkstreamSpec Complete ✅
 
-**Spec**: .claude/specs/active/realtime-notifications/ws-1.md
+**Spec**: .claude/specs/groups/sg-realtime-notifications/spec.md
 **Summary**: 4 requirements, 4 tasks, 1 contract, ready for review
 ```
 
@@ -487,7 +487,7 @@ title: Original Feature
 status: superseded
 superseded_by: ws-new-feature
 superseded_at: 2026-01-20T14:30:00Z
-supersession_reason: "Replaced by v2 implementation with new architecture"
+supersession_reason: 'Replaced by v2 implementation with new architecture'
 ---
 ```
 
@@ -535,8 +535,8 @@ Move the superseded spec from active to archive directory:
 # For spec groups
 mv .claude/specs/groups/<old-spec-group-id> .claude/specs/archive/<old-spec-group-id>
 
-# For standalone specs (legacy)
-mv .claude/specs/active/<old-spec>.md .claude/specs/archive/<old-spec>.md
+# For standalone specs (legacy, if any remain)
+mv .claude/specs/groups/<old-spec-group-id>/spec.md .claude/specs/archive/<old-spec-group-id>/spec.md
 ```
 
 **Archive location**: `.claude/specs/archive/`
@@ -555,7 +555,7 @@ mv .claude/specs/active/<old-spec>.md .claude/specs/archive/<old-spec>.md
    status: superseded
    superseded_by: ws-auth-v2
    superseded_at: 2026-01-20T14:30:00Z
-   supersession_reason: "Replaced by OAuth2-based authentication"
+   supersession_reason: 'Replaced by OAuth2-based authentication'
    ---
    ```
 
@@ -591,7 +591,7 @@ After deprecation, verify:
 - [ ] Registry shows old spec as superseded with reference to new spec
 - [ ] Registry shows new spec with `supersedes` array
 - [ ] Old spec moved to `.claude/specs/archive/`
-- [ ] New spec created in `.claude/specs/groups/` or `.claude/specs/active/`
+- [ ] New spec created in `.claude/specs/groups/`
 
 ## Handoff
 

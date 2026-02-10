@@ -6,7 +6,7 @@ model: opus
 skills: atomize
 hooks:
   PostToolUse:
-    - matcher: "Edit|Write"
+    - matcher: 'Edit|Write'
       hooks:
         - type: command
           command: "node .claude/scripts/hook-wrapper.mjs '.claude/specs/**/*.md' 'node .claude/scripts/spec-validate.mjs {{file}}'"

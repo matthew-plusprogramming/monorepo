@@ -23,6 +23,7 @@ Decompose a high-level spec (`spec.md`) into atomic specs—units that are indep
 ## Prerequisites
 
 Before running `/atomize`:
+
 1. Spec group must exist with `manifest.json`
 2. `requirements.md` must exist (from `/prd sync` or `/pm`)
 3. `spec.md` must exist (from `/spec`)
@@ -36,6 +37,7 @@ Before running `/atomize`:
    - Validate `manifest.json`, `requirements.md`, `spec.md` exist
 
 2. **Dispatch atomizer agent**
+
    ```
    Task: atomizer
    Prompt: Decompose spec.md into atomic specs
@@ -58,6 +60,7 @@ Before running `/atomize`:
    - Extract TOO_COARSE, TOO_GRANULAR, MISSING_COVERAGE items
 
 2. **Dispatch atomizer with feedback**
+
    ```
    Task: atomizer
    Prompt: Refine atomic specs based on enforcement feedback
@@ -134,12 +137,14 @@ User reviews summary → APPROVED
 ## Edge Cases
 
 ### No Active Spec Group
+
 ```
 Error: No active spec group found
 Create one with /prd sync <doc-id> or /pm
 ```
 
 ### Already Has Atomic Specs
+
 ```
 Warning: Spec group already has 3 atomic specs
 Options:
@@ -148,6 +153,7 @@ Options:
 ```
 
 ### Requirements Changed After Atomization
+
 ```
 Warning: requirements.md modified after last atomization
 Re-run /atomize to ensure coverage
@@ -156,6 +162,7 @@ Re-run /atomize to ensure coverage
 ## State Transitions
 
 After successful `/atomize`:
+
 - `manifest.json` updated:
   - `atomic_specs.count`: N
   - `atomic_specs.coverage`: "X%"

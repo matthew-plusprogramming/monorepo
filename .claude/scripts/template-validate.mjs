@@ -155,7 +155,7 @@ function validateTemplate(filePath) {
   const requirements = TEMPLATE_REQUIREMENTS[templateType];
   const content = readFileSync(filePath, 'utf-8');
 
-  console.log(`Validating as ${templateType}...`);
+  console.error(`Validating as ${templateType}...`);
 
   // Check for required placeholders
   if (requirements.placeholders) {
@@ -199,13 +199,13 @@ function main() {
   const args = process.argv.slice(2);
 
   if (args.length === 0) {
-    console.log('Usage: template-validate.mjs <template-file>');
-    console.log('No file provided, nothing to validate.');
-    console.log('\nSupported template types:');
+    console.error('Usage: template-validate.mjs <template-file>');
+    console.error('Error: No file provided.');
+    console.error('\nSupported template types:');
     for (const templateName of Object.keys(TEMPLATE_REQUIREMENTS)) {
-      console.log(`  - ${templateName}`);
+      console.error(`  - ${templateName}`);
     }
-    process.exit(0);
+    process.exit(1);
   }
 
   let hasErrors = false;
@@ -218,7 +218,7 @@ function main() {
     // Print warnings
     for (const warning of warnings) {
       hasWarnings = true;
-      console.warn(`Warning in ${basename(filePath)}: ${warning}`);
+      console.error(`Warning in ${basename(filePath)}: ${warning}`);
     }
 
     // Print errors
@@ -228,7 +228,7 @@ function main() {
     }
 
     if (errors.length === 0 && warnings.length === 0) {
-      console.log(`Template ${basename(filePath)} is valid.`);
+      console.error(`Template ${basename(filePath)} is valid.`);
     }
   }
 
@@ -237,7 +237,7 @@ function main() {
   }
 
   if (args.length > 1) {
-    console.log(`\nValidated ${args.length} template(s) successfully.`);
+    console.error(`\nValidated ${args.length} template(s) successfully.`);
   }
 
   process.exit(0);

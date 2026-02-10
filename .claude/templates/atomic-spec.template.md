@@ -58,6 +58,14 @@ _Filled by implementer agent after implementation._
 | ---- | ---- | ----------- |
 |      |      |             |
 
+## Assumptions Made
+
+_Populated by implementer during implementation. Reviewed during code review._
+
+| ID  | Assumption | Confidence | Rationale | Needs Review |
+| --- | ---------- | ---------- | --------- | ------------ |
+|     |            |            |           |              |
+
 ## Test Evidence
 
 _Filled by test-writer agent after tests written._

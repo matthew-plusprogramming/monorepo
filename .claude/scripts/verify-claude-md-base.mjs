@@ -134,9 +134,9 @@ function main() {
     process.exit(2);
   }
 
-  console.log(`Verifying: ${claudeMdPath}`);
-  console.log(`Against:   ${TEMPLATE_PATH}`);
-  console.log('');
+  console.error(`Verifying: ${claudeMdPath}`);
+  console.error(`Against:   ${TEMPLATE_PATH}`);
+  console.error('');
 
   // Read files
   const templateContent = readFileSync(TEMPLATE_PATH, 'utf-8');
@@ -150,9 +150,9 @@ function main() {
   const diffs = diffLines(templateBase, targetBase);
 
   if (diffs.length === 0) {
-    console.log('✅ PASS: Base sections match');
-    console.log(`   Template lines: ${templateBase.split('\n').length}`);
-    console.log(`   Target lines:   ${targetBase.split('\n').length}`);
+    console.error('✅ PASS: Base sections match');
+    console.error(`   Template lines: ${templateBase.split('\n').length}`);
+    console.error(`   Target lines:   ${targetBase.split('\n').length}`);
     process.exit(0);
   } else {
     console.error('❌ FAIL: Base section drift detected');

@@ -1,7 +1,3 @@
----
-last_reviewed: 2026-01-07
----
-
 # Testing Guidelines
 
 ## Boundaries & Dependency Injection

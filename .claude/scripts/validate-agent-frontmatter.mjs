@@ -78,9 +78,9 @@ function main() {
   const args = process.argv.slice(2);
 
   if (args.length === 0) {
-    console.log('Usage: validate-agent-frontmatter.mjs <file1.md> [file2.md ...]');
-    console.log('No files provided, nothing to validate.');
-    process.exit(0);
+    console.error('Usage: validate-agent-frontmatter.mjs <file1.md> [file2.md ...]');
+    console.error('Error: No files provided.');
+    process.exit(1);
   }
 
   let hasErrors = false;
@@ -100,7 +100,7 @@ function main() {
     process.exit(1);
   }
 
-  console.log(`Validated ${args.length} agent file(s) successfully.`);
+  console.error(`Validated ${args.length} agent file(s) successfully.`);
   process.exit(0);
 }
 

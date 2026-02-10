@@ -15,19 +15,19 @@ You are a <agent-name> subagent responsible for <primary responsibility>.
 
 ### Required Fields
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `name` | string | Unique identifier for the agent (lowercase, hyphenated) |
-| `description` | string | Brief description of purpose and behavior |
-| `tools` | string | Comma-separated list of allowed tools |
-| `model` | string | Model to use (typically "opus") |
+| Field         | Type   | Description                                             |
+| ------------- | ------ | ------------------------------------------------------- |
+| `name`        | string | Unique identifier for the agent (lowercase, hyphenated) |
+| `description` | string | Brief description of purpose and behavior               |
+| `tools`       | string | Comma-separated list of allowed tools                   |
+| `model`       | string | Model to use (typically "opus")                         |
 
 ### Optional Fields
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `skills` | string | Comma-separated list of associated skills |
-| `exit_validation` | array | Validation steps to run before completion |
+| Field             | Type   | Description                               |
+| ----------------- | ------ | ----------------------------------------- |
+| `skills`          | string | Comma-separated list of associated skills |
+| `exit_validation` | array  | Validation steps to run before completion |
 
 ### exit_validation Schema
 
@@ -50,15 +50,16 @@ exit_validation: [lint, test]
 
 **Behavior by validation type**:
 
-| Validation | Command | Purpose |
-|------------|---------|---------|
-| `lint` | `npm run lint` | Ensure code style compliance |
-| `build` | `npm run build` | Verify TypeScript compilation |
-| `test` | `npm test` | Confirm all tests pass |
+| Validation | Command         | Purpose                       |
+| ---------- | --------------- | ----------------------------- |
+| `lint`     | `npm run lint`  | Ensure code style compliance  |
+| `build`    | `npm run build` | Verify TypeScript compilation |
+| `test`     | `npm test`      | Confirm all tests pass        |
 
 **Execution order**: Validations run in the order specified. Failing any validation blocks completion.
 
 **Agent requirements**:
+
 - Agents with `exit_validation` MUST run all specified checks before reporting completion
 - If any validation fails, the agent MUST fix issues or escalate
 - Validation results MUST be included in the completion report
@@ -72,6 +73,7 @@ exit_validation: [lint, test]
 ## When You're Invoked
 
 You're dispatched when:
+
 1. <Scenario 1>
 2. <Scenario 2>
 3. <Scenario 3>
@@ -102,14 +104,15 @@ All validations must pass. Include results in completion report:
 ```markdown
 ## Exit Validation
 
-| Check | Status | Details |
-|-------|--------|---------|
-| lint | PASS | 0 warnings |
-| build | PASS | Compiled successfully |
-| test | PASS | 147 tests, 100% passing |
+| Check | Status | Details                 |
+| ----- | ------ | ----------------------- |
+| lint  | PASS   | 0 warnings              |
+| build | PASS   | Compiled successfully   |
+| test  | PASS   | 147 tests, 100% passing |
 ```
 
 If any validation fails:
+
 1. Attempt to fix the issue
 2. Re-run validation
 3. If still failing, escalate with details

@@ -1,7 +1,8 @@
 ---
 id: prd-<slug>
 title: <Product/Feature Name>
-version: v1.0
+description: <One-sentence summary of what this PRD covers>
+version: 1.0
 state: draft
 author: <name>
 date: <YYYY-MM-DD>
@@ -12,22 +13,22 @@ last_updated: <YYYY-MM-DD>
 
 ## Document Metadata
 
-| Field | Value |
-|-------|-------|
-| PRD ID | prd-<slug> |
-| Version | v1.0 |
-| State | DRAFT |
-| Author | <name> |
-| Created | <YYYY-MM-DD> |
+| Field        | Value        |
+| ------------ | ------------ |
+| PRD ID       | prd-<slug>   |
+| Version      | 1.0          |
+| State        | DRAFT        |
+| Author       | <name>       |
+| Created      | <YYYY-MM-DD> |
 | Last Updated | <YYYY-MM-DD> |
 
 ---
 
 ## Version History
 
-| Version | Date | Author | State | Summary of Changes |
-|---------|------|--------|-------|-------------------|
-| v1.0 | <YYYY-MM-DD> | <name> | DRAFT | Initial draft |
+| Version | Date         | Author | State | Summary of Changes |
+| ------- | ------------ | ------ | ----- | ------------------ |
+| 1.0     | <YYYY-MM-DD> | <name> | DRAFT | Initial draft      |
 
 > **Note**: Agent/system changes create new version as DRAFT. User changes can go directly to REVIEWED.
 
@@ -55,20 +56,20 @@ last_updated: <YYYY-MM-DD>
 
 _Each requirement must be testable and traceable to specs, tests, code, and PRs._
 
-| ID | Requirement | Priority | Notes |
-|----|-------------|----------|-------|
-| R1 | <Requirement text> | High/Med/Low | |
-| R2 | <Requirement text> | High/Med/Low | |
-| R3 | <Requirement text> | High/Med/Low | |
+| ID  | Requirement        | Priority     | Notes |
+| --- | ------------------ | ------------ | ----- |
+| R1  | <Requirement text> | High/Med/Low |       |
+| R2  | <Requirement text> | High/Med/Low |       |
+| R3  | <Requirement text> | High/Med/Low |       |
 
 ### Non-Functional Requirements
 
 _Performance, security, scalability, accessibility, etc._
 
-| ID | Requirement | Target | Notes |
-|----|-------------|--------|-------|
-| NF1 | <Requirement text> | <Measurable target> | |
-| NF2 | <Requirement text> | <Measurable target> | |
+| ID  | Requirement        | Target              | Notes |
+| --- | ------------------ | ------------------- | ----- |
+| NF1 | <Requirement text> | <Measurable target> |       |
+| NF2 | <Requirement text> | <Measurable target> |       |
 
 ---
 
@@ -95,10 +96,10 @@ _Performance, security, scalability, accessibility, etc._
 
 _What are we assuming to be true? These will be monitored in production._
 
-| ID | Assumption | Confidence | Validation Method | Expiry Condition |
-|----|------------|------------|-------------------|------------------|
-| A1 | <Assumption text> | High/Med/Low | <How to validate> | <When this expires> |
-| A2 | <Assumption text> | High/Med/Low | <How to validate> | <When this expires> |
+| ID  | Assumption        | Confidence   | Validation Method | Expiry Condition    |
+| --- | ----------------- | ------------ | ----------------- | ------------------- |
+| A1  | <Assumption text> | High/Med/Low | <How to validate> | <When this expires> |
+| A2  | <Assumption text> | High/Med/Low | <How to validate> | <When this expires> |
 
 > **Note**: Unstated assumptions are bugs in disguise. All assumptions are first-class citizens that can expire.
 
@@ -108,8 +109,8 @@ _What are we assuming to be true? These will be monitored in production._
 
 _What decisions have been made and why?_
 
-| Decision | Options Considered | Choice | Rationale |
-|----------|-------------------|--------|-----------|
+| Decision         | Options Considered   | Choice          | Rationale         |
+| ---------------- | -------------------- | --------------- | ----------------- |
 | <Decision topic> | <Option A, Option B> | <Chosen option> | <Why this choice> |
 
 <Document the tradeoffs explicitly. Future readers need to understand not just what was decided, but why.>
@@ -161,8 +162,8 @@ _What decisions have been made and why?_
 
 ## 9. Risks & Mitigations
 
-| Risk | Likelihood | Impact | Mitigation | Owner |
-|------|------------|--------|------------|-------|
+| Risk               | Likelihood   | Impact       | Mitigation            | Owner  |
+| ------------------ | ------------ | ------------ | --------------------- | ------ |
 | <Risk description> | High/Med/Low | High/Med/Low | <Mitigation strategy> | <name> |
 
 ---
@@ -171,9 +172,9 @@ _What decisions have been made and why?_
 
 ### Metrics
 
-| Metric | Current State | Target | Measurement Method |
-|--------|---------------|--------|-------------------|
-| <Metric name> | <Baseline> | <Target value> | <How measured> |
+| Metric        | Current State | Target         | Measurement Method |
+| ------------- | ------------- | -------------- | ------------------ |
+| <Metric name> | <Baseline>    | <Target value> | <How measured>     |
 
 ### Acceptance Criteria (High-Level)
 
@@ -198,10 +199,10 @@ _What decisions have been made and why?_
 
 ## 12. Open Questions
 
-| ID | Question | Status | Resolution | Resolved By |
-|----|----------|--------|------------|-------------|
-| Q1 | <Question text> | Open | | |
-| Q2 | <Question text> | Resolved | <Answer> | <name> |
+| ID  | Question        | Status   | Resolution | Resolved By |
+| --- | --------------- | -------- | ---------- | ----------- |
+| Q1  | <Question text> | Open     |            |             |
+| Q2  | <Question text> | Resolved | <Answer>   | <name>      |
 
 ---
 
@@ -211,9 +212,9 @@ _This section is populated as work progresses (Traceability Matrix)._
 
 ### Spec Groups
 
-| Spec Group ID | PRD Version | State | Link |
-|---------------|-------------|-------|------|
-| sg-<slug> | v1.0 | DRAFT | <link> |
+| Spec Group ID | PRD Version | State | Link   |
+| ------------- | ----------- | ----- | ------ |
+| sg-<slug>     | 1.0         | DRAFT | <link> |
 
 ### Related PRDs
 
@@ -227,10 +228,10 @@ _This section is populated as work progresses (Traceability Matrix)._
 
 ## Approval
 
-| Role | Name | Date | Decision |
-|------|------|------|----------|
-| Product Owner | | | Approved / Rejected / Needs Revision |
-| Technical Lead | | | Approved / Rejected / Needs Revision |
+| Role           | Name | Date | Decision                             |
+| -------------- | ---- | ---- | ------------------------------------ |
+| Product Owner  |      |      | Approved / Rejected / Needs Revision |
+| Technical Lead |      |      | Approved / Rejected / Needs Revision |
 
 ---
 

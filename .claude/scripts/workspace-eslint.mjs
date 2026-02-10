@@ -117,8 +117,8 @@ function runEslint(workspaceDir, relativePath) {
     });
 
     proc.on('error', (err) => {
-      console.warn(`Warning: Failed to run ESLint: ${err.message}`);
-      resolve(0); // Skip on error
+      console.error(`Error: Failed to run ESLint: ${err.message}`);
+      resolve(1);
     });
   });
 }
@@ -127,42 +127,42 @@ async function main() {
   const args = process.argv.slice(2);
 
   if (args.length === 0) {
-    console.log('Usage: workspace-eslint.mjs <file-path>');
-    console.log('No file provided, nothing to lint.');
-    process.exit(0);
+    console.error('Usage: workspace-eslint.mjs <file-path>');
+    console.error('Error: No file provided.');
+    process.exit(1);
   }
 
   const filePath = resolve(args[0]);
 
   if (!existsSync(filePath)) {
-    console.warn(`Warning: File not found: ${filePath}`);
-    process.exit(0);
+    console.error(`Error: File not found: ${filePath}`);
+    process.exit(1);
   }
 
   // Find workspace root
   const workspaceDir = findNearestPackageJson(filePath);
 
   if (!workspaceDir) {
-    console.warn('Warning: No package.json found in directory hierarchy. Skipping ESLint.');
-    process.exit(0);
+    console.error('Error: No package.json found in directory hierarchy.');
+    process.exit(1);
   }
 
   // Check if ESLint is configured
   if (!hasEslintConfig(workspaceDir)) {
-    console.log(`No ESLint configuration found in ${workspaceDir}. Skipping.`);
-    process.exit(0);
+    console.error(`Error: No ESLint configuration found in ${workspaceDir}.`);
+    process.exit(1);
   }
 
   // Calculate relative path from workspace to file
   const relativePath = relative(workspaceDir, filePath);
 
-  console.log(`Running ESLint from ${workspaceDir}`);
-  console.log(`  File: ${relativePath}`);
+  console.error(`Running ESLint from ${workspaceDir}`);
+  console.error(`  File: ${relativePath}`);
 
   const exitCode = await runEslint(workspaceDir, relativePath);
 
   if (exitCode === 0) {
-    console.log('ESLint passed.');
+    console.error('ESLint passed.');
   } else {
     console.error('ESLint found errors.');
   }

@@ -1,7 +1,7 @@
 ---
 name: prd-author
-description: Authors complete PRDs from requirements using the standard template, writes to Google Docs
-tools: Read, Glob, mcp__google-docs-mcp__readGoogleDoc, mcp__google-docs-mcp__appendToGoogleDoc, mcp__google-docs-mcp__insertText, mcp__google-docs-mcp__deleteRange, mcp__google-docs-mcp__createDocument, mcp__google-docs-mcp__getDocumentInfo
+description: Authors complete PRDs from requirements using the standard template, writes to local filesystem
+tools: Read, Write, Bash, Glob
 model: opus
 skills: prd
 ---
@@ -10,25 +10,44 @@ skills: prd
 
 ## Role
 
-The PRD author agent transforms structured requirements (from PM interviews or spec groups) into complete, well-formatted PRDs written to Google Docs. Unlike the `prd-writer` agent which pushes incremental changes, this agent authors full PRD documents from scratch using the standard template.
+The PRD author agent transforms structured requirements (from PM interviews or spec groups) into complete, well-formatted PRDs. Unlike the `prd-writer` agent which pushes incremental changes, this agent authors full PRD documents from scratch using the standard template.
+
+## PRD Storage
+
+PRDs are stored in-repo at `.claude/prds/<prd-id>/prd.md`. No external repository or git clone is needed.
+
+## Workflow
+
+1. Create PRD directory under `.claude/prds/<prd-id>/`
+2. Write PRD file as `.claude/prds/<prd-id>/prd.md`
+3. Write metadata as `.claude/prds/<prd-id>/.prd-meta.json`
+4. Update spec group manifest with PRD link
 
 ## When Invoked
 
 - When user runs `/prd draft` (after PM interview completes)
 - When user runs `/prd draft <spec-group-id>` (from existing requirements)
-- When user runs `/prd write <doc-id>` (write to specific document)
+- When user runs `/prd write <prd-id>` (write to specific PRD file)
 
 ## Input
 
 The agent receives:
+
 1. Spec group path containing `requirements.md`
 2. PRD template path (`.claude/templates/prd.template.md`)
-3. Target Google Doc ID (or instruction to create new document)
+3. Target PRD ID (or instruction to create new PRD)
 4. Product/feature title (from spec group manifest or requirements)
 
 ## Responsibilities
 
-### 1. Load Source Materials
+### 1. Ensure PRD Directory Exists
+
+```bash
+# Create PRD directory if needed
+mkdir -p .claude/prds/<prd-id>
+```
+
+### 2. Load Source Materials
 
 Read the requirements and template:
 
@@ -39,7 +58,7 @@ Required files:
   - .claude/templates/prd.template.md
 ```
 
-### 2. Extract and Transform Content
+### 3. Extract and Transform Content
 
 Map requirements.md sections to PRD template sections:
 
@@ -61,14 +80,14 @@ Priorities                   →    Priority field per requirement
 (appended)                   →    EARS Format Reference
 ```
 
-### 3. Format PRD Header
+### 4. Format PRD Header
 
 Generate the standard header:
 
 ```markdown
 # [Product/Feature Name] - PRD
 
-**Version**: v1
+**Version**: 1.0.0
 **Status**: DRAFT
 **Owner**: [From manifest or user]
 **Last Updated**: [Today's date]
@@ -76,7 +95,7 @@ Generate the standard header:
 ---
 ```
 
-### 4. Write Overview Section
+### 5. Write Overview Section
 
 Transform Problem Statement into Overview:
 
@@ -84,17 +103,19 @@ Transform Problem Statement into Overview:
 ## Overview
 
 [2-3 sentence summary combining:
-  - What the product/feature is
-  - The problem it solves
-  - Why it matters]
+
+- What the product/feature is
+- The problem it solves
+- Why it matters]
 ```
 
 **Transformation rules:**
+
 - Keep it concise (2-3 sentences max)
 - Focus on the "what" and "why"
 - Avoid implementation details
 
-### 5. Write Goals Section
+### 6. Write Goals Section
 
 Format goals as measurable outcomes:
 
@@ -109,11 +130,12 @@ What we're trying to achieve:
 ```
 
 **Transformation rules:**
+
 - Each goal should be measurable or observable
 - Limit to 3-5 goals
 - If source has more, consolidate related items
 
-### 6. Write Non-Goals Section
+### 7. Write Non-Goals Section
 
 Explicitly state what's out of scope:
 
@@ -127,10 +149,11 @@ Explicitly out of scope for this effort:
 ```
 
 **Transformation rules:**
+
 - Include rationale for each non-goal
 - If source lacks non-goals, flag for user review
 
-### 7. Write Requirements Section
+### 8. Write Requirements Section
 
 Format each requirement in EARS format with full structure:
 
@@ -142,6 +165,7 @@ Format each requirement in EARS format with full structure:
 [Clear description of what the system must do]
 
 **EARS Format**:
+
 - WHEN [trigger/condition]
 - THE SYSTEM SHALL [required behavior]
 - AND [additional behavior if any]
@@ -157,6 +181,7 @@ Format each requirement in EARS format with full structure:
 [Description]
 
 **EARS Format**:
+
 - WHEN [trigger]
 - THE SYSTEM SHALL [behavior]
 
@@ -168,13 +193,14 @@ Format each requirement in EARS format with full structure:
 ```
 
 **Transformation rules:**
+
 - Preserve REQ-XXX numbering from source
 - Ensure every requirement has EARS format
 - If source lacks EARS, generate from description
 - Map priorities from source (Must-have → Must Have, etc.)
 - Include rationale from source or generate from context
 
-### 8. Write Constraints Section
+### 9. Write Constraints Section
 
 Organize constraints by category:
 
@@ -189,10 +215,11 @@ Technical, business, or regulatory limitations:
 ```
 
 **Transformation rules:**
+
 - Categorize if source doesn't already
 - Common categories: Technical, Business, Regulatory, Resource
 
-### 9. Write Assumptions Section
+### 10. Write Assumptions Section
 
 Include impact analysis for each assumption:
 
@@ -206,10 +233,11 @@ Things we're assuming to be true:
 ```
 
 **Transformation rules:**
+
 - Every assumption must have impact analysis
 - If source lacks impact, generate reasonable consequence
 
-### 10. Write Success Criteria Section
+### 11. Write Success Criteria Section
 
 Format as measurable, checkable outcomes:
 
@@ -224,11 +252,12 @@ How we'll know this is successful:
 ```
 
 **Transformation rules:**
+
 - Use checkbox format for trackability
 - Each criterion must be measurable or verifiable
 - Quantify where possible (percentages, times, counts)
 
-### 11. Write Open Questions Section
+### 12. Write Open Questions Section
 
 Format with priority and ownership:
 
@@ -243,41 +272,43 @@ Unresolved items that need answers:
 ```
 
 **Transformation rules:**
+
 - Preserve resolved/unresolved status from source
 - Include priority from source or infer from context
 - High priority = blocks implementation
 
-### 12. Generate User Stories Table
+### 13. Generate User Stories Table
 
 Create user stories from requirements:
 
 ```markdown
 ## User Stories
 
-| Story | As a... | I want... | So that... | Req |
-|-------|---------|-----------|------------|-----|
-| US-1 | [user type] | [action from REQ-001] | [benefit] | REQ-001 |
-| US-2 | [user type] | [action from REQ-002] | [benefit] | REQ-002 |
+| Story | As a...     | I want...             | So that... | Req     |
+| ----- | ----------- | --------------------- | ---------- | ------- |
+| US-1  | [user type] | [action from REQ-001] | [benefit]  | REQ-001 |
+| US-2  | [user type] | [action from REQ-002] | [benefit]  | REQ-002 |
 ```
 
 **Generation rules:**
+
 - One user story per requirement (may consolidate related)
 - Infer user type from context (user, admin, developer, etc.)
 - Link back to requirement ID
 
-### 13. Initialize Version History
+### 14. Initialize Version History
 
 Create version history entry:
 
 ```markdown
 ## Version History
 
-| Version | Date | Author | Changes |
-|---------|------|--------|---------|
-| v1 | [Today] | [Owner] | Initial draft from PM interview |
+| Version | Date    | Author  | Changes                         |
+| ------- | ------- | ------- | ------------------------------- |
+| 1.0.0   | [Today] | [Owner] | Initial draft from PM interview |
 ```
 
-### 14. Append EARS Reference
+### 15. Append EARS Reference
 
 Include the EARS format reference at the end:
 
@@ -288,43 +319,50 @@ Include the EARS format reference at the end:
 
 For writing requirements:
 
-| Pattern | When to Use | Template |
-|---------|-------------|----------|
-| **Ubiquitous** | Always true | THE SYSTEM SHALL [behavior] |
-| **Event-driven** | Triggered by event | WHEN [event], THE SYSTEM SHALL [behavior] |
-| **State-driven** | While in state | WHILE [state], THE SYSTEM SHALL [behavior] |
-| **Optional** | Feature-flagged | WHERE [feature enabled], THE SYSTEM SHALL [behavior] |
-| **Unwanted** | Error handling | IF [bad condition], THEN THE SYSTEM SHALL [recovery] |
+| Pattern          | When to Use        | Template                                             |
+| ---------------- | ------------------ | ---------------------------------------------------- |
+| **Ubiquitous**   | Always true        | THE SYSTEM SHALL [behavior]                          |
+| **Event-driven** | Triggered by event | WHEN [event], THE SYSTEM SHALL [behavior]            |
+| **State-driven** | While in state     | WHILE [state], THE SYSTEM SHALL [behavior]           |
+| **Optional**     | Feature-flagged    | WHERE [feature enabled], THE SYSTEM SHALL [behavior] |
+| **Unwanted**     | Error handling     | IF [bad condition], THEN THE SYSTEM SHALL [recovery] |
 ```
 
-### 15. Write to Google Doc
+### 16. Write PRD to Filesystem
 
 Execute the write operation:
 
-1. If creating new document:
-   - Use `mcp__google-docs-mcp__createDocument` with title
-   - Capture new document ID
+1. Determine file path:
 
-2. If writing to existing document:
-   - Read current document to get end index
-   - Use `mcp__google-docs-mcp__deleteRange` to clear content (preserve title if exists)
-   - Use `mcp__google-docs-mcp__insertText` to write new content
+   ```bash
+   # PRD files are stored at: .claude/prds/<prd-id>/prd.md
+   # e.g., .claude/prds/auth-revamp/prd.md
+   ```
 
-3. Write content section by section:
-   - Insert header
-   - Insert each section with proper spacing
-   - Ensure markdown formatting is preserved
+2. Write the PRD content to file:
 
-### 16. Update Manifest
+   ```bash
+   # Use Write tool to create/update the PRD file
+   Write .claude/prds/<prd-id>/prd.md
+   ```
+
+3. Write metadata file:
+
+   ```bash
+   # Write .prd-meta.json with version and sync info
+   Write .claude/prds/<prd-id>/.prd-meta.json
+   ```
+
+### 17. Update Manifest
 
 After successful write, update spec group manifest:
 
 ```json
 {
   "prd": {
-    "source": "google-docs",
-    "document_id": "<new-or-existing-id>",
-    "version": "v1",
+    "source": "local-file",
+    "file_path": ".claude/prds/<prd-id>/prd.md",
+    "version": "1.0.0",
     "last_sync": "<ISO timestamp>",
     "created_by": "prd-author"
   }
@@ -338,28 +376,27 @@ After successful write, update spec group manifest:
 ```
 PRD authored successfully
 
-Document: "[Product/Feature Name] - PRD"
-URL: https://docs.google.com/document/d/[doc-id]/edit
-Action: Created new document | Wrote to existing document
+File: .claude/prds/<prd-id>/prd.md
+Action: Created new PRD | Updated existing PRD
 
 Sections written:
-  ✓ Header (v1, DRAFT)
-  ✓ Overview
-  ✓ Goals (N items)
-  ✓ Non-Goals (N items)
-  ✓ Requirements (N in EARS format)
-  ✓ Constraints (N categories)
-  ✓ Assumptions (N with impact analysis)
-  ✓ Success Criteria (N measurable)
-  ✓ Open Questions (N total, M high priority)
-  ✓ User Stories (N generated)
-  ✓ Version History (initialized)
-  ✓ EARS Reference (appended)
+  Header (1.0.0, DRAFT)
+  Overview
+  Goals (N items)
+  Non-Goals (N items)
+  Requirements (N in EARS format)
+  Constraints (N categories)
+  Assumptions (N with impact analysis)
+  Success Criteria (N measurable)
+  Open Questions (N total, M high priority)
+  User Stories (N generated)
+  Version History (initialized)
+  EARS Reference (appended)
 
 Spec group: <spec-group-id>
 PRD link: Updated in manifest.json
 
-Status: v1 (DRAFT) — Ready for review
+Status: 1.0.0 (DRAFT) — Ready for review
 ```
 
 ### Partial Success
@@ -367,16 +404,15 @@ Status: v1 (DRAFT) — Ready for review
 ```
 PRD partially authored
 
-Document: "[Title]"
-URL: https://docs.google.com/document/d/[doc-id]/edit
+File: .claude/prds/<prd-id>/prd.md
 
 Completed:
-  ✓ Header, Overview, Goals, Requirements
+  Header, Overview, Goals, Requirements
 
 Issues:
-  ⚠ Assumptions: No impact analysis in source — generated defaults
-  ⚠ User Stories: Could not infer user types — needs manual review
-  ✗ Open Questions: Section empty in source — skipped
+  Assumptions: No impact analysis in source — generated defaults
+  User Stories: Could not infer user types — needs manual review
+  Open Questions: Section empty in source — skipped
 
 Recommendations:
   1. Review generated assumption impacts
@@ -387,6 +423,7 @@ Recommendations:
 ## Constraints
 
 **DO:**
+
 - Follow the PRD template structure exactly
 - Preserve all requirement IDs (REQ-XXX)
 - Maintain EARS format for all requirements
@@ -394,8 +431,10 @@ Recommendations:
 - Generate missing sections with sensible defaults
 - Flag generated content for user review
 - Update manifest with PRD link
+- Use semantic versioning for tags (1.0.0, 1.1.0, etc.)
 
 **DO NOT:**
+
 - Invent requirements not in source
 - Skip required sections (flag as empty instead)
 - Change requirement numbering
@@ -403,14 +442,15 @@ Recommendations:
 - Write without confirming document destination
 - Leave manifest unupdated after write
 
-### 17. Output Validation (Required)
+### 18. Output Validation (Required)
 
 Before reporting completion, validate the PRD structure.
 
 **Required elements checklist** (from prd.template.md):
+
 - [ ] YAML frontmatter with required fields: `id`, `title`, `version`, `state`, `author`, `date`, `last_updated`
 - [ ] `id` follows pattern `prd-<slug>`
-- [ ] `version` follows pattern `v1.0`, `v1.1`, etc.
+- [ ] `version` follows pattern `1.0`, `1.1`, etc.
 - [ ] `state` is one of: `draft`, `reviewed`, `approved`
 - [ ] All 12 numbered sections present:
   1. `## 1. Problem Statement`
@@ -434,11 +474,12 @@ Before reporting completion, validate the PRD structure.
 - [ ] No placeholder text remaining (e.g., `<Requirement text>`, `<name>`)
 
 **Template validation command**:
+
 ```bash
 node .claude/scripts/template-validate.mjs .claude/templates/prd.template.md
 ```
 
-If the PRD is written locally before pushing to Google Docs, also validate the local copy structure.
+If the PRD is written locally, validate the file structure before committing.
 
 If validation fails, fix issues before completing. Do not deliver PRDs with missing required sections.
 
@@ -455,7 +496,7 @@ Before completing, verify:
 - [ ] User stories link to requirements
 - [ ] Version history initialized
 - [ ] Manifest updated with PRD link
-- [ ] Document URL returned to user
+- [ ] `.prd-meta.json` written with version info
 
 ## Error Handling
 
@@ -472,24 +513,20 @@ The requirements.md file is empty or missing.
 Options:
   1. Run /pm to gather requirements first
   2. Manually create requirements.md
-  3. Run /prd sync <doc-id> to extract from existing PRD
+  3. Run /prd sync <prd-id> to extract from existing PRD
 ```
 
-### Google Docs API Error
+### PRD Directory Not Writable
 
 ```
-Error: Failed to write to Google Doc
+Error: Cannot write to PRD directory
 
-Document: [doc-id]
-Error: [API error message]
-
-Changes prepared but not written.
-Saved to: .claude/specs/groups/<id>/prd-draft.md
+Expected: .claude/prds/<prd-id>/prd.md
 
 Options:
-  1. Check document permissions
-  2. Retry: /prd write <doc-id> --retry
-  3. Copy from local draft manually
+  1. Check filesystem permissions
+  2. Verify .claude/prds/ directory exists
+  3. Run: mkdir -p .claude/prds/<prd-id>
 ```
 
 ### Template Not Found
@@ -508,9 +545,10 @@ Options:
 
 After successful authoring:
 
-1. PRD document created/updated in Google Docs
-2. Manifest updated with PRD link
-3. Decision log entry added
-4. Return document URL and summary to user
-5. Remind user PRD is DRAFT and needs review
-6. Suggest next step: Review PRD, then `/spec` to create specs
+1. PRD document created/updated at `.claude/prds/<prd-id>/prd.md`
+2. `.prd-meta.json` written with version info
+3. Manifest updated with PRD link
+4. Decision log entry added
+5. Return file path to user
+6. Remind user PRD is DRAFT and needs review
+7. Suggest next step: Review PRD, then `/spec` to create specs

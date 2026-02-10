@@ -13,6 +13,7 @@
  *   complete-atomic-spec <atomic_spec_id>         - Mark an atomic spec as done
  *   dispatch-subagent <task_id> <type> <desc>     - Track subagent dispatch
  *   complete-subagent <task_id> <result_summary>  - Mark subagent as complete
+ *   journal-created <path-to-journal>             - Mark journal entry as created
  *   complete-work                                 - Finalize completed work
  *   archive-incomplete                            - Archive incomplete work to history
  *   get-status                                    - Output current session state summary (JSON)
@@ -43,6 +44,7 @@ const VALID_PHASES = [
   'testing',
   'verifying',
   'reviewing',
+  'journaling',
   'complete'
 ];
 
@@ -241,11 +243,11 @@ function opInit() {
   if (existsSync(SESSION_PATH)) {
     const session = loadSession();
     if (session) {
-      console.log('session.json already exists and is valid.');
+      console.error('session.json already exists and is valid.');
       return;
     }
     // File exists but is invalid - recreate
-    console.log('session.json exists but is invalid. Recreating...');
+    console.error('session.json exists but is invalid. Recreating...');
   }
 
   const session = createEmptySession();
@@ -253,7 +255,7 @@ function opInit() {
     message: 'Session initialized'
   });
   saveSession(session);
-  console.log(`Initialized session.json at ${SESSION_PATH}`);
+  console.error(`Initialized session.json at ${SESSION_PATH}`);
 }
 
 /**
@@ -294,7 +296,7 @@ function opStartWork(specGroupId, workflow, objective) {
       initialPhase = 'spec_authoring';
       break;
     case 'journal-only':
-      initialPhase = 'complete';
+      initialPhase = 'journaling';
       break;
     default:
       initialPhase = 'pm_interview';
@@ -314,6 +316,13 @@ function opStartWork(specGroupId, workflow, objective) {
     next_actions: []
   };
 
+  // Initialize journal tracking fields for journal-only workflow
+  if (workflow === 'journal-only') {
+    session.phase_checkpoint.journal_required = true;
+    session.phase_checkpoint.journal_created = false;
+    session.phase_checkpoint.journal_entry_path = null;
+  }
+
   addHistoryEntry(session, 'work_started', {
     spec_group_id: specGroupId,
     workflow,
@@ -321,7 +330,7 @@ function opStartWork(specGroupId, workflow, objective) {
   });
 
   saveSession(session);
-  console.log(`Started work on '${specGroupId}' with workflow '${workflow}'`);
+  console.error(`Started work on '${specGroupId}' with workflow '${workflow}'`);
 }
 
 /**
@@ -352,10 +361,21 @@ function opTransitionPhase(newPhase) {
   // Allow forward progression or staying in same phase
   // Allow backward only for certain cases (e.g., returning to spec_authoring after review feedback)
   if (newIndex < oldIndex && newPhase !== 'spec_authoring' && newPhase !== 'atomizing') {
-    console.warn(
+    console.error(
       `Warning: Transitioning backward from '${oldPhase}' to '${newPhase}'. ` +
       `Ensure this is intentional.`
     );
+  }
+
+  // Warn if transitioning from journaling to complete without journal created
+  if (oldPhase === 'journaling' && newPhase === 'complete') {
+    if (session.phase_checkpoint?.journal_required === true &&
+        session.phase_checkpoint?.journal_created !== true) {
+      console.error(
+        `Warning: Transitioning from 'journaling' to 'complete' but journal_created is not true. ` +
+        `A journal entry should be created before completing journal-only workflow.`
+      );
+    }
   }
 
   session.active_work.current_phase = newPhase;
@@ -372,7 +392,7 @@ function opTransitionPhase(newPhase) {
   });
 
   saveSession(session);
-  console.log(`Transitioned from '${oldPhase}' to '${newPhase}'`);
+  console.error(`Transitioned from '${oldPhase}' to '${newPhase}'`);
 }
 
 /**
@@ -400,7 +420,7 @@ function opCompleteAtomicSpec(atomicSpecId) {
 
   // Check if already completed
   if (session.phase_checkpoint.atomic_specs_completed.includes(atomicSpecId)) {
-    console.log(`Atomic spec '${atomicSpecId}' is already marked as completed.`);
+    console.error(`Atomic spec '${atomicSpecId}' is already marked as completed.`);
     return;
   }
 
@@ -419,7 +439,7 @@ function opCompleteAtomicSpec(atomicSpecId) {
   });
 
   saveSession(session);
-  console.log(`Marked atomic spec '${atomicSpecId}' as completed.`);
+  console.error(`Marked atomic spec '${atomicSpecId}' as completed.`);
 }
 
 /**
@@ -470,7 +490,7 @@ function opDispatchSubagent(taskId, subagentType, description) {
   });
 
   saveSession(session);
-  console.log(`Dispatched subagent '${subagentType}' with task_id '${finalTaskId}'`);
+  console.error(`Dispatched subagent '${subagentType}' with task_id '${finalTaskId}'`);
 }
 
 /**
@@ -493,7 +513,7 @@ function opCompleteSubagent(taskId, resultSummary) {
     // Check if already completed
     const completedTask = session.subagent_tasks.completed_this_session.find(t => t.task_id === taskId);
     if (completedTask) {
-      console.log(`Task '${taskId}' is already completed.`);
+      console.error(`Task '${taskId}' is already completed.`);
       return;
     }
     throw new Error(`Task '${taskId}' not found in in_flight tasks.`);
@@ -520,7 +540,7 @@ function opCompleteSubagent(taskId, resultSummary) {
   });
 
   saveSession(session);
-  console.log(`Completed subagent task '${taskId}'`);
+  console.error(`Completed subagent task '${taskId}'`);
 }
 
 /**
@@ -533,7 +553,7 @@ function opCompleteWork() {
   }
 
   if (!session.active_work) {
-    console.log('No active work to complete.');
+    console.error('No active work to complete.');
     return;
   }
 
@@ -542,7 +562,7 @@ function opCompleteWork() {
 
   // Ensure we're in a completion state
   if (session.active_work.current_phase !== 'complete') {
-    console.warn(
+    console.error(
       `Warning: Completing work while phase is '${session.active_work.current_phase}'. ` +
       `Consider transitioning to 'complete' first.`
     );
@@ -571,7 +591,7 @@ function opCompleteWork() {
   session.subagent_tasks.in_flight = [];
 
   saveSession(session);
-  console.log(`Completed work on '${specGroupId}'`);
+  console.error(`Completed work on '${specGroupId}'`);
 }
 
 /**
@@ -584,7 +604,7 @@ function opArchiveIncomplete() {
   }
 
   if (!session.active_work) {
-    console.log('No active work to archive.');
+    console.error('No active work to archive.');
     return;
   }
 
@@ -616,7 +636,36 @@ function opArchiveIncomplete() {
   session.subagent_tasks.in_flight = [];
 
   saveSession(session);
-  console.log(`Archived incomplete work on '${specGroupId}' (was at phase '${currentPhase}')`);
+  console.error(`Archived incomplete work on '${specGroupId}' (was at phase '${currentPhase}')`);
+}
+
+/**
+ * journal-created - Mark that a journal entry has been created.
+ */
+function opJournalCreated(journalPath) {
+  if (!journalPath) {
+    throw new Error('Usage: journal-created <path-to-journal>');
+  }
+
+  const session = loadSession();
+  if (!session) {
+    throw new Error('No session.json exists. Run "init" first.');
+  }
+
+  if (!session.phase_checkpoint) {
+    throw new Error('No phase checkpoint. This should not happen.');
+  }
+
+  session.phase_checkpoint.journal_created = true;
+  session.phase_checkpoint.journal_entry_path = journalPath;
+
+  addHistoryEntry(session, 'checkpoint_saved', {
+    spec_group_id: session.active_work?.spec_group_id,
+    message: `Journal entry created: ${journalPath}`
+  });
+
+  saveSession(session);
+  console.error(`Marked journal entry as created: ${journalPath}`);
 }
 
 /**
@@ -631,7 +680,7 @@ function opGetStatus() {
       has_active_work: false,
       message: 'No session.json found. Run "init" to create one.'
     };
-    console.log(JSON.stringify(status, null, 2));
+    console.error(JSON.stringify(status, null, 2));
     return;
   }
 
@@ -669,7 +718,7 @@ function opGetStatus() {
     }))
   };
 
-  console.log(JSON.stringify(status, null, 2));
+  console.error(JSON.stringify(status, null, 2));
 }
 
 // =============================================================================
@@ -677,7 +726,7 @@ function opGetStatus() {
 // =============================================================================
 
 function printUsage() {
-  console.log(`
+  console.error(`
 Session Checkpoint Utility
 
 Usage: node session-checkpoint.mjs <operation> [args...]
@@ -689,6 +738,7 @@ Operations:
   complete-atomic-spec <atomic_spec_id>           Mark atomic spec as done
   dispatch-subagent <task_id> <type> <desc>       Track subagent dispatch
   complete-subagent <task_id> <result_summary>    Mark subagent complete
+  journal-created <path-to-journal>               Mark journal entry as created
   complete-work                                   Finalize completed work
   archive-incomplete                              Archive incomplete work
   get-status                                      Output session state (JSON)
@@ -738,6 +788,10 @@ function main() {
 
       case 'complete-subagent':
         opCompleteSubagent(args[1], args.slice(2).join(' '));
+        break;
+
+      case 'journal-created':
+        opJournalCreated(args[1]);
         break;
 
       case 'complete-work':

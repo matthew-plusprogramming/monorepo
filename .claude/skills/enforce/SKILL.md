@@ -22,6 +22,7 @@ Validate that atomic specs are at the right level of granularity—not too coars
 ## Prerequisites
 
 Before running `/enforce`:
+
 1. Spec group must exist with `manifest.json`
 2. `requirements.md` must exist
 3. `atomic/` directory must contain atomic specs (from `/atomize`)
@@ -33,6 +34,7 @@ Before running `/enforce`:
    - Validate required files exist
 
 2. **Dispatch atomicity-enforcer agent**
+
    ```
    Task: atomicity-enforcer
    Prompt: Validate atomic specs in <spec-group-path>
@@ -51,24 +53,28 @@ Before running `/enforce`:
 ## Validation Criteria
 
 ### TOO_COARSE (needs splitting)
+
 - Contains multiple distinct behaviors
 - Would require multiple test suites
 - Cannot partially roll back
 - Reviewer needs sibling context
 
 ### TOO_GRANULAR (needs merging)
+
 - Cannot test in isolation
 - Cannot deploy meaningfully alone
 - Describes code fragment, not behavior
 - No standalone user value
 
 ### JUST_RIGHT (passing)
+
 - Single testable behavior
 - Deployable as standalone PR
 - Reviewable without siblings
 - Reversible without breaking others
 
 ### Coverage
+
 - Every REQ-XXX must appear in at least one atomic spec
 
 ## Output
@@ -128,6 +134,7 @@ Next step: Run /atomize --refine to address issues
 ## Strict Mode
 
 With `--strict`:
+
 - All WARNINGS become FAILING
 - Used before implementation to ensure maximum atomicity discipline
 - Recommended for complex or high-risk features
@@ -151,17 +158,20 @@ Repeat until PASSING or max iterations
 After `/enforce`:
 
 **If PASSING:**
+
 - `manifest.json`:
   - `atomic_specs.enforcement_status`: "passing"
   - `atomic_specs.last_enforced`: <timestamp>
 - Spec group ready for `review_state` → APPROVED
 
 **If WARNINGS:**
+
 - `manifest.json`:
   - `atomic_specs.enforcement_status`: "warnings"
 - User decides whether to proceed or refine
 
 **If FAILING:**
+
 - `manifest.json`:
   - `atomic_specs.enforcement_status`: "failing"
 - Must run `/atomize --refine` before implementation
@@ -169,12 +179,14 @@ After `/enforce`:
 ## Edge Cases
 
 ### No Atomic Specs
+
 ```
 Error: No atomic specs found in spec group
 Run /atomize first to decompose spec.md
 ```
 
 ### Requirements Changed
+
 ```
 Warning: requirements.md modified since last atomization
 Coverage check may be inaccurate
@@ -182,6 +194,7 @@ Consider re-running /atomize
 ```
 
 ### Circular Dependencies Detected
+
 ```
 Error: Circular dependency detected
   as-002 depends on as-003

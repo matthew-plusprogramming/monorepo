@@ -23,12 +23,14 @@ Review implementation for quality issues before security review. Catch maintaina
 ## When to Use
 
 **Mandatory for**:
+
 - Any implementation completing the spec workflow
 - Multi-file changes
 - Public API additions or modifications
 - Changes to core services
 
 **Optional for**:
+
 - Single-file bug fixes
 - Documentation-only changes
 - Test-only changes
@@ -43,6 +45,7 @@ Implementation → Unify → Code Review → Security Review → Merge
 ```
 
 Code Review runs BEFORE Security Review because:
+
 - Quality issues may mask security issues
 - Consistent code is easier to security-review
 - Catches different class of problems
@@ -149,14 +152,32 @@ Check each category systematically:
 - Test isolation (no shared state)
 - Tests reference correct atomic spec IDs
 
+#### H. Assumption Review
+
+- `// TODO(assumption):` comments identified and reviewed
+- Each assumption's confidence level assessed for appropriateness
+- No assumptions contradict explicit spec requirements
+- No assumptions make behavioral decisions (should have been escalated)
+- Atomic spec "Assumptions Made" section matches code TODOs
+- Each assumption has clear resolution: Accept / Reject / Escalate
+
 ### Step 4: Severity Classification
 
-| Level | Meaning | Blocks Merge |
-|-------|---------|--------------|
-| **Critical** | Will cause runtime failure | Yes |
-| **High** | Significant maintainability issue | Yes |
-| **Medium** | Should fix but not blocking | No |
-| **Low** | Suggestion for improvement | No |
+| Level        | Meaning                                        | Blocks Merge |
+| ------------ | ---------------------------------------------- | ------------ |
+| **Critical** | Will cause runtime failure                     | Yes          |
+| **High**     | Significant maintainability issue              | Yes          |
+| **High**     | Unresolved assumptions (TODO(assumption) open) | Yes          |
+| **Medium**   | Should fix but not blocking                    | No           |
+| **Low**      | Suggestion for improvement                     | No           |
+
+**Assumption Severity Rules**:
+
+- Unresolved `// TODO(assumption):` comments → High (blocking)
+- Assumption contradicts spec → High (blocking)
+- Assumption makes behavioral decision → High (blocking)
+- Low-confidence assumption without justification → Medium
+- Accepted assumption with documentation → No finding
 
 ### Step 5: Generate Review Report
 
@@ -170,41 +191,50 @@ Check each category systematically:
 ### Summary
 
 | Severity | Count |
-|----------|-------|
-| Critical | 0 |
-| High | 0 |
-| Medium | 2 |
-| Low | 3 |
+| -------- | ----- |
+| Critical | 0     |
+| High     | 0     |
+| Medium   | 2     |
+| Low      | 3     |
 
 **Verdict**: ✅ PASS
 
 ### Per Atomic Spec Review
 
 #### as-001: Logout Button UI
+
 - Files: src/components/UserMenu.tsx
 - Quality: ✅ Clean
 - Spec Conformance: ✅ Matches ACs
+- Assumption Review: ✅ No assumptions
 
 #### as-002: Token Clearing
+
 - Files: src/services/auth-service.ts
 - Quality: ⚠️ 1 Medium finding (M1)
 - Spec Conformance: ✅ Matches ACs
+- Assumption Review: ✅ 1 assumption (Accepted)
 
 #### as-003: Post-Logout Redirect
+
 - Files: src/router/auth-router.ts
 - Quality: ✅ Clean
 - Spec Conformance: ✅ Matches ACs
+- Assumption Review: ✅ No assumptions
 
 #### as-004: Error Handling
+
 - Files: src/services/auth-service.ts
 - Quality: ⚠️ 1 Medium finding (M2)
 - Spec Conformance: ✅ Matches ACs
+- Assumption Review: ✅ No assumptions
 
 ### Findings
 
 #### Medium Severity
 
 **M1: Function approaching length limit**
+
 - **File**: src/services/auth-service.ts:45-90
 - **Atomic Spec**: as-002
 - **Issue**: `logout` function is 45 lines (approaching 50 line threshold)
@@ -212,6 +242,7 @@ Check each category systematically:
 - **Suggestion**: Consider extracting token clearing logic
 
 **M2: Missing return type**
+
 - **File**: src/services/auth-service.ts:95
 - **Atomic Spec**: as-004
 - **Issue**: `handleLogoutError` has no return type annotation
@@ -249,6 +280,7 @@ If Critical or High severity issues found:
 ### Blocking Issues
 
 **H1: Swallowed exception in error handling**
+
 - **File**: src/services/auth-service.ts:78
 - **Atomic Spec**: as-004
 - **Issue**: Catch block returns null, hiding failure cause
@@ -257,6 +289,7 @@ If Critical or High severity issues found:
 - **Required Fix**: Throw AuthError with cause chain
 
 **H2: Implementation deviates from spec**
+
 - **File**: src/services/auth-service.ts:67
 - **Atomic Spec**: as-002
 - **Issue**: Clears ALL localStorage, spec says only auth_token
@@ -265,6 +298,40 @@ If Critical or High severity issues found:
 - **Required Fix**: Change `localStorage.clear()` to `localStorage.removeItem('auth_token')`
 
 **Action**: Fix blocking issues, then re-run code review.
+```
+
+#### Blocking on Unresolved Assumptions
+
+When unresolved assumptions are found, the review produces verdict `BLOCKED`:
+
+```markdown
+## Code Review Report
+
+**Spec Group**: <spec-group-id>
+**Verdict**: ❌ BLOCKED (1 unresolved assumption)
+
+### Blocking Issues
+
+**H3: Unresolved assumption - timeout duration**
+
+- **File**: src/services/auth-service.ts:52
+- **Atomic Spec**: as-002
+- **TODO**: `// TODO(assumption): [HIGH] Assuming 5s timeout is sufficient - spec doesn't specify`
+- **Issue**: Behavioral assumption made without escalation
+- **Impact**: May cause timeout failures in slow network conditions
+- **Resolution Required**: One of:
+  - **Accept**: Add to atomic spec "Assumptions Made" section with justification
+  - **Reject**: Remove assumption, use spec-defined value or escalate
+  - **Escalate**: Propose spec amendment with timeout AC
+
+### Assumption Summary
+
+| File                         | Line | Assumption                  | Confidence | Status     |
+| ---------------------------- | ---- | --------------------------- | ---------- | ---------- |
+| src/services/auth-service.ts | 52   | 5s timeout sufficient       | HIGH       | Unresolved |
+| src/services/auth-service.ts | 78   | Retry not needed on failure | MEDIUM     | Accepted   |
+
+**Action**: Resolve all unresolved assumptions, then re-run code review.
 ```
 
 ### Step 7: Update Manifest
@@ -292,13 +359,16 @@ Update manifest.json with code review status:
 ### Be Specific and Actionable
 
 **Bad**:
+
 ```markdown
 Code quality could be better in auth.ts
 ```
 
 **Good**:
+
 ```markdown
 **Quality: Function too long** (Medium)
+
 - File: src/services/auth-service.ts:45-120
 - Atomic Spec: as-002
 - Issue: `validateSession` is 75 lines with 8 branches
@@ -312,6 +382,7 @@ Always verify implementation matches atomic spec:
 
 ```markdown
 **Spec Conformance: Extra feature added** (High)
+
 - File: src/services/auth-service.ts:85
 - Atomic Spec: as-002
 - Issue: Auto-retry on failure added (not in spec)
@@ -326,14 +397,16 @@ Every finding should reference the atomic spec it relates to:
 
 ```markdown
 **H1: Missing error handling**
+
 - **File**: src/router/auth-router.ts:45
-- **Atomic Spec**: as-003  ← Always include this
+- **Atomic Spec**: as-003 ← Always include this
 - **Issue**: ...
 ```
 
 ### Acknowledge Good Patterns
 
 Include positive observations:
+
 - Well-structured code
 - Good test coverage
 - Clear AC references in code
@@ -364,18 +437,30 @@ For each atomic spec:
 □ No `any` without justification
 □ Public APIs have return types
 □ Tests reference correct atomic spec IDs
+
+## Assumption Review (Category H)
+
+□ TODO(assumption) comments identified and reviewed
+□ Each assumption's confidence level validated for appropriateness
+□ Spec intent checked - no assumptions contradict requirements
+□ Behavioral assumption contradictions flagged (should have been escalated)
+□ Atomic spec "Assumptions Made" section matches code TODOs
+□ Each assumption resolved: Accept / Reject / Escalate
 ```
 
 ## Integration with Other Skills
 
 **Before code review**:
+
 - `/unify` to ensure spec-impl-test convergence
 
 **After code review**:
+
 - If PASS → Proceed to `/security`
 - If BLOCKED → Use `/implement` to fix issues, then re-run `/code-review`
 
 **Full review chain after code-review**:
+
 1. `/security` - Security review (always)
 2. `/browser-test` - UI validation (if UI changes)
 3. `/docs` - Documentation generation (if public API)
@@ -390,6 +475,7 @@ You report findings but do not modify code. Let Implementer fix issues.
 ### Not Security Review
 
 Focus on code quality. Security Reviewer handles:
+
 - Injection vulnerabilities
 - Authentication/authorization flaws
 - Secrets exposure
@@ -404,6 +490,7 @@ Flag obvious security issues, but security review is the comprehensive check.
 **Input**: Well-structured logout implementation (spec group sg-logout-button)
 
 **Review**:
+
 - as-001: ✅ Clean implementation
 - as-002: ✅ Clean implementation
 - as-003: ✅ Clean implementation
@@ -416,6 +503,7 @@ Flag obvious security issues, but security review is the comprehensive check.
 **Input**: Feature implementation with minor issues
 
 **Review**:
+
 - as-001: ✅ Clean
 - as-002: ⚠️ 1 Medium (long function)
 - as-003: ✅ Clean
@@ -428,6 +516,7 @@ Flag obvious security issues, but security review is the comprehensive check.
 **Input**: Implementation with spec deviation
 
 **Review**:
+
 - as-002: ❌ High (clears all localStorage instead of just auth_token)
 
 **Output**: ❌ BLOCKED - Fix H1 before proceeding

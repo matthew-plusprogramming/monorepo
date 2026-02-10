@@ -157,6 +157,16 @@ function validateAgainstSchema(data, schema, path = '') {
     }
   }
 
+  // Check for additional properties not in schema
+  if (schema.additionalProperties === false && typeof data === 'object' && !Array.isArray(data)) {
+    const allowedKeys = schema.properties ? Object.keys(schema.properties) : [];
+    for (const key of Object.keys(data)) {
+      if (!allowedKeys.includes(key)) {
+        errors.push(`${path}${key}: additional property not allowed by schema`);
+      }
+    }
+  }
+
   return errors;
 }
 
@@ -233,9 +243,9 @@ function main() {
   const args = process.argv.slice(2);
 
   if (args.length === 0) {
-    console.log('Usage: validate-manifest.mjs <manifest.json> [manifest2.json ...]');
-    console.log('No files provided, nothing to validate.');
-    process.exit(0);
+    console.error('Usage: validate-manifest.mjs <manifest.json> [manifest2.json ...]');
+    console.error('Error: No files provided.');
+    process.exit(1);
   }
 
   let hasErrors = false;
@@ -243,14 +253,14 @@ function main() {
 
   for (const arg of args) {
     const filePath = resolve(arg);
-    console.log(`Validating: ${basename(filePath)}`);
+    console.error(`Validating: ${basename(filePath)}`);
 
     const { errors, warnings } = validateManifest(filePath);
 
     // Print warnings
     for (const warning of warnings) {
       hasWarnings = true;
-      console.warn(`Warning: ${warning}`);
+      console.error(`Warning: ${warning}`);
     }
 
     // Print errors
@@ -260,10 +270,10 @@ function main() {
     }
 
     if (errors.length === 0) {
-      console.log(`Manifest ${basename(filePath)} is valid.`);
+      console.error(`Manifest ${basename(filePath)} is valid.`);
     }
 
-    console.log('');
+    console.error('');
   }
 
   if (hasErrors) {
@@ -272,7 +282,7 @@ function main() {
   }
 
   if (args.length > 1) {
-    console.log(`Validated ${args.length} manifest(s) successfully.`);
+    console.error(`Validated ${args.length} manifest(s) successfully.`);
   }
 
   process.exit(0);

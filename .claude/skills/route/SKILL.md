@@ -1,6 +1,7 @@
 ---
 name: route
 description: Analyze task complexity and route to appropriate workflow. Defaults to oneoff-spec (specs are cheap, bugs are expensive). Use oneoff-vibe only for truly trivial changes or explicit user override. Use orchestrator for large multi-workstream efforts. Use journal-only for non-spec work that needs documentation.
+user-invocable: true
 allowed-tools: Read, Glob, Grep
 ---
 
@@ -418,8 +419,8 @@ For architectural decisions, use the decision-record template:
 After routing:
 
 - **oneoff-vibe**: Proceed directly to implementation
-- **oneoff-spec**: Use `/pm` to gather requirements → (optional) `/prd draft` to write PRD to Google Docs → `/spec` to create spec group → `/atomize` to create atomic specs → `/enforce` to validate atomicity → [If spec has dependencies: `/investigate` to surface cross-spec inconsistencies] → User approval → `/implement` + `/test` → `/unify` → `/code-review` → `/security` → (if PRD exists) `/prd push` to sync discoveries
-- **orchestrator**: Use `/pm` to create ProblemBrief → (optional) `/prd draft` for stakeholder PRD → `/spec` to create MasterSpec with workstream spec groups → For each workstream: `/atomize` + `/enforce` → **MANDATORY: `/investigate` to surface cross-workstream inconsistencies** → Resolve decisions → User approval → Facilitator orchestrates parallel execution → `/prd push` to sync discoveries
+- **oneoff-spec**: Use `/pm` to gather requirements → (optional) `/prd draft` to create PRD in git repo → `/spec` to create spec group → `/atomize` to create atomic specs → `/enforce` to validate atomicity → [If spec has dependencies: `/investigate` to surface cross-spec inconsistencies] → User approval → `/implement` + `/test` → `/unify` → `/code-review` → `/security` → (if PRD exists) `/prd push` to sync discoveries
+- **orchestrator**: Use `/pm` to create ProblemBrief → (optional) `/prd draft` to create PRD in git repo → `/spec` to create MasterSpec with workstream spec groups → For each workstream: `/atomize` + `/enforce` → **MANDATORY: `/investigate` to surface cross-workstream inconsistencies** → Resolve decisions → User approval → Facilitator orchestrates parallel execution → `/prd push` to sync discoveries
 - **refactor**: Use `/refactor` skill → Define scope and patterns → Run tests (baseline) → Execute refactoring → Run tests (verification) → `/code-review` → `/security` (if applicable)
 - **journal-only**: Create appropriate journal entry → For decisions: use decision-record template at `.claude/templates/decision-record.template.md` → For investigations: document findings, root cause, resolution → For hotfixes: document fix, root cause, prevention measures → Store in `.claude/journals/` directory
 

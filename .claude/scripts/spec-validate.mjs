@@ -93,9 +93,14 @@ function validateSpecFile(filePath) {
   }
 
   // Validate status is a known value
-  const validStatuses = ['draft', 'review', 'approved', 'implementing', 'complete', 'archived'];
+  // Top-level specs use: draft, review, approved, implementing, complete, archived
+  // Atomic specs use: pending, implementing, implemented, tested, verified
+  const validStatuses = [
+    'draft', 'review', 'approved', 'implementing', 'complete', 'archived',
+    'pending', 'implemented', 'tested', 'verified'
+  ];
   if (frontmatter.status && !validStatuses.includes(frontmatter.status)) {
-    warnings.push(`unknown status '${frontmatter.status}' (expected one of: ${validStatuses.join(', ')})`);
+    warnings.push(`unknown status '${frontmatter.status}' (expected one of: draft, review, approved, implementing, complete, archived [top-level] or pending, implementing, implemented, tested, verified [atomic])`);
   }
 
   // Validate required sections
@@ -105,10 +110,14 @@ function validateSpecFile(filePath) {
     }
   }
 
-  // Check optional sections and warn if missing
-  for (const section of OPTIONAL_SECTIONS) {
-    if (!section.pattern.test(content)) {
-      warnings.push(`missing optional section '${section.name}'`);
+  // Check optional sections and warn if missing (only for atomic specs, not master/workstream specs)
+  // Master specs and workstream specs don't need Acceptance Criteria - they have workstreams instead
+  const isAtomicSpec = filePath.includes('/atomic/') || frontmatter.id?.startsWith('as-');
+  if (isAtomicSpec) {
+    for (const section of OPTIONAL_SECTIONS) {
+      if (!section.pattern.test(content)) {
+        warnings.push(`missing optional section '${section.name}'`);
+      }
     }
   }
 
@@ -118,14 +127,16 @@ function validateSpecFile(filePath) {
 function main() {
   const args = process.argv.slice(2);
 
-  // Check for --strict flag
-  const strictMode = args.includes('--strict');
-  const filePaths = args.filter((arg) => arg !== '--strict');
+  // Strict mode is default; use --no-strict to disable
+  // --strict is still accepted for backwards compatibility (no-op)
+  const noStrict = args.includes('--no-strict');
+  const strictMode = !noStrict;
+  const filePaths = args.filter((arg) => arg !== '--strict' && arg !== '--no-strict');
 
   if (filePaths.length === 0) {
-    console.log('Usage: spec-validate.mjs [--strict] <file1.md> [file2.md ...]');
-    console.log('No files provided, nothing to validate.');
-    process.exit(0);
+    console.error('Usage: spec-validate.mjs [--no-strict] <file1.md> [file2.md ...]');
+    console.error('Error: No files provided.');
+    process.exit(1);
   }
 
   let hasErrors = false;
@@ -144,7 +155,7 @@ function main() {
     if (warnings.length > 0) {
       hasWarnings = true;
       for (const warning of warnings) {
-        console.warn(`Warning in ${filePath}: ${warning}`);
+        console.error(`Warning in ${filePath}: ${warning}`);
       }
     }
   }
@@ -158,7 +169,7 @@ function main() {
     process.exit(1);
   }
 
-  console.log(`Validated ${filePaths.length} spec file(s) successfully.`);
+  console.error(`Validated ${filePaths.length} spec file(s) successfully.`);
   process.exit(0);
 }
 

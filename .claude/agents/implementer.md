@@ -6,7 +6,7 @@ model: opus
 skills: implement
 hooks:
   PostToolUse:
-    - matcher: "Edit|Write"
+    - matcher: 'Edit|Write'
       hooks:
         - type: command
           command: "node .claude/scripts/hook-wrapper.mjs '*.ts,*.tsx,*.js,*.jsx,*.json,*.md' 'npx prettier --write {{file}} 2>/dev/null'"
@@ -17,11 +17,11 @@ hooks:
   Stop:
     - hooks:
         - type: command
-          command: "npm run lint 2>&1 | head -30 || true"
+          command: 'npm run lint 2>&1 | head -30 || true'
         - type: command
-          command: "npm run build 2>&1 | head -30 || true"
+          command: 'npm run build 2>&1 | head -30 || true'
         - type: command
-          command: "npm test 2>&1 | head -30 || true"
+          command: 'npm test 2>&1 | head -30 || true'
 ---
 
 # Implementer Subagent
@@ -48,10 +48,10 @@ You're dispatched when:
 
 ```bash
 # Load spec
-cat .claude/specs/active/<slug>.md
+cat .claude/specs/groups/<spec-group-id>/spec.md
 
 # Verify approval
-grep "^status: approved" .claude/specs/active/<slug>.md
+grep "^status: approved" .claude/specs/groups/<spec-group-id>/spec.md
 ```
 
 Verify:
@@ -182,6 +182,85 @@ If you encounter missing requirements:
 
 **NEVER make the decision yourself.** Escalate.
 
+### 4b. Document Implementation Assumptions
+
+Not all uncertainty requires escalation. When the spec is silent on **non-behavioral implementation details**, you may proceed with a documented assumption rather than blocking on an Open Question.
+
+#### When to Assume vs Escalate
+
+```
+Uncertainty encountered during implementation
+                    │
+                    ▼
+        Does it change observable behavior?
+                    │
+           ┌───────┴───────┐
+           │ YES           │ NO
+           ▼               ▼
+    ESCALATE as       DOCUMENT as
+    Open Question      Assumption
+    (blocking)        (non-blocking)
+```
+
+**Observable behavior** includes: user-visible output, API responses, error codes, redirect destinations, data persistence. If your decision would change what a user or caller sees/receives, escalate.
+
+**Non-behavioral details** include: timeout durations, log message formatting, internal variable names, error message exact wording (when format is consistent), default values for optional parameters.
+
+#### Examples
+
+| Scenario                                                             | Decision                           | Rationale                                        |
+| -------------------------------------------------------------------- | ---------------------------------- | ------------------------------------------------ |
+| Spec says "redirect to login" but not whether to preserve return URL | **ESCALATE**                       | Changes user experience                          |
+| Spec says "show error" but not the exact message text                | **ASSUMPTION**                     | Implementation detail, follows existing patterns |
+| Spec says "timeout" but not the duration                             | **ASSUMPTION** (medium confidence) | Reasonable default can be chosen                 |
+| Spec says "validate input" but not what error code to return         | **ESCALATE**                       | API contract decision                            |
+| Spec says "log the event" but not the log level                      | **ASSUMPTION**                     | Internal detail, follows codebase convention     |
+| Spec says "retry on failure" but not how many times                  | **ESCALATE**                       | Affects reliability guarantees                   |
+
+#### TODO Comment Format
+
+When documenting an assumption in code, use this format:
+
+```typescript
+// TODO(assumption): <description> [confidence: high|medium|low]
+```
+
+**Confidence levels**:
+
+- **high**: Following clear codebase pattern, very likely correct
+- **medium**: Reasonable choice, but spec author should validate
+- **low**: Best guess, definitely needs review
+
+**Examples**:
+
+```typescript
+// TODO(assumption): Using 30s timeout based on similar service patterns [confidence: medium]
+const TIMEOUT_MS = 30000;
+
+// TODO(assumption): Error message follows existing toast format [confidence: high]
+showToast({ message: 'Logout failed. Please try again.', type: 'error' });
+
+// TODO(assumption): Default page size matches pagination elsewhere in app [confidence: high]
+const DEFAULT_PAGE_SIZE = 20;
+```
+
+#### Update Atomic Spec
+
+After making an assumption, update the atomic spec's "Assumptions Made" section:
+
+```markdown
+## Assumptions Made
+
+| ID      | Assumption                 | Confidence | Rationale                         | Needs Review |
+| ------- | -------------------------- | ---------- | --------------------------------- | ------------ |
+| ASM-001 | Used 30s timeout           | Medium     | Based on similar service patterns | Yes          |
+| ASM-002 | Error follows toast format | High       | Matches existing codebase pattern | Yes          |
+```
+
+**All assumptions need review** regardless of confidence level. The code review phase will validate each assumption and either accept it, reject it (requiring code changes), or escalate it to a spec amendment.
+
+**Important**: Assumptions are for implementation details only. If you find yourself documenting an assumption about behavior, STOP and escalate instead.
+
 ### 5. Maintain Spec Conformance
 
 Follow these rules:
@@ -222,7 +301,7 @@ npm test
 # All tests must pass, no failures or skipped
 ```
 
-**Execution order matters**: Run in sequence (lint -> build -> test). Fix issues before proceeding.
+**Execution order matters**: Run in sequence (lint → build → test). Fix issues before proceeding.
 
 **If any validation fails**:
 
@@ -245,15 +324,37 @@ npm test
 
 All must pass before proceeding.
 
-### 7. Update Spec Status
+### 7. Update Parent Spec Task List
+
+After marking each atomic spec as `implemented`, update the corresponding task checkbox in the parent spec.md to keep it synchronized:
+
+1. Open the spec group's `spec.md` file
+2. Find the task list item matching the atomic spec ID (e.g., `- [ ] as-001:`)
+3. Change `[ ]` to `[x]` to mark it complete
+
+Example:
+
+```markdown
+Before: - [ ] as-001: Implement logout button UI
+After: - [x] as-001: Implement logout button UI
+```
+
+**Why this matters**: The manifest.json tracks machine state, but spec.md is the human-readable record. Keeping both in sync prevents drift where manifest says complete but spec.md shows unchecked boxes.
+
+### 8. Update Spec Status on Completion
+
+When ALL atomic specs in the group are marked `implemented`:
+
+1. **Update spec.md frontmatter** - Change the `status` field to `implemented`:
 
 ```yaml
 ---
+status: implemented
 implementation_status: complete
 ---
 ```
 
-Add final log entry:
+2. **Add final log entry** to the Execution Log section:
 
 ```markdown
 ## Execution Log
@@ -265,14 +366,16 @@ Add final log entry:
   - Ready for unifier validation
 ```
 
-### 8. Deliver to Orchestrator
+This signals to the unifier that implementation is ready for verification.
+
+### 9. Deliver to Orchestrator
 
 Report completion:
 
 ```markdown
 ## Implementation Complete ✅
 
-**Spec**: .claude/specs/active/<slug>.md
+**Spec**: .claude/specs/groups/<spec-group-id>/spec.md
 **Tasks**: 6/6 complete
 **Tests**: 12 passing
 **Status**: Ready for validation
@@ -284,6 +387,27 @@ Report completion:
 - src/api/auth.ts (logout endpoint)
 
 **Next**: Run unifier for spec-impl-test alignment validation
+```
+
+### Journal Status
+
+| Field            | Value                                             |
+| ---------------- | ------------------------------------------------- |
+| Journal Required | Yes / No                                          |
+| Journal Created  | Yes / No / N/A                                    |
+| Journal Path     | `.claude/journal/entries/<id>.md` or N/A          |
+| Reason           | <Brief explanation if journal was/wasn't created> |
+
+**When to set journal_required to Yes**:
+
+- When fixing bugs outside spec scope (commit contains "fix" without spec context)
+- When making changes that are not part of the spec's acceptance criteria
+- When discovering and documenting issues for future reference
+
+If a journal entry was created, mark it in the session:
+
+```bash
+node .claude/scripts/session-checkpoint.mjs journal-created .claude/journal/entries/<journal-id>.md
 ```
 
 ## Worktree Awareness
@@ -388,7 +512,7 @@ The spec is accessible from the worktree at the same relative path:
 
 ```bash
 # Load spec
-cat .claude/specs/active/<slug>/ws-<id>.md
+cat .claude/specs/groups/<spec-group-id>/spec.md
 
 # The .claude/ directory is shared across all worktrees
 ```
@@ -595,7 +719,7 @@ localStorage.clear(); // WRONG - does more than spec says
 ```typescript
 // Spec: "clear token"
 // Implementation: Clear token only
-localStorage.removeItem("auth_token"); // Correct
+localStorage.removeItem('auth_token'); // Correct
 ```
 
 ## Error Handling

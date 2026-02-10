@@ -8,15 +8,15 @@
  * 2. Load .claude/specs/schema/session.schema.json
  * 3. Validate session against schema
  * 4. Report validation errors
- * 5. Exit 0 on valid or if session.json doesn't exist (graceful degradation)
- * 6. Exit 1 on validation failure or missing schema
+ * 5. Exit 0 on valid
+ * 6. Exit 1 on validation failure, missing session, or missing schema
  *
  * Usage:
  *   node session-validate.mjs
  *
  * Exit codes:
- *   0 - Validation passed or session.json doesn't exist
- *   1 - Validation failed or schema missing
+ *   0 - Validation passed
+ *   1 - Validation failed, session.json missing, or schema missing
  */
 
 import { existsSync, readFileSync } from 'node:fs';
@@ -383,11 +383,10 @@ function validateSession(data) {
  * Load and validate session.json
  */
 function main() {
-  // Check if session.json exists - graceful degradation if not
+  // Check if session.json exists
   if (!existsSync(SESSION_PATH)) {
-    console.log(`Session file not found: ${SESSION_PATH}`);
-    console.log('No session.json to validate (graceful degradation).');
-    process.exit(0);
+    console.error(`Session file not found: ${SESSION_PATH}`);
+    process.exit(1);
   }
 
   // Check if schema exists - error if not
@@ -418,7 +417,7 @@ function main() {
     process.exit(1);
   }
 
-  console.log('Session validation passed.');
+  console.error('Session validation passed.');
   process.exit(0);
 }
 

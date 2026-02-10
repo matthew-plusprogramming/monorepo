@@ -7,17 +7,20 @@ allowed-tools: Read, mcp__claude-in-chrome__tabs_context_mcp, mcp__claude-in-chr
 # Browser Testing Skill
 
 ## Purpose
+
 Execute browser-based UI testing for web applications using Claude in Chrome MCP tools. Verify UI acceptance criteria, capture evidence, and validate user flows.
 
 ## When to Use
 
 Mandatory for:
+
 - UI components or page changes
 - User interaction flows (clicks, forms, navigation)
 - Visual features (modals, toasts, animations)
 - Responsive design changes
 
 Optional for:
+
 - Backend-only changes
 - API-only features
 - Non-visual refactoring
@@ -39,14 +42,17 @@ cat .claude/specs/groups/<spec-group-id>/atomic/as-001-*.md
 ```
 
 Extract UI-specific acceptance criteria from atomic specs:
+
 - User interactions (button clicks, form submissions)
 - Visual feedback (toasts, modals, error messages)
 - Navigation (redirects, route changes)
 - State changes (UI updates, data display)
 
 Example:
+
 ```markdown
 ## UI Acceptance Criteria (from atomic specs)
+
 - as-001 AC1: Logout button visible in UserMenu
 - as-001 AC2: Clicking logout triggers logout flow
 - as-003 AC1: User redirected to /login page
@@ -76,6 +82,7 @@ navigate({
 ```
 
 **Environment options**:
+
 - Local dev: `http://localhost:3000`
 - Staging: `https://staging.example.com`
 - Production: Only for smoke tests, never for destructive tests
@@ -92,6 +99,7 @@ For each UI acceptance criterion in atomic specs, execute a test case.
 **Atomic Spec**: as-004 (Error Handling & Feedback)
 
 **Steps**:
+
 1. Navigate to /dashboard
 2. Find logout button
 3. Click logout button
@@ -107,24 +115,24 @@ For each UI acceptance criterion in atomic specs, execute a test case.
 
 ```javascript
 // Step 1: Navigate
-navigate({ url: "http://localhost:3000/dashboard", tabId });
+navigate({ url: 'http://localhost:3000/dashboard', tabId });
 
 // Step 2: Find element
-find({ query: "logout button", tabId });
+find({ query: 'logout button', tabId });
 // Returns: ref_1 (logout button reference)
 
 // Step 3: Interact
 computer({
-  action: "left_click",
-  ref: "ref_1",
-  tabId
+  action: 'left_click',
+  ref: 'ref_1',
+  tabId,
 });
 
 // Step 4: Wait and verify
-await computer({ action: "wait", duration: 1, tabId });
+await computer({ action: 'wait', duration: 1, tabId });
 
 // Step 5: Take evidence screenshot
-computer({ action: "screenshot", tabId });
+computer({ action: 'screenshot', tabId });
 // Screenshot captured with ID for later reference
 ```
 
@@ -133,40 +141,43 @@ computer({ action: "screenshot", tabId });
 Use multiple verification methods:
 
 #### Visual Verification
+
 ```javascript
 // Take screenshot
-const screenshot = computer({ action: "screenshot", tabId });
+const screenshot = computer({ action: 'screenshot', tabId });
 
 // Use find to locate expected element
-find({ query: "confirmation toast", tabId });
+find({ query: 'confirmation toast', tabId });
 // Returns: ref_2 if found, error if not
 ```
 
 #### DOM Verification
+
 ```javascript
 // Read page to check element exists
-read_page({ tabId, filter: "all" });
+read_page({ tabId, filter: 'all' });
 // Returns accessibility tree with elements
 
 // Or use JavaScript to verify
 javascript_tool({
   tabId,
-  action: "javascript_exec",
+  action: 'javascript_exec',
   text: `
     const toast = document.querySelector('[role="status"]');
     toast?.textContent.includes("logged out");
-  `
+  `,
 });
 // Returns: true/false
 ```
 
 #### Navigation Verification
+
 ```javascript
 // Check current URL
 javascript_tool({
   tabId,
-  action: "javascript_exec",
-  text: "window.location.pathname"
+  action: 'javascript_exec',
+  text: 'window.location.pathname',
 });
 // Returns: "/login" (verify redirect)
 ```
@@ -174,33 +185,38 @@ javascript_tool({
 ### Step 6: Handle Failures and Errors
 
 #### Element Not Found
+
 ```javascript
-find({ query: "logout button", tabId });
+find({ query: 'logout button', tabId });
 // Error: "No elements found matching 'logout button'"
 ```
 
 **Actions**:
+
 1. Take screenshot to see current page state
 2. Try alternative selectors ("button with text logout", "sign out button")
 3. Check if page loaded correctly (read_page)
 4. If element genuinely missing → Report as test failure
 
 #### Interaction Failed
+
 ```javascript
-computer({ action: "left_click", ref: "ref_1", tabId });
+computer({ action: 'left_click', ref: 'ref_1', tabId });
 // Element not clickable, or click has no effect
 ```
 
 **Actions**:
+
 1. Wait for page to settle (animations, loading)
 2. Scroll element into view
 3. Try alternative interaction (keyboard instead of mouse)
 4. Report as test failure if truly broken
 
 #### Unexpected Behavior
+
 ```javascript
 // Expected redirect to /login, but stayed on /dashboard
-javascript_tool({ text: "window.location.pathname", tabId });
+javascript_tool({ text: 'window.location.pathname', tabId });
 // Returns: "/dashboard" (unexpected)
 ```
 
@@ -212,17 +228,18 @@ For each test case, capture evidence:
 
 ```javascript
 // Screenshot of key states
-computer({ action: "screenshot", tabId });
+computer({ action: 'screenshot', tabId });
 
 // Zoom in on specific element
 computer({
-  action: "zoom",
+  action: 'zoom',
   region: [x0, y0, x1, y1], // Element bounds
-  tabId
+  tabId,
 });
 ```
 
 **Evidence includes**:
+
 - Initial state before interaction
 - Interaction point (e.g., button being clicked)
 - Final state after interaction
@@ -247,9 +264,11 @@ Create test results document:
 ### as-001: Logout Button UI
 
 #### TC1: Logout Button Click (as-001 AC1, AC2)
+
 **Status**: ✅ PASS
 
 **Steps**:
+
 1. ✅ Navigated to http://localhost:3000/dashboard
 2. ✅ Found logout button (ref_1)
 3. ✅ Clicked logout button
@@ -264,9 +283,11 @@ Create test results document:
 ### as-003: Post-Logout Redirect
 
 #### TC2: Redirect to Login (as-003 AC1)
+
 **Status**: ✅ PASS
 
 **Steps**:
+
 1. ✅ Clicked logout button
 2. ✅ Verified redirect to /login
 
@@ -279,9 +300,11 @@ Create test results document:
 ### as-004: Error Handling & Feedback
 
 #### TC3: Confirmation Toast (as-004 AC1)
+
 **Status**: ✅ PASS
 
 **Steps**:
+
 1. ✅ Clicked logout button
 2. ✅ Toast appeared with message "You have been logged out"
 3. ✅ Toast auto-dismissed after 3 seconds
@@ -291,9 +314,11 @@ Create test results document:
 **Result**: Confirmation toast displayed correctly
 
 #### TC4: Retry Button on Error (as-004 AC2)
+
 **Status**: ❌ FAIL
 
 **Steps**:
+
 1. ✅ Simulated network error (DevTools network throttling)
 2. ✅ Clicked logout button
 3. ❌ Expected retry button, but only error message shown
@@ -311,6 +336,7 @@ Create test results document:
 **Atomic Specs Tested**: 3 (as-001, as-003, as-004)
 
 **Per Atomic Spec**:
+
 - as-001: ✅ 1/1 pass
 - as-003: ✅ 1/1 pass
 - as-004: ⚠️ 1/2 pass (1 fail)
@@ -329,7 +355,7 @@ Update `manifest.json` with browser test status:
 ```json
 {
   "convergence": {
-    "browser_tested": true  // or false if blocking failures
+    "browser_tests_passed": true // or false if blocking failures
   },
   "decision_log": [
     {
@@ -347,10 +373,10 @@ Add browser test evidence to atomic specs:
 ```markdown
 ## Browser Test Evidence
 
-| AC | Test Case | Status | Evidence |
-|----|-----------|--------|----------|
+| AC  | Test Case       | Status  | Evidence           |
+| --- | --------------- | ------- | ------------------ |
 | AC1 | Toast displayed | ✅ Pass | screenshot-004.png |
-| AC2 | Retry button | ❌ Fail | screenshot-005.png |
+| AC2 | Retry button    | ❌ Fail | screenshot-005.png |
 
 **Browser Test Status**: ⚠️ 1/2 pass
 ```
@@ -363,12 +389,12 @@ Summary in spec group:
 **Date**: 2026-01-02 17:30
 **Environment**: localhost:3000
 
-| Atomic Spec | AC | Test Case | Status | Evidence |
-|-------------|-----|-----------|--------|----------|
-| as-001 | AC1 | Logout button | ✅ Pass | screenshot-001.png |
-| as-003 | AC1 | Redirect to /login | ✅ Pass | screenshot-003.png |
-| as-004 | AC1 | Confirmation toast | ✅ Pass | screenshot-004.png |
-| as-004 | AC2 | Retry button | ❌ Fail | screenshot-005.png |
+| Atomic Spec | AC  | Test Case          | Status  | Evidence           |
+| ----------- | --- | ------------------ | ------- | ------------------ |
+| as-001      | AC1 | Logout button      | ✅ Pass | screenshot-001.png |
+| as-003      | AC1 | Redirect to /login | ✅ Pass | screenshot-003.png |
+| as-004      | AC1 | Confirmation toast | ✅ Pass | screenshot-004.png |
+| as-004      | AC2 | Retry button       | ❌ Fail | screenshot-005.png |
 
 **Overall**: 3/4 pass (75%) - 1 blocking failure in as-004
 ```
@@ -398,68 +424,68 @@ If tests fail:
 
 ```javascript
 // Find form fields
-find({ query: "email input", tabId });
+find({ query: 'email input', tabId });
 // Returns: ref_1
 
-find({ query: "password input", tabId });
+find({ query: 'password input', tabId });
 // Returns: ref_2
 
 // Fill form
-form_input({ ref: "ref_1", value: "test@example.com", tabId });
-form_input({ ref: "ref_2", value: "password123", tabId });
+form_input({ ref: 'ref_1', value: 'test@example.com', tabId });
+form_input({ ref: 'ref_2', value: 'password123', tabId });
 
 // Find and click submit
-find({ query: "submit button", tabId });
+find({ query: 'submit button', tabId });
 // Returns: ref_3
 
-computer({ action: "left_click", ref: "ref_3", tabId });
+computer({ action: 'left_click', ref: 'ref_3', tabId });
 
 // Verify outcome
-await computer({ action: "wait", duration: 1, tabId });
-computer({ action: "screenshot", tabId });
+await computer({ action: 'wait', duration: 1, tabId });
+computer({ action: 'screenshot', tabId });
 ```
 
 ### Pattern 2: Modal Interaction
 
 ```javascript
 // Open modal
-find({ query: "delete button", tabId });
-computer({ action: "left_click", ref: "ref_1", tabId });
+find({ query: 'delete button', tabId });
+computer({ action: 'left_click', ref: 'ref_1', tabId });
 
 // Verify modal appears
-await computer({ action: "wait", duration: 0.5, tabId });
-find({ query: "confirmation dialog", tabId });
+await computer({ action: 'wait', duration: 0.5, tabId });
+find({ query: 'confirmation dialog', tabId });
 // Returns: ref_2
 
 // Interact with modal
-find({ query: "confirm delete button", tabId });
-computer({ action: "left_click", ref: "ref_3", tabId });
+find({ query: 'confirm delete button', tabId });
+computer({ action: 'left_click', ref: 'ref_3', tabId });
 
 // Verify modal dismissed
-await computer({ action: "wait", duration: 0.5, tabId });
-computer({ action: "screenshot", tabId });
+await computer({ action: 'wait', duration: 0.5, tabId });
+computer({ action: 'screenshot', tabId });
 ```
 
 ### Pattern 3: Navigation Flow
 
 ```javascript
 // Start at page A
-navigate({ url: "http://localhost:3000/page-a", tabId });
+navigate({ url: 'http://localhost:3000/page-a', tabId });
 
 // Click link to page B
-find({ query: "go to page B link", tabId });
-computer({ action: "left_click", ref: "ref_1", tabId });
+find({ query: 'go to page B link', tabId });
+computer({ action: 'left_click', ref: 'ref_1', tabId });
 
 // Verify navigation
-await computer({ action: "wait", duration: 1, tabId });
+await computer({ action: 'wait', duration: 1, tabId });
 const currentPath = javascript_tool({
   tabId,
-  action: "javascript_exec",
-  text: "window.location.pathname"
+  action: 'javascript_exec',
+  text: 'window.location.pathname',
 });
 
 // Assert
-if (currentPath === "/page-b") {
+if (currentPath === '/page-b') {
   // Success
 } else {
   // Failure
@@ -472,68 +498,72 @@ if (currentPath === "/page-b") {
 // Simulate error condition
 javascript_tool({
   tabId,
-  action: "javascript_exec",
+  action: 'javascript_exec',
   text: `
     // Mock API to fail
     window.fetch = async () => {
       throw new Error("Network error");
     };
-  `
+  `,
 });
 
 // Trigger action that calls API
-find({ query: "save button", tabId });
-computer({ action: "left_click", ref: "ref_1", tabId });
+find({ query: 'save button', tabId });
+computer({ action: 'left_click', ref: 'ref_1', tabId });
 
 // Verify error UI
-await computer({ action: "wait", duration: 1, tabId });
-find({ query: "error message", tabId });
-computer({ action: "screenshot", tabId });
+await computer({ action: 'wait', duration: 1, tabId });
+find({ query: 'error message', tabId });
+computer({ action: 'screenshot', tabId });
 ```
 
 ## Best Practices
 
 ### Use Semantic Selectors
+
 ```javascript
 // Good - Semantic and resilient
-find({ query: "logout button", tabId });
-find({ query: "button with text logout", tabId });
-find({ query: "button with aria-label logout", tabId });
+find({ query: 'logout button', tabId });
+find({ query: 'button with text logout', tabId });
+find({ query: 'button with aria-label logout', tabId });
 
 // Avoid - Brittle selectors
 // (find tool doesn't use CSS selectors, but JavaScript tool could)
 ```
 
 ### Wait for Interactions to Complete
+
 ```javascript
 // After click, wait for action to complete
-computer({ action: "left_click", ref: "ref_1", tabId });
-await computer({ action: "wait", duration: 1, tabId }); // Wait 1 second
+computer({ action: 'left_click', ref: 'ref_1', tabId });
+await computer({ action: 'wait', duration: 1, tabId }); // Wait 1 second
 
 // Or check for expected element
-find({ query: "success message", tabId });
+find({ query: 'success message', tabId });
 ```
 
 ### Capture Evidence Liberally
+
 ```javascript
 // Before interaction
-computer({ action: "screenshot", tabId });
+computer({ action: 'screenshot', tabId });
 
 // After interaction
-computer({ action: "left_click", ref: "ref_1", tabId });
-await computer({ action: "wait", duration: 1, tabId });
-computer({ action: "screenshot", tabId });
+computer({ action: 'left_click', ref: 'ref_1', tabId });
+await computer({ action: 'wait', duration: 1, tabId });
+computer({ action: 'screenshot', tabId });
 
 // Evidence trail for debugging
 ```
 
 ### Clean Up Test State
+
 ```javascript
 // After tests, reset state
 javascript_tool({
   tabId,
-  action: "javascript_exec",
-  text: "localStorage.clear(); sessionStorage.clear();"
+  action: 'javascript_exec',
+  text: 'localStorage.clear(); sessionStorage.clear();',
 });
 
 // Or create fresh tab for next test
@@ -543,11 +573,13 @@ tabs_create_mcp();
 ## Integration with Other Skills
 
 After browser testing:
+
 - If PASS with public API → Trigger `/docs` for documentation, then commit
 - If PASS (no public API) → Ready for commit
 - If FAIL → Use `/implement` to fix, then re-test
 
 Before browser testing:
+
 - Run `/unify` for spec-impl-test convergence
 - Run `/security` for security review
 - Browser testing validates UI before final gates
@@ -561,6 +593,7 @@ Before browser testing:
 **Spec Group**: sg-logout-button
 
 **Atomic Spec UI ACs**:
+
 - as-001 AC1: Logout button visible
 - as-001 AC2: Click triggers logout
 - as-003 AC1: Redirect to /login
@@ -571,49 +604,50 @@ Before browser testing:
 
 ```javascript
 // Test 1: Happy path logout
-navigate({ url: "http://localhost:3000/dashboard", tabId });
-find({ query: "logout button", tabId }); // ref_1
-computer({ action: "screenshot", tabId }); // Before
-computer({ action: "left_click", ref: "ref_1", tabId });
-await computer({ action: "wait", duration: 1, tabId });
-computer({ action: "screenshot", tabId }); // After
+navigate({ url: 'http://localhost:3000/dashboard', tabId });
+find({ query: 'logout button', tabId }); // ref_1
+computer({ action: 'screenshot', tabId }); // Before
+computer({ action: 'left_click', ref: 'ref_1', tabId });
+await computer({ action: 'wait', duration: 1, tabId });
+computer({ action: 'screenshot', tabId }); // After
 
 // Verify redirect (AC1.2)
 const path = javascript_tool({
   tabId,
-  action: "javascript_exec",
-  text: "window.location.pathname"
+  action: 'javascript_exec',
+  text: 'window.location.pathname',
 });
 // Result: "/login" ✅
 
 // Verify toast (AC1.3)
-find({ query: "confirmation toast", tabId }); // Found ✅
+find({ query: 'confirmation toast', tabId }); // Found ✅
 
 // Test 2: Error path with retry
-navigate({ url: "http://localhost:3000/dashboard", tabId });
+navigate({ url: 'http://localhost:3000/dashboard', tabId });
 
 // Simulate network error
 javascript_tool({
   tabId,
-  action: "javascript_exec",
-  text: "window.fetch = () => Promise.reject(new Error('Network error'));"
+  action: 'javascript_exec',
+  text: "window.fetch = () => Promise.reject(new Error('Network error'));",
 });
 
-find({ query: "logout button", tabId }); // ref_1
-computer({ action: "left_click", ref: "ref_1", tabId });
-await computer({ action: "wait", duration: 1, tabId });
+find({ query: 'logout button', tabId }); // ref_1
+computer({ action: 'left_click', ref: 'ref_1', tabId });
+await computer({ action: 'wait', duration: 1, tabId });
 
 // Verify error message
-find({ query: "error message", tabId }); // Found ✅
+find({ query: 'error message', tabId }); // Found ✅
 
 // Verify retry button (as-004 AC2)
-find({ query: "retry button", tabId }); // Not found ❌
-computer({ action: "screenshot", tabId }); // Evidence
+find({ query: 'retry button', tabId }); // Not found ❌
+computer({ action: 'screenshot', tabId }); // Evidence
 
 // Result: FAIL - Retry button missing
 ```
 
 **Output**:
+
 - as-001: ✅ 2/2 ACs pass
 - as-003: ✅ 1/1 AC pass
 - as-004: ⚠️ 1/2 ACs pass (retry button missing)

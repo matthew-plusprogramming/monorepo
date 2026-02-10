@@ -290,7 +290,7 @@ Location: `src/middleware/error-handler.ts:15-45`
 Controllers throw typed errors:
 
 ```typescript
-throw new ValidationError("Invalid email format", { field: "email" });
+throw new ValidationError('Invalid email format', { field: 'email' });
 ```
 ````
 
@@ -438,6 +438,31 @@ Your investigation is successful when:
 - Open questions are explicitly stated
 - Output fits in ~500-1000 tokens (not a hard limit, but a guideline)
 - Substantive findings (>500 chars) are auto-journaled for future reference
+
+## Deliver to Orchestrator
+
+When reporting completion, include the following sections:
+
+### Journal Status
+
+| Field            | Value                                             |
+| ---------------- | ------------------------------------------------- |
+| Journal Required | Yes / No                                          |
+| Journal Created  | Yes / No / N/A                                    |
+| Journal Path     | `.claude/journal/entries/<id>.md` or N/A          |
+| Reason           | <Brief explanation if journal was/wasn't created> |
+
+**When to set journal_required to Yes**:
+
+- When findings exceed 500 characters
+- When investigation answers a non-trivial question
+- When findings would be valuable for future reference
+
+If a journal entry was created, mark it in the session:
+
+```bash
+node .claude/scripts/session-checkpoint.mjs journal-created .claude/journal/entries/<journal-id>.md
+```
 
 ## Fix Report Journaling
 

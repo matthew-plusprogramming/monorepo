@@ -176,7 +176,7 @@ Files created:
 **Next Steps**:
 
 1. Review requirements: `cat .claude/specs/groups/sg-<feature-slug>/requirements.md`
-2. (Optional) Run `/prd draft sg-<feature-slug>` to write PRD to Google Docs
+2. (Optional) Run `/prd draft sg-<feature-slug>` to write PRD to git repository
 3. Run `/spec sg-<feature-slug>` to create spec.md
 4. Run `/atomize sg-<feature-slug>` to decompose into atomic specs
 5. Run `/enforce sg-<feature-slug>` to validate atomicity
@@ -250,10 +250,10 @@ After `/pm` completes:
 
 ### Linking to External PRD
 
-After `/pm`, if requirements should link to a Google Doc PRD:
+After `/pm`, if requirements should link to a PRD in the git repository:
 
 ```
-/prd link sg-<feature-slug> <google-doc-id>
+/prd link sg-<feature-slug> <prd-path>
 ```
 
 ## Error Handling

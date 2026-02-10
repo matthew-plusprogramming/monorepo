@@ -13,10 +13,9 @@
  * 4. Block: After 3 consecutive ignored warnings (heartbeat_warnings >= 3)
  * 5. Reset: heartbeat_warnings resets to 0 when progress is logged
  *
- * Graceful degradation:
- * - If no active spec found, exits silently (0)
- * - If manifest can't be read, exits silently (0)
- * - Warnings are advisory, blocking requires explicit threshold
+ * Exit codes:
+ *   0 - Success (no active spec, within threshold, or progress update detected)
+ *   1 - Block (heartbeat threshold exceeded, or file argument missing)
  *
  * Usage (via hook-wrapper):
  *   node .claude/scripts/hook-wrapper.mjs '.claude/specs/**' 'node .claude/scripts/progress-heartbeat-check.mjs {{file}}'
@@ -261,8 +260,8 @@ function main() {
   const args = process.argv.slice(2);
 
   if (args.length === 0) {
-    // No file provided, exit silently
-    process.exit(0);
+    console.error('Error: No file path provided to progress-heartbeat-check hook');
+    process.exit(1);
   }
 
   const filePath = resolve(args[0]);
@@ -276,7 +275,7 @@ function main() {
       // AC3.4: Block after 3 consecutive ignored warnings
       process.exit(1);
     } else {
-      console.log(result.message);
+      console.error(result.message);
     }
   }
 

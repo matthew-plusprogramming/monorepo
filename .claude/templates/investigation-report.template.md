@@ -3,7 +3,7 @@ id: investigation-<NNN>
 title: <Brief description of the investigation>
 date: <YYYY-MM-DD>
 type: investigation-report
-status: complete | ongoing | blocked
+status: complete | ongoing | blocked | deprecated
 spec_group: <spec-group-id if applicable, null otherwise>
 ---
 

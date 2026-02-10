@@ -55,6 +55,7 @@
             "testing",
             "verifying",
             "reviewing",
+            "journaling",
             "complete"
           ],
           "description": "Current phase in the workflow lifecycle"
@@ -83,6 +84,7 @@
             "testing",
             "verifying",
             "reviewing",
+            "journaling",
             "complete"
           ],
           "description": "Phase this checkpoint represents (should match active_work.current_phase)"
@@ -111,6 +113,18 @@
             "type": "string"
           },
           "description": "Ordered list of next concrete actions to take"
+        },
+        "journal_required": {
+          "type": "boolean",
+          "description": "Whether a journal entry is required before commit"
+        },
+        "journal_created": {
+          "type": "boolean",
+          "description": "Whether the required journal entry has been created"
+        },
+        "journal_entry_path": {
+          "type": ["string", "null"],
+          "description": "Path to the created journal entry"
         }
       },
       "required": ["phase"]

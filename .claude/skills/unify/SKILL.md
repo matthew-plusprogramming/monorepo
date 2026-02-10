@@ -23,6 +23,7 @@ Validate that implementation and tests conform to the spec group's atomic specs.
 ## Convergence Criteria
 
 A spec group is **converged** when:
+
 1. **Requirements complete** - All REQ-XXX requirements present with EARS format
 2. **Spec complete** - spec.md has all required sections
 3. **Atomic specs complete** - All atomic specs have implementation and test evidence
@@ -51,6 +52,7 @@ ls .claude/specs/groups/<spec-group-id>/atomic/
 ```
 
 Verify in manifest.json:
+
 - `review_state` is `APPROVED`
 - `atomic_specs.enforcement_status` is `passing`
 - `work_state` is `VERIFYING`
@@ -58,6 +60,7 @@ Verify in manifest.json:
 ### Step 2: Requirements Completeness Check
 
 Verify requirements.md:
+
 - [ ] Problem statement present
 - [ ] Goals and non-goals defined
 - [ ] REQ-XXX requirements in EARS format
@@ -81,6 +84,7 @@ Verify requirements.md:
 ### Step 3: Spec Completeness Check
 
 Verify spec.md:
+
 - [ ] Context (references requirements.md)
 - [ ] Goals/Non-goals (consistent with requirements.md)
 - [ ] Requirements Summary (references, doesn't duplicate)
@@ -116,6 +120,7 @@ cat .claude/specs/groups/<spec-group-id>/atomic/as-001-logout-button-ui.md
 ```
 
 Verify each atomic spec:
+
 - [ ] `status` is `implemented`
 - [ ] Requirements refs present (REQ-XXX)
 - [ ] Acceptance criteria defined
@@ -128,12 +133,12 @@ Verify each atomic spec:
 ```markdown
 ## Atomic Spec Coverage: ✅ Pass
 
-| Atomic Spec | Status | Impl Evidence | Test Evidence |
-|-------------|--------|---------------|---------------|
-| as-001 | implemented | ✅ 2 files | ✅ 2 tests |
-| as-002 | implemented | ✅ 1 file | ✅ 2 tests |
-| as-003 | implemented | ✅ 1 file | ✅ 2 tests |
-| as-004 | implemented | ✅ 2 files | ✅ 2 tests |
+| Atomic Spec | Status      | Impl Evidence | Test Evidence |
+| ----------- | ----------- | ------------- | ------------- |
+| as-001      | implemented | ✅ 2 files    | ✅ 2 tests    |
+| as-002      | implemented | ✅ 1 file     | ✅ 2 tests    |
+| as-003      | implemented | ✅ 1 file     | ✅ 2 tests    |
+| as-004      | implemented | ✅ 2 files    | ✅ 2 tests    |
 
 **All 4 atomic specs have complete evidence**
 ```
@@ -145,12 +150,12 @@ Verify complete chain: REQ → Atomic Spec → Implementation → Test
 ```markdown
 ## Traceability Matrix
 
-| Requirement | Atomic Specs | Implementation | Tests |
-|-------------|--------------|----------------|-------|
-| REQ-001 | as-001 | UserMenu.tsx:15 | user-menu.test.ts:12 |
-| REQ-002 | as-002 | auth-service.ts:67 | auth-service.test.ts:24 |
-| REQ-003 | as-003 | auth-router.ts:23 | auth-router.test.ts:18 |
-| REQ-004 | as-004 | auth-service.ts:72 | auth-service.test.ts:35 |
+| Requirement | Atomic Specs | Implementation     | Tests                   |
+| ----------- | ------------ | ------------------ | ----------------------- |
+| REQ-001     | as-001       | UserMenu.tsx:15    | user-menu.test.ts:12    |
+| REQ-002     | as-002       | auth-service.ts:67 | auth-service.test.ts:24 |
+| REQ-003     | as-003       | auth-router.ts:23  | auth-router.test.ts:18  |
+| REQ-004     | as-004       | auth-service.ts:72 | auth-service.test.ts:35 |
 
 **Coverage**: 100% of requirements traced to atomic specs, implementation, and tests
 ```
@@ -166,6 +171,7 @@ cat src/services/auth-service.ts
 ```
 
 For each atomic spec AC:
+
 - [ ] Implementation exists at stated location
 - [ ] Behavior matches AC description
 - [ ] Error handling matches edge cases
@@ -177,18 +183,22 @@ For each atomic spec AC:
 ## Implementation Alignment: ✅ Pass
 
 **as-001**: Logout Button UI
+
 - AC1 ✅ Button rendered in UserMenu (UserMenu.tsx:15)
 - AC2 ✅ Button triggers logout (UserMenu.tsx:18)
 
 **as-002**: Token Clearing
+
 - AC1 ✅ Token cleared from localStorage (auth-service.ts:67)
 - AC2 ✅ Server session invalidated (auth-service.ts:70)
 
 **as-003**: Post-Logout Redirect
+
 - AC1 ✅ Redirect to /login (auth-router.ts:23)
 - AC2 ✅ Confirmation message shown (auth-router.ts:28)
 
 **as-004**: Error Handling
+
 - AC1 ✅ Error message displayed (auth-service.ts:72)
 - AC2 ✅ User stays logged in on error (auth-service.ts:75)
 
@@ -208,6 +218,7 @@ npm test -- --coverage
 ```
 
 For each atomic spec:
+
 - [ ] Every AC has at least one test
 - [ ] Test references atomic spec ID and AC
 - [ ] Test passes
@@ -243,6 +254,7 @@ grep -A 10 "contracts" .claude/specs/groups/<spec-group-id>/manifest.json
 ```
 
 Verify:
+
 - All contracts registered
 - No duplicate contract IDs
 - Implementations match contract interfaces
@@ -267,27 +279,33 @@ All validation checks passed. Ready for code review.
 ## Validation Results
 
 ### Requirements: ✅ Pass
+
 - 4 requirements in EARS format
 - All high priority questions resolved
 
 ### Spec: ✅ Pass
+
 - All sections present
 - 8 acceptance criteria
 - 1 sequence diagram
 
 ### Atomic Specs: ✅ Pass
+
 - 4 atomic specs, all implemented
 - Implementation evidence complete
 - Test evidence complete
 
 ### Traceability: ✅ Pass
+
 - 100% coverage: REQ → atomic spec → impl → test
 
 ### Implementation: ✅ Pass
+
 - All ACs implemented per atomic specs
 - No undocumented features
 
 ### Tests: ✅ Pass
+
 - 8 tests, all passing
 - 100% AC coverage
 - 94% line coverage
@@ -297,23 +315,27 @@ All validation checks passed. Ready for code review.
 ## Evidence
 
 **Files Modified**:
+
 - src/services/auth-service.ts
 - src/components/UserMenu.tsx
 - src/router/auth-router.ts
 
 **Test Files**:
-- src/services/__tests__/auth-service.test.ts (4 tests)
-- src/components/__tests__/user-menu.test.ts (2 tests)
-- src/router/__tests__/auth-router.test.ts (2 tests)
+
+- src/services/**tests**/auth-service.test.ts (4 tests)
+- src/components/**tests**/user-menu.test.ts (2 tests)
+- src/router/**tests**/auth-router.test.ts (2 tests)
 
 **Test Output**:
 ```
-PASS  src/services/__tests__/auth-service.test.ts
-PASS  src/components/__tests__/user-menu.test.ts
-PASS  src/router/__tests__/auth-router.test.ts
+
+PASS src/services/**tests**/auth-service.test.ts
+PASS src/components/**tests**/user-menu.test.ts
+PASS src/router/**tests**/auth-router.test.ts
 
 Tests: 8 passed, 8 total
 Coverage: 94% statements
+
 ```
 
 ---
@@ -336,10 +358,8 @@ Update manifest.json with convergence status:
   "convergence": {
     "spec_complete": true,
     "all_acs_implemented": true,
-    "all_tests_written": true,
     "all_tests_passing": true,
-    "test_coverage": "94%",
-    "traceability_complete": true,
+    "unifier_passed": true,
     "code_review_passed": false,
     "security_review_passed": false
   },
@@ -370,17 +390,20 @@ Issues found. Implementation iteration required.
 ## Issues
 
 ### Issue 1: Missing Implementation Evidence (Priority: High)
+
 - **Atomic Spec**: as-003
 - **Problem**: Implementation Evidence section empty
 - **Action**: Fill evidence in as-003-post-logout-redirect.md
 
 ### Issue 2: Test Failing (Priority: High)
+
 - **Atomic Spec**: as-002
 - **Test**: auth-service.test.ts:35
 - **Error**: Expected null, got "test-token"
 - **Action**: Fix token clearing logic or fix test
 
 ### Issue 3: Broken Traceability (Priority: Medium)
+
 - **Requirement**: REQ-003
 - **Problem**: No atomic spec references REQ-003
 - **Action**: Update as-003 to reference REQ-003
@@ -390,6 +413,7 @@ Issues found. Implementation iteration required.
 ## Recommendations
 
 **Iteration 1**:
+
 1. Fill Implementation Evidence in as-003
 2. Fix failing test for as-002
 3. Update REQ-003 reference in as-003
@@ -400,6 +424,7 @@ After fixes, re-run `/unify <spec-group-id>` to validate.
 ## Convergence Gates
 
 ### Spec Group Gates
+
 - [ ] Requirements complete (EARS format)
 - [ ] Spec complete with all sections
 - [ ] Atomic specs all `status: implemented`
@@ -411,7 +436,9 @@ After fixes, re-run `/unify <spec-group-id>` to validate.
 - [ ] No undocumented features
 
 ### MasterSpec Gates
+
 All spec group gates plus:
+
 - [ ] All workstream spec groups converged
 - [ ] Contract registry validated
 - [ ] No cross-workstream conflicts
@@ -421,6 +448,7 @@ All spec group gates plus:
 ## Integration with Other Skills
 
 After convergence, the review chain is:
+
 1. `/code-review <spec-group-id>` - Code quality review (always)
 2. `/security <spec-group-id>` - Security review (always)
 3. `/browser-test <spec-group-id>` - UI validation (if UI changes)
@@ -430,6 +458,7 @@ After convergence, the review chain is:
 **Next step after unify passes**: Dispatch `/code-review`
 
 If not converged:
+
 - Use `/implement` to fill missing evidence
 - Use `/test` to fix failing tests
 - Re-run `/unify` after fixes
@@ -441,6 +470,7 @@ If not converged:
 **Input**: Spec group sg-logout-button (all atomic specs complete)
 
 **Unifier Process**:
+
 1. Requirements: ✅ 4 REQ-XXX in EARS format
 2. Spec: ✅ All sections present
 3. Atomic specs: ✅ 4/4 implemented with evidence
@@ -455,16 +485,19 @@ If not converged:
 **Input**: Spec group sg-dark-mode (missing test evidence)
 
 **Unifier Process**:
+
 1. Requirements: ✅ Pass
 2. Spec: ✅ Pass
 3. Atomic specs: ❌ as-002 missing Test Evidence
 4. Tests: ❌ 1 test failing
 
 **Output**:
+
 ```markdown
 ❌ NOT CONVERGED
 
 **Issues**:
+
 - as-002: Missing Test Evidence section
 - as-002: Test auth-service.test.ts:35 failing
 
@@ -479,17 +512,20 @@ After test fixed → Re-run unifier → CONVERGED ✅
 **Input**: Spec group with broken traceability
 
 **Unifier Process**:
+
 1. Requirements: ✅ 4 requirements
 2. Atomic specs: 3 atomic specs
 3. Traceability: ❌ REQ-004 has no atomic spec
 
 **Output**:
+
 ```markdown
 ❌ NOT CONVERGED
 
 **Issue**: REQ-004 "Error Handling" has no atomic spec
 
 **Action**: Either:
+
 - Add as-004-error-handling.md for REQ-004
 - Update existing atomic spec to reference REQ-004
 

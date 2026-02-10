@@ -1,7 +1,7 @@
 ---
 name: prd
-description: Create, sync, and manage PRDs in Google Docs. Draft new PRDs from PM interviews, sync existing PRDs, and push discoveries back.
-allowed-tools: Read, Write, Glob, Task, mcp__google-docs-mcp__readGoogleDoc, mcp__google-docs-mcp__getDocumentInfo, mcp__google-docs-mcp__appendToGoogleDoc, mcp__google-docs-mcp__insertText, mcp__google-docs-mcp__deleteRange, mcp__google-docs-mcp__createDocument
+description: Create, sync, and manage PRDs stored locally. Draft new PRDs from PM interviews, sync existing PRDs, and push discoveries back.
+allowed-tools: Read, Write, Edit, Bash, Glob, Grep
 user-invocable: true
 ---
 
@@ -10,54 +10,82 @@ user-invocable: true
 ## Purpose
 
 Full lifecycle management for Product Requirements Documents (PRDs):
+
 - **Create** new PRDs from PM interviews using the standard template
-- **Write** PRDs to Google Docs
-- **Sync** existing PRDs from Google Docs to local spec groups
+- **Write** PRDs to local filesystem
+- **Sync** existing PRDs to local spec groups
 - **Push** implementation discoveries back to PRDs
+
+## PRD Storage
+
+PRDs are stored in-repo under `.claude/prds/` for version control alongside the codebase.
+
+### Directory Structure
+
+```
+.claude/prds/
+├── <prd-id>/
+│   ├── prd.md                    # The PRD document
+│   └── .prd-meta.json            # Metadata (version, last sync, etc.)
+└── <another-prd-id>/
+    └── ...
+```
+
+### File Operations
+
+PRDs are read and written directly from the filesystem — no git clone needed since they live in the same repository.
+
+- **Create**: Create directory under `.claude/prds/<prd-id>/`, write `prd.md`
+- **Read**: Read `.claude/prds/<prd-id>/prd.md` directly
+- **Update**: Edit `.claude/prds/<prd-id>/prd.md` in place
+- **Version**: Tracked via PRD frontmatter (`version` field) and `.prd-meta.json`
 
 ## Usage
 
 ```
-/prd draft                     # Start PM interview, then draft PRD to Google Doc
+/prd draft                     # Start PM interview, then draft PRD
 /prd draft <spec-group-id>     # Draft PRD from existing spec group requirements
-/prd write <doc-id>            # Write/overwrite PRD to specified Google Doc
-/prd write <doc-id> <spec-group-id>  # Write specific spec group's PRD to doc
+/prd write <prd-id>             # Write/overwrite PRD to specified PRD directory
+/prd write <prd-id> <spec-group-id>  # Write specific spec group's PRD
 
-/prd sync <doc-id-or-url>      # Pull PRD, extract requirements, create spec group
+/prd sync <prd-id>             # Read PRD, extract requirements, create spec group
 /prd status                    # Show all linked PRDs and their sync state
 /prd status <spec-group-id>    # Show PRD status for specific spec group
-/prd diff <spec-group-id>      # Show differences between local and remote PRD
-/prd push <spec-group-id>      # Push local discoveries back to PRD (creates new version)
-/prd link <spec-group-id> <doc-id>  # Link existing spec group to a PRD
+/prd diff <spec-group-id>      # Show differences between spec group and PRD
+/prd push <spec-group-id>      # Push local discoveries back to PRD (updates version)
+/prd link <spec-group-id> <prd-id>  # Link existing spec group to a PRD
 ```
 
 ## Commands
 
 ### /prd draft
 
-Creates a new PRD by running a PM interview, then writes to Google Docs using the standard template.
+Creates a new PRD by running a PM interview, then writes using the standard template.
 
 **Process**:
+
 1. If no spec-group-id provided:
    - Invoke `/pm` skill to run discovery interview
    - PM skill creates spec group with `requirements.md`
-2. Prompt user for Google Doc destination:
-   - Create new document
-   - Write to existing document (provide doc ID)
+2. Prompt user for PRD ID (slug for directory name):
+   - Create new directory under `.claude/prds/<prd-id>/`
+   - Or write to existing PRD directory
 3. Dispatch `prd-author` agent to:
    - Read `requirements.md` from spec group
    - Read PRD template from `.claude/templates/prd.template.md`
    - Transform requirements into PRD format
-   - Write formatted PRD to Google Doc
+   - Write formatted PRD to `.claude/prds/<prd-id>/prd.md`
 4. Update `manifest.json` with PRD link
 
 **Output**:
+
 ```
 PRD drafted successfully
 
 Title: "AI-Native Engineering Dashboard"
 Spec Group: sg-ai-dashboard
-Document: https://docs.google.com/document/d/1abc.../edit
+Path: .claude/prds/ai-dashboard/prd.md
+Version: 1.0.0
 
 Sections created:
   ✓ Overview
@@ -70,35 +98,38 @@ Sections created:
   ✓ Open Questions (4)
   ✓ Version History
 
-Status: v1 (DRAFT)
+Status: 1.0.0 (DRAFT)
 
 Next steps:
-  1. Review PRD in Google Docs
+  1. Review PRD in .claude/prds/ai-dashboard/prd.md
   2. Mark as REVIEWED when satisfied
   3. Run /spec sg-ai-dashboard to create specs
 ```
 
 ### /prd write
 
-Writes a PRD to a Google Doc using the standard template format. Can create new doc or overwrite existing.
+Writes a PRD to `.claude/prds/` using the standard template format. Can create new PRD or overwrite existing.
 
 **Input**:
-- `doc-id`: Google Doc ID or "new" to create new document
+
+- `prd-id`: PRD directory name (slug) or "new" to create from spec group
 - `spec-group-id` (optional): If not provided, uses most recent spec group
 
 **Process**:
+
 1. Resolve spec group (use provided ID or most recent)
-2. If doc-id is "new":
-   - Will create new Google Doc with title from spec group
+2. If prd-id is "new":
+   - Create new directory `.claude/prds/<slug>/` with slug from spec group
 3. Dispatch `prd-author` agent to:
    - Load spec group's `requirements.md`
    - Load PRD template
    - Transform requirements to PRD sections (see mapping below)
-   - Clear existing content if overwriting
-   - Write formatted PRD content to Google Doc
+   - Write `prd.md` to `.claude/prds/<prd-id>/prd.md`
+   - Write `.prd-meta.json` with metadata
 4. Update manifest with PRD link
 
 **Template Mapping**:
+
 ```
 requirements.md Section    →    PRD Template Section
 ─────────────────────────────────────────────────────
@@ -118,12 +149,14 @@ Priorities                 →    Requirements Priority field
 ```
 
 **Output**:
-```
-PRD written to Google Doc
 
-Document: "AI-Native Engineering Dashboard"
-URL: https://docs.google.com/document/d/1abc.../edit
-Action: Created new document (or: Overwrote existing content)
+```
+PRD written successfully
+
+PRD ID: "ai-dashboard"
+Path: .claude/prds/ai-dashboard/prd.md
+Action: Created new PRD (or: Overwrote existing content)
+Version: 1.0.0
 
 Content:
   - Overview: 2 paragraphs
@@ -135,22 +168,23 @@ Content:
   - Success Criteria: 6 measurable outcomes
   - Open Questions: 4 (2 high priority)
   - User Stories: 7 generated
-  - Version History: v1 initialized
+  - Version History: 1.0.0 initialized
 
-Spec group sg-ai-dashboard linked to document.
+Spec group sg-ai-dashboard linked to project.
 ```
 
 ### /prd sync
 
-Creates a new spec group from an external PRD.
+Creates a new spec group from an existing PRD in `.claude/prds/`.
 
-**Input**: Google Doc ID or full URL
-- Doc ID: `1pQA7lIvofbKL7NzS4PkIRKlfBNnVsTtCMgSfJB7A17Y`
-- URL: `https://docs.google.com/document/d/1pQA7.../edit`
+**Input**: PRD ID (directory name under `.claude/prds/`)
+
+- PRD ID: `logout-feature`
 
 **Process**:
-1. Fetch document metadata (title, last modified)
-2. Read document content
+
+1. Read PRD from `.claude/prds/<prd-id>/prd.md`
+2. Read PRD metadata from `.claude/prds/<prd-id>/.prd-meta.json` (if exists)
 3. Dispatch `prd-reader` agent to extract:
    - Requirements (convert to EARS format)
    - Constraints
@@ -162,12 +196,13 @@ Creates a new spec group from an external PRD.
 7. Set `review_state: DRAFT` (agent created, needs user review)
 
 **Output**:
+
 ```
 PRD synced successfully
 
-Document: "Logout Feature Requirements"
-Version: v1 (detected from document)
-Last Modified: 2026-01-14
+PRD ID: "logout-feature"
+Path: .claude/prds/logout-feature/prd.md
+Version: 1.0.0 (from frontmatter)
 
 Created spec group: sg-logout-feature
   - 4 requirements extracted
@@ -184,36 +219,39 @@ Next steps:
 Shows sync status for linked PRDs.
 
 **Output**:
+
 ```
 PRD Status
 
 sg-logout-feature
   PRD: "Logout Feature Requirements"
-  Source: google-docs (1pQA7...)
-  Local Version: v1
-  Remote Version: v1
-  Status: IN_SYNC ✓
+  Source: local-file (logout-feature)
+  PRD Path: .claude/prds/logout-feature/prd.md
+  Version: 1.0.0
+  Status: LINKED
   Last Synced: 2026-01-14T10:00:00Z
 
 sg-auth-revamp
   PRD: "Authentication Revamp"
-  Source: google-docs (2xYz...)
-  Local Version: v2
-  Remote Version: v3  ← DRIFT DETECTED
-  Status: OUT_OF_SYNC ✗
+  Source: local-file (auth-revamp)
+  PRD Path: .claude/prds/auth-revamp/prd.md
+  Spec Version: 1.1.0
+  PRD Version: 1.2.0  ← DRIFT DETECTED
+  Status: OUT_OF_SYNC
   Last Synced: 2026-01-10T14:00:00Z
   Action: Run /prd diff sg-auth-revamp to see changes
 ```
 
 ### /prd diff
 
-Shows differences between local requirements and remote PRD.
+Shows differences between local requirements and PRD.
 
 **Output**:
+
 ```
 PRD Diff: sg-auth-revamp
 
-Remote PRD has been updated (v2 → v3)
+PRD has been updated (1.1.0 → 1.2.0)
 
 Changes detected:
   + NEW: REQ-005 "Multi-factor authentication support"
@@ -231,35 +269,39 @@ Options:
 
 ### /prd push
 
-Pushes local discoveries back to the PRD document.
+Pushes local discoveries back to the PRD.
 
 **When to use**:
+
 - Implementation revealed new requirements
 - Assumptions were invalidated
 - Constraints were discovered
 
 **Process**:
+
 1. Read local `requirements.md`
 2. Compare with last synced state
 3. Identify new/changed requirements
 4. Dispatch `prd-writer` agent to:
-   - Append new requirements to PRD
+   - Update `.claude/prds/<prd-id>/prd.md` with new requirements
    - Add "Implementation Notes" section
-   - Increment version marker
+   - Increment version in frontmatter and `.prd-meta.json`
 5. Update `manifest.json` with new PRD version
-6. Set remote PRD version state to DRAFT (agent change)
+6. Set PRD version state to DRAFT (agent change, needs human review)
 
 **Output**:
+
 ```
 PRD updated successfully
 
-Pushed to: "Authentication Revamp" (v3 → v4)
+PRD: "auth-revamp" (1.1.0 → 1.2.0)
+Path: .claude/prds/auth-revamp/prd.md
 Changes:
   + Added REQ-006: Rate limiting for login attempts
   + Added Implementation Note: "Rate limit discovered necessary during load testing"
 
-Remote PRD version: v4 (DRAFT - needs human review)
-Local spec group: sg-auth-revamp (synced to v4)
+PRD version: 1.2.0 (DRAFT - needs human review)
+Local spec group: sg-auth-revamp (synced to 1.2.0)
 ```
 
 ## PRD Format Expectations
@@ -305,13 +347,14 @@ Brief description of what this is and why it matters.
 - [x] Resolved question → Answer
 
 ## Version History
-- v1 (2026-01-10): Initial draft
-- v2 (2026-01-14): Added REQ-003 based on user feedback
+- 1.0.0 (2026-01-10): Initial draft
+- 1.1.0 (2026-01-14): Added REQ-003 based on user feedback
 ```
 
 ### Flexible Extraction
 
 The `prd-reader` agent can also extract from less structured documents by:
+
 - Looking for bullet points that describe behaviors
 - Identifying "must", "shall", "should" language
 - Finding sections labeled "requirements", "features", "user stories"
@@ -330,9 +373,9 @@ PM interview gathers requirements
     ↓
 Spec group created with requirements.md
     ↓
-PRD written to Google Doc (using template)
+PRD written to .claude/prds/<prd-id>/prd.md
     ↓
-User reviews PRD in Google Docs
+User reviews PRD in .claude/prds/<prd-id>/prd.md
     ↓
 /spec (creates spec.md from requirements)
     ↓
@@ -342,15 +385,15 @@ User reviews PRD in Google Docs
     ↓
 /prd push (if new requirements discovered)
     ↓
-PRD updated, new version as DRAFT
+PRD updated with new version
 ```
 
-### Flow 2: Sync Existing PRD (External PRD → Specs)
+### Flow 2: Sync Existing PRD (PRD → Specs)
 
 ```
-PRD already exists in Google Docs
+PRD already exists in .claude/prds/<prd-id>/prd.md
     ↓
-/prd sync <doc-id>
+/prd sync <prd-id>
     ↓
 prd-reader extracts requirements
     ↓
@@ -367,141 +410,173 @@ User reviews extracted requirements
     ↓
 /prd push (if new requirements discovered)
     ↓
-PRD updated, new version as DRAFT
+PRD updated with new version
 ```
 
 ### PM Skill Relationship
 
 The `/pm` skill and `/prd` skill work together:
 
-| Skill | Purpose | Output |
-|-------|---------|--------|
-| `/pm` | Gather requirements via interview | `requirements.md` in spec group |
-| `/prd draft` | Interview + write PRD to Google Doc | PRD in Google Docs + spec group |
-| `/prd write` | Write existing requirements to PRD | PRD in Google Docs |
-| `/prd sync` | Extract requirements from existing PRD | `requirements.md` in spec group |
+| Skill        | Purpose                                | Output                              |
+| ------------ | -------------------------------------- | ----------------------------------- |
+| `/pm`        | Gather requirements via interview      | `requirements.md` in spec group     |
+| `/prd draft` | Interview + write PRD                  | PRD in `.claude/prds/` + spec group |
+| `/prd write` | Write existing requirements to PRD     | PRD in `.claude/prds/`              |
+| `/prd sync`  | Extract requirements from existing PRD | `requirements.md` in spec group     |
 
 **When to use which:**
+
 - **Starting fresh**: `/prd draft` — runs PM interview then writes PRD
-- **Have requirements, need PRD**: `/prd write <doc-id>` — formats and writes
-- **PRD exists, need local requirements**: `/prd sync <doc-id>` — extracts to local
+- **Have requirements, need PRD**: `/prd write <prd-id>` — formats and writes
+- **PRD exists, need spec group**: `/prd sync <prd-id>` — extracts requirements to spec group
 - **Just gathering requirements (no PRD yet)**: `/pm` — interview only
 
 ## Agents
 
 The `/prd` skill uses three specialized agents:
 
-| Agent | Purpose | Used By |
-|-------|---------|---------|
+| Agent        | Purpose                                                | Used By                    |
+| ------------ | ------------------------------------------------------ | -------------------------- |
 | `prd-author` | Authors complete PRDs from requirements using template | `/prd draft`, `/prd write` |
-| `prd-reader` | Extracts requirements from existing PRDs | `/prd sync` |
-| `prd-writer` | Pushes incremental discoveries back to PRDs | `/prd push` |
+| `prd-reader` | Extracts requirements from existing PRDs               | `/prd sync`                |
+| `prd-writer` | Pushes incremental discoveries back to PRDs            | `/prd push`                |
 
 ### Agent Responsibilities
 
 **prd-author** (`.claude/agents/prd-author.md`):
-- Transforms `requirements.md` → full PRD document
+
+- Transforms `requirements.md` into full PRD document
 - Follows PRD template structure exactly
-- Writes to Google Docs (create new or overwrite)
+- Writes to `.claude/prds/<prd-id>/prd.md`
 - Generates User Stories from requirements
 - Initializes version history
 
 **prd-reader** (`.claude/agents/prd-reader.md`):
-- Reads external PRDs from Google Docs
+
+- Reads PRDs from `.claude/prds/<prd-id>/prd.md`
 - Extracts requirements, constraints, assumptions
 - Converts prose/user stories to EARS format
 - Creates `requirements.md` in spec group
 
 **prd-writer** (`.claude/agents/prd-writer.md`):
-- Computes diff between local and last-synced state
+
+- Computes diff between spec group requirements and PRD
 - Appends new requirements discovered during implementation
 - Updates assumptions (marks invalidated)
 - Adds implementation notes
-- Increments PRD version
+- Increments PRD version in frontmatter
 
 ## Version Detection
 
-The skill attempts to detect PRD versions by:
-1. Looking for explicit "Version: vX" or "v1, v2" markers
-2. Checking "Version History" section
-3. Using document revision history from Google Docs API
-4. Falling back to date-based versioning if none found
+The skill manages PRD versions through:
+
+1. PRD frontmatter `version` field (e.g., `version: 1.2.0`)
+2. `.prd-meta.json` file in each PRD directory
+3. Version History section in the PRD document
+4. Git commit history for change tracking
 
 ## State Transitions
 
 ### On /prd draft (new PRD + spec group)
+
 ```json
 {
   "review_state": "DRAFT",
   "work_state": "PLAN_READY",
   "updated_by": "agent",
   "prd": {
-    "source": "google-docs",
-    "document_id": "...",
-    "version": "v1",
+    "source": "local-file",
+    "file_path": ".claude/prds/<prd-id>/prd.md",
+    "version": "1.0.0",
     "last_sync": "<now>",
     "created_by": "prd-draft"
   }
 }
 ```
-- Google Doc created/written with PRD content
-- PRD version: v1 (DRAFT)
-- Spec group linked to document
 
-### On /prd write (write to existing doc)
+- PRD written to `.claude/prds/<prd-id>/prd.md`
+- PRD version: 1.0.0 (DRAFT)
+- Spec group linked to PRD
+
+### On /prd write (write to existing PRD)
+
 ```json
 {
   "prd": {
-    "source": "google-docs",
-    "document_id": "...",
-    "version": "v1",
+    "source": "local-file",
+    "file_path": ".claude/prds/<prd-id>/prd.md",
+    "version": "1.0.0",
     "last_sync": "<now>",
     "created_by": "prd-write"
   }
 }
 ```
+
 - Existing spec group's `manifest.json` updated with PRD link
-- Google Doc content replaced with formatted PRD
+- PRD content written to `.claude/prds/<prd-id>/prd.md`
 
 ### On /prd sync (new spec group from existing PRD)
+
 ```json
 {
   "review_state": "DRAFT",
   "work_state": "PLAN_READY",
   "updated_by": "agent",
   "prd": {
-    "source": "google-docs",
-    "document_id": "...",
-    "version": "v1",
+    "source": "local-file",
+    "file_path": ".claude/prds/<prd-id>/prd.md",
+    "version": "1.0.0",
     "last_sync": "<now>"
   }
 }
 ```
 
 ### On /prd push
-- Remote PRD gets new version (DRAFT state in PRD)
+
+- PRD file updated in `.claude/prds/<prd-id>/prd.md`
 - Local `manifest.json` updated with new version reference
 - Local `review_state` unchanged (local work continues)
 
+### Backward Compatibility
+
+For spec groups linked to external PRD sources (e.g., Google Docs), the `source` field supports:
+
+```json
+{
+  "prd": {
+    "source": "google-docs",
+    "document_id": "...",
+    "version": "1",
+    "last_sync": "<now>"
+  }
+}
+```
+
+The primary workflow uses `"source": "local-file"`, but legacy sources (`google-docs`, `git-repo`) are still recognized.
+
 ## Error Handling
 
-### Document Not Found
+### PRD Not Found
+
 ```
-Error: Could not access document 1pQA7...
+Error: PRD 'logout-feature' not found
 
-Possible causes:
-  - Document ID is incorrect
-  - Document is not shared with the service account
-  - Document has been deleted
+Expected path: .claude/prds/logout-feature/prd.md
 
-Check document sharing settings and try again.
+Available PRDs:
+  - auth-revamp (.claude/prds/auth-revamp/prd.md)
+  - dashboard-v2 (.claude/prds/dashboard-v2/prd.md)
+  - notification-system (.claude/prds/notification-system/prd.md)
+
+Check PRD ID and try again, or use /prd draft to create new.
 ```
 
 ### No Requirements Found
+
 ```
 Warning: No clear requirements found in PRD
 
-The document exists but doesn't contain recognizable requirements.
+The PRD exists but doesn't contain recognizable requirements.
 Consider:
   1. Adding a "Requirements" section to the PRD
   2. Using /pm to interview and generate requirements locally
@@ -510,39 +585,46 @@ Consider:
 Spec group created with empty requirements.md
 ```
 
-### Permission Denied for Push
-```
-Error: Cannot update PRD - insufficient permissions
+### PRD Directory Missing prd.md
 
-The service account has read-only access to this document.
-Options:
-  1. Grant edit access to the service account
-  2. Manually copy changes to the PRD
-  3. Export requirements: /prd export sg-logout-feature
+```
+Error: PRD directory exists but prd.md is missing
+
+Directory: .claude/prds/logout-feature/
+Expected file: .claude/prds/logout-feature/prd.md
+
+The PRD directory exists but does not contain a prd.md file.
+Use /prd draft or /prd write to create the PRD document.
 ```
 
 ## Edge Cases
 
 ### PRD Has Multiple Versions in One Document
+
 Some PRDs track versions inline. The reader will:
+
 - Extract the latest/current version's requirements
 - Note previous versions in the change log
 - Flag if version is ambiguous
 
 ### PRD is Actually a User Story Collection
+
 If the document is Agile user stories rather than requirements:
+
 - Convert "As a X, I want Y, so that Z" to EARS format
 - Group related stories into single requirements where appropriate
 - Flag for user review
 
 ### Linked PRD Deleted
+
 ```
-Warning: Linked PRD no longer accessible
+Warning: Linked PRD no longer exists
 
 Spec group: sg-logout-feature
-Previous PRD: google-docs/1pQA7...
+Previous PRD: .claude/prds/logout-feature/prd.md
 
 Options:
   1. /prd unlink sg-logout-feature  # Continue with local-only
-  2. /prd link sg-logout-feature <new-doc-id>  # Link to replacement
+  2. /prd link sg-logout-feature <new-prd-id>  # Link to replacement
+  3. /prd draft sg-logout-feature  # Re-create PRD from requirements
 ```

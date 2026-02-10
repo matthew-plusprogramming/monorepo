@@ -39,10 +39,10 @@ labels: needs-discovery
 
 _These will be refined through the discovery process._
 
-| ID | Requirement | Priority | Status |
-|----|-------------|----------|--------|
-| REQ-001 | <Requirement text> | High/Med/Low | Draft |
-| REQ-002 | <Requirement text> | High/Med/Low | Draft |
+| ID      | Requirement        | Priority     | Status |
+| ------- | ------------------ | ------------ | ------ |
+| REQ-001 | <Requirement text> | High/Med/Low | Draft  |
+| REQ-002 | <Requirement text> | High/Med/Low | Draft  |
 
 ---
 
@@ -63,10 +63,10 @@ _Completed by the Git Issue Discovery & PM Interview System._
 
 _Assumptions that affect scope or implementation. These must be validated._
 
-| ID | Assumption | Source | Validated |
-|----|------------|--------|-----------|
-| A1 | <Assumption text> | <User/Inferred> | ☐ |
-| A2 | <Assumption text> | <User/Inferred> | ☐ |
+| ID  | Assumption        | Source          | Validated |
+| --- | ----------------- | --------------- | --------- |
+| A1  | <Assumption text> | <User/Inferred> | ☐         |
+| A2  | <Assumption text> | <User/Inferred> | ☐         |
 
 ---
 
@@ -74,20 +74,20 @@ _Assumptions that affect scope or implementation. These must be validated._
 
 _Hard constraints that limit implementation options._
 
-| ID | Constraint | Reason |
-|----|------------|--------|
-| C1 | <Constraint text> | <Why this constraint exists> |
-| C2 | <Constraint text> | <Why this constraint exists> |
+| ID  | Constraint        | Reason                       |
+| --- | ----------------- | ---------------------------- |
+| C1  | <Constraint text> | <Why this constraint exists> |
+| C2  | <Constraint text> | <Why this constraint exists> |
 
 ---
 
 ## Related Artifacts
 
-| Type | Reference | Status |
-|------|-----------|--------|
-| PRD | <link or "to be created"> | |
-| Existing Feature | <link> | |
-| Knowledge Base Entry | <link> | |
+| Type                 | Reference                 | Status |
+| -------------------- | ------------------------- | ------ |
+| PRD                  | <link or "to be created"> |        |
+| Existing Feature     | <link>                    |        |
+| Knowledge Base Entry | <link>                    |        |
 
 ---
 
