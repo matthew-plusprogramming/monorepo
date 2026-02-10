@@ -202,12 +202,16 @@ Update manifest.json with enforcement_status: PASSING or FAILING.
 
 ```javascript
 // Check enforcement status before proceeding
-const manifest = JSON.parse(fs.readFileSync('.claude/specs/groups/<id>/workstreams/ws-1/manifest.json'));
+const manifest = JSON.parse(
+  fs.readFileSync('.claude/specs/groups/<id>/workstreams/ws-1/manifest.json'),
+);
 
 if (manifest.enforcement_status !== 'PASSING') {
   // Do NOT dispatch implementers
   // Either iterate with /atomize --refine or escalate to user
-  throw new Error(`ws-1 atomicity enforcement failed: ${manifest.enforcement_issues}`);
+  throw new Error(
+    `ws-1 atomicity enforcement failed: ${manifest.enforcement_issues}`,
+  );
 }
 
 // Only proceed to implementation if enforcement passes
@@ -387,7 +391,7 @@ Check: OWASP Top 10, input validation, auth/authz, secrets handling.
 
 **If PASSED**:
 
-- Update convergence_status.security_reviewed: true
+- Update convergence.security_reviewed: true
 - Check if workstream has UI components → Run browser test (step 9a)
 - If no UI → Add to merge queue
 
@@ -402,7 +406,8 @@ For workstreams that include UI components (frontend, components, user-facing fe
 
 ```javascript
 // Check if workstream has UI changes
-const hasUIChanges = workstream.tags?.includes('ui') ||
+const hasUIChanges =
+  workstream.tags?.includes('ui') ||
   workstream.title.toLowerCase().includes('frontend') ||
   workstream.title.toLowerCase().includes('ui') ||
   workstream.title.toLowerCase().includes('component');
@@ -441,7 +446,7 @@ Report PASS or FAIL with evidence (screenshots, interaction logs).
 
 **If PASSED**:
 
-- Update convergence_status.browser_tested: true
+- Update convergence.browser_tested: true
 - Add to merge queue
 
 **If FAILED**:

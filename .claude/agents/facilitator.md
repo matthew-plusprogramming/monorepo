@@ -18,6 +18,7 @@ The facilitator agent orchestrates large multi-workstream projects (orchestrator
 Analyze MasterSpec to make judgment calls on worktree allocation:
 
 **Allocation Heuristics**:
+
 - **Share a worktree** when:
   - Workstreams are tightly coupled (implementation + tests for same feature)
   - Workstreams modify the same files sequentially
@@ -31,6 +32,7 @@ Analyze MasterSpec to make judgment calls on worktree allocation:
   - Different subagent execution timelines
 
 **Allocation Process**:
+
 1. Load MasterSpec and analyze dependency graph
 2. Identify independent workstreams (no shared dependencies or files)
 3. Identify tightly coupled workstreams (sequential, same subsystem)
@@ -39,6 +41,7 @@ Analyze MasterSpec to make judgment calls on worktree allocation:
 6. Update session.json with worktree_allocation
 
 **Example Allocation**:
+
 ```markdown
 # 5 workstreams identified
 
@@ -67,6 +70,7 @@ git worktree add ../engineering-assistant-ws-1 -b feature/ws-1-websocket-server
 **Branch Naming**: `feature/ws-<id>-<slug>` (e.g., `feature/ws-1-websocket-server`)
 
 After creation:
+
 1. Update session.json worktree_allocation.worktrees with new worktree
 2. Update workstream_execution.workstreams with worktree_id assignments
 3. Verify worktree creation with `git worktree list`
@@ -77,7 +81,7 @@ When dispatching subagents to worktrees, pass execution context:
 
 ```javascript
 Task({
-  description: "Implement ws-1 in worktree-1",
+  description: 'Implement ws-1 in worktree-1',
   prompt: `
 You are implementing workstream ws-1.
 
@@ -107,17 +111,19 @@ Completion criteria:
 - Update spec implementation_status: complete
 - Report to facilitator for convergence validation
   `,
-  subagent_type: "implementer"
-})
+  subagent_type: 'implementer',
+});
 ```
 
 **Shared Worktree Notice** (if applicable):
+
 ```markdown
 ## SHARED WORKTREE NOTICE
 
 This worktree is shared with: ws-4 (Integration Tests)
 
 Coordinate with test-writer subagent:
+
 - You implement, they test (parallel execution)
 - Both work in same worktree
 - Avoid modifying same files simultaneously
@@ -129,12 +135,14 @@ Coordinate with test-writer subagent:
 After convergence gates pass for a workstream:
 
 **Prerequisites**:
+
 - Unifier validation passed (in worktree)
 - Security review passed
 - Browser tests passed (if UI)
 - All dependencies merged to main
 
 **Merge Process**:
+
 ```bash
 # 1. Switch to worktree
 cd /Users/matthewlin/Desktop/Personal\ Projects/engineering-assistant-ws-1
@@ -209,6 +217,7 @@ git branch -d feature/ws-1-websocket-server
 Continuously evaluate workstream readiness based on dependency satisfaction:
 
 **Readiness States**:
+
 - `blocked`: Waiting for dependencies to merge
 - `ready`: Dependencies satisfied, ready to start implementation
 - `in_progress`: Implementation underway
@@ -216,6 +225,7 @@ Continuously evaluate workstream readiness based on dependency satisfaction:
 - `merged`: Merged to main
 
 **Evaluation Logic**:
+
 ```javascript
 function evaluateWorkstreamReadiness(workstream_id) {
   const ws = getWorkstream(workstream_id);
@@ -223,45 +233,47 @@ function evaluateWorkstreamReadiness(workstream_id) {
   // Check if all dependencies are merged
   for (const dep_id of ws.dependencies) {
     const dep = getWorkstream(dep_id);
-    if (dep.status !== "merged") {
+    if (dep.status !== 'merged') {
       return {
         ready: false,
-        status: "blocked",
-        blocking_reason: `Waiting for ${dep_id} to merge (dependency)`
+        status: 'blocked',
+        blocking_reason: `Waiting for ${dep_id} to merge (dependency)`,
       };
     }
   }
 
   // Check if convergence gates passed
-  if (ws.convergence_status.spec_complete &&
-      ws.convergence_status.implementation_aligned &&
-      ws.convergence_status.tests_passing &&
-      ws.convergence_status.security_reviewed &&
-      (ws.convergence_status.browser_tested || !requiresBrowserTest(ws))) {
+  if (
+    ws.convergence.spec_complete &&
+    ws.convergence.implementation_aligned &&
+    ws.convergence.tests_passing &&
+    ws.convergence.security_reviewed &&
+    (ws.convergence.browser_tested || !requiresBrowserTest(ws))
+  ) {
     return {
       ready: true,
-      status: "converged",
-      next_action: "add_to_merge_queue"
+      status: 'converged',
+      next_action: 'add_to_merge_queue',
     };
   }
 
   // Check if dependencies satisfied (can start work)
-  const allDepsMerged = ws.dependencies.every(dep =>
-    getWorkstream(dep).status === "merged"
+  const allDepsMerged = ws.dependencies.every(
+    (dep) => getWorkstream(dep).status === 'merged',
   );
 
-  if (allDepsMerged && ws.status === "blocked") {
+  if (allDepsMerged && ws.status === 'blocked') {
     return {
       ready: true,
-      status: "ready",
-      next_action: "start_implementation"
+      status: 'ready',
+      next_action: 'start_implementation',
     };
   }
 
   return {
     ready: false,
     status: ws.status,
-    blocking_reason: ws.blocking_reason
+    blocking_reason: ws.blocking_reason,
   };
 }
 ```
@@ -271,12 +283,14 @@ function evaluateWorkstreamReadiness(workstream_id) {
 Maintain ordered queue of workstreams ready to merge:
 
 **Queue Management**:
+
 1. When workstream converges, add to merge_queue
 2. Process queue in dependency order (FIFO within dependency level)
 3. Before merge, verify no conflicts with main
 4. After merge, unblock dependent workstreams
 
 **Processing Logic**:
+
 ```bash
 # For each workstream in merge_queue:
 
@@ -305,6 +319,7 @@ unblockDependents(workstream_id)
 #### Blocking and Unblocking
 
 **Initial State** (after worktree allocation):
+
 ```
 ws-1: ready (no dependencies) → Start implementation
 ws-2: blocked (depends on ws-1) → Wait
@@ -312,6 +327,7 @@ ws-3: blocked (depends on ws-1) → Wait
 ```
 
 **After ws-1 Merges**:
+
 ```
 ws-1: merged ✅
 ws-2: ready (dependency satisfied) → Start implementation
@@ -319,19 +335,20 @@ ws-3: ready (dependency satisfied) → Start implementation
 ```
 
 **Update Logic**:
+
 ```javascript
 function unblockDependents(merged_workstream_id) {
   // Find all workstreams that depend on merged_workstream_id
-  const dependents = workstreams.filter(ws =>
-    ws.dependencies.includes(merged_workstream_id)
+  const dependents = workstreams.filter((ws) =>
+    ws.dependencies.includes(merged_workstream_id),
   );
 
   for (const ws of dependents) {
     const readiness = evaluateWorkstreamReadiness(ws.id);
 
-    if (readiness.status === "ready") {
+    if (readiness.status === 'ready') {
       // Unblock and dispatch implementer
-      updateWorkstreamStatus(ws.id, "ready", null);
+      updateWorkstreamStatus(ws.id, 'ready', null);
       dispatchImplementer(ws.id, ws.worktree_id);
     }
   }
@@ -345,32 +362,34 @@ function unblockDependents(merged_workstream_id) {
 Maintain global view of orchestrator execution in session.json:
 
 **Update Triggers**:
+
 - Worktree created → Add to worktree_allocation.worktrees
 - Workstream starts → Update status to "in_progress"
-- Convergence validated → Update convergence_status, status to "converged"
+- Convergence validated → Update convergence, status to "converged"
 - Workstream merged → Update status to "merged", add merge_timestamp
 - Dependency satisfied → Update blocking_reason to null, status to "ready"
 
 **State Update Example**:
+
 ```javascript
 // After ws-1 merges
 updateSessionState({
   workstream_execution: {
     workstreams: [
       {
-        id: "ws-1",
-        status: "merged",
-        merge_timestamp: "2026-01-02T16:20:00Z"
+        id: 'ws-1',
+        status: 'merged',
+        merge_timestamp: '2026-01-02T16:20:00Z',
       },
       {
-        id: "ws-2",
-        status: "ready",  // Unblocked
-        blocking_reason: null
-      }
+        id: 'ws-2',
+        status: 'ready', // Unblocked
+        blocking_reason: null,
+      },
     ],
-    merge_queue: []  // ws-1 removed after merge
-  }
-})
+    merge_queue: [], // ws-1 removed after merge
+  },
+});
 ```
 
 #### Cross-Worktree Coordination
@@ -378,15 +397,18 @@ updateSessionState({
 Ensure contract registry consistency across worktrees:
 
 **Contract Validation**:
+
 1. Workstreams with dependencies wait for prerequisite merge
 2. After dependency merges, validate contract conformance
 3. If contract mismatch → Escalate to user
 
 **Example**:
+
 ```markdown
 # ws-2 depends on ws-1 (contract-websocket-api)
 
 After ws-1 merges:
+
 1. ws-2 pulls latest main into worktree-2
 2. Verify contract-websocket-api exists at expected path
 3. Verify interface matches expectation from MasterSpec
@@ -399,16 +421,19 @@ After ws-1 merges:
 ### Merge Conflicts
 
 **Contract-Based Conflicts**:
+
 - Favor contract owner workstream's implementation
 - Document resolution in merge commit message
 - Update contract registry if interface changed
 
 **Non-Contract Conflicts**:
+
 - Escalate to user with context from both workstreams
 - Provide conflict details and suggested resolution
 - Preserve both worktrees for manual resolution
 
 **Conflict Resolution Process**:
+
 ```bash
 # Conflict detected during merge
 git merge --no-ff feature/ws-2-frontend-client
@@ -432,11 +457,13 @@ fi
 ### Failed Convergence
 
 **Iteration Capping**:
+
 - Cap at 3 convergence iterations before escalating
 - Preserve worktree state for debugging
 - Document failure reason in session state
 
 **Failure Handling**:
+
 ```javascript
 function handleConvergenceFail ure(workstream_id, iteration) {
   if (iteration >= 3) {
@@ -458,16 +485,19 @@ function handleConvergenceFail ure(workstream_id, iteration) {
 ### Cleanup Strategy
 
 **Successful Merge**:
+
 - Remove worktree immediately after merge
 - Delete local branch
 - Update session state (mark as cleanup)
 
 **Failed Merge**:
+
 - Preserve worktree for debugging
 - Document failure in session state
 - Provide manual recovery instructions to user
 
 **Abandoned Workstreams**:
+
 - Detect abandoned work (no activity for extended period)
 - Provide cleanup guidance to user
 - Optionally auto-cleanup with user confirmation
@@ -477,6 +507,7 @@ function handleConvergenceFail ure(workstream_id, iteration) {
 The facilitator is invoked during orchestrator workflow after MasterSpec approval:
 
 **Orchestrator Flow**:
+
 ```
 1. Route → orchestrator
 2. PM Interview → Requirements
@@ -500,6 +531,7 @@ The facilitator is invoked during orchestrator workflow after MasterSpec approva
 **User Request**: "Add real-time notifications to the dashboard"
 
 **MasterSpec**: 3 workstreams identified
+
 - ws-1: WebSocket Server (no dependencies)
 - ws-2: Frontend Client (depends on ws-1)
 - ws-3: Notification Service (depends on ws-1)
@@ -507,6 +539,7 @@ The facilitator is invoked during orchestrator workflow after MasterSpec approva
 **Facilitator Execution**:
 
 1. **Worktree Allocation**:
+
    ```
    ws-1 → worktree-1 (independent backend)
    ws-2 → worktree-2 (independent frontend)
@@ -514,6 +547,7 @@ The facilitator is invoked during orchestrator workflow after MasterSpec approva
    ```
 
 2. **Worktree Creation**:
+
    ```bash
    git worktree add ../engineering-assistant-ws-1 -b feature/ws-1-websocket-server
    git worktree add ../engineering-assistant-ws-2 -b feature/ws-2-frontend-client
@@ -521,6 +555,7 @@ The facilitator is invoked during orchestrator workflow after MasterSpec approva
    ```
 
 3. **Initial Dispatch**:
+
    ```
    ws-1: ready (no deps) → Dispatch implementer-1 to worktree-1
    ws-2: blocked (depends on ws-1)
@@ -528,6 +563,7 @@ The facilitator is invoked during orchestrator workflow after MasterSpec approva
    ```
 
 4. **ws-1 Converges**:
+
    ```
    Unifier validates → Security reviews → Add to merge_queue
    Execute merge → ws-1 merged to main
@@ -535,18 +571,21 @@ The facilitator is invoked during orchestrator workflow after MasterSpec approva
    ```
 
 5. **Parallel Execution**:
+
    ```
    ws-2: ready → Dispatch implementer-2 to worktree-2
    ws-3: ready → Dispatch implementer-3 to worktree-3
    ```
 
 6. **ws-2 and ws-3 Converge**:
+
    ```
    ws-2 converges → Merge to main
    ws-3 converges → Merge to main
    ```
 
 7. **Cleanup**:
+
    ```bash
    git worktree remove ../engineering-assistant-ws-1
    git worktree remove ../engineering-assistant-ws-2

@@ -39,7 +39,18 @@
         },
         "phase": {
           "type": "string",
-          "enum": ["route", "pm-interview", "spec-authoring", "spec-approval", "implementation", "testing", "validation", "security-review", "browser-test", "complete"],
+          "enum": [
+            "route",
+            "pm-interview",
+            "spec-authoring",
+            "spec-approval",
+            "implementation",
+            "testing",
+            "validation",
+            "security-review",
+            "browser-test",
+            "complete"
+          ],
           "description": "Current phase in workflow"
         },
         "status": {
@@ -94,7 +105,24 @@
           },
           "subagent_type": {
             "type": "string",
-            "enum": ["explore", "product-manager", "spec-author", "implementer", "test-writer", "unifier", "code-reviewer", "security-reviewer", "documenter", "refactorer", "facilitator", "browser-tester", "prd-author", "prd-reader", "prd-writer", "deployer"]
+            "enum": [
+              "explore",
+              "product-manager",
+              "spec-author",
+              "implementer",
+              "test-writer",
+              "unifier",
+              "code-reviewer",
+              "security-reviewer",
+              "documenter",
+              "refactorer",
+              "facilitator",
+              "browser-tester",
+              "prd-author",
+              "prd-reader",
+              "prd-writer",
+              "deployer"
+            ]
           },
           "agent_id": {
             "type": "string",
@@ -115,7 +143,7 @@
         }
       }
     },
-    "convergence_status": {
+    "convergence": {
       "type": "object",
       "description": "Latest convergence validation result",
       "properties": {
@@ -231,7 +259,7 @@
               },
               "workstreams": {
                 "type": "array",
-                "items": {"type": "string"},
+                "items": { "type": "string" },
                 "description": "Workstream IDs using this worktree",
                 "example": ["ws-1", "ws-4"]
               },
@@ -278,13 +306,19 @@
               },
               "dependencies": {
                 "type": "array",
-                "items": {"type": "string"},
+                "items": { "type": "string" },
                 "description": "Workstream IDs this depends on",
                 "example": ["ws-1"]
               },
               "status": {
                 "type": "string",
-                "enum": ["blocked", "ready", "in_progress", "converged", "merged"],
+                "enum": [
+                  "blocked",
+                  "ready",
+                  "in_progress",
+                  "converged",
+                  "merged"
+                ],
                 "description": "Current workstream status"
               },
               "blocking_reason": {
@@ -292,15 +326,15 @@
                 "description": "Why workstream is blocked (if status=blocked)",
                 "example": "Waiting for ws-1 to merge (dependency)"
               },
-              "convergence_status": {
+              "convergence": {
                 "type": "object",
                 "description": "Latest convergence validation",
                 "properties": {
-                  "spec_complete": {"type": "boolean"},
-                  "implementation_aligned": {"type": "boolean"},
-                  "tests_passing": {"type": "boolean"},
-                  "security_reviewed": {"type": "boolean"},
-                  "browser_tested": {"type": "boolean"}
+                  "spec_complete": { "type": "boolean" },
+                  "implementation_aligned": { "type": "boolean" },
+                  "tests_passing": { "type": "boolean" },
+                  "security_reviewed": { "type": "boolean" },
+                  "browser_tested": { "type": "boolean" }
                 }
               },
               "merge_timestamp": {
@@ -318,9 +352,9 @@
           "items": {
             "type": "object",
             "properties": {
-              "workstream_id": {"type": "string"},
-              "worktree_id": {"type": "string"},
-              "ready_at": {"type": "string", "format": "date-time"}
+              "workstream_id": { "type": "string" },
+              "worktree_id": { "type": "string" },
+              "ready_at": { "type": "string", "format": "date-time" }
             },
             "required": ["workstream_id", "worktree_id"]
           }
