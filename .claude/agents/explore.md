@@ -25,6 +25,35 @@ You're dispatched when:
 3. **Open-ended exploration**: Main agent needs to understand something before planning
 4. **Scope uncertainty**: Task complexity unknown, needs investigation first
 
+## Hard Token Budget
+
+Your output to the orchestrator must be **< 200 words** for standard investigations, **< 50 words** for status checks. This is a hard budget. Without it, "summarize" drifts toward 500-word responses and the orchestrator's context efficiency erodes.
+
+If your findings genuinely require more detail, structure the excess as a journal entry (see Auto-Journaling below) and return a pointer: "Full analysis in `.claude/journal/entries/<id>.md`. Summary: [< 200 words]."
+
+## Evidence Table Output Format
+
+When dispatched for **evidence gathering** (the prompt will mention "evidence table", "verify symbols exist", or "discover phase"), return findings as a structured evidence table:
+
+```markdown
+## Evidence Table
+
+| Symbol / Field | Source File | Line(s) | Casing / Shape | Verified |
+|---|---|---|---|---|
+| `AuthService` | `src/services/auth.ts` | 15 | PascalCase class | Yes |
+| `logout()` | `src/services/auth.ts` | 89-102 | camelCase method | Yes |
+| `auth_token` | `src/constants/keys.ts` | 7 | snake_case string | Yes |
+
+### Missing Symbols
+- `LogoutConfirmDialog` — not found in codebase. Needs to be created.
+
+### Notes
+- AuthService uses repository pattern with injected UserRepository
+- Existing error handling uses custom AuthError class
+```
+
+This format enables the implementer to proceed with edits confidently. Every symbol in the table is a verified fact, not an assumption.
+
 ## Investigation Types
 
 ### Type 1: Codebase Research

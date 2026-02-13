@@ -23,6 +23,40 @@ Use this skill when:
 
 ## Orchestration Flow
 
+### Step 0: Check for Existing Session State
+
+Before initializing, check for an interrupted orchestration session:
+
+```bash
+node .claude/scripts/session-checkpoint.mjs get-status
+```
+
+**If active_work exists with workflow "orchestrator"**:
+
+1. Display resume prompt to user:
+
+   ```
+   Found interrupted orchestration session:
+   - Task: <objective from active_work>
+   - Phase: <current_phase>
+   - Workstreams: X/Y complete
+
+   Resume this session? (yes/no)
+   ```
+
+2. If resuming:
+   - Load session.json `worktree_allocation` and `workstream_execution`
+   - Verify worktrees still exist: `git worktree list`
+   - Determine which workstreams are complete vs in-progress
+   - Resume from last checkpoint (see Recovery Protocol below)
+
+3. If not resuming:
+   - Archive current session state
+   - Clean up orphaned worktrees if any
+   - Start fresh with Step 1
+
+**If no active orchestration work**, proceed to Step 1.
+
 ### 1. Load MasterSpec and Spec Group
 
 ```bash
@@ -87,7 +121,19 @@ git worktree add ../${REPO_NAME}-ws-2 -b feature/ws-2-<slug>
 git worktree list
 ```
 
-**Update session.json**:
+### Create Session State File
+
+After allocating worktrees, persist state to session.json:
+
+```bash
+# Initialize session with orchestrator workflow
+node .claude/scripts/session-checkpoint.mjs start-work <master-spec-id> orchestrator "Orchestrating: <objective>"
+
+# Transition to implementing phase
+node .claude/scripts/session-checkpoint.mjs transition-phase implementing
+```
+
+Also create the full worktree state in session.json:
 
 ```json
 {
@@ -106,6 +152,8 @@ git worktree list
   }
 }
 ```
+
+This state enables cross-session recovery if the orchestration is interrupted.
 
 ### 4. Evaluate Initial Workstream Readiness
 
@@ -391,7 +439,7 @@ Check: OWASP Top 10, input validation, auth/authz, secrets handling.
 
 **If PASSED**:
 
-- Update convergence.security_reviewed: true
+- Update convergence.security_review_passed: true
 - Check if workstream has UI components → Run browser test (step 9a)
 - If no UI → Add to merge queue
 
@@ -446,7 +494,7 @@ Report PASS or FAIL with evidence (screenshots, interaction logs).
 
 **If PASSED**:
 
-- Update convergence.browser_tested: true
+- Update convergence.browser_tests_passed: true
 - Add to merge queue
 
 **If FAILED**:
@@ -659,34 +707,86 @@ If security review finds critical/high severity issues:
 2. Report findings to user
 3. Wait for fixes, then re-validate
 
-## State Management
+## State Management and Recovery
+
+### Session Persistence
+
+The orchestrator maintains state in two locations:
+
+1. `.claude/context/session.json` - Global session state with phase, active work, worktree allocation
+2. Per-workstream state in manifest.json - Each workstream spec group tracks its own implementation progress
+
+### Cross-Session Recovery
+
+On session start, the orchestrator checks for incomplete work (see Step 0):
+
+1. **Check session.json** for active orchestrator workflow
+2. **Verify worktrees exist** - Each allocated worktree should still be present
+3. **Check workstream status** - Determine which workstreams are complete vs in-progress
+4. **Resume or restart** - Continue from where we left off or restart failed workstreams
+
+**Recovery Decision Matrix**:
+
+| Worktree Status | Workstream Status | Action                                |
+| --------------- | ----------------- | ------------------------------------- |
+| Exists          | merged            | Skip (already done)                   |
+| Exists          | converged         | Resume at security review             |
+| Exists          | in_progress       | Resume implementation                 |
+| Exists          | ready             | Resume dispatch                       |
+| Missing         | any non-merged    | Recreate worktree, restart workstream |
+
+### Checkpoint Triggers
+
+Session state is updated on these events:
+
+- **Worktree allocation** (new worktree created)
+- **Workstream dispatch** (subagent started)
+- **Workstream completion** (subagent finished)
+- **Convergence validation** (unifier result)
+- **Merge operation** (workstream merged to main)
+- **Phase transition** (all workstreams done, moving to review)
+
+```bash
+# After each workstream completion
+node .claude/scripts/session-checkpoint.mjs complete-subagent <task_id> "<summary>"
+
+# After merge
+node .claude/scripts/session-checkpoint.mjs transition-phase verifying
+```
+
+### State Fields
 
 Throughout orchestration, maintain session.json with:
 
-- `worktree_allocation`: All active worktrees
-- `workstream_execution`: Status of each workstream
-- `merge_queue`: Workstreams ready to merge
-
-Update after:
-
-- Worktree creation
-- Workstream status changes
-- Convergence validation
-- Merge completion
-- Cleanup
+- `worktree_allocation`: All active worktrees with paths, branches, workstreams
+- `workstream_execution`: Status of each workstream (ready, blocked, in_progress, converged, merged)
+- `merge_queue`: Workstreams ready to merge (FIFO order)
+- `active_work.workflow`: "orchestrator"
+- `current_phase`: Current orchestration phase
 
 ## Success Criteria
 
 Orchestrator task complete when:
 
-- ✅ All workstream spec groups converged (all atomic specs implemented + tested)
-- ✅ All UI workstreams browser tested
-- ✅ All workstreams merged to main
-- ✅ All worktrees cleaned up
-- ✅ Integration tests passing
-- ✅ No merge conflicts remain
-- ✅ MasterSpec manifest.json shows all convergence gates passed
-- ✅ Full traceability chain validated for each workstream
+- All workstream spec groups converged (all atomic specs implemented + tested)
+- All UI workstreams browser tested
+- All workstreams merged to main
+- All worktrees cleaned up
+- Integration tests passing
+- No merge conflicts remain
+- MasterSpec manifest.json shows all convergence gates passed
+- Full traceability chain validated for each workstream
+
+### Finalize Session
+
+After all success criteria met, complete the orchestration work:
+
+```bash
+# Complete orchestration work and clear active session
+node .claude/scripts/session-checkpoint.mjs complete-work
+```
+
+This clears the `active_work` from session.json, archiving the completed orchestration. The next session start will not prompt for resume.
 
 ## Example Session
 

@@ -94,6 +94,12 @@
           },
           {
             "_source": "metaclaude",
+            "_id": "structured-error-validate",
+            "type": "command",
+            "command": "node /Users/matthewlin/workspace/metaclaude-assistant/.claude/scripts/hook-wrapper.mjs '*.ts,*.tsx' 'node /Users/matthewlin/workspace/metaclaude-assistant/.claude/scripts/structured-error-validator.mjs {{file}}'"
+          },
+          {
+            "_source": "metaclaude",
             "_id": "spec-schema-validate",
             "type": "command",
             "command": "node /Users/matthewlin/workspace/metaclaude-assistant/.claude/scripts/hook-wrapper.mjs '.claude/specs/**/*.md' 'node /Users/matthewlin/workspace/metaclaude-assistant/.claude/scripts/spec-schema-validate.mjs {{file}}'"
@@ -103,6 +109,18 @@
             "_id": "spec-validate",
             "type": "command",
             "command": "node /Users/matthewlin/workspace/metaclaude-assistant/.claude/scripts/hook-wrapper.mjs '.claude/specs/**/*.md' 'node /Users/matthewlin/workspace/metaclaude-assistant/.claude/scripts/spec-validate.mjs {{file}}'"
+          },
+          {
+            "_source": "metaclaude",
+            "_id": "evidence-table-check",
+            "type": "command",
+            "command": "node /Users/matthewlin/workspace/metaclaude-assistant/.claude/scripts/hook-wrapper.mjs '.claude/specs/**/*.md' 'node /Users/matthewlin/workspace/metaclaude-assistant/.claude/scripts/evidence-table-check.mjs {{file}}'"
+          },
+          {
+            "_source": "metaclaude",
+            "_id": "spec-approval-hash",
+            "type": "command",
+            "command": "node /Users/matthewlin/workspace/metaclaude-assistant/.claude/scripts/hook-wrapper.mjs '.claude/specs/**/*.md' 'node /Users/matthewlin/workspace/metaclaude-assistant/.claude/scripts/spec-approval-hash.mjs {{file}}'"
           },
           {
             "_source": "metaclaude",
@@ -143,6 +161,12 @@
             "_id": "session-state-finalize",
             "type": "command",
             "command": "node -e \"const fs=require('fs');const p='/Users/matthewlin/workspace/metaclaude-assistant/.claude/context/session.json';if(fs.existsSync(p)){const s=JSON.parse(fs.readFileSync(p));if(s.active_work){s.phase_checkpoint.checkpoint_state='interrupted';s.updated_at=new Date().toISOString();fs.writeFileSync(p,JSON.stringify(s,null,2))}}\" 2>/dev/null || true"
+          },
+          {
+            "_source": "metaclaude",
+            "_id": "journal-promotion-check",
+            "type": "command",
+            "command": "node /Users/matthewlin/workspace/metaclaude-assistant/.claude/scripts/journal-promotion-check.mjs"
           },
           {
             "type": "command",

@@ -20,6 +20,10 @@ hooks:
 
 The PRD reader agent extracts structured requirements from Product Requirements Documents stored in `.claude/prds/`. It converts human-readable product intent into machine-actionable requirements in EARS format.
 
+## Hard Token Budget
+
+Your return to the orchestrator must be **< 200 words**. Include: requirement count extracted, EARS format requirements, key constraints, and assumptions identified. This is a hard budget.
+
 ## PRD Storage
 
 PRDs are stored in-repo at `.claude/prds/<prd-id>/prd.md`. No external repository or git clone is needed.

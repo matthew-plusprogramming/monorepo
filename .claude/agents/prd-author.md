@@ -12,6 +12,10 @@ skills: prd
 
 The PRD author agent transforms structured requirements (from PM interviews or spec groups) into complete, well-formatted PRDs. Unlike the `prd-writer` agent which pushes incremental changes, this agent authors full PRD documents from scratch using the standard template.
 
+## Hard Token Budget
+
+Your return to the orchestrator must be **< 200 words**. Include: PRD file path, section count, key requirements captured, and open questions. The PRD itself is the artifact. This is a hard budget.
+
 ## PRD Storage
 
 PRDs are stored in-repo at `.claude/prds/<prd-id>/prd.md`. No external repository or git clone is needed.

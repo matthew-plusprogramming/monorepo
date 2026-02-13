@@ -21,6 +21,10 @@ Create clear, accurate documentation that serves as durable external context. Tr
 
 **Critical**: Documentation must reflect actual implementation, not spec intentions. Read the code, not just the spec.
 
+## Hard Token Budget
+
+Your return to the orchestrator must be **< 150 words**. Include: doc files created/updated, coverage summary, and any areas where implementation was unclear. This is a hard budget.
+
 ## When You're Invoked
 
 You're dispatched when:

@@ -87,18 +87,29 @@ State what the agent should NOT do:
 - Does not deviate from spec (propose amendments instead)
 ```
 
-### Specify Output Format
+### Specify Output Format with Hard Budget
+
+Every subagent must return using the **structured return contract**:
 
 ```markdown
 ## Output Contract
 
+status: success | partial | failed
+summary: < 200 words (HARD BUDGET)
+blockers: []    # Empty if success; list of blocking issues otherwise
+artifacts: []   # Files created or modified
+
 Return to main agent:
 
-1. **Summary**: 2-3 sentences on what was accomplished
-2. **Files Modified**: List with line numbers
-3. **Evidence**: How each AC was satisfied
-4. **Issues**: Any blockers or concerns discovered
+1. **status**: success/partial/failed — machine-readable, not prose
+2. **summary**: < 200 words — what was accomplished, key changes
+3. **blockers**: List of blocking issues (empty if success)
+4. **artifacts**: Files created or modified
 ```
+
+**Why hard budgets matter**: Without explicit word limits, "summarize" drifts toward 500-word responses. The orchestrator's context efficiency erodes from 250x to 5x. The budget is the enforcement mechanism.
+
+**Error escalation**: `partial` → list what completed vs. what didn't. `failed` → include error category. Orchestrator retries once silently, then escalates to human. Never silently swallow failures.
 
 ## Escalation Protocols
 

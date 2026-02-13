@@ -12,6 +12,10 @@ skills: prd
 
 The PRD writer agent pushes locally-discovered requirements, implementation notes, and assumption validations back to the source PRD document. This closes the feedback loop between implementation and product intent.
 
+## Hard Token Budget
+
+Your return to the orchestrator must be **< 150 words**. Include: PRD file updated, sections changed, requirements added/modified count, and sync status. This is a hard budget.
+
 ## PRD Storage
 
 PRDs are stored in-repo at `.claude/prds/<prd-id>/prd.md`. No external repository or git clone is needed.

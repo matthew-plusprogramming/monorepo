@@ -22,17 +22,18 @@ The system has been migrated from a **task-list based workflow** to an **atomic 
 
 The atomic spec workflow is built on these foundational primitives (per Unified Vision):
 
-| Artifact | Purpose | Location |
-|----------|---------|----------|
-| **PRDs** | Human-readable source of intent, versioned (v1, v2...), DRAFT/REVIEWED state | External (Notion/Google Docs) |
-| **Requirements** | Testable language derived from PRDs, bridge to specs | `requirements.md` in spec group |
-| **Atomic Specs** | Independently testable/reviewable/deployable units | `atomic/*.md` in spec group |
-| **Knowledge Base** | Curated institutional knowledge, queried by agents | `.claude/memory-bank/` |
-| **Traceability Matrix** | Links: Requirement → Spec → Tests → Code → PR | Validated by Unifier |
+| Artifact                | Purpose                                                                      | Location                        |
+| ----------------------- | ---------------------------------------------------------------------------- | ------------------------------- |
+| **PRDs**                | Human-readable source of intent, versioned (v1, v2...), DRAFT/REVIEWED state | External (Notion/Google Docs)   |
+| **Requirements**        | Testable language derived from PRDs, bridge to specs                         | `requirements.md` in spec group |
+| **Atomic Specs**        | Independently testable/reviewable/deployable units                           | `atomic/*.md` in spec group     |
+| **Knowledge Base**      | Curated institutional knowledge, queried by agents                           | `.claude/memory-bank/`          |
+| **Traceability Matrix** | Links: Requirement → Spec → Tests → Code → PR                                | Validated by Unifier            |
 
 ### PRD Versioning
 
 PRDs are versioned (v1, v2, v3...) with state tracking:
+
 - **DRAFT**: Agent/system changes create new versions starting as DRAFT
 - **REVIEWED**: User changes can go directly to REVIEWED
 
@@ -81,12 +82,12 @@ Spec groups are linked to specific PRD versions. When a PRD evolves, new spec gr
 
 A spec group is a directory containing all artifacts for a feature:
 
-| File | Purpose |
-|------|---------|
-| `manifest.json` | Tracks state (review_state, work_state), convergence gates, decision log |
-| `requirements.md` | Business requirements in EARS format (REQ-001, REQ-002, etc.) |
-| `spec.md` | Technical specification with acceptance criteria |
-| `atomic/*.md` | Atomic specs that decompose the work |
+| File              | Purpose                                                                  |
+| ----------------- | ------------------------------------------------------------------------ |
+| `manifest.json`   | Tracks state (review_state, work_state), convergence gates, decision log |
+| `requirements.md` | Business requirements in EARS format (REQ-001, REQ-002, etc.)            |
+| `spec.md`         | Technical specification with acceptance criteria                         |
+| `atomic/*.md`     | Atomic specs that decompose the work                                     |
 
 ### Atomic Specs
 
@@ -98,6 +99,7 @@ Atomic specs are the unit of work. Each must be:
 - **Independently Reversible**: Can revert without affecting others
 
 Format:
+
 ```markdown
 ---
 id: as-001
@@ -107,26 +109,32 @@ requirements_refs: [REQ-001, REQ-002]
 ---
 
 ## Description
+
 Single sentence describing the behavior.
 
 ## Acceptance Criteria
+
 - AC1: When X, then Y
 - AC2: When A, then B
 
 ## Test Strategy
+
 How to test this atomic spec.
 
 ## Implementation Evidence
-| File | Line | Description |
-|------|------|-------------|
-| src/file.ts | 42 | Implementation location |
+
+| File        | Line | Description             |
+| ----------- | ---- | ----------------------- |
+| src/file.ts | 42   | Implementation location |
 
 ## Test Evidence
-| AC | Test File | Line | Test Name | Status |
-|----|-----------|------|-----------|--------|
-| AC1 | file.test.ts | 24 | "should..." | ✅ Pass |
+
+| AC  | Test File    | Line | Test Name   | Status  |
+| --- | ------------ | ---- | ----------- | ------- |
+| AC1 | file.test.ts | 24   | "should..." | ✅ Pass |
 
 ## Decision Log
+
 - `<timestamp>`: Created from spec decomposition
 - `<timestamp>`: Implementation complete
 ```
@@ -146,10 +154,10 @@ The unifier validates this chain before allowing merge.
 
 ### Two-Dimensional State
 
-| State Type | Values | Purpose |
-|------------|--------|---------|
-| `review_state` | DRAFT → REVIEWED → APPROVED | User approval tracking |
-| `work_state` | PLAN_READY → IMPLEMENTING → VERIFYING → READY_TO_MERGE | Work progress |
+| State Type     | Values                                                 | Purpose                |
+| -------------- | ------------------------------------------------------ | ---------------------- |
+| `review_state` | DRAFT → REVIEWED → APPROVED                            | User approval tracking |
+| `work_state`   | PLAN_READY → IMPLEMENTING → VERIFYING → READY_TO_MERGE | Work progress          |
 
 ---
 
@@ -161,6 +169,7 @@ The unifier validates this chain before allowing merge.
 **After**: Gathers requirements, outputs to `requirements.md` in spec group
 
 Key changes:
+
 - Creates `requirements.md` with EARS-format requirements (REQ-XXX)
 - Each requirement has: Description, Rationale, Priority, Acceptance Criteria
 - Identifies edge cases, constraints, assumptions
@@ -172,6 +181,7 @@ Key changes:
 **After**: Creates spec group structure with `spec.md`
 
 Key changes:
+
 - Creates spec group directory at `.claude/specs/groups/<spec-group-id>/`
 - Creates `manifest.json` with initial state
 - Creates `spec.md` that references `requirements.md`
@@ -182,6 +192,7 @@ Key changes:
 **Purpose**: Decompose `spec.md` into atomic specs
 
 Key behaviors:
+
 - Reads `spec.md` acceptance criteria
 - Creates atomic specs in `atomic/` directory
 - Each atomic spec references requirements (REQ-XXX)
@@ -192,6 +203,7 @@ Key behaviors:
 **Purpose**: Validate atomic specs meet atomicity criteria
 
 Key behaviors:
+
 - Runs atomicity validation on each atomic spec
 - Checks: single responsibility, independence, testability
 - Updates `manifest.json` with enforcement status
@@ -202,6 +214,7 @@ Key behaviors:
 **Purpose**: Sync PRDs from external sources (Google Docs)
 
 Key behaviors:
+
 - Reads PRD from Google Doc
 - Extracts requirements and stores in `requirements.md`
 - Maintains sync state with external source
@@ -213,6 +226,7 @@ Key behaviors:
 **After**: Executes atomic specs from spec group
 
 Key changes:
+
 - Input: `.claude/specs/groups/<spec-group-id>/atomic/` (was `.claude/specs/active/`)
 - Executes atomic specs in order (as-001, as-002, etc.)
 - Fills Implementation Evidence section in each atomic spec
@@ -220,6 +234,7 @@ Key changes:
 - References AC numbers in code comments
 
 Usage:
+
 ```
 /implement <spec-group-id>                    # Implement all atomic specs
 /implement <spec-group-id> <atomic-spec-id>   # Implement specific atomic spec
@@ -231,6 +246,7 @@ Usage:
 **After**: Writes tests for atomic spec acceptance criteria
 
 Key changes:
+
 - Input: `.claude/specs/groups/<spec-group-id>/atomic/` (was `.claude/specs/active/`)
 - Maps tests to atomic spec ACs (not just spec ACs)
 - Test names reference atomic spec ID and AC (e.g., `"should clear token (as-002 AC1)"`)
@@ -238,6 +254,7 @@ Key changes:
 - Updates `manifest.json` with test completion
 
 Usage:
+
 ```
 /test <spec-group-id>                    # Write tests for all atomic specs
 /test <spec-group-id> <atomic-spec-id>   # Write tests for specific atomic spec
@@ -250,6 +267,7 @@ Usage:
 **After**: Validates full traceability chain including requirements and atomic specs
 
 Key changes:
+
 - Input: `.claude/specs/groups/<spec-group-id>/` (was `.claude/specs/active/`)
 - Validates requirements completeness (EARS format)
 - Validates spec completeness
@@ -258,6 +276,7 @@ Key changes:
 - Updates `manifest.json` with convergence status
 
 Convergence criteria:
+
 1. Requirements complete (all REQ-XXX in EARS format)
 2. Spec complete (all required sections)
 3. Atomic specs complete (all have impl + test evidence)
@@ -265,6 +284,7 @@ Convergence criteria:
 5. Tests pass (all passing, coverage adequate)
 
 Usage:
+
 ```
 /unify <spec-group-id>          # Full validation
 /unify <spec-group-id> --quick  # Skip deep validation
@@ -280,6 +300,7 @@ Usage:
 **After**: Creates `requirements.md` with structured EARS requirements
 
 Key behaviors:
+
 - Interviews user for requirements
 - Outputs REQ-XXX requirements in EARS format
 - Identifies edge cases, constraints, open questions
@@ -291,6 +312,7 @@ Key behaviors:
 **After**: Creates spec.md that references requirements.md
 
 Key behaviors:
+
 - References requirements.md (doesn't duplicate)
 - Maps acceptance criteria to requirements
 - Does NOT create atomic specs
@@ -301,6 +323,7 @@ Key behaviors:
 **Purpose**: Decompose specs into atomic specs
 
 Key behaviors:
+
 - Reads spec.md acceptance criteria
 - Creates one atomic spec per logical unit
 - Ensures independence criteria
@@ -311,6 +334,7 @@ Key behaviors:
 **Purpose**: Validate atomic specs meet criteria
 
 Checks:
+
 - Single responsibility
 - Independence (no tight coupling)
 - Testability (can test in isolation)
@@ -324,6 +348,7 @@ Checks:
 **After**: Executes atomic specs
 
 Key changes:
+
 - Reads atomic specs from `atomic/` directory
 - Executes in order (as-001, as-002, etc.)
 - Fills Implementation Evidence section
@@ -337,6 +362,7 @@ Key changes:
 **After**: Writes tests for atomic spec ACs
 
 Key changes:
+
 - Maps tests to atomic spec ACs
 - Test names include atomic spec ID (e.g., `as-002 AC1`)
 - Fills Test Evidence section in atomic spec
@@ -349,6 +375,7 @@ Key changes:
 **After**: Validates full traceability including requirements
 
 Key changes:
+
 - Validates requirements completeness
 - Validates spec completeness
 - Validates atomic spec coverage
@@ -425,6 +452,7 @@ Skills are now organized in `.claude/skills/<skill-name>/` directories:
 ```
 
 Each `SKILL.md` file contains:
+
 - Skill metadata (name, description, triggers)
 - Instructions for execution
 - Input/output specifications
@@ -434,10 +462,10 @@ Each `SKILL.md` file contains:
 
 The workflow includes validation schemas:
 
-| Schema | Purpose |
-|--------|---------|
-| `atomic-spec.schema.json` | Validates atomic spec YAML frontmatter and structure |
-| `spec-group.schema.json` | Validates manifest.json structure and convergence gates |
+| Schema                    | Purpose                                                 |
+| ------------------------- | ------------------------------------------------------- |
+| `atomic-spec.schema.json` | Validates atomic spec YAML frontmatter and structure    |
+| `spec-group.schema.json`  | Validates manifest.json structure and convergence gates |
 
 These schemas enable tooling to validate spec artifacts before processing.
 
@@ -448,6 +476,7 @@ These schemas enable tooling to validate spec artifacts before processing.
 ### For Existing Projects
 
 1. **Create spec group structure**:
+
    ```bash
    mkdir -p .claude/specs/groups
    mkdir -p .claude/specs/schema
@@ -549,6 +578,7 @@ User Request
 **After**: Reviews files from atomic spec Implementation Evidence
 
 Key changes:
+
 - Input: `.claude/specs/groups/<spec-group-id>/` (was `.claude/specs/active/`)
 - Reviews per atomic spec (not per spec)
 - Checks spec conformance (impl matches atomic spec ACs)
@@ -556,21 +586,25 @@ Key changes:
 - Updates `manifest.json` with `convergence.code_review_passed`
 
 Usage:
+
 ```
 /code-review <spec-group-id>                   # Review all changes
 /code-review <spec-group-id> <atomic-spec-id>  # Review specific atomic spec
 ```
 
 Report format includes per-atomic-spec review:
+
 ```markdown
 ### Per Atomic Spec Review
 
 #### as-001: Logout Button UI
+
 - Files: src/components/UserMenu.tsx
 - Quality: ✅ Clean
 - Spec Conformance: ✅ Matches ACs
 
 #### as-002: Token Clearing
+
 - Files: src/services/auth-service.ts
 - Quality: ⚠️ 1 Medium finding (M1)
 - Spec Conformance: ✅ Matches ACs
@@ -582,26 +616,31 @@ Report format includes per-atomic-spec review:
 **After**: Reviews files from atomic spec Implementation Evidence
 
 Key changes:
+
 - Input: `.claude/specs/groups/<spec-group-id>/` (was `.claude/specs/active/`)
 - Reviews per atomic spec (not per spec)
 - All findings reference atomic spec ID
 - Updates `manifest.json` with `convergence.security_review_passed`
 
 Usage:
+
 ```
 /security <spec-group-id>                   # Security review all changes
 /security <spec-group-id> <atomic-spec-id>  # Review specific atomic spec
 ```
 
 Report format includes per-atomic-spec security review:
+
 ```markdown
 ### Per Atomic Spec Review
 
 ### as-001: Logout Button UI
+
 - Files: src/components/UserMenu.tsx
 - Security: ✅ No security concerns (pure UI)
 
 ### as-002: Token Clearing
+
 - Files: src/services/auth-service.ts
 - Security: ✅ Pass
 - Notes: Token properly cleared from localStorage
@@ -617,6 +656,7 @@ Report format includes per-atomic-spec security review:
 **After**: Reviews per atomic spec
 
 Key changes:
+
 - Reads Implementation Evidence from each atomic spec
 - Verifies code matches atomic spec ACs (spec conformance)
 - All findings reference atomic spec ID
@@ -628,6 +668,7 @@ Key changes:
 **After**: Reviews per atomic spec
 
 Key changes:
+
 - Reads Implementation Evidence from each atomic spec
 - Security checks per atomic spec
 - All findings reference atomic spec ID
@@ -643,12 +684,14 @@ Key changes:
 **After**: Checks `.claude/specs/groups/<spec-group-id>/manifest.json` for existing spec groups
 
 Key changes:
+
 - Context loading checks for spec groups instead of single spec files
 - Checks `review_state` and `work_state` from manifest.json to determine next action
 - Medium tasks reference spec groups with requirements.md, spec.md, and atomic specs
 - Large tasks create MasterSpec with workstream spec groups
 
 State-based routing:
+
 - `review_state: DRAFT` → Continue spec authoring or atomization
 - `review_state: REVIEWED` → Awaiting user approval
 - `review_state: APPROVED` → Route to implementation
@@ -663,6 +706,7 @@ State-based routing:
 **After**: Loads MasterSpec spec group from `.claude/specs/groups/<master-spec-group-id>/`
 
 Key changes:
+
 - MasterSpec is now a spec group with workstream subdirectories
 - Each workstream has its own spec group with atomic specs
 - **Atomize + Enforce per workstream**: Before dispatching implementers, orchestrate now calls `/atomize` and `/enforce` for each workstream to create and validate atomic specs
@@ -672,6 +716,7 @@ Key changes:
 - Merge commits reference atomic specs completed
 
 Orchestration flow (14 steps):
+
 1. Load MasterSpec
 2. Allocate worktrees
 3. Create worktrees
@@ -688,6 +733,7 @@ Orchestration flow (14 steps):
 14. Final integration validation
 
 MasterSpec structure:
+
 ```
 .claude/specs/groups/<master-spec-group-id>/
 ├── manifest.json           # Master spec state tracking
@@ -711,6 +757,7 @@ MasterSpec structure:
 **After**: Orchestrates workstream spec groups with atomic specs
 
 Key changes:
+
 - Loads MasterSpec spec group at `.claude/specs/groups/<master-spec-group-id>/`
 - Each workstream has its own spec group with atomic/ directory
 - **Calls `/atomize` + `/enforce` before dispatching implementers** (ensures atomic specs exist and are valid)
@@ -721,6 +768,7 @@ Key changes:
 - Success criteria includes traceability chain validation
 
 Convergence gate evaluation:
+
 ```javascript
 const conv = manifest.convergence;
 if (
@@ -742,37 +790,41 @@ if (
 The system uses 16 agents organized into 4 categories (per Unified Vision):
 
 ### Orchestration Agents
-| Agent | Purpose |
-|-------|---------|
-| `main-facilitator` | Coordinates work, delegates to specialists, protects context |
+
+| Agent                           | Purpose                                                        |
+| ------------------------------- | -------------------------------------------------------------- |
+| `main-facilitator`              | Coordinates work, delegates to specialists, protects context   |
 | `multi-workstream-orchestrator` | Manages parallel workstreams for large efforts (git worktrees) |
 
 ### Specification Agents
-| Agent | Purpose |
-|-------|---------|
-| `product-manager` | Requirements gathering and user interviews |
-| `prd-critic` | Reviews PRDs for completeness and clarity |
-| `spec-author` | Authors atomic specs from requirements |
-| `atomizer` | Decomposes specs into atomic units |
-| `atomicity-enforcer` | Validates specs meet atomicity criteria |
-| `risk-reviewer` | Identifies risks and rollout concerns |
+
+| Agent                | Purpose                                    |
+| -------------------- | ------------------------------------------ |
+| `product-manager`    | Requirements gathering and user interviews |
+| `prd-critic`         | Reviews PRDs for completeness and clarity  |
+| `spec-author`        | Authors atomic specs from requirements     |
+| `atomizer`           | Decomposes specs into atomic units         |
+| `atomicity-enforcer` | Validates specs meet atomicity criteria    |
+| `risk-reviewer`      | Identifies risks and rollout concerns      |
 
 ### Execution Agents
-| Agent | Purpose |
-|-------|---------|
-| `explorer` | Research and investigation (codebase or web) |
-| `implementer` | Implements code from approved specs |
-| `test-writer` | Writes tests for acceptance criteria |
-| `refactorer` | Code quality improvements preserving behavior |
+
+| Agent         | Purpose                                       |
+| ------------- | --------------------------------------------- |
+| `explorer`    | Research and investigation (codebase or web)  |
+| `implementer` | Implements code from approved specs           |
+| `test-writer` | Writes tests for acceptance criteria          |
+| `refactorer`  | Code quality improvements preserving behavior |
 
 ### Verification Agents
-| Agent | Purpose |
-|-------|---------|
-| `unifier` | Validates spec-implementation-test alignment |
-| `code-reviewer` | Code quality and best practices (includes UX validation) |
-| `security-reviewer` | Security vulnerabilities and concerns |
-| `quality-scanner` | Continuous complexity and duplication monitoring |
-| `documenter` | Generates and maintains documentation |
+
+| Agent               | Purpose                                                  |
+| ------------------- | -------------------------------------------------------- |
+| `unifier`           | Validates spec-implementation-test alignment             |
+| `code-reviewer`     | Code quality and best practices (includes UX validation) |
+| `security-reviewer` | Security vulnerabilities and concerns                    |
+| `quality-scanner`   | Continuous complexity and duplication monitoring         |
+| `documenter`        | Generates and maintains documentation                    |
 
 ---
 
@@ -801,15 +853,15 @@ Before merge, all gates must pass in manifest.json:
 
 The following metrics should be tracked (thresholds configurable per project):
 
-| Metric | Description |
-|--------|-------------|
-| Cyclomatic complexity | Per function complexity measurement |
-| Cognitive complexity | Per function readability measurement |
-| Code duplication | Percentage of duplicated code in codebase |
-| Code churn | Percentage of changes within time window |
-| Test coverage | Percentage of code covered by tests |
-| Refactor ratio | Percentage of changes that are refactors |
-| Complexity delta | Change in complexity per PR |
+| Metric                | Description                               |
+| --------------------- | ----------------------------------------- |
+| Cyclomatic complexity | Per function complexity measurement       |
+| Cognitive complexity  | Per function readability measurement      |
+| Code duplication      | Percentage of duplicated code in codebase |
+| Code churn            | Percentage of changes within time window  |
+| Test coverage         | Percentage of code covered by tests       |
+| Refactor ratio        | Percentage of changes that are refactors  |
+| Complexity delta      | Change in complexity per PR               |
 
 The `quality-scanner` agent monitors these metrics continuously and opens refactor PRs when thresholds are exceeded.
 
@@ -829,6 +881,7 @@ Hard constraints on AI authority (per Unified Vision):
 ### Generator Cannot Grade Own Work
 
 The agent that creates must be structurally separate from the agent that reviews:
+
 - Generation and verification are distinct roles with distinct authorities
 - This separation is architectural, not advisory
 - Trust emerges from independent validation, not self-assessment
@@ -864,14 +917,17 @@ User Request
 **After**: Reads spec group from `.claude/specs/groups/<spec-group-id>/`
 
 Key changes:
+
 - Loads manifest.json and spec.md from spec group
 - Reads atomic specs for Implementation Evidence (files documented)
 - Documents features per atomic spec
 - Updates `manifest.json` with `convergence.documentation_complete`
 
 Output includes atomic specs documented:
+
 ```markdown
 **Atomic Specs Documented**:
+
 - as-001: Logout Button UI
 - as-002: Token Clearing
 - as-003: Post-Logout Redirect
@@ -885,6 +941,7 @@ Output includes atomic specs documented:
 **After**: Extracts UI criteria from atomic specs in spec group
 
 Key changes:
+
 - Loads spec group and lists atomic specs
 - Extracts UI-specific acceptance criteria from each atomic spec
 - Test cases reference atomic spec ID and AC (e.g., "as-004 AC1")
@@ -893,13 +950,16 @@ Key changes:
 - Adds Browser Test Evidence section to atomic specs
 
 Test results format:
+
 ```markdown
 ## Test Cases by Atomic Spec
 
 ### as-001: Logout Button UI
+
 - TC1 (as-001 AC1, AC2): ✅ PASS
 
 ### as-004: Error Handling & Feedback
+
 - TC3 (as-004 AC1): ✅ PASS
 - TC4 (as-004 AC2): ❌ FAIL
 ```
@@ -910,6 +970,7 @@ Test results format:
 **After**: Same contract, but with optional spec group context
 
 Key changes:
+
 - Added "Relationship to Spec Groups" section
 - Refactoring log includes related spec group ID when applicable
 - Notes which atomic specs are affected (for traceability)
@@ -917,10 +978,12 @@ Key changes:
 - Does NOT update atomic specs (refactoring doesn't change behavior)
 
 Refactoring log format:
+
 ```markdown
 **Related Spec Group** (if applicable): sg-order-processing
 
 ### Change 1: Extract validation logic
+
 - **Atomic Specs Affected**: as-001, as-002 (test evidence still valid)
 ```
 
@@ -952,17 +1015,17 @@ When user initiates logout, clear the authentication token from local storage.
 
 ## Implementation Evidence
 
-| File | Line | Description |
-|------|------|-------------|
-| src/services/auth-service.ts | 67 | logout() clears token |
-| src/services/auth-service.ts | 70 | Auth state emission |
+| File                         | Line | Description           |
+| ---------------------------- | ---- | --------------------- |
+| src/services/auth-service.ts | 67   | logout() clears token |
+| src/services/auth-service.ts | 70   | Auth state emission   |
 
 ## Test Evidence
 
-| AC | Test File | Line | Test Name | Status |
-|----|-----------|------|-----------|--------|
-| AC1 | auth-service.test.ts | 24 | "should clear token (as-002 AC1)" | ✅ Pass |
-| AC2 | auth-service.test.ts | 35 | "should emit auth state (as-002 AC2)" | ✅ Pass |
+| AC  | Test File            | Line | Test Name                             | Status  |
+| --- | -------------------- | ---- | ------------------------------------- | ------- |
+| AC1 | auth-service.test.ts | 24   | "should clear token (as-002 AC1)"     | ✅ Pass |
+| AC2 | auth-service.test.ts | 35   | "should emit auth state (as-002 AC2)" | ✅ Pass |
 
 ## Decision Log
 
@@ -978,6 +1041,7 @@ When user initiates logout, clear the authentication token from local storage.
 Use this checklist to verify a project has been fully migrated to the atomic spec workflow:
 
 ### Directory Structure
+
 - [ ] `.claude/specs/groups/` directory exists
 - [ ] `.claude/specs/schema/` directory exists with:
   - [ ] `atomic-spec.schema.json`
@@ -989,20 +1053,24 @@ Use this checklist to verify a project has been fully migrated to the atomic spe
 - [ ] `.claude/skills/` directory exists with skill subdirectories
 
 ### Skills
+
 - [ ] `/atomize` skill implemented (`.claude/skills/atomize/SKILL.md`)
 - [ ] `/enforce` skill implemented (`.claude/skills/enforce/SKILL.md`)
 - [ ] `/prd` skill implemented (`.claude/skills/prd/SKILL.md`)
 - [ ] Other skills updated to reference spec groups
 
 ### Agents
+
 - [ ] Agent files updated to reference `.claude/specs/groups/` paths
 - [ ] `atomizer` agent exists (`.claude/agents/atomizer.md`)
 - [ ] `atomicity-enforcer` agent exists (`.claude/agents/atomicity-enforcer.md`)
 
 ### Legacy Cleanup
+
 - [ ] No orphaned specs in `.claude/specs/active/` (all migrated or archived)
 - [ ] Agent references to `.claude/specs/active/<slug>.md` removed
 
 ### Example Artifacts
+
 - [ ] At least one example spec group exists in `.claude/specs/groups/`
 - [ ] Example includes: `manifest.json`, `requirements.md`, `spec.md`, `atomic/*.md`

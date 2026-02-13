@@ -132,4 +132,43 @@ You retain ownership of:
 - User communication and expectation management
 - Progress tracking and state persistence
 
-**Subagent outputs must be summarized before reuse in main context.**
+**Subagent outputs must be summarized to < 200 words before reuse in main context.**
+
+---
+
+## Hard Token Budgets
+
+Vague "summarize" instructions produce vague results. Concrete budgets produce concrete summaries.
+
+| Return Type | Word Budget | When |
+|---|---|---|
+| Standard exploration | < 200 words | Most subagent returns |
+| Status check | < 50 words | Simple completion/progress check |
+| Investigation report | < 300 words | Cross-spec analysis, deep research |
+| Code review finding | < 200 words per finding | Single issue with evidence |
+| Implementation completion | < 150 words | Summary of changes and status |
+
+**Empirical basis**: A production workstream agent used 163 tool calls across 22 modified files while consuming only ~153k tokens total. The hard budget kept each subagent return to ~200 tokens, achieving 250x compression vs. direct reads.
+
+If findings genuinely require more detail, the subagent should write a journal entry and return a pointer: "Full analysis in `.claude/journal/entries/<id>.md`. Summary: [< 200 words]."
+
+---
+
+## Exceptions to Delegation-First
+
+Not every operation benefits from the framework's abstractions. These are sanctioned exceptions:
+
+### File-Based Coordination
+
+For trivially simple inter-agent coordination, use sentinel files instead of dispatching subagents:
+
+```bash
+# Check if workstreams are done — costs ~10 tokens
+ls .claude/coordination/ws-*.done 2>/dev/null
+```
+
+The rule: if the check is a single `ls` or file read under 10 lines, do it directly. If it requires investigation or judgment, delegate.
+
+### Pre-Computed Structure
+
+When the human provides explicit decomposition in their prompt, use it directly. The atomizer is a fallback for ambiguous scope, not the default. Front-loading decomposition in prompts saves 5-10 exploratory turns per workstream.

@@ -22,6 +22,12 @@
  */
 
 import { spawn } from 'child_process';
+import {
+  OUTPUT_MAX_LINES,
+  OUTPUT_HEAD_LINES,
+  OUTPUT_TAIL_LINES,
+  validateHookInput,
+} from './lib/constants.mjs';
 
 // Read all stdin
 async function readStdin() {
@@ -123,6 +129,13 @@ async function main() {
     process.exit(1);
   }
 
+  // Validate input structure
+  const { valid, error } = validateHookInput(inputData);
+  if (!valid) {
+    console.error(`Hook input validation failed: ${error}`);
+    process.exit(1);
+  }
+
   // Extract file path from tool_input
   const toolInput = inputData.tool_input || {};
   const filePath = toolInput.file_path;
@@ -163,18 +176,14 @@ async function main() {
     const output = (stdout + stderr).trim();
     if (output) {
       const lines = output.split('\n');
-      const maxLines = 50;
-      const headLines = 10;
-      const tailLines = 40;
-
-      if (lines.length <= maxLines) {
+      if (lines.length <= OUTPUT_MAX_LINES) {
         // Show everything if under the limit
         console.error(lines.join('\n'));
       } else {
         // Show head + tail with indicator of skipped lines
-        const head = lines.slice(0, headLines);
-        const tail = lines.slice(-tailLines);
-        const skipped = lines.length - headLines - tailLines;
+        const head = lines.slice(0, OUTPUT_HEAD_LINES);
+        const tail = lines.slice(-OUTPUT_TAIL_LINES);
+        const skipped = lines.length - OUTPUT_HEAD_LINES - OUTPUT_TAIL_LINES;
         console.error(head.join('\n'));
         console.error(`\n... (${skipped} lines omitted) ...\n`);
         console.error(tail.join('\n'));

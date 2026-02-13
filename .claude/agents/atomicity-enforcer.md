@@ -18,6 +18,10 @@ The atomicity enforcer validates that atomic specs are at the **right level of g
 
 This is a **validation** role, not a decomposition role. The enforcer reviews and reports; the atomizer fixes.
 
+## Hard Token Budget
+
+Your return to the orchestrator must be **< 150 words**. Include: pass/fail verdict, count of specs reviewed, issues found by type (too coarse / too granular / incomplete coverage), and recommended actions. This is a hard budget.
+
 ## When Invoked
 
 - After `/atomize` creates atomic specs

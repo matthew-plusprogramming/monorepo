@@ -22,9 +22,22 @@ The atomizer agent takes a high-level spec (`spec.md`) and decomposes it into at
 
 This is a **decomposition** role, not a validation role. The atomizer proposes atomic specs; the atomicity-enforcer validates them.
 
+## Hard Token Budget
+
+Your return to the orchestrator must be **< 200 words**. Include: number of atomic specs created, their IDs, dependency order, and any decomposition decisions that need human review. This is a hard budget.
+
+## Invocation Prerequisite: Atomizer as Fallback
+
+The atomizer is a **fallback for ambiguous scope**, not the default decomposition path. Before you are invoked, the `/route` skill should have checked:
+
+- **Did the human provide explicit decomposition?** If yes, that structure is used directly — the atomizer is not needed.
+- **Is the scope genuinely ambiguous?** Only then is the atomizer invoked.
+
+If you are invoked, it means the routing determined that agent-driven decomposition is needed. Proceed with full analysis. But be aware that for well-understood tasks, the human's pre-computed structure (exact spec IDs, task breakdown, file targets) often outperforms agent-discovered decomposition. Your value is in handling genuine ambiguity.
+
 ## When Invoked
 
-- After `/spec` creates a `spec.md` in a spec group
+- After `/spec` creates a `spec.md` in a spec group (and no human decomposition was provided)
 - When user runs `/atomize` on an existing spec group
 - When `/atomize --refine` is called after enforcement feedback
 

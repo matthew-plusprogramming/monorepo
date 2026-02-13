@@ -16,6 +16,10 @@ Test UI features in the browser. Verify UI acceptance criteria. Capture screensh
 
 **Critical**: You test UI only. You do NOT test backend logic (that's for unit/integration tests).
 
+## Hard Token Budget
+
+Your return to the orchestrator must be **< 150 words**. Include: pass/fail per AC tested, screenshot evidence paths, and any UI issues found. This is a hard budget.
+
 ## When You're Invoked
 
 You're dispatched when:

@@ -27,6 +27,13 @@ tags: [design, principles, patterns]
 - Build complex functionality from simple, composable units.
 - Avoid deep inheritance trees; favor flat, composable structures.
 
+## Dependency Injection
+
+- Pass collaborators via constructor parameters or function arguments, not module-level singletons.
+- An agent asked to "write tests for ServiceX" must be able to see exactly which dependencies to mock. Without DI, the agent must trace imports through the entire codebase.
+- Use factory functions or a lightweight container for complex dependency graphs.
+- Register services as factories; resolve dependencies at runtime.
+
 ## Explicit Over Implicit
 
 - Make dependencies explicit; avoid hidden globals or singletons.
@@ -38,7 +45,9 @@ tags: [design, principles, patterns]
 
 - Define clear interfaces at module boundaries.
 - Use typed contracts for inter-service communication.
-- Validate inputs at system boundaries; trust internal data.
+- Validate inputs at system boundaries with runtime schemas (Zod, io-ts); trust internal data after validation.
+- Derive TypeScript types from schemas (`z.infer<typeof Schema>`), never hand-write parallel type definitions.
+- When contract schemas exist (OpenAPI, GraphQL, Prisma), generate types from them. The schema is the single source of truth.
 - Document breaking changes in specs before implementation.
 
 ## Incremental Change
@@ -53,7 +62,8 @@ tags: [design, principles, patterns]
 - Validate inputs early; reject invalid data at the boundary.
 - Surface errors clearly; avoid silent failures.
 - Use typed error channels (Effect) for predictable error handling.
-- Log errors with context for debugging.
+- Use a **structured error taxonomy**: typed error classes with machine-readable `error_code`, `blame` attribution (`self` | `upstream` | `client`), and `retry_safe` boolean. Never throw raw strings.
+- Log errors with context for debugging. Include error codes, correlation IDs, and blame attribution.
 
 ## Configuration as Code
 

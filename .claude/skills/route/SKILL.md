@@ -266,6 +266,11 @@ workflow: oneoff-vibe | oneoff-spec | orchestrator | refactor | journal-only
 rationale: <Brief explanation of why this workflow was chosen>
 estimated_scope: small | medium | large
 estimated_files: <N>
+decomposition:
+  human_provided: true | false  # Did the human provide explicit task breakdown?
+  atomizer_needed: true | false  # Only true if scope is ambiguous AND human didn't decompose
+  # When human_provided is true: skip /atomize, use the provided structure directly
+  # When atomizer_needed is true: run /atomize after spec authoring
 delegation:
   parallel_subtasks:
     - <subtask 1>: <subagent type>
@@ -280,6 +285,13 @@ workstreams:
 investigation_scope: <spec-group-id | master-spec-id | null>
 next_action: <Suggested next step>
 ```
+
+**Decomposition rules**:
+
+- If the user's prompt contains an explicit task list, numbered steps, or specific file targets → `human_provided: true`, `atomizer_needed: false`
+- If the user describes a feature without structure → `human_provided: false`, `atomizer_needed: true`
+- When `human_provided: true`, the workflow skips `/atomize` and `/enforce`. The human's decomposition becomes the atomic specs directly (or a single spec if the structure is simple enough).
+- The atomizer is a **fallback for ambiguous scope**, not the default. When humans already know the structure, agent-driven decomposition adds 5-10 turns of overhead with no benefit.
 
 **Investigation rules**:
 

@@ -30,23 +30,23 @@ You're dispatched when:
 
 ### Stacks
 
-| Stack | Purpose | Group |
-|-------|---------|-------|
-| `myapp-api-stack` | DynamoDB tables (users, verification, rate limit, deny list) | infra |
-| `myapp-analytics-stack` | EventBridge, DLQ, analytics tables, log groups | infra |
-| `myapp-api-lambda-stack` | Lambda packaging, IAM role, analytics permissions | lambdas |
-| `myapp-analytics-lambda-stack` | Analytics processor Lambda | lambdas |
-| `myapp-client-website-stack` | S3 + CloudFront static hosting | website |
-| `myapp-bootstrap-stack` | CDKTF backend/state resources | (standalone) |
+| Stack                          | Purpose                                                      | Group        |
+| ------------------------------ | ------------------------------------------------------------ | ------------ |
+| `myapp-api-stack`              | DynamoDB tables (users, verification, rate limit, deny list) | infra        |
+| `myapp-analytics-stack`        | EventBridge, DLQ, analytics tables, log groups               | infra        |
+| `myapp-api-lambda-stack`       | Lambda packaging, IAM role, analytics permissions            | lambdas      |
+| `myapp-analytics-lambda-stack` | Analytics processor Lambda                                   | lambdas      |
+| `myapp-client-website-stack`   | S3 + CloudFront static hosting                               | website      |
+| `myapp-bootstrap-stack`        | CDKTF backend/state resources                                | (standalone) |
 
 ### Stack Groups
 
-| Group | Stacks | Typical Use |
-|-------|--------|-------------|
-| `infra` | api-stack, analytics-stack | Infrastructure changes |
-| `lambdas` | api-lambda-stack, analytics-lambda-stack | Code deployments |
-| `website` | client-website-stack | Frontend deployments |
-| `all` | All stacks in dependency order | Full deployment |
+| Group     | Stacks                                   | Typical Use            |
+| --------- | ---------------------------------------- | ---------------------- |
+| `infra`   | api-stack, analytics-stack               | Infrastructure changes |
+| `lambdas` | api-lambda-stack, analytics-lambda-stack | Code deployments       |
+| `website` | client-website-stack                     | Frontend deployments   |
+| `all`     | All stacks in dependency order           | Full deployment        |
 
 ### Dependency Order
 
@@ -94,11 +94,11 @@ node scripts/cdk.mjs bootstrap --auto-approve
 
 ### Flags
 
-| Flag | Purpose |
-|------|---------|
-| `--prod` | Target production environment |
-| `--dry-run` | Preview without executing |
-| `--force` | Force deployment even if validation fails |
+| Flag             | Purpose                                                           |
+| ---------------- | ----------------------------------------------------------------- |
+| `--prod`         | Target production environment                                     |
+| `--dry-run`      | Preview without executing                                         |
+| `--force`        | Force deployment even if validation fails                         |
 | `--auto-approve` | Skip interactive prompts (REQUIRED for non-interactive execution) |
 
 **IMPORTANT**: Always use `--auto-approve` when running deployments. You are a non-interactive agent.
@@ -117,14 +117,14 @@ npm run sequence -- run <name> [--dry-run]
 
 #### Available Sequences
 
-| Sequence | Description |
-|----------|-------------|
-| `build-deploy-api-lambda` | Build and deploy API lambda |
-| `deploy-infra` | Deploy infrastructure stacks |
-| `deploy-lambdas` | Build and deploy all lambdas |
-| `full-deploy` | Full deployment: prepare + deploy all |
-| `clean-and-deploy` | Clean rebuild + full deployment + tests |
-| `refresh-outputs` | Pull fresh outputs from infra stacks |
+| Sequence                  | Description                             |
+| ------------------------- | --------------------------------------- |
+| `build-deploy-api-lambda` | Build and deploy API lambda             |
+| `deploy-infra`            | Deploy infrastructure stacks            |
+| `deploy-lambdas`          | Build and deploy all lambdas            |
+| `full-deploy`             | Full deployment: prepare + deploy all   |
+| `clean-and-deploy`        | Clean rebuild + full deployment + tests |
+| `refresh-outputs`         | Pull fresh outputs from infra stacks    |
 
 ## Common Operations
 
@@ -191,6 +191,7 @@ node scripts/cdk.mjs build
 ```
 
 This produces:
+
 - `cdk/platform-cdk/dist/lambda.zip`
 - `cdk/platform-cdk/dist/lambdas/`
 - `cdk/platform-cdk/dist/client-website/`
@@ -199,12 +200,12 @@ This produces:
 
 ### Environment Files
 
-| File | Purpose |
-|------|---------|
-| `cdk/platform-cdk/.env.dev` | Dev AWS credentials/config |
+| File                               | Purpose                     |
+| ---------------------------------- | --------------------------- |
+| `cdk/platform-cdk/.env.dev`        | Dev AWS credentials/config  |
 | `cdk/platform-cdk/.env.production` | Prod AWS credentials/config |
-| `apps/node-server/.env.dev` | Server dev config |
-| `apps/node-server/.env.production` | Server prod config |
+| `apps/node-server/.env.dev`        | Server dev config           |
+| `apps/node-server/.env.production` | Server prod config          |
 
 ### Decrypt/Encrypt Envs
 
@@ -289,12 +290,14 @@ After deployment, report:
 
 **Environment**: dev
 **Stacks Deployed**:
+
 - myapp-api-stack
 - myapp-api-lambda-stack
 
 **Outputs Refreshed**: Yes
 
 **Next Steps**:
+
 - Run `npm test` to verify deployment
 - Check CloudWatch logs for any errors
 ```

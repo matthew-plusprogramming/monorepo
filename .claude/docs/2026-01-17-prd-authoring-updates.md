@@ -9,11 +9,13 @@ This document describes changes made to the `.claude/` structure to support full
 Added the ability to **create new PRDs** from PM interviews and write them to Google Docs using the standard template. Previously, the `/prd` skill could only sync/extract from existing PRDs.
 
 **New capabilities:**
+
 - `/prd draft` — Run PM interview, then write PRD to Google Doc
 - `/prd write <doc-id>` — Write requirements to a Google Doc as formatted PRD
 - `prd-author` agent — Transforms requirements.md → full PRD document
 
 **Updated integrations:**
+
 - `/route` skill now includes PRD draft/push in workflow descriptions
 - `/pm` skill now documents PRD integration in handoff steps
 
@@ -24,6 +26,7 @@ Added the ability to **create new PRDs** from PM interviews and write them to Go
 ### 1. Updated: `.claude/skills/prd/SKILL.md`
 
 **Changes:**
+
 - Updated description and allowed-tools in frontmatter
 - Added `/prd draft` command documentation
 - Added `/prd write` command documentation
@@ -35,6 +38,7 @@ Added the ability to **create new PRDs** from PM interviews and write them to Go
 ### 2. Updated: `.claude/skills/route/SKILL.md`
 
 **Changes:**
+
 - Updated "Integration with Other Skills" section to include PRD workflow
 - Now documents that `/prd draft` is an optional step after PM interview
 - Includes `/prd push` at end of workflow for syncing discoveries back
@@ -45,6 +49,7 @@ Added the ability to **create new PRDs** from PM interviews and write them to Go
 ## Integration with Other Skills
 
 After routing:
+
 - **oneoff-vibe**: Proceed directly to implementation
 - **oneoff-spec**: Use `/pm` to gather requirements → (optional) `/prd draft` to write PRD to Google Docs → `/spec` to create spec group → `/atomize` to create atomic specs → `/enforce` to validate atomicity → User approval → `/implement` + `/test` → `/unify` → `/code-review` → `/security` → (if PRD exists) `/prd push` to sync discoveries
 - **orchestrator**: Use `/pm` to create ProblemBrief → (optional) `/prd draft` for stakeholder PRD → `/spec` to create MasterSpec with workstream spec groups → For each workstream: `/atomize` + `/enforce` → User approval → Facilitator orchestrates parallel execution → `/prd push` to sync discoveries
@@ -53,6 +58,7 @@ After routing:
 ### 3. Updated: `.claude/skills/pm/SKILL.md`
 
 **Changes:**
+
 - Updated "Integration with Spec Group Workflow" section
 - Added PRD draft as optional step after requirements gathering
 - Added PRD push as step after implementation completes
@@ -69,10 +75,12 @@ Spec group created: `sg-<feature-slug>`
 Location: `.claude/specs/groups/sg-<feature-slug>/`
 
 Files created:
+
 - `manifest.json` — Spec group metadata (review_state: DRAFT)
 - `requirements.md` — <N> requirements in EARS format
 
 **Next Steps**:
+
 1. Review requirements: `cat .claude/specs/groups/sg-<feature-slug>/requirements.md`
 2. (Optional) Run `/prd draft sg-<feature-slug>` to write PRD to Google Docs for stakeholder review
 3. Run `/spec sg-<feature-slug>` to create spec.md
@@ -87,20 +95,20 @@ Files created:
 ```markdown
 ## Usage
 
-/prd draft                     # Start PM interview, then draft PRD to Google Doc
-/prd draft <spec-group-id>     # Draft PRD from existing spec group requirements
-/prd write <doc-id>            # Write/overwrite PRD to specified Google Doc
-/prd write <doc-id> <spec-group-id>  # Write specific spec group's PRD to doc
+/prd draft # Start PM interview, then draft PRD to Google Doc
+/prd draft <spec-group-id> # Draft PRD from existing spec group requirements
+/prd write <doc-id> # Write/overwrite PRD to specified Google Doc
+/prd write <doc-id> <spec-group-id> # Write specific spec group's PRD to doc
 ```
 
 ```markdown
 ## Agents
 
-| Agent | Purpose | Used By |
-|-------|---------|---------|
+| Agent        | Purpose                                                | Used By                    |
+| ------------ | ------------------------------------------------------ | -------------------------- |
 | `prd-author` | Authors complete PRDs from requirements using template | `/prd draft`, `/prd write` |
-| `prd-reader` | Extracts requirements from existing PRDs | `/prd sync` |
-| `prd-writer` | Pushes incremental discoveries back to PRDs | `/prd push` |
+| `prd-reader` | Extracts requirements from existing PRDs               | `/prd sync`                |
+| `prd-writer` | Pushes incremental discoveries back to PRDs            | `/prd push`                |
 ```
 
 ---
@@ -110,6 +118,7 @@ Files created:
 **New agent for full PRD authoring.**
 
 **Frontmatter:**
+
 ```yaml
 ---
 name: prd-author
@@ -121,6 +130,7 @@ skills: prd
 ```
 
 **Key responsibilities:**
+
 1. Load `requirements.md` from spec group
 2. Load PRD template from `.claude/templates/prd.template.md`
 3. Transform each section according to mapping:
@@ -139,6 +149,7 @@ skills: prd
 5. Update manifest.json with PRD link
 
 **Sections in agent file:**
+
 - Role
 - When Invoked
 - Input
@@ -156,6 +167,7 @@ skills: prd
 **Existing agent for extracting requirements from PRDs.**
 
 **Frontmatter:**
+
 ```yaml
 ---
 name: prd-reader
@@ -167,6 +179,7 @@ skills: prd
 ```
 
 **Key responsibilities:**
+
 1. Fetch and read Google Doc PRD documents
 2. Detect document structure (headings, sections)
 3. Extract requirements and convert to EARS format
@@ -182,6 +195,7 @@ skills: prd
 **Existing agent for pushing incremental discoveries back to PRDs.**
 
 **Frontmatter:**
+
 ```yaml
 ---
 name: prd-writer
@@ -193,6 +207,7 @@ skills: prd
 ```
 
 **Key responsibilities:**
+
 1. Compute local changes (new requirements, modified, invalidated assumptions)
 2. Read current PRD state for conflict detection
 3. Format updates for PRD (new requirements, invalidated assumptions, implementation notes)
@@ -217,17 +232,29 @@ The `prd-author` agent depends on this template. Ensure it exists with the stand
 ---
 
 ## Overview
+
 ## Goals
+
 ## Non-Goals
+
 ## Requirements
+
 ### REQ-001: [Title]
+
 ## Constraints
+
 ## Assumptions
+
 ## Success Criteria
+
 ## Open Questions
+
 ## User Stories (Optional)
+
 ## Implementation Notes
+
 ## Version History
+
 ## EARS Format Reference
 ```
 
@@ -250,6 +277,7 @@ Spec group created
 ### After (create + sync)
 
 **Flow 1: Create New PRD**
+
 ```
 User has idea/request
     ↓
@@ -265,6 +293,7 @@ Spec group linked to PRD
 ```
 
 **Flow 2: Sync Existing PRD** (unchanged)
+
 ```
 PRD exists in Google Docs
     ↓
@@ -279,14 +308,15 @@ Spec group created
 
 ## Skill Relationship Clarification
 
-| Skill | Purpose | Output |
-|-------|---------|--------|
-| `/pm` | Gather requirements via interview | `requirements.md` in spec group |
-| `/prd draft` | Interview + write PRD to Google Doc | PRD in Google Docs + spec group |
-| `/prd write` | Write existing requirements to PRD | PRD in Google Docs |
-| `/prd sync` | Extract requirements from existing PRD | `requirements.md` in spec group |
+| Skill        | Purpose                                | Output                          |
+| ------------ | -------------------------------------- | ------------------------------- |
+| `/pm`        | Gather requirements via interview      | `requirements.md` in spec group |
+| `/prd draft` | Interview + write PRD to Google Doc    | PRD in Google Docs + spec group |
+| `/prd write` | Write existing requirements to PRD     | PRD in Google Docs              |
+| `/prd sync`  | Extract requirements from existing PRD | `requirements.md` in spec group |
 
 **When to use which:**
+
 - **Starting fresh**: `/prd draft` — runs PM interview then writes PRD
 - **Have requirements, need PRD**: `/prd write <doc-id>` — formats and writes
 - **PRD exists, need local requirements**: `/prd sync <doc-id>` — extracts to local
@@ -303,6 +333,7 @@ To apply these changes to another project:
 Replace or merge changes into `.claude/skills/prd/SKILL.md`:
 
 1. Update frontmatter:
+
 ```yaml
 description: Create, sync, and manage PRDs in Google Docs. Draft new PRDs from PM interviews, sync existing PRDs, and push discoveries back.
 allowed-tools: Read, Write, Glob, Task, mcp__google-docs-mcp__readGoogleDoc, mcp__google-docs-mcp__getDocumentInfo, mcp__google-docs-mcp__appendToGoogleDoc, mcp__google-docs-mcp__insertText, mcp__google-docs-mcp__deleteRange, mcp__google-docs-mcp__createDocument
@@ -325,6 +356,7 @@ Merge changes into `.claude/skills/route/SKILL.md`:
 ## Integration with Other Skills
 
 After routing:
+
 - **oneoff-vibe**: Proceed directly to implementation
 - **oneoff-spec**: Use `/pm` to gather requirements → (optional) `/prd draft` to write PRD to Google Docs → `/spec` to create spec group → `/atomize` to create atomic specs → `/enforce` to validate atomicity → User approval → `/implement` + `/test` → `/unify` → `/code-review` → `/security` → (if PRD exists) `/prd push` to sync discoveries
 - **orchestrator**: Use `/pm` to create ProblemBrief → (optional) `/prd draft` for stakeholder PRD → `/spec` to create MasterSpec with workstream spec groups → For each workstream: `/atomize` + `/enforce` → User approval → Facilitator orchestrates parallel execution → `/prd push` to sync discoveries
@@ -345,10 +377,12 @@ Spec group created: `sg-<feature-slug>`
 Location: `.claude/specs/groups/sg-<feature-slug>/`
 
 Files created:
+
 - `manifest.json` — Spec group metadata (review_state: DRAFT)
 - `requirements.md` — <N> requirements in EARS format
 
 **Next Steps**:
+
 1. Review requirements: `cat .claude/specs/groups/sg-<feature-slug>/requirements.md`
 2. (Optional) Run `/prd draft sg-<feature-slug>` to write PRD to Google Docs for stakeholder review
 3. Run `/spec sg-<feature-slug>` to create spec.md
@@ -368,6 +402,7 @@ If the requirements came from a user interview but should be linked to an extern
 /prd link sg-<feature-slug> <google-doc-id>
 
 This will:
+
 1. Update `manifest.json` with PRD reference
 2. Mark requirements as needing sync verification
 3. Enable `/prd push` to send discoveries back to the PRD
@@ -376,6 +411,7 @@ This will:
 ### Step 4: Copy all PRD agents
 
 Copy these agent files to `.claude/agents/`:
+
 - `prd-author.md` — Authors PRDs from requirements (NEW)
 - `prd-reader.md` — Extracts requirements from existing PRDs
 - `prd-writer.md` — Pushes discoveries back to PRDs
@@ -389,11 +425,13 @@ Copy `.claude/templates/prd.template.md` to target project. This template define
 Add PRD skill and agents to the reference tables:
 
 1. Add to **Core Skills** table:
+
    ```markdown
    | `/prd` | Create, sync, manage PRDs in Google Docs | Drafting new PRDs or syncing external ones |
    ```
 
 2. Add to **Specialized Subagents** table:
+
    ```markdown
    | `prd-author` | opus | Author complete PRDs from requirements using template |
    | `prd-reader` | opus | Extract requirements from existing PRDs |
@@ -407,6 +445,7 @@ Add PRD skill and agents to the reference tables:
 ### Step 7: Verify other dependencies
 
 The following must also exist:
+
 - `.claude/skills/pm/SKILL.md` — For PM interviews (with PRD integration updates)
 - `.claude/skills/route/SKILL.md` — For task routing (with PRD workflow updates)
 
@@ -434,6 +473,7 @@ Ensure the Google Docs MCP server is configured in your Claude Code settings.
 After migration, verify:
 
 ### PRD Skill Verification
+
 - [ ] `/prd draft` starts PM interview and prompts for doc destination
 - [ ] `/prd write new` creates a new Google Doc
 - [ ] `/prd write <existing-doc-id>` writes to existing doc
@@ -445,16 +485,19 @@ After migration, verify:
 - [ ] `/prd push` still works for incremental updates
 
 ### Route Skill Verification
+
 - [ ] `/route` mentions `/prd draft` as optional step in oneoff-spec workflow
 - [ ] `/route` mentions `/prd push` at end of workflow when PRD exists
 - [ ] Orchestrator workflow includes PRD draft for stakeholder PRD
 
 ### PM Skill Verification
+
 - [ ] `/pm` handoff section includes PRD draft as step 2 (optional)
 - [ ] `/pm` handoff section includes PRD push as step 7 (if PRD exists)
 - [ ] "Linking to External PRD" section exists with `/prd link` command
 
 ### Integration Verification
+
 - [ ] Full workflow works: `/pm` → `/prd draft` → `/spec` → (implement) → `/prd push`
 - [ ] Requirements flow correctly from PM interview → requirements.md → PRD
 - [ ] Discoveries flow correctly from implementation → `/prd push` → PRD updates
@@ -489,25 +532,27 @@ Root:
 
 ### File Summary
 
-| File | Action | Purpose |
-|------|--------|---------|
-| `.claude/agents/prd-author.md` | Copy (new) | Authors complete PRDs from requirements using template |
-| `.claude/agents/prd-reader.md` | Copy | Extracts requirements from existing PRDs |
-| `.claude/agents/prd-writer.md` | Copy | Pushes incremental discoveries back to PRDs |
-| `.claude/skills/prd/SKILL.md` | Replace or merge | Adds `/prd draft` and `/prd write` commands |
-| `.claude/skills/route/SKILL.md` | Merge | Adds PRD to workflow integration section |
-| `.claude/skills/pm/SKILL.md` | Merge | Adds PRD to handoff steps and linking |
-| `.claude/templates/prd.template.md` | Copy | Standard PRD template structure |
-| `CLAUDE.md` | Merge | Add `/prd` skill and PRD agents to reference tables |
+| File                                | Action           | Purpose                                                |
+| ----------------------------------- | ---------------- | ------------------------------------------------------ |
+| `.claude/agents/prd-author.md`      | Copy (new)       | Authors complete PRDs from requirements using template |
+| `.claude/agents/prd-reader.md`      | Copy             | Extracts requirements from existing PRDs               |
+| `.claude/agents/prd-writer.md`      | Copy             | Pushes incremental discoveries back to PRDs            |
+| `.claude/skills/prd/SKILL.md`       | Replace or merge | Adds `/prd draft` and `/prd write` commands            |
+| `.claude/skills/route/SKILL.md`     | Merge            | Adds PRD to workflow integration section               |
+| `.claude/skills/pm/SKILL.md`        | Merge            | Adds PRD to handoff steps and linking                  |
+| `.claude/templates/prd.template.md` | Copy             | Standard PRD template structure                        |
+| `CLAUDE.md`                         | Merge            | Add `/prd` skill and PRD agents to reference tables    |
 
 ### CLAUDE.md Updates Required
 
 Add to **Core Skills** table:
+
 ```markdown
 | `/prd` | Create, sync, manage PRDs in Google Docs | Drafting new PRDs or syncing external ones |
 ```
 
 Add to **Specialized Subagents** table:
+
 ```markdown
 | `prd-author` | opus | Author complete PRDs from requirements using template |
 | `prd-reader` | opus | Extract requirements from existing PRDs |
@@ -515,12 +560,13 @@ Add to **Specialized Subagents** table:
 ```
 
 Update **Medium Task (oneoff-spec)** workflow to include PRD:
+
 ```markdown
 #### Medium Task (oneoff-spec)
 
 Request → Route → PM Interview → (optional) PRD Draft → Spec → Approve →
-  [Parallel: Implement + Test] → Unify → Code Review → Security →
-  [If UI: Browser Test] → [If public API: Docs] → [If PRD: Push discoveries] → Commit
+[Parallel: Implement + Test] → Unify → Code Review → Security →
+[If UI: Browser Test] → [If public API: Docs] → [If PRD: Push discoveries] → Commit
 ```
 
 ---
@@ -535,6 +581,7 @@ This update was made while drafting a PRD for the "AI-Native Engineering Dashboa
 4. The `prd-author` agent bridges this gap
 
 The PRD template and `requirements.md` format serve different purposes:
+
 - `requirements.md` — Internal format for spec workflow
 - PRD template — External format for stakeholder communication
 
