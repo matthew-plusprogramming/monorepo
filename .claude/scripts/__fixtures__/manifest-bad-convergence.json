@@ -1,0 +1,13 @@
+{
+  "id": "sg-bad-convergence",
+  "title": "Bad Convergence Fields",
+  "review_state": "APPROVED",
+  "work_state": "IMPLEMENTING",
+  "created_at": "2026-01-01T00:00:00Z",
+  "convergence": {
+    "spec_complete": true,
+    "implemented": true,
+    "tests_passing": true,
+    "test_coverage": 95
+  }
+}

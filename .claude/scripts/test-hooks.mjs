@@ -3,7 +3,7 @@
 /**
  * Hook Test Harness
  * Validates all PostToolUse, SubagentStop, and Stop hooks work correctly.
- * NOT in the registry -- dev/testing tool only.
+ * Registered in metaclaude-registry.json and synced to consumer repos.
  *
  * Usage:
  *   node .claude/scripts/test-hooks.mjs
