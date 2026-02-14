@@ -7,6 +7,12 @@ dependencies: []
 contracts: []
 status: draft
 implementation_status: not_started
+
+# Supersession Metadata (optional - set when this spec is superseded)
+# status: superseded                        # Set to 'superseded' when replaced by newer spec
+# superseded_by: <spec-group-id>            # ID of the spec group that supersedes this one
+# supersession_date: <YYYY-MM-DD>           # Date when supersession occurred
+# supersession_reason: "<explanation>"      # Brief explanation of why spec was superseded
 ---
 
 # <Workstream Title>

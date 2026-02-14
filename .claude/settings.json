@@ -141,8 +141,22 @@
             "command": "node /Users/matthewlin/workspace/metaclaude-assistant/.claude/scripts/session-validate.mjs"
           },
           {
+            "_source": "metaclaude",
+            "_id": "prettier-format",
             "type": "command",
-            "command": "npx prettier --write $CLAUDE_FILE_PATHS 2>/dev/null || true"
+            "command": "node /Users/matthewlin/workspace/metaclaude-assistant/.claude/scripts/hook-wrapper.mjs '*.{ts,tsx,js,jsx,json,md,css,scss,yml,yaml}' 'npx prettier --write {{file}} 2>/dev/null || true'"
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "_source": "metaclaude",
+            "_id": "convergence-gate-reminder",
+            "type": "command",
+            "command": "node /Users/matthewlin/workspace/metaclaude-assistant/.claude/scripts/convergence-gate-reminder.mjs"
           }
         ]
       }
@@ -167,22 +181,6 @@
             "_id": "journal-promotion-check",
             "type": "command",
             "command": "node /Users/matthewlin/workspace/metaclaude-assistant/.claude/scripts/journal-promotion-check.mjs"
-          },
-          {
-            "type": "command",
-            "command": "echo \"Session ended at $(date)\" >> .claude/context/session.log 2>/dev/null || true"
-          }
-        ]
-      }
-    ],
-    "SubagentStop": [
-      {
-        "hooks": [
-          {
-            "_source": "metaclaude",
-            "_id": "convergence-gate-reminder",
-            "type": "command",
-            "command": "node /Users/matthewlin/workspace/metaclaude-assistant/.claude/scripts/convergence-gate-reminder.mjs"
           }
         ]
       }
