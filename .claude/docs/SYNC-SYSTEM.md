@@ -32,13 +32,13 @@ node .claude/scripts/metaclaude-cli.mjs remove <name>      # Remove a project
 
 ### Key Files
 
-| File | Purpose |
-|------|---------|
-| `.claude/metaclaude-registry.json` | Central registry: all artifacts, versions, hashes, bundles |
-| `.claude/projects.json` | Target projects and their configurations |
-| `.claude/locks/<project>.lock.json` | Tracks what is installed in each project |
-| `.claude/scripts/metaclaude-cli.mjs` | The sync CLI |
-| `.claude/scripts/compute-hashes.mjs` | Hash computation and verification |
+| File                                 | Purpose                                                    |
+| ------------------------------------ | ---------------------------------------------------------- |
+| `.claude/metaclaude-registry.json`   | Central registry: all artifacts, versions, hashes, bundles |
+| `.claude/projects.json`              | Target projects and their configurations                   |
+| `.claude/locks/<project>.lock.json`  | Tracks what is installed in each project                   |
+| `.claude/scripts/metaclaude-cli.mjs` | The sync CLI                                               |
+| `.claude/scripts/compute-hashes.mjs` | Hash computation and verification                          |
 
 ---
 
@@ -56,15 +56,15 @@ Categories: `core`, `config`, `agents`, `skills`, `templates`, `docs`, `scripts`
 
 Each artifact has these fields:
 
-| Field | Required | Description |
-|-------|----------|-------------|
-| `version` | Yes | Semver version string |
-| `hash` | Yes | First 8 chars of SHA-256 hash of file content |
-| `path` | Yes | Path to source file in metaclaude-assistant (relative to repo root) |
-| `description` | Yes | What the artifact does |
-| `target_path` | No | Override destination path in consumer (defaults to `path`) |
-| `dependencies` | No | Other artifacts this depends on (informational) |
-| `merge_strategy` | No | Special merge behavior (only `"settings-merge"` currently) |
+| Field            | Required | Description                                                         |
+| ---------------- | -------- | ------------------------------------------------------------------- |
+| `version`        | Yes      | Semver version string                                               |
+| `hash`           | Yes      | First 8 chars of SHA-256 hash of file content                       |
+| `path`           | Yes      | Path to source file in metaclaude-assistant (relative to repo root) |
+| `description`    | Yes      | What the artifact does                                              |
+| `target_path`    | No       | Override destination path in consumer (defaults to `path`)          |
+| `dependencies`   | No       | Other artifacts this depends on (informational)                     |
+| `merge_strategy` | No       | Special merge behavior (only `"settings-merge"` currently)          |
 
 ### Concrete Example
 
@@ -108,23 +108,27 @@ minimal -> core-workflow -> full-workflow -> orchestrator
 ### Bundle Definitions
 
 **minimal** -- Core scripts, schemas, infrastructure. The foundation every project needs.
+
 - Validation scripts (eslint, tsc, spec-validate, hook-wrapper, etc.)
 - Infrastructure directories (coordination, journal/decisions)
 - Core schemas (spec-group, session)
 - `core/claude-md-base` and `config/settings`
 
 **core-workflow** -- Extends minimal. Adds the implement/test/unify cycle.
+
 - Agents: implementer, test-writer, unifier, atomizer, atomicity-enforcer
 - Skills: implement, test, unify, atomize, enforce
 - Templates: task-spec, atomic-spec, requirements, evidence-table
 - Memory-bank files, docs/hooks
 
 **full-workflow** -- Extends core-workflow. Adds all review agents and remaining skills. **This is the default bundle for all projects** (set in `projects.json` defaults).
+
 - Agents: explore, product-manager, spec-author, code-reviewer, security-reviewer, documenter, browser-tester, interface-investigator, facilitator, refactorer, prd-author, prd-reader, prd-writer
 - Skills: route, pm, spec, code-review, security, docs, browser-test, investigate, prd, orchestrate, refactor
 - Templates: prd, spec-group-summary, qa-checklist, integration-testing, git-issue, fix-report, investigation-report, decision-record, agent
 
 **orchestrator** -- Extends full-workflow. Adds multi-workstream orchestration.
+
 - Templates: workstream-spec, refactor-proposal
 - Schemas: master-spec, workstream-spec, contract-registry
 
@@ -144,6 +148,7 @@ This is the single most common source of sync bugs. The registry and bundles are
 Both are required. Adding an artifact to the registry without adding it to a bundle means it will sit in metaclaude-assistant and never reach consumer projects.
 
 **Past bugs caused by this:**
+
 - The `facilitator` and `refactorer` agents were in the registry but missing from the `full-workflow` bundle includes, so they never synced to consumer projects despite being registered.
 - Convergence-related scripts were registered but not added to any bundle, silently missing from all targets.
 
@@ -201,6 +206,7 @@ Add under the appropriate category. Example for a new agent:
 This is the step people forget. Add `"agents/my-agent"` to the `includes` array of the appropriate bundle in the `bundles` section of `metaclaude-registry.json`.
 
 Choose the right bundle level:
+
 - `minimal` -- Infrastructure, validation scripts, core config
 - `core-workflow` -- Implement/test/unify pipeline artifacts
 - `full-workflow` -- All review agents, all skills, all templates (most artifacts go here)
@@ -280,15 +286,15 @@ diff .claude/agents/my-agent.md ../target-project/.claude/agents/my-agent.md
 
 These files stay in metaclaude-assistant and are never copied to consumer projects:
 
-| File/Directory | Reason |
-|----------------|--------|
-| `metaclaude-registry.json` | Canonical registry, not a target artifact |
-| `projects.json` | Internal config for the sync system |
-| `.claude/locks/` | Per-project lock files, stored in metaclaude-assistant |
+| File/Directory                       | Reason                                                                 |
+| ------------------------------------ | ---------------------------------------------------------------------- |
+| `metaclaude-registry.json`           | Canonical registry, not a target artifact                              |
+| `projects.json`                      | Internal config for the sync system                                    |
+| `.claude/locks/`                     | Per-project lock files, stored in metaclaude-assistant                 |
 | `.claude/scripts/compute-hashes.mjs` | Sync infrastructure (not in any bundle, despite being in the registry) |
-| `.claude/scripts/metaclaude-cli.mjs` | The sync CLI itself (not in any bundle) |
-| `test-hooks.mjs`, `__fixtures__/` | Testing infrastructure |
-| Repo-specific agents | e.g., `deployer.md` that only exists in ai-eng-dashboard |
+| `.claude/scripts/metaclaude-cli.mjs` | The sync CLI itself (not in any bundle)                                |
+| `test-hooks.mjs`, `__fixtures__/`    | Testing infrastructure                                                 |
+| Repo-specific agents                 | e.g., `deployer.md` that only exists in ai-eng-dashboard               |
 
 Note: `compute-hashes.mjs` and `metaclaude-cli.mjs` ARE in the registry (for hash tracking) but are NOT in any bundle's includes, so they never sync. This is intentional -- they are metaclaude-internal tools.
 
@@ -323,18 +329,25 @@ Target project has a custom hook for database migrations:
 ```json
 {
   "hooks": {
-    "PostToolUse": [{
-      "matcher": "*.sql",
-      "hooks": [
-        { "type": "command", "command": "sqlfluff lint $file", "_source": "metaclaude" },
-        { "type": "command", "command": "run-migration-check $file" }
-      ]
-    }]
+    "PostToolUse": [
+      {
+        "matcher": "*.sql",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sqlfluff lint $file",
+            "_source": "metaclaude"
+          },
+          { "type": "command", "command": "run-migration-check $file" }
+        ]
+      }
+    ]
   }
 }
 ```
 
 After sync:
+
 - The `sqlfluff lint` hook (metaclaude) gets replaced with whatever the current metaclaude version is
 - The `run-migration-check` hook (project-specific, no `_source`) is preserved untouched
 
@@ -374,6 +387,7 @@ Lock files at `.claude/locks/<project>.lock.json` track what was installed in ea
 ### The `--force` Flag
 
 `--force` overrides conflict detection. Use it when:
+
 - You intentionally want to overwrite local modifications
 - You are doing a clean re-sync of all artifacts
 - A previous sync was interrupted and left inconsistent state
@@ -389,7 +403,7 @@ Hashes provide content-addressable integrity checking for all artifacts.
 ### How Hashes Are Computed
 
 ```javascript
-createHash('sha256').update(content).digest('hex').slice(0, 8)
+createHash('sha256').update(content).digest('hex').slice(0, 8);
 ```
 
 The hash is the first 8 characters of the SHA-256 hex digest of the file's UTF-8 content.
@@ -410,6 +424,7 @@ node .claude/scripts/compute-hashes.mjs --update
 ### When to Update Hashes
 
 Run `compute-hashes.mjs --update` after:
+
 - Editing any artifact file
 - Adding a new artifact (to replace the `"placeholder"` hash)
 - Any change to a file tracked in the registry

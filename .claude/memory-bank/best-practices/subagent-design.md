@@ -96,8 +96,8 @@ Every subagent must return using the **structured return contract**:
 
 status: success | partial | failed
 summary: < 200 words (HARD BUDGET)
-blockers: []    # Empty if success; list of blocking issues otherwise
-artifacts: []   # Files created or modified
+blockers: [] # Empty if success; list of blocking issues otherwise
+artifacts: [] # Files created or modified
 
 Return to main agent:
 

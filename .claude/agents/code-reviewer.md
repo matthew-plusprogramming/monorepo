@@ -3,6 +3,7 @@ name: code-reviewer
 description: Code review subagent specialized in quality, style, and best practices review. Runs before security reviewer. READ-ONLY - reports issues but does not fix them.
 tools: Read, Glob, Grep
 model: opus
+skills: code-review
 ---
 
 # Code Reviewer Subagent

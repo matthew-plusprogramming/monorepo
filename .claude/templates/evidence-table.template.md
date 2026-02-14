@@ -9,23 +9,23 @@ created_at: <ISO timestamp>
 
 ## Symbols Verified
 
-| Symbol / Field | Source File | Line(s) | Casing / Shape | Verified |
-|---|---|---|---|---|
-| `<SymbolName>` | `<file-path>` | <line-numbers> | <casing-note> | Yes/No |
+| Symbol / Field | Source File   | Line(s)        | Casing / Shape | Verified |
+| -------------- | ------------- | -------------- | -------------- | -------- |
+| `<SymbolName>` | `<file-path>` | <line-numbers> | <casing-note>  | Yes/No   |
 
 ## Missing Symbols
 
 Symbols referenced in the spec that do not yet exist in the codebase:
 
-| Symbol / Field | Expected Location | Action Required |
-|---|---|---|
+| Symbol / Field | Expected Location      | Action Required                              |
+| -------------- | ---------------------- | -------------------------------------------- |
 | `<SymbolName>` | `<expected-file-path>` | Create / Add to contract / Clarify with spec |
 
 ## Interface Contracts Verified
 
-| Contract | Source | Shape / Signature | Matches Spec |
-|---|---|---|---|
-| `<InterfaceName>` | `<file-path>:<line>` | `<brief signature>` | Yes/No |
+| Contract          | Source               | Shape / Signature   | Matches Spec |
+| ----------------- | -------------------- | ------------------- | ------------ |
+| `<InterfaceName>` | `<file-path>:<line>` | `<brief signature>` | Yes/No       |
 
 ## Notes
 
@@ -33,20 +33,20 @@ Symbols referenced in the spec that do not yet exist in the codebase:
 
 ## Methodology
 
-| Field | Value |
-|---|---|
-| Tools used | Grep, Glob, Read |
-| Files examined | <count> |
-| Search patterns used | <list key grep/glob patterns> |
+| Field                | Value                          |
+| -------------------- | ------------------------------ |
+| Tools used           | Grep, Glob, Read               |
+| Files examined       | <count>                        |
+| Search patterns used | <list key grep/glob patterns>  |
 | Directories searched | <list top-level dirs searched> |
-| Time spent | <optional: estimated minutes> |
+| Time spent           | <optional: estimated minutes>  |
 
 ### Search Log
 
 _Record of key searches performed during evidence gathering:_
 
-| Tool | Pattern / Path | Result Count | Key Finding |
-|---|---|---|---|
-| Grep | `<pattern>` in `<path>` | <N matches> | <what was found> |
-| Glob | `<pattern>` | <N files> | <what was found> |
-| Read | `<file:lines>` | N/A | <what was confirmed> |
+| Tool | Pattern / Path          | Result Count | Key Finding          |
+| ---- | ----------------------- | ------------ | -------------------- |
+| Grep | `<pattern>` in `<path>` | <N matches>  | <what was found>     |
+| Glob | `<pattern>`             | <N files>    | <what was found>     |
+| Read | `<file:lines>`          | N/A          | <what was confirmed> |

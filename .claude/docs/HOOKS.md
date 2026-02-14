@@ -53,10 +53,13 @@ The key field is `tool_input.file_path` which contains the absolute path to the 
 
 ### Trigger Points
 
-| Hook Event    | When Triggered                | Use Case        |
-| ------------- | ----------------------------- | --------------- |
-| `PostToolUse` | After Edit or Write completes | File validation |
-| `Stop`        | When session ends             | Session logging |
+| Hook Event     | When Triggered                | Matchers      | Use Case                         |
+| -------------- | ----------------------------- | ------------- | -------------------------------- |
+| `PostToolUse`  | After Edit or Write completes | `Edit\|Write` | File validation                  |
+| `PostToolUse`  | After Read completes          | `Read`        | Superseded artifact warnings     |
+| `PostToolUse`  | After Bash completes          | `Bash`        | Commit policy enforcement        |
+| `SubagentStop` | When a subagent completes     | (none)        | Convergence gate reminders       |
+| `Stop`         | When session ends             | (none)        | Session logging and finalization |
 
 ### Configuration Location
 
@@ -141,22 +144,28 @@ The wrapper:
 
 ### PostToolUse Hooks (Edit|Write)
 
-| Hook ID                      | Trigger Pattern         | Script                           | Purpose                                          |
-| ---------------------------- | ----------------------- | -------------------------------- | ------------------------------------------------ |
-| `typescript-typecheck`       | `*.ts,*.tsx`            | `workspace-tsc.mjs`              | TypeScript type checking via workspace-aware tsc |
-| `eslint-check`               | `*.ts,*.tsx,*.js,*.jsx` | `workspace-eslint.mjs`           | Linting via workspace-aware ESLint               |
-| `json-validate`              | `*.json`                | inline JSON.parse                | JSON syntax validation                           |
-| `claude-md-drift`            | `*CLAUDE.md`            | `verify-claude-md-base.mjs`      | Detect CLAUDE.md drift from canonical base       |
-| `manifest-validate`          | `*manifest.json`        | `validate-manifest.mjs`          | Validate manifest against spec-group schema      |
-| `template-validate`          | `.claude/templates/*`   | `template-validate.mjs`          | Validate template structure and placeholders     |
-| `registry-hash-verify`       | `.claude/**`            | `compute-hashes.mjs --verify`    | Artifact hash verification                       |
-| `agent-frontmatter-validate` | `.claude/agents/*.md`   | `validate-agent-frontmatter.mjs` | Agent frontmatter schema validation              |
-| `skill-frontmatter-validate` | `*SKILL.md`             | `validate-skill-frontmatter.mjs` | Skill frontmatter schema validation              |
-| `spec-schema-validate`       | `.claude/specs/**/*.md` | `spec-schema-validate.mjs`       | JSON schema validation for specs                 |
-| `spec-validate`              | `.claude/specs/**/*.md` | `spec-validate.mjs`              | Spec markdown structure validation               |
-| `progress-heartbeat-check`   | `.claude/specs/**`      | `progress-heartbeat-check.mjs`   | Enforce progress logging (warn 15min, block 3x)  |
-| `registry-artifact-validate` | `*artifacts.json`       | `registry-artifact-validate.mjs` | Validate artifact registry schema and semantics  |
-| `superseded-artifact-warn`   | `.claude/specs/**/*.md` | `superseded-artifact-warn.mjs`   | Warn when reading superseded specs               |
+| Hook ID                      | Trigger Pattern         | Script                            | Purpose                                                |
+| ---------------------------- | ----------------------- | --------------------------------- | ------------------------------------------------------ |
+| `typescript-typecheck`       | `*.ts,*.tsx`            | `workspace-tsc.mjs`               | TypeScript type checking via workspace-aware tsc       |
+| `eslint-check`               | `*.ts,*.tsx,*.js,*.jsx` | `workspace-eslint.mjs`            | Linting via workspace-aware ESLint                     |
+| `json-validate`              | `*.json`                | inline JSON.parse                 | JSON syntax validation                                 |
+| `claude-md-drift`            | `*CLAUDE.md`            | `verify-claude-md-base.mjs`       | Detect CLAUDE.md drift from canonical base             |
+| `manifest-validate`          | `*manifest.json`        | `validate-manifest.mjs`           | Validate manifest against spec-group schema            |
+| `template-validate`          | `.claude/templates/*`   | `template-validate.mjs`           | Validate template structure and placeholders           |
+| `registry-hash-verify`       | `.claude/**`            | `compute-hashes.mjs --verify`     | Artifact hash verification                             |
+| `agent-frontmatter-validate` | `.claude/agents/*.md`   | `validate-agent-frontmatter.mjs`  | Agent frontmatter schema validation                    |
+| `skill-frontmatter-validate` | `*SKILL.md`             | `validate-skill-frontmatter.mjs`  | Skill frontmatter schema validation                    |
+| `spec-schema-validate`       | `.claude/specs/**/*.md` | `spec-schema-validate.mjs`        | JSON schema validation for specs                       |
+| `spec-validate`              | `.claude/specs/**/*.md` | `spec-validate.mjs`               | Spec markdown structure validation                     |
+| `progress-heartbeat-check`   | `.claude/specs/**`      | `progress-heartbeat-check.mjs`    | Enforce progress logging (warn 15min, block 3x)        |
+| `registry-artifact-validate` | `*artifacts.json`       | `registry-artifact-validate.mjs`  | Validate artifact registry schema and semantics        |
+| `convergence-field-validate` | `*manifest.json`        | `validate-convergence-fields.mjs` | Validate convergence field names against canonical set |
+| `spec-manifest-sync`         | `*manifest.json`        | `validate-spec-manifest-sync.mjs` | Detect drift between manifest state and spec tasks     |
+| `structured-error-validate`  | `*.ts,*.tsx`            | `structured-error-validator.mjs`  | Warn on raw `throw new Error()` in non-test files      |
+| `evidence-table-check`       | `.claude/specs/**/*.md` | `evidence-table-check.mjs`        | Warn when implementing spec lacks evidence table       |
+| `spec-approval-hash`         | `.claude/specs/**/*.md` | `spec-approval-hash.mjs`          | Detect content drift in approved specs                 |
+| `session-state-validate`     | (no pattern)            | `session-validate.mjs`            | Validate session.json schema compliance                |
+| `prettier-format`            | (no pattern)            | inline `npx prettier`             | Auto-format edited files with Prettier                 |
 
 ### PostToolUse Hooks (Read)
 
@@ -164,11 +173,25 @@ The wrapper:
 | -------------------------- | ----------------------- | ------------------------------ | ---------------------------------- |
 | `superseded-artifact-warn` | `.claude/specs/**/*.md` | `superseded-artifact-warn.mjs` | Warn when reading superseded specs |
 
+### PostToolUse Hooks (Bash)
+
+| Hook ID                | Script                     | Purpose                                                      |
+| ---------------------- | -------------------------- | ------------------------------------------------------------ |
+| `journal-commit-check` | `journal-commit-check.mjs` | Block commits when journal entry is required but not created |
+
+### SubagentStop Hooks
+
+| Hook ID                     | Script                          | Purpose                                                                 |
+| --------------------------- | ------------------------------- | ----------------------------------------------------------------------- |
+| `convergence-gate-reminder` | `convergence-gate-reminder.mjs` | Remind main agent to update convergence gates after subagent completion |
+
 ### Stop Hooks
 
-| Hook ID       | Purpose                                                |
-| ------------- | ------------------------------------------------------ |
-| `session-log` | Logs session end time to `.claude/context/session.log` |
+| Hook ID                   | Script / Command              | Purpose                                                          |
+| ------------------------- | ----------------------------- | ---------------------------------------------------------------- |
+| `session-log`             | inline `echo` command         | Logs session end time to `.claude/context/session.log`           |
+| `session-state-finalize`  | inline `node -e` command      | Mark session.json as interrupted if not completed gracefully     |
+| `journal-promotion-check` | `journal-promotion-check.mjs` | Suggest journal entries for memory-bank promotion at session end |
 
 ---
 
@@ -207,7 +230,7 @@ All validation scripts are located in `.claude/scripts/`.
 - `name`: Agent name (string)
 - `description`: One-line description (string)
 - `tools`: Comma-separated tool list (string)
-- `model`: Model to use - `opus` or `sonnet` (string)
+- `model`: Model to use - `opus` (string)
 
 **Optional Fields**:
 
@@ -333,6 +356,115 @@ All validation scripts are located in `.claude/scripts/`.
    - `superseded_by` - the replacing spec ID
    - `supersession_date` - when it was superseded
    - `supersession_reason` - why it was replaced
+
+### validate-convergence-fields.mjs
+
+**Purpose**: Validate convergence object field names in manifest.json.
+
+**Behavior**:
+
+1. Parses `manifest.json` and extracts the convergence object
+2. Checks each field name against the 8 canonical convergence gate fields
+3. Suggests corrections for misspelled or non-canonical field names
+4. Reports error if non-canonical fields found
+
+### validate-spec-manifest-sync.mjs
+
+**Purpose**: Detect drift between manifest work state and spec task completion.
+
+**Behavior**:
+
+1. Checks if manifest `work_state` is `READY_TO_MERGE` or `VERIFYING`
+2. Reads the corresponding spec file and counts unchecked task boxes
+3. Warns if manifest claims completion but spec has unchecked tasks
+
+### structured-error-validator.mjs
+
+**Purpose**: Warn on raw `throw new Error()` patterns in TypeScript files.
+
+**Behavior**:
+
+1. Scans file for `Error` constructor usage
+2. Skips test files (`__tests__`, `*.test.ts`, `*.spec.ts`)
+3. Warns to use typed error classes from the structured error taxonomy
+4. Always exits 0 (warning only, never blocks)
+
+### evidence-table-check.mjs
+
+**Purpose**: Warn when an atomic spec with `status: implementing` lacks a populated evidence table.
+
+**Behavior**:
+
+1. Checks frontmatter for `status: implementing`
+2. Searches for an Evidence Table section with at least one data row
+3. Warns if implementing without evidence (Practice 1.7 compliance)
+4. Always exits 0 (warning only)
+
+### spec-approval-hash.mjs
+
+**Purpose**: Detect content drift in approved specs by comparing body hash.
+
+**Behavior**:
+
+1. Computes SHA256 hash of the spec body (below frontmatter)
+2. For approved specs, compares against `approval_hash` in frontmatter
+3. Warns if content changed post-approval or if hash is missing
+4. Always exits 0 (warning only)
+
+### session-validate.mjs
+
+**Purpose**: Validate `session.json` against the session schema.
+
+**Behavior**:
+
+1. Loads `.claude/context/session.json` and `.claude/specs/schema/session.schema.json`
+2. Validates version (semver), timestamps (ISO 8601), workflow/phase/status enums
+3. Checks spec group ID patterns (`sg-<slug>`) and atomic spec ID patterns (`as-NNN`)
+4. Reports validation failures, exits 1 on error
+
+### journal-commit-check.mjs
+
+**Purpose**: Block git commits when a journal entry is required but not created.
+
+**Behavior**:
+
+1. Reads `session.json` phase checkpoint
+2. If `journal_required: true` and `journal_created` is not true, warns and blocks
+3. Only triggers on Bash commands containing `git commit`
+
+### convergence-gate-reminder.mjs
+
+**Purpose**: Remind the main agent to update convergence gates after subagent completion.
+
+**Behavior**:
+
+1. Reads SubagentStop event data from stdin (JSON with `agent_type` field)
+2. Maps agent type to convergence gate field (e.g., `implementer` → `all_acs_implemented`)
+3. Outputs JSON with `additionalContext` containing the reminder
+4. Returns empty JSON `{}` for unmapped agent types
+
+**Gate Mapping**:
+
+| Agent Type          | Convergence Gate Field   |
+| ------------------- | ------------------------ |
+| `implementer`       | `all_acs_implemented`    |
+| `test-writer`       | `all_tests_passing`      |
+| `unifier`           | `unifier_passed`         |
+| `code-reviewer`     | `code_review_passed`     |
+| `security-reviewer` | `security_review_passed` |
+| `browser-tester`    | `browser_tests_passed`   |
+| `documenter`        | `docs_generated`         |
+
+### journal-promotion-check.mjs
+
+**Purpose**: Suggest promotion of frequently-tagged journal entries to memory-bank.
+
+**Behavior**:
+
+1. Scans `.claude/journal/entries/` for markdown files
+2. Parses frontmatter tags and type fields
+3. Suggests promotion when a tag or type appears 3+ times
+4. Runs at session end, informational only (always exits 0)
 
 ---
 
@@ -567,5 +699,3 @@ mv .claude/settings.json.bak .claude/settings.json
 ---
 
 ## Related Documentation
-
-- [ATOMIC_SPEC_MIGRATION.md](./ATOMIC_SPEC_MIGRATION.md) - Spec group and atomic spec workflow

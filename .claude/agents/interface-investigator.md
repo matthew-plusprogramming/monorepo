@@ -116,6 +116,7 @@ grep -rh "depends\|requires\|assumes\|prerequisite" .claude/specs/ --include="*.
 When investigating multi-workstream specs, check for naming convention consistency:
 
 **Environment Variable Prefixes**:
+
 ```bash
 # Extract all env var references and check prefix consistency
 grep -rh "[A-Z][A-Z0-9_]*=" .claude/specs/groups/<master-spec-id>/ | cut -d= -f1 | sort | uniq
@@ -123,6 +124,7 @@ grep -rh "[A-Z][A-Z0-9_]*=" .claude/specs/groups/<master-spec-id>/ | cut -d= -f1
 ```
 
 **API Field Casing**:
+
 ```bash
 # Check for mixed casing in API contracts
 grep -rh '"[a-z][a-zA-Z]*":' .claude/specs/ --include="*.md"  # camelCase
@@ -131,6 +133,7 @@ grep -rh '"[a-z][a-z_]*":' .claude/specs/ --include="*.md"    # snake_case
 ```
 
 **Constant Naming Patterns**:
+
 ```bash
 # Check for consistent constant naming
 grep -rh "const [A-Z_]" .claude/specs/ --include="*.md"
@@ -142,17 +145,17 @@ grep -rh "const [A-Z_]" .claude/specs/ --include="*.md"
 ```markdown
 ## Naming Consistency: PASS | ISSUES FOUND
 
-| Convention | Workstreams Using | Conflicts |
-|---|---|---|
-| Env var prefix: APP_ | ws-1, ws-2 | ws-3 uses NEXT_ |
-| API fields: camelCase | ws-1 | ws-2 uses snake_case |
-| Constants: UPPER_SNAKE | all | none |
+| Convention             | Workstreams Using | Conflicts            |
+| ---------------------- | ----------------- | -------------------- |
+| Env var prefix: APP\_  | ws-1, ws-2        | ws-3 uses NEXT\_     |
+| API fields: camelCase  | ws-1              | ws-2 uses snake_case |
+| Constants: UPPER_SNAKE | all               | none                 |
 
 ### Naming Decisions Required
 
-| ID | Convention | Options | Recommendation | Affected |
-|---|---|---|---|---|
-| NAM-001 | API casing | camelCase vs snake_case | camelCase (matches existing) | ws-2 |
+| ID      | Convention | Options                 | Recommendation               | Affected |
+| ------- | ---------- | ----------------------- | ---------------------------- | -------- |
+| NAM-001 | API casing | camelCase vs snake_case | camelCase (matches existing) | ws-2     |
 ```
 
 ## Your Responsibilities

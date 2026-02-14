@@ -38,16 +38,18 @@ When dispatched for **evidence gathering** (the prompt will mention "evidence ta
 ```markdown
 ## Evidence Table
 
-| Symbol / Field | Source File | Line(s) | Casing / Shape | Verified |
-|---|---|---|---|---|
-| `AuthService` | `src/services/auth.ts` | 15 | PascalCase class | Yes |
-| `logout()` | `src/services/auth.ts` | 89-102 | camelCase method | Yes |
-| `auth_token` | `src/constants/keys.ts` | 7 | snake_case string | Yes |
+| Symbol / Field | Source File             | Line(s) | Casing / Shape    | Verified |
+| -------------- | ----------------------- | ------- | ----------------- | -------- |
+| `AuthService`  | `src/services/auth.ts`  | 15      | PascalCase class  | Yes      |
+| `logout()`     | `src/services/auth.ts`  | 89-102  | camelCase method  | Yes      |
+| `auth_token`   | `src/constants/keys.ts` | 7       | snake_case string | Yes      |
 
 ### Missing Symbols
+
 - `LogoutConfirmDialog` — not found in codebase. Needs to be created.
 
 ### Notes
+
 - AuthService uses repository pattern with injected UserRepository
 - Existing error handling uses custom AuthError class
 ```

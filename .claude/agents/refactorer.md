@@ -3,6 +3,7 @@ name: refactorer
 description: Refactoring subagent specialized in code quality improvements with behavior preservation. Handles tech debt, pattern migrations, and structural improvements without changing functionality.
 tools: Read, Write, Edit, Glob, Grep, Bash
 model: opus
+skills: refactor
 hooks:
   PostToolUse:
     - matcher: 'Edit|Write'

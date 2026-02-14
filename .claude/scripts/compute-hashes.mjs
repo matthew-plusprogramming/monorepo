@@ -29,6 +29,8 @@ function getAllArtifactPaths(registry) {
 
   for (const [category, artifacts] of Object.entries(registry.artifacts)) {
     for (const [name, artifact] of Object.entries(artifacts)) {
+      // Skip category-level metadata (e.g., _sync_policy)
+      if (name.startsWith('_') || typeof artifact !== 'object' || !artifact.path) continue;
       paths.push({
         id: `${category}/${name}`,
         path: artifact.path,
@@ -49,8 +51,8 @@ function main() {
   const registry = JSON.parse(readFileSync(REGISTRY_PATH, 'utf-8'));
   const artifacts = getAllArtifactPaths(registry);
 
-  console.log('\nMetaClaude Artifact Hashes');
-  console.log('='.repeat(70));
+  console.error('\nMetaClaude Artifact Hashes');
+  console.error('='.repeat(70));
 
   let mismatches = 0;
   let missing = 0;
@@ -61,7 +63,7 @@ function main() {
     const currentHash = computeHash(fullPath);
 
     if (!currentHash) {
-      console.log(`  ? ${artifact.id}: FILE MISSING (${artifact.path})`);
+      console.error(`  ? ${artifact.id}: FILE MISSING (${artifact.path})`);
       missing++;
       continue;
     }
@@ -69,7 +71,7 @@ function main() {
     const status = currentHash === artifact.registeredHash ? '✓' : '✗';
     const color = currentHash === artifact.registeredHash ? '\x1b[32m' : '\x1b[33m';
 
-    console.log(`${color}  ${status} ${artifact.id}: ${currentHash}${currentHash !== artifact.registeredHash ? ` (registry: ${artifact.registeredHash})` : ''}\x1b[0m`);
+    console.error(`${color}  ${status} ${artifact.id}: ${currentHash}${currentHash !== artifact.registeredHash ? ` (registry: ${artifact.registeredHash})` : ''}\x1b[0m`);
 
     if (currentHash !== artifact.registeredHash) {
       mismatches++;
@@ -84,22 +86,22 @@ function main() {
     }
   }
 
-  console.log('\n' + '-'.repeat(70));
-  console.log(`Summary: ${matched} matched, ${mismatches} mismatched, ${missing} missing`);
+  console.error('\n' + '-'.repeat(70));
+  console.error(`Summary: ${matched} matched, ${mismatches} mismatched, ${missing} missing`);
 
   if (update && mismatches > 0) {
     registry.updated_at = new Date().toISOString();
     writeFileSync(REGISTRY_PATH, JSON.stringify(registry, null, 2) + '\n');
-    console.log(`\nRegistry updated with ${mismatches} new hashes.`);
+    console.error(`\nRegistry updated with ${mismatches} new hashes.`);
   }
 
   if (verify && (mismatches > 0 || missing > 0)) {
-    console.log('\nVerification FAILED');
+    console.error('\nVerification FAILED');
     process.exit(1);
   }
 
   if (verify && mismatches === 0 && missing === 0) {
-    console.log('\nVerification PASSED');
+    console.error('\nVerification PASSED');
   }
 }
 

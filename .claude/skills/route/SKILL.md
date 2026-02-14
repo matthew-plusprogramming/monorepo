@@ -267,8 +267,8 @@ rationale: <Brief explanation of why this workflow was chosen>
 estimated_scope: small | medium | large
 estimated_files: <N>
 decomposition:
-  human_provided: true | false  # Did the human provide explicit task breakdown?
-  atomizer_needed: true | false  # Only true if scope is ambiguous AND human didn't decompose
+  human_provided: true | false # Did the human provide explicit task breakdown?
+  atomizer_needed: true | false # Only true if scope is ambiguous AND human didn't decompose
   # When human_provided is true: skip /atomize, use the provided structure directly
   # When atomizer_needed is true: run /atomize after spec authoring
 delegation:

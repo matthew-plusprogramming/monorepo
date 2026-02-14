@@ -68,14 +68,14 @@ This is a **deliberate exception** to delegation-first. Polling for a file's exi
 
 Use this table to decide between file-based coordination and subagent dispatch:
 
-| Check Type | Method | Rationale |
-|---|---|---|
-| File existence or `ls` | File-based | ~10 tokens, trivially simple |
-| File read < 10 lines | File-based | Low cost, no judgment needed |
-| Status polling (is workstream done?) | File-based | Read `.claude/coordination/<ws-id>.done` |
-| Investigation or code analysis | Dispatch subagent | Requires judgment, pattern matching |
-| Decision-making or conflict resolution | Dispatch subagent | Requires synthesis |
-| Multi-file analysis | Dispatch subagent | Context aggregation needed |
+| Check Type                             | Method            | Rationale                                |
+| -------------------------------------- | ----------------- | ---------------------------------------- |
+| File existence or `ls`                 | File-based        | ~10 tokens, trivially simple             |
+| File read < 10 lines                   | File-based        | Low cost, no judgment needed             |
+| Status polling (is workstream done?)   | File-based        | Read `.claude/coordination/<ws-id>.done` |
+| Investigation or code analysis         | Dispatch subagent | Requires judgment, pattern matching      |
+| Decision-making or conflict resolution | Dispatch subagent | Requires synthesis                       |
+| Multi-file analysis                    | Dispatch subagent | Context aggregation needed               |
 
 #### .done File JSON Schema
 
@@ -91,6 +91,7 @@ Use this table to decide between file-based coordination and subagent dispatch:
 #### Coordination File Lifecycle
 
 After a workstream is merged to main and its worktree cleaned up:
+
 1. Archive coordination files: `mv .claude/coordination/ws-N.* .claude/coordination/archive/`
 2. If archive directory doesn't exist, create it
 3. Coordination files are NOT deleted — they provide audit trail

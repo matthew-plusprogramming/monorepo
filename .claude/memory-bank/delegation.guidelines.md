@@ -140,13 +140,13 @@ You retain ownership of:
 
 Vague "summarize" instructions produce vague results. Concrete budgets produce concrete summaries.
 
-| Return Type | Word Budget | When |
-|---|---|---|
-| Standard exploration | < 200 words | Most subagent returns |
-| Status check | < 50 words | Simple completion/progress check |
-| Investigation report | < 300 words | Cross-spec analysis, deep research |
-| Code review finding | < 200 words per finding | Single issue with evidence |
-| Implementation completion | < 150 words | Summary of changes and status |
+| Return Type               | Word Budget             | When                               |
+| ------------------------- | ----------------------- | ---------------------------------- |
+| Standard exploration      | < 200 words             | Most subagent returns              |
+| Status check              | < 50 words              | Simple completion/progress check   |
+| Investigation report      | < 300 words             | Cross-spec analysis, deep research |
+| Code review finding       | < 200 words per finding | Single issue with evidence         |
+| Implementation completion | < 150 words             | Summary of changes and status      |
 
 **Empirical basis**: A production workstream agent used 163 tool calls across 22 modified files while consuming only ~153k tokens total. The hard budget kept each subagent return to ~200 tokens, achieving 250x compression vs. direct reads.
 

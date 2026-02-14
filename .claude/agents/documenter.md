@@ -3,6 +3,7 @@ name: documenter
 description: Documentation subagent specialized in generating user docs, API docs, and architecture docs from implementation. Creates durable external artifacts.
 tools: Read, Write, Glob, Grep
 model: opus
+skills: docs
 hooks:
   PostToolUse:
     - matcher: 'Edit|Write'

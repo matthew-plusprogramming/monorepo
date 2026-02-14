@@ -72,11 +72,13 @@ If not approved → STOP and report to orchestrator.
 Before coding, dispatch an **Explore subagent** to study existing patterns. You are a conductor at this level — you do not read files directly for pattern discovery.
 
 **Dispatch Explore subagent** with prompt:
+
 - "Investigate codebase patterns relevant to [feature area]. Report: file structure, naming conventions, error handling patterns, import organization. Return evidence table with key symbols. Budget: < 200 words."
 
 The Explore subagent returns a structured summary and evidence table. Use this to inform your implementation.
 
 **What you receive back**:
+
 - File structure patterns
 - Naming conventions in use
 - Error handling patterns
@@ -99,11 +101,11 @@ Before editing any file, you MUST have evidence that the target symbols exist. T
 
 **Step 2: Evidence Table** — Before your first edit, produce a table in the spec's Execution Log:
 
-| Symbol / Field | Source File | Line(s) | Casing / Shape | Verified |
-|---|---|---|---|---|
-| `AuthService.logout()` | `src/services/auth.ts` | 89-102 | camelCase method | Yes |
-| `LogoutButton` | `src/components/Header.tsx` | 42 | PascalCase component | Yes |
-| `auth_token` | `localStorage` key | grep confirmed | snake_case string | Yes |
+| Symbol / Field         | Source File                 | Line(s)        | Casing / Shape       | Verified |
+| ---------------------- | --------------------------- | -------------- | -------------------- | -------- |
+| `AuthService.logout()` | `src/services/auth.ts`      | 89-102         | camelCase method     | Yes      |
+| `LogoutButton`         | `src/components/Header.tsx` | 42             | PascalCase component | Yes      |
+| `auth_token`           | `localStorage` key          | grep confirmed | snake_case string    | Yes      |
 
 **Step 3: Proceed** — Only after evidence is gathered, begin edits.
 
@@ -401,16 +403,17 @@ Report completion using the **structured return contract** (< 150 words):
 
 status: success
 summary: |
-  Implemented logout feature per sg-logout-button spec.
-  6/6 tasks complete, 12 tests passing, build clean.
-  AuthService.logout() clears token and calls API.
-  LogoutButton added to UserMenu with error handling.
+Implemented logout feature per sg-logout-button spec.
+6/6 tasks complete, 12 tests passing, build clean.
+AuthService.logout() clears token and calls API.
+LogoutButton added to UserMenu with error handling.
 blockers: []
 artifacts:
-  - src/services/auth-service.ts (logout method)
-  - src/components/UserMenu.tsx (logout button)
-  - src/api/auth.ts (logout endpoint)
-  - src/services/__tests__/auth-service.test.ts (3 new tests)
+
+- src/services/auth-service.ts (logout method)
+- src/components/UserMenu.tsx (logout button)
+- src/api/auth.ts (logout endpoint)
+- src/services/**tests**/auth-service.test.ts (3 new tests)
 
 **Next**: Run unifier for spec-impl-test alignment validation
 ```

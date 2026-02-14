@@ -11,7 +11,7 @@ The schema defines truth. Types are generated from it. Agents must use what the 
 
 ## Evidence-Before-Edit
 
-The single most common class of AI-generated bugs is "I assumed it was called X": snake_case vs camelCase mismatches, referencing fields that don't exist, using a route path that was renamed. These aren't logic errors — they're failures of *discovery*.
+The single most common class of AI-generated bugs is "I assumed it was called X": snake*case vs camelCase mismatches, referencing fields that don't exist, using a route path that was renamed. These aren't logic errors — they're failures of \_discovery*.
 
 ### The Rule
 
@@ -25,10 +25,10 @@ An agent may not introduce or reference any identifier unless it first shows evi
 
 Before any edit phase, produce a table:
 
-| Symbol / Field | Source File | Line(s) | Notes |
-|---|---|---|---|
-| `AuthService` | `src/services/auth.ts` | 15 | PascalCase class |
-| `logout()` | `src/services/auth.ts` | 89 | camelCase method |
+| Symbol / Field | Source File            | Line(s) | Notes            |
+| -------------- | ---------------------- | ------- | ---------------- |
+| `AuthService`  | `src/services/auth.ts` | 15      | PascalCase class |
+| `logout()`     | `src/services/auth.ts` | 89      | camelCase method |
 
 If evidence is missing: search more, or propose adding the symbol to the contract. Never invent locally.
 

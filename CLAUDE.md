@@ -373,6 +373,8 @@ Load memory-bank files based on task context:
 | `best-practices/ears-format.md`          | Security requirements work | Security-reviewer, Spec-author |
 | `best-practices/contract-first.md`       | Implementation routed      | Implementer, Code-reviewer     |
 | `best-practices/skill-event-emission.md` | Skill development          | Skill authors                  |
+| `best-practices/software-principles.md`  | Implementation routed      | Implementer, Code-reviewer     |
+| `best-practices/typescript.md`           | TypeScript work dispatched | Implementer, Code-reviewer     |
 
 ### Maintenance
 

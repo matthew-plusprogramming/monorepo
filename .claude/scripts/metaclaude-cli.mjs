@@ -40,7 +40,7 @@ const colors = {
 };
 
 function log(msg, color = 'reset') {
-  console.log(`${colors[color]}${msg}${colors.reset}`);
+  console.error(`${colors[color]}${msg}${colors.reset}`);
 }
 
 function computeHash(content) {
@@ -131,6 +131,116 @@ function getProjectsToProcess(config, projectArg) {
     return [projectArg];
   }
   return Object.keys(config.projects);
+}
+
+// ============== SETTINGS MERGE ==============
+
+/**
+ * Merge settings.json with special handling for metaclaude hooks.
+ *
+ * Strategy:
+ * 1. If no existing target settings.json, copy source directly
+ * 2. If existing file:
+ *    - Remove hooks with _source: "metaclaude" from target
+ *    - Add all hooks from source (which have _source: "metaclaude")
+ *    - Preserve project-specific hooks (those without _source field)
+ *
+ * @param {string} sourceContent - Source settings.json content
+ * @param {string} targetPath - Path to target settings.json
+ * @returns {{ merged: string, report: string[] }} Merged content and report messages
+ */
+function mergeSettings(sourceContent, targetPath) {
+  const report = [];
+  const source = JSON.parse(sourceContent);
+
+  // If target doesn't exist, just use source
+  if (!existsSync(targetPath)) {
+    report.push('No existing settings.json, using source directly');
+    return { merged: JSON.stringify(source, null, 2) + '\n', report };
+  }
+
+  const targetContent = readFileSync(targetPath, 'utf-8');
+  let target;
+  try {
+    target = JSON.parse(targetContent);
+  } catch (e) {
+    report.push('Warning: Target settings.json has invalid JSON, overwriting');
+    return { merged: JSON.stringify(source, null, 2) + '\n', report };
+  }
+
+  // Merge hooks section
+  if (!target.hooks) {
+    target.hooks = {};
+  }
+
+  // Process each hook type (PostToolUse, Stop, etc.)
+  for (const hookType of Object.keys(source.hooks || {})) {
+    const sourceHookGroups = source.hooks[hookType] || [];
+    const targetHookGroups = target.hooks[hookType] || [];
+
+    // Build new hook groups array
+    const mergedHookGroups = [];
+
+    for (const sourceGroup of sourceHookGroups) {
+      const matcher = sourceGroup.matcher || '*';
+
+      // Find matching group in target (same matcher)
+      let targetGroup = targetHookGroups.find(g => (g.matcher || '*') === matcher);
+
+      if (!targetGroup) {
+        // No matching group in target, use source group directly
+        mergedHookGroups.push(sourceGroup);
+        report.push(`  Added hook group [${hookType}] matcher="${matcher}"`);
+      } else {
+        // Merge hooks within the group
+        const targetHooks = targetGroup.hooks || [];
+        const sourceHooks = sourceGroup.hooks || [];
+
+        // Remove metaclaude hooks from target
+        const projectHooks = targetHooks.filter(h => h._source !== 'metaclaude');
+        const removedCount = targetHooks.length - projectHooks.length;
+        if (removedCount > 0) {
+          report.push(`  Removed ${removedCount} existing metaclaude hooks from [${hookType}] matcher="${matcher}"`);
+        }
+
+        // Add all source hooks (all have _source: "metaclaude")
+        const metaclaudeHooks = sourceHooks.filter(h => h._source === 'metaclaude');
+
+        if (projectHooks.length > 0) {
+          report.push(`  Preserved ${projectHooks.length} project-specific hooks in [${hookType}] matcher="${matcher}"`);
+        }
+        report.push(`  Added ${metaclaudeHooks.length} metaclaude hooks to [${hookType}] matcher="${matcher}"`);
+
+        mergedHookGroups.push({
+          ...sourceGroup,
+          hooks: [...metaclaudeHooks, ...projectHooks]
+        });
+      }
+    }
+
+    // Also preserve any target hook groups that don't exist in source
+    for (const targetGroup of targetHookGroups) {
+      const matcher = targetGroup.matcher || '*';
+      const existsInSource = sourceHookGroups.some(g => (g.matcher || '*') === matcher);
+
+      if (!existsInSource) {
+        // This is a project-specific hook group, preserve it
+        // But still filter out any metaclaude hooks that may have been added previously
+        const projectHooks = (targetGroup.hooks || []).filter(h => h._source !== 'metaclaude');
+        if (projectHooks.length > 0) {
+          mergedHookGroups.push({
+            ...targetGroup,
+            hooks: projectHooks
+          });
+          report.push(`  Preserved project hook group [${hookType}] matcher="${matcher}" (${projectHooks.length} hooks)`);
+        }
+      }
+    }
+
+    target.hooks[hookType] = mergedHookGroups;
+  }
+
+  return { merged: JSON.stringify(target, null, 2) + '\n', report };
 }
 
 // ============== COMMANDS ==============
@@ -326,6 +436,15 @@ async function cmdSync(projectArg, options) {
         continue;
       }
 
+      // Check category-level sync policy (e.g., memory-bank never-overwrite)
+      const [category] = artifactPath.split('/');
+      const categoryMeta = registry.artifacts[category];
+      if (categoryMeta?._sync_policy === 'never-overwrite' && existsSync(targetFile)) {
+        log(`  Skip ${artifactPath}: never-overwrite policy (file exists)`, 'dim');
+        skipped++;
+        continue;
+      }
+
       const sourceContent = readFileSync(sourceFile, 'utf-8');
       const sourceHash = computeHash(sourceContent);
 
@@ -333,16 +452,30 @@ async function cmdSync(projectArg, options) {
       if (existsSync(targetFile) && lock.installed[artifactPath]) {
         const localHash = computeHash(readFileSync(targetFile, 'utf-8'));
         if (localHash !== lock.installed[artifactPath].hash && !options.force) {
-          log(`  Conflict ${artifactPath}: local modifications detected`, 'yellow');
-          log(`    Use --force to overwrite or add to protected list`, 'dim');
-          conflicts++;
-          continue;
+          // Special case: settings.json uses merge strategy, not conflict
+          if (artifact.merge_strategy !== 'settings-merge') {
+            log(`  Conflict ${artifactPath}: local modifications detected`, 'yellow');
+            log(`    Use --force to overwrite or add to protected list`, 'dim');
+            conflicts++;
+            continue;
+          }
         }
       }
 
-      // Create directory and copy file
+      // Create directory
       mkdirSync(dirname(targetFile), { recursive: true });
-      copyFileSync(sourceFile, targetFile);
+
+      // Handle special merge strategies
+      if (artifact.merge_strategy === 'settings-merge') {
+        const { merged, report } = mergeSettings(sourceContent, targetFile);
+        writeFileSync(targetFile, merged);
+        for (const msg of report) {
+          log(msg, 'dim');
+        }
+      } else {
+        // Standard copy
+        copyFileSync(sourceFile, targetFile);
+      }
 
       // Update lock
       lock.installed[artifactPath] = {
@@ -567,7 +700,7 @@ async function main() {
     case '--help':
     case '-h':
     default:
-      console.log(`
+      console.error(`
 MetaClaude CLI - Centralized artifact sync across repositories
 
 Commands:

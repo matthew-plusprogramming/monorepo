@@ -128,6 +128,7 @@ Check all required sections present:
 Check that the Evidence-Before-Edit protocol was followed:
 
 **Evidence Table Check**:
+
 - [ ] Atomic spec contains a populated Evidence Table (or Pre-Implementation Evidence Table)
 - [ ] Evidence entries reference files that actually exist in the codebase
 - [ ] Symbols listed in evidence table are actually used in the implementation
@@ -155,6 +156,7 @@ grep -l "Evidence Table" .claude/specs/groups/<spec-group-id>/atomic/*.md
 ```
 
 **Impact on Convergence**:
+
 - Evidence table missing entirely → Convergence status: PARTIAL (flag "Evidence protocol not followed")
 - Evidence table present but entries stale → Convergence status: PARTIAL (flag "Evidence table drift")
 - Evidence table present and entries verified → No impact on convergence status

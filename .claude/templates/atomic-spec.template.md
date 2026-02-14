@@ -55,32 +55,32 @@ status: pending
 _Filled by Explore subagent during DISCOVER phase, before implementation begins. This is the verified state of the codebase BEFORE edits._
 
 | Symbol / Field | Source File | Line(s) | Casing / Shape | Verified |
-|---|---|---|---|---|
-| | | | | |
+| -------------- | ----------- | ------- | -------------- | -------- |
+|                |             |         |                |          |
 
 ### Missing Symbols
 
 _Symbols referenced in this spec that do not yet exist in the codebase:_
 
 | Symbol / Field | Expected Location | Action Required |
-|---|---|---|
-| | | |
+| -------------- | ----------------- | --------------- |
+|                |                   |                 |
 
 ## Contracts & Schemas
 
 _Declare Zod schemas, OpenAPI specs, generated types this spec depends on or creates._
 
-| Contract | Type | Source / Location | Status |
-|---|---|---|---|
-| | Zod schema / OpenAPI / Generated type / Interface | | exists / to-create |
+| Contract | Type                                              | Source / Location | Status             |
+| -------- | ------------------------------------------------- | ----------------- | ------------------ |
+|          | Zod schema / OpenAPI / Generated type / Interface |                   | exists / to-create |
 
 ## Dependencies
 
 _Which other atomic specs must complete first? What contracts must already exist?_
 
-| Dependency | Type | Status | Blocking? |
-|---|---|---|---|
-| | atomic-spec / contract / external | pending / complete | Yes / No |
+| Dependency | Type                              | Status             | Blocking? |
+| ---------- | --------------------------------- | ------------------ | --------- |
+|            | atomic-spec / contract / external | pending / complete | Yes / No  |
 
 ## Implementation Evidence
 
