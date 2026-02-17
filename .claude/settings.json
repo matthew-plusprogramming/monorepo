@@ -8,7 +8,7 @@
             "_source": "metaclaude",
             "_id": "superseded-artifact-warn",
             "type": "command",
-            "command": "node .claude/scripts/hook-wrapper.mjs '.claude/specs/**/*.md' 'node .claude/scripts/superseded-artifact-warn.mjs {{file}}'"
+            "command": "cd \"$CLAUDE_PROJECT_DIR\" && node .claude/scripts/hook-wrapper.mjs '.claude/specs/**/*.md' 'node .claude/scripts/superseded-artifact-warn.mjs {{file}}'"
           }
         ]
       },
@@ -19,7 +19,7 @@
             "_source": "metaclaude",
             "_id": "journal-commit-check",
             "type": "command",
-            "command": "node .claude/scripts/journal-commit-check.mjs"
+            "command": "cd \"$CLAUDE_PROJECT_DIR\" && node .claude/scripts/journal-commit-check.mjs"
           }
         ]
       },
@@ -30,121 +30,115 @@
             "_source": "metaclaude",
             "_id": "json-validate",
             "type": "command",
-            "command": "node .claude/scripts/hook-wrapper.mjs '*.json' 'node -e \"const f = process.argv[1]; if (!f.includes('\\''tsconfig'\\'')) JSON.parse(require('\\''fs'\\'').readFileSync(f))\" {{file}}'"
+            "command": "cd \"$CLAUDE_PROJECT_DIR\" && node .claude/scripts/hook-wrapper.mjs '*.json' 'node -e \"const f = process.argv[1]; if (!f.includes('\\''tsconfig'\\'')) JSON.parse(require('\\''fs'\\'').readFileSync(f))\" {{file}}'"
           },
           {
             "_source": "metaclaude",
             "_id": "claude-md-drift",
             "type": "command",
-            "command": "node .claude/scripts/hook-wrapper.mjs '*CLAUDE.md' 'node .claude/scripts/verify-claude-md-base.mjs \"$(dirname {{file}})\" 2>&1 | head -10'"
+            "command": "cd \"$CLAUDE_PROJECT_DIR\" && node .claude/scripts/hook-wrapper.mjs '*CLAUDE.md' 'node .claude/scripts/verify-claude-md-base.mjs \"$(dirname {{file}})\" 2>&1 | head -10'"
           },
           {
             "_source": "metaclaude",
             "_id": "manifest-validate",
             "type": "command",
-            "command": "node .claude/scripts/hook-wrapper.mjs '*manifest.json' 'node .claude/scripts/validate-manifest.mjs {{file}}'"
+            "command": "cd \"$CLAUDE_PROJECT_DIR\" && node .claude/scripts/hook-wrapper.mjs '*manifest.json' 'node .claude/scripts/validate-manifest.mjs {{file}}'"
           },
           {
             "_source": "metaclaude",
             "_id": "convergence-field-validate",
             "type": "command",
-            "command": "node .claude/scripts/hook-wrapper.mjs '*manifest.json' 'node .claude/scripts/validate-convergence-fields.mjs {{file}}'"
+            "command": "cd \"$CLAUDE_PROJECT_DIR\" && node .claude/scripts/hook-wrapper.mjs '*manifest.json' 'node .claude/scripts/validate-convergence-fields.mjs {{file}}'"
           },
           {
             "_source": "metaclaude",
             "_id": "spec-manifest-sync",
             "type": "command",
-            "command": "node .claude/scripts/hook-wrapper.mjs '.claude/specs/groups/**/manifest.json' 'node .claude/scripts/validate-spec-manifest-sync.mjs {{file}}'"
+            "command": "cd \"$CLAUDE_PROJECT_DIR\" && node .claude/scripts/hook-wrapper.mjs '.claude/specs/groups/**/manifest.json' 'node .claude/scripts/validate-spec-manifest-sync.mjs {{file}}'"
           },
           {
             "_source": "metaclaude",
             "_id": "template-validate",
             "type": "command",
-            "command": "node .claude/scripts/hook-wrapper.mjs '.claude/templates/*' 'node .claude/scripts/template-validate.mjs {{file}}'"
-          },
-          {
-            "_source": "metaclaude",
-            "_id": "registry-hash-verify",
-            "type": "command",
-            "command": "node .claude/scripts/hook-wrapper.mjs '.claude/**' 'node .claude/scripts/compute-hashes.mjs --verify 2>&1 | head -5'"
+            "command": "cd \"$CLAUDE_PROJECT_DIR\" && node .claude/scripts/hook-wrapper.mjs '.claude/templates/*' 'node .claude/scripts/template-validate.mjs {{file}}'"
           },
           {
             "_source": "metaclaude",
             "_id": "agent-frontmatter-validate",
             "type": "command",
-            "command": "node .claude/scripts/hook-wrapper.mjs '.claude/agents/*.md' 'node .claude/scripts/validate-agent-frontmatter.mjs {{file}}'"
+            "command": "cd \"$CLAUDE_PROJECT_DIR\" && node .claude/scripts/hook-wrapper.mjs '.claude/agents/*.md' 'node .claude/scripts/validate-agent-frontmatter.mjs {{file}}'"
           },
           {
             "_source": "metaclaude",
             "_id": "skill-frontmatter-validate",
             "type": "command",
-            "command": "node .claude/scripts/hook-wrapper.mjs '*SKILL.md' 'node .claude/scripts/validate-skill-frontmatter.mjs {{file}}'"
+            "command": "cd \"$CLAUDE_PROJECT_DIR\" && node .claude/scripts/hook-wrapper.mjs '*SKILL.md' 'node .claude/scripts/validate-skill-frontmatter.mjs {{file}}'"
           },
           {
             "_source": "metaclaude",
             "_id": "typescript-typecheck",
             "type": "command",
-            "command": "node .claude/scripts/hook-wrapper.mjs '*.ts,*.tsx' 'node .claude/scripts/workspace-tsc.mjs {{file}}'"
+            "command": "cd \"$CLAUDE_PROJECT_DIR\" && node .claude/scripts/hook-wrapper.mjs '*.ts,*.tsx' 'node .claude/scripts/workspace-tsc.mjs {{file}}'"
           },
           {
             "_source": "metaclaude",
             "_id": "eslint-check",
             "type": "command",
-            "command": "node .claude/scripts/hook-wrapper.mjs '*.ts,*.tsx,*.js,*.jsx' 'node .claude/scripts/workspace-eslint.mjs {{file}}'"
+            "command": "cd \"$CLAUDE_PROJECT_DIR\" && node .claude/scripts/hook-wrapper.mjs '*.ts,*.tsx,*.js,*.jsx' 'node .claude/scripts/workspace-eslint.mjs {{file}}'"
           },
           {
             "_source": "metaclaude",
             "_id": "structured-error-validate",
             "type": "command",
-            "command": "node .claude/scripts/hook-wrapper.mjs '*.ts,*.tsx' 'node .claude/scripts/structured-error-validator.mjs {{file}}'"
+            "command": "cd \"$CLAUDE_PROJECT_DIR\" && node .claude/scripts/hook-wrapper.mjs '*.ts,*.tsx' 'node .claude/scripts/structured-error-validator.mjs {{file}}'"
           },
           {
             "_source": "metaclaude",
             "_id": "spec-schema-validate",
             "type": "command",
-            "command": "node .claude/scripts/hook-wrapper.mjs '.claude/specs/**/*.md' 'node .claude/scripts/spec-schema-validate.mjs {{file}}'"
+            "command": "cd \"$CLAUDE_PROJECT_DIR\" && node .claude/scripts/hook-wrapper.mjs '.claude/specs/**/*.md' 'node .claude/scripts/spec-schema-validate.mjs {{file}}'"
           },
           {
             "_source": "metaclaude",
             "_id": "spec-validate",
             "type": "command",
-            "command": "node .claude/scripts/hook-wrapper.mjs '.claude/specs/**/*.md' 'node .claude/scripts/spec-validate.mjs {{file}}'"
+            "command": "cd \"$CLAUDE_PROJECT_DIR\" && node .claude/scripts/hook-wrapper.mjs '.claude/specs/**/*.md' 'node .claude/scripts/spec-validate.mjs {{file}}'"
           },
           {
             "_source": "metaclaude",
             "_id": "evidence-table-check",
             "type": "command",
-            "command": "node .claude/scripts/hook-wrapper.mjs '.claude/specs/**/*.md' 'node .claude/scripts/evidence-table-check.mjs {{file}}'"
+            "command": "cd \"$CLAUDE_PROJECT_DIR\" && node .claude/scripts/hook-wrapper.mjs '.claude/specs/**/*.md' 'node .claude/scripts/evidence-table-check.mjs {{file}}'"
           },
           {
             "_source": "metaclaude",
             "_id": "spec-approval-hash",
             "type": "command",
-            "command": "node .claude/scripts/hook-wrapper.mjs '.claude/specs/**/*.md' 'node .claude/scripts/spec-approval-hash.mjs {{file}}'"
+            "command": "cd \"$CLAUDE_PROJECT_DIR\" && node .claude/scripts/hook-wrapper.mjs '.claude/specs/**/*.md' 'node .claude/scripts/spec-approval-hash.mjs {{file}}'"
           },
           {
             "_source": "metaclaude",
             "_id": "registry-artifact-validate",
             "type": "command",
-            "command": "node .claude/scripts/hook-wrapper.mjs '.claude/registry/artifacts.json' 'node .claude/scripts/registry-artifact-validate.mjs {{file}}'"
+            "command": "cd \"$CLAUDE_PROJECT_DIR\" && node .claude/scripts/hook-wrapper.mjs '.claude/registry/artifacts.json' 'node .claude/scripts/registry-artifact-validate.mjs {{file}}'"
           },
           {
             "_source": "metaclaude",
             "_id": "progress-heartbeat-check",
             "type": "command",
-            "command": "node .claude/scripts/hook-wrapper.mjs '.claude/specs/**' 'node .claude/scripts/progress-heartbeat-check.mjs {{file}}'"
+            "command": "cd \"$CLAUDE_PROJECT_DIR\" && node .claude/scripts/hook-wrapper.mjs '.claude/specs/**' 'node .claude/scripts/progress-heartbeat-check.mjs {{file}}'"
           },
           {
             "_source": "metaclaude",
             "_id": "session-state-validate",
             "type": "command",
-            "command": "node .claude/scripts/session-validate.mjs"
+            "command": "cd \"$CLAUDE_PROJECT_DIR\" && node .claude/scripts/session-validate.mjs"
           },
           {
             "_source": "metaclaude",
             "_id": "prettier-format",
             "type": "command",
-            "command": "node .claude/scripts/hook-wrapper.mjs '*.{ts,tsx,js,jsx,json,md,css,scss,yml,yaml}' 'npx prettier --write {{file}} 2>/dev/null || true'"
+            "command": "cd \"$CLAUDE_PROJECT_DIR\" && node .claude/scripts/hook-wrapper.mjs '*.{ts,tsx,js,jsx,json,md,css,scss,yml,yaml}' 'npx prettier --write {{file}} 2>/dev/null || true'"
           }
         ]
       }
@@ -156,7 +150,7 @@
             "_source": "metaclaude",
             "_id": "convergence-gate-reminder",
             "type": "command",
-            "command": "node .claude/scripts/convergence-gate-reminder.mjs"
+            "command": "cd \"$CLAUDE_PROJECT_DIR\" && node .claude/scripts/convergence-gate-reminder.mjs"
           }
         ]
       }
@@ -168,19 +162,19 @@
             "_source": "metaclaude",
             "_id": "session-log",
             "type": "command",
-            "command": "echo \"Session ended at $(date)\" >> .claude/context/session.log 2>/dev/null || true"
+            "command": "cd \"$CLAUDE_PROJECT_DIR\" && echo \"Session ended at $(date)\" >> .claude/context/session.log 2>/dev/null || true"
           },
           {
             "_source": "metaclaude",
             "_id": "session-state-finalize",
             "type": "command",
-            "command": "node -e \"const fs=require('fs');const p='.claude/context/session.json';if(fs.existsSync(p)){const s=JSON.parse(fs.readFileSync(p));if(s.active_work){s.phase_checkpoint.checkpoint_state='interrupted';s.updated_at=new Date().toISOString();fs.writeFileSync(p,JSON.stringify(s,null,2))}}\" 2>/dev/null || true"
+            "command": "cd \"$CLAUDE_PROJECT_DIR\" && node -e \"const fs=require('fs');const p='.claude/context/session.json';if(fs.existsSync(p)){const s=JSON.parse(fs.readFileSync(p));if(s.active_work){s.phase_checkpoint.checkpoint_state='interrupted';s.updated_at=new Date().toISOString();fs.writeFileSync(p,JSON.stringify(s,null,2))}}\" 2>/dev/null || true"
           },
           {
             "_source": "metaclaude",
             "_id": "journal-promotion-check",
             "type": "command",
-            "command": "node .claude/scripts/journal-promotion-check.mjs"
+            "command": "cd \"$CLAUDE_PROJECT_DIR\" && node .claude/scripts/journal-promotion-check.mjs"
           }
         ]
       }
