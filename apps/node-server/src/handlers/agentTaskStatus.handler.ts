@@ -60,7 +60,10 @@ const updateStatusHandler = (input: handlerInput) =>
     const req = yield* input;
     const taskId = req.params.id as string;
 
-    const parsedInput = yield* parseInput(AgentTaskStatusUpdateInputSchema, req.body);
+    const parsedInput = yield* parseInput(
+      AgentTaskStatusUpdateInputSchema,
+      req.body,
+    );
 
     const repo = yield* AgentTaskRepository;
 
@@ -150,7 +153,8 @@ export const updateAgentTaskStatusRequestHandler = generateRequestHandler<
     },
     [HTTP_RESPONSE.INTERNAL_SERVER_ERROR]: {
       errorType: InternalServerError,
-      mapper: (e) => ({ error: e.message }),
+      // AC1.3: Return generic message, real error logged by generateRequestHandler
+      mapper: () => ({ error: 'Internal server error' }),
     },
   },
   successCode: HTTP_RESPONSE.OK,
@@ -166,7 +170,8 @@ export const getAgentTaskStatusRequestHandler = generateRequestHandler<
   statusCodesToErrors: {
     [HTTP_RESPONSE.INTERNAL_SERVER_ERROR]: {
       errorType: InternalServerError,
-      mapper: (e) => ({ error: e.message }),
+      // AC1.3: Return generic message, real error logged by generateRequestHandler
+      mapper: () => ({ error: 'Internal server error' }),
     },
   },
   successCode: HTTP_RESPONSE.OK,
@@ -186,7 +191,8 @@ export const getAgentTaskLogsRequestHandler = generateRequestHandler<
     },
     [HTTP_RESPONSE.INTERNAL_SERVER_ERROR]: {
       errorType: InternalServerError,
-      mapper: (e) => ({ error: e.message }),
+      // AC1.3: Return generic message, real error logged by generateRequestHandler
+      mapper: () => ({ error: 'Internal server error' }),
     },
   },
   successCode: HTTP_RESPONSE.OK,

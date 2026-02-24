@@ -127,13 +127,16 @@ export const fetchProjects = async (): Promise<ListProjectsResponse> => {
  * Fetch a single project by ID
  */
 export const fetchProject = async (id: string): Promise<Project> => {
-  const response = await fetch(`${getApiUrl()}/api/projects/${id}`, {
-    method: 'GET',
-    headers: {
-      Accept: 'application/json',
+  const response = await fetch(
+    `${getApiUrl()}/api/projects/${encodeURIComponent(id)}`,
+    {
+      method: 'GET',
+      headers: {
+        Accept: 'application/json',
+      },
+      credentials: 'include',
     },
-    credentials: 'include',
-  });
+  );
 
   if (!response.ok) {
     throw new Error(await buildErrorMessage(response));
@@ -143,9 +146,4 @@ export const fetchProject = async (id: string): Promise<Project> => {
   return data;
 };
 
-export type {
-  ListProjectsResponse,
-  Project,
-  ProjectHealth,
-  SpecGroupSummary,
-};
+export type { ListProjectsResponse, Project, ProjectHealth, SpecGroupSummary };

@@ -6,6 +6,7 @@ export type CapturedLoggerEntries = {
   readonly logs: Array<ReadonlyArray<unknown>>;
   readonly errors: Array<ReadonlyArray<unknown>>;
   readonly debugs: Array<ReadonlyArray<unknown>>;
+  readonly warns: Array<ReadonlyArray<unknown>>;
 };
 
 export type LoggerServiceFake = {
@@ -20,6 +21,7 @@ export const createLoggerServiceFake = (): LoggerServiceFake => {
     logs: [],
     errors: [],
     debugs: [],
+    warns: [],
   };
 
   const service: LoggerServiceSchema = {
@@ -35,6 +37,10 @@ export const createLoggerServiceFake = (): LoggerServiceFake => {
       Effect.sync(() => {
         entries.debugs.push(input);
       }),
+    logWarn: (...input) =>
+      Effect.sync(() => {
+        entries.warns.push(input);
+      }),
   };
 
   return {
@@ -45,6 +51,7 @@ export const createLoggerServiceFake = (): LoggerServiceFake => {
       entries.logs.length = 0;
       entries.errors.length = 0;
       entries.debugs.length = 0;
+      entries.warns.length = 0;
     },
   };
 };

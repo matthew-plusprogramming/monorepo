@@ -70,7 +70,11 @@ export const generateRequestHandler = <R, E extends Error>({
       }
 
       if (!errorMatch) {
-        res.status(HTTP_RESPONSE.INTERNAL_SERVER_ERROR).send(error.message);
+        // AC1.1, AC1.2: Log real error server-side, return generic message to client
+        console.error('[UnhandledError]', error.message, error.cause);
+        res
+          .status(HTTP_RESPONSE.INTERNAL_SERVER_ERROR)
+          .send('Internal server error');
       }
     } else {
       res.status(successCode).send(result.right);

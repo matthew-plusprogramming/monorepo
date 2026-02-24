@@ -124,11 +124,7 @@ const dispatchHandler = (input: handlerInput) =>
               status: AgentTaskStatus.FAILED,
               errorMessage: 'Webhook dispatch failed',
             })
-            .pipe(
-              Effect.catchTag('AgentTaskNotFoundError', () =>
-                Effect.void,
-              ),
-            ),
+            .pipe(Effect.catchTag('AgentTaskNotFoundError', () => Effect.void)),
         ),
       );
 
@@ -150,7 +146,8 @@ const dispatchHandler = (input: handlerInput) =>
         ),
       );
 
-    const actionLabel = action === AgentAction.IMPLEMENT ? 'Implementation' : 'Test';
+    const actionLabel =
+      action === AgentAction.IMPLEMENT ? 'Implementation' : 'Test';
 
     return {
       task: updatedTask,
@@ -207,7 +204,10 @@ export const dispatchAgentTaskRequestHandler = generateRequestHandler<
     },
     [HTTP_RESPONSE.BAD_GATEWAY]: {
       errorType: WebhookDispatchError,
-      mapper: (e) => ({ error: e.message, retryable: true }),
+      mapper: (e) => {
+        console.error('Webhook dispatch error:', e.message);
+        return { error: 'Webhook dispatch failed', retryable: true };
+      },
     },
     [HTTP_RESPONSE.SERVICE_UNAVAILABLE]: {
       errorType: WebhookNotConfiguredError,
@@ -216,11 +216,15 @@ export const dispatchAgentTaskRequestHandler = generateRequestHandler<
     [504]: {
       // Gateway Timeout for webhook timeout
       errorType: WebhookTimeoutError,
-      mapper: (e) => ({ error: e.message, retryable: true }),
+      mapper: (e) => {
+        console.error('Webhook timeout error:', e.message);
+        return { error: 'Webhook request timed out', retryable: true };
+      },
     },
     [HTTP_RESPONSE.INTERNAL_SERVER_ERROR]: {
       errorType: InternalServerError,
-      mapper: (e) => ({ error: e.message }),
+      // AC1.3: Return generic message, real error logged by generateRequestHandler
+      mapper: () => ({ error: 'Internal server error' }),
     },
   },
   successCode: HTTP_RESPONSE.CREATED,
@@ -240,7 +244,8 @@ export const getAgentTaskRequestHandler = generateRequestHandler<
     },
     [HTTP_RESPONSE.INTERNAL_SERVER_ERROR]: {
       errorType: InternalServerError,
-      mapper: (e) => ({ error: e.message }),
+      // AC1.3: Return generic message, real error logged by generateRequestHandler
+      mapper: () => ({ error: 'Internal server error' }),
     },
   },
   successCode: HTTP_RESPONSE.OK,

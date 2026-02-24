@@ -36,10 +36,7 @@ const getGitHubPRsHandler = (
   input: handlerInput,
 ): Effect.Effect<
   GetGitHubPRsResponse,
-  | ProjectNotFoundError
-  | NoLinkedRepoError
-  | GitHubApiError
-  | GitHubAuthError,
+  ProjectNotFoundError | NoLinkedRepoError | GitHubApiError | GitHubAuthError,
   GitHubService
 > => {
   return Effect.gen(function* () {
@@ -61,10 +58,7 @@ const getGitHubPRsHandler = (
  */
 export const getGitHubPRsRequestHandler = generateRequestHandler<
   GetGitHubPRsResponse,
-  | ProjectNotFoundError
-  | NoLinkedRepoError
-  | GitHubApiError
-  | GitHubAuthError
+  ProjectNotFoundError | NoLinkedRepoError | GitHubApiError | GitHubAuthError
 >({
   effectfulHandler: (input) =>
     getGitHubPRsHandler(input).pipe(Effect.provide(AppLayer)),
@@ -80,11 +74,13 @@ export const getGitHubPRsRequestHandler = generateRequestHandler<
     },
     [HTTP_RESPONSE.BAD_GATEWAY]: {
       errorType: GitHubApiError,
-      mapper: (e) => ({ error: e.message }),
+      // AC1.5: Mask internal API errors from GitHub upstream
+      mapper: () => ({ error: 'GitHub API request failed' }),
     },
     [HTTP_RESPONSE.UNAUTHORIZED]: {
       errorType: GitHubAuthError,
-      mapper: (e) => ({ error: e.message }),
+      // AC1.5: Mask internal auth errors from GitHub upstream
+      mapper: () => ({ error: 'GitHub authentication failed' }),
     },
   },
   successCode: HTTP_RESPONSE.OK,

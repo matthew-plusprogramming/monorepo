@@ -1,0 +1,63 @@
+{
+  "id": "sg-cross-repo-security",
+  "title": "Cross-Repo Security Hardening from ai-eng-dashboard",
+  "review_state": "DRAFT",
+  "work_state": "VERIFYING",
+  "updated_by": "agent",
+  "created_at": "2026-02-20T18:00:00Z",
+  "updated_at": "2026-02-24T03:15:00.000Z",
+  "requirements": {
+    "count": 5,
+    "source": "manual"
+  },
+  "atomic_specs": {
+    "count": 6,
+    "coverage": "100%",
+    "enforcement_status": "not_run",
+    "implemented": 6
+  },
+  "convergence": {
+    "spec_complete": true,
+    "all_acs_implemented": true,
+    "all_tests_passing": false,
+    "unifier_passed": false,
+    "code_review_passed": false,
+    "security_review_passed": false,
+    "browser_tests_passed": null,
+    "docs_generated": false
+  },
+  "decision_log": [
+    {
+      "timestamp": "2026-02-20T18:00:00Z",
+      "actor": "agent",
+      "action": "spec_group_created",
+      "details": "Created from cross-repo analysis of ai-eng-dashboard security-related commits"
+    },
+    {
+      "timestamp": "2026-02-20T18:00:00Z",
+      "actor": "agent",
+      "action": "requirements_extracted",
+      "details": "5 requirements extracted from ai-eng-dashboard commits: 7de0eb9, 939099f, 1ac0139"
+    },
+    {
+      "timestamp": "2026-02-20T18:00:00Z",
+      "actor": "agent",
+      "action": "spec_authored",
+      "details": "spec.md created with 5 atomic specs, 30 ACs, 27 tasks"
+    },
+    {
+      "timestamp": "2026-02-23T00:00:00Z",
+      "actor": "agent",
+      "action": "enforce_investigate_fixes",
+      "details": "Applied 8 fixes from enforcement and investigation: split AS-004 into AS-004+AS-006, moved AC1.6 to AS-002 as AC2.7, updated AS-001 GitHub error mapper coverage, added AC3.9 to AS-003, resolved buildChildEnv location, clarified AS-005 limiter scope, noted AS-004 defense-in-depth context. Total: 6 atomic specs, 36 ACs, 29 tasks."
+    },
+    {
+      "timestamp": "2026-02-23T18:00:00Z",
+      "actor": "agent",
+      "action": "implementation_complete",
+      "details": "All 6 atomic specs implemented: AS-001 (error masking, 13 handlers + request.handler.ts), AS-002 (payload size guard, webhook middleware + express.json limit + rate limit capacity bounds), AS-003 (child env allowlist, 4 callsites updated), AS-004 (route param validation, 10 routes), AS-005 (concurrency limiter, bundle-argon-2 wrapped), AS-006 (Zod audit, all POST/PUT/PATCH already validated)."
+    }
+  ],
+  "last_progress_update": "2026-02-24T03:08:39.632Z",
+  "heartbeat_warnings": 0
+}

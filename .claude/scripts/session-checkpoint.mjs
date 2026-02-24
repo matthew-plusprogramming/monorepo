@@ -26,6 +26,7 @@
  *   1 - Validation or operational error
  */
 
+import { randomUUID } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
 
@@ -117,9 +118,7 @@ function now() {
  * Generate a unique task ID.
  */
 function generateTaskId() {
-  const timestamp = Date.now().toString(36);
-  const random = Math.random().toString(36).substring(2, 8);
-  return `task-${timestamp}-${random}`;
+  return `task-${randomUUID()}`;
 }
 
 /**

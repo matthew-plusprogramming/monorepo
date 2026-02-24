@@ -16,6 +16,7 @@ import { dirname, join, resolve } from 'node:path';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import process from 'node:process';
+import { checkArtifactFreshness, formatTimeDelta, formatTimestamp, ARTIFACT_SOURCE_DIRS } from './utils/cdk-freshness.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(__dirname, '..');
@@ -379,7 +380,7 @@ const cmdOutputs = async (stacks, options) => {
 };
 
 const cmdDeploy = async (stacks, options) => {
-  const { stage = 'dev', dryRun = false, autoApprove = false, force = false } = options;
+  const { stage = 'dev', dryRun = false, autoApprove = false, force = false, acknowledgeStale = false } = options;
   const stageLabel = stage === 'production' ? 'production' : 'development';
 
   // Topologically sort stacks
@@ -397,6 +398,43 @@ const cmdDeploy = async (stacks, options) => {
   if (!valid && !force) {
     console.log(`${LOG_PREFIX} ❌ Validation failed. Use --force to skip validation.`);
     process.exit(1);
+  }
+
+  // AC3.1: Freshness gate -- check artifacts before deploying
+  // AC3.4: --force does NOT bypass freshness (intentional design)
+  if (!acknowledgeStale) {
+    let hasStale = false;
+    for (const stackName of sorted) {
+      const def = STACK_DEFINITIONS[stackName];
+      if (!def) continue;
+      for (const artifact of def.requiredArtifacts) {
+        const artifactFullPath = join(DIST_DIR, artifact);
+        const sourceDirs = ARTIFACT_SOURCE_DIRS[artifact];
+        if (!sourceDirs) continue;
+        const resolvedSourceDirs = sourceDirs.map((dir) => join(REPO_ROOT, dir));
+        const result = checkArtifactFreshness(artifactFullPath, resolvedSourceDirs);
+        if (result.stale) {
+          hasStale = true;
+          // AC3.2: Show artifact timestamp, source timestamp, and time delta
+          const artifactTime = result.artifactMtime ? formatTimestamp(result.artifactMtime) : 'missing';
+          const sourceTime = result.newestSourceMtime ? formatTimestamp(result.newestSourceMtime) : 'unknown';
+          const delta = result.delta > 0 ? formatTimeDelta(result.delta) : 'N/A';
+          console.error(`${LOG_PREFIX} STALE ARTIFACT: ${artifact}`);
+          console.error(`${LOG_PREFIX}   Artifact built: ${artifactTime}`);
+          console.error(`${LOG_PREFIX}   Source changed: ${sourceTime}`);
+          console.error(`${LOG_PREFIX}   Delta: ${delta}`);
+          if (result.newestSourcePath) {
+            console.error(`${LOG_PREFIX}   Newest source: ${result.newestSourcePath}`);
+          }
+        }
+      }
+    }
+    if (hasStale) {
+      console.error(`\n${LOG_PREFIX} Deploy blocked: stale artifact(s) detected.`);
+      console.error(`${LOG_PREFIX} Rebuild with: node scripts/cdk.mjs build`);
+      console.error(`${LOG_PREFIX} Or bypass with: --acknowledge-stale`);
+      process.exit(1);
+    }
   }
 
   // Deploy each stack
@@ -639,6 +677,7 @@ const parseArgs = (rawArgs) => {
   let force = false;
   let noCache = true;
   let autoApprove = false;
+  let acknowledgeStale = false;
   let help = false;
 
   for (const arg of rawArgs) {
@@ -666,6 +705,9 @@ const parseArgs = (rawArgs) => {
       case '--auto-approve':
         autoApprove = true;
         break;
+      case '--acknowledge-stale':
+        acknowledgeStale = true;
+        break;
       case '-h':
       case '--help':
         help = true;
@@ -675,7 +717,7 @@ const parseArgs = (rawArgs) => {
     }
   }
 
-  return { args, stage, dryRun, force, noCache, autoApprove, help };
+  return { args, stage, dryRun, force, noCache, autoApprove, acknowledgeStale, help };
 };
 
 // ============================================================================
@@ -718,6 +760,7 @@ const usage = () => {
       '  --no-cache            Disable Turborepo cache for builds (default)',
       '  --cache               Enable Turborepo cache for builds',
       '  --auto-approve        Skip interactive approval prompts',
+      '  --acknowledge-stale   Deploy even if artifacts are older than source files',
       '  -h, --help            Show this help message',
       '',
       'Examples:',
@@ -735,7 +778,7 @@ const usage = () => {
 // ============================================================================
 
 const main = async () => {
-  const { args, stage, dryRun, force, noCache, autoApprove, help } = parseArgs(
+  const { args, stage, dryRun, force, noCache, autoApprove, acknowledgeStale, help } = parseArgs(
     process.argv.slice(2)
   );
 
@@ -769,7 +812,7 @@ const main = async () => {
           throw new Error('Missing stack or group identifier');
         }
         const stacks = resolveStacks(target);
-        await cmdDeploy(stacks, { stage, dryRun, autoApprove, force });
+        await cmdDeploy(stacks, { stage, dryRun, autoApprove, force, acknowledgeStale });
         break;
       }
 

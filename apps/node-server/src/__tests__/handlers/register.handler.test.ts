@@ -238,9 +238,9 @@ const propagatesRepoCreateFailure = async (): Promise<void> => {
   // Act
   await handler(req, res, vi.fn());
 
-  // Assert
+  // Assert — AC1.3: InternalServerError mapper returns generic message
   expect(captured.statusCode).toBe(HTTP_RESPONSE.INTERNAL_SERVER_ERROR);
-  expect(captured.sendBody).toBe('ddb put failed');
+  expect(captured.sendBody).toEqual({ error: 'Internal server error' });
 };
 
 const propagatesHashingFailure = async (): Promise<void> => {
@@ -261,9 +261,9 @@ const propagatesHashingFailure = async (): Promise<void> => {
   // Act
   await handler(req, res, vi.fn());
 
-  // Assert
+  // Assert — AC1.3: InternalServerError mapper returns generic message
   expect(captured.statusCode).toBe(HTTP_RESPONSE.INTERNAL_SERVER_ERROR);
-  expect(captured.sendBody).toBe(HASH_FAILURE_MESSAGE);
+  expect(captured.sendBody).toEqual({ error: 'Internal server error' });
 };
 
 const propagatesHashingFailureWithoutErrorCause = async (): Promise<void> => {
@@ -284,9 +284,9 @@ const propagatesHashingFailureWithoutErrorCause = async (): Promise<void> => {
   // Act
   await handler(req, res, vi.fn());
 
-  // Assert
+  // Assert — AC1.3: InternalServerError mapper returns generic message
   expect(captured.statusCode).toBe(HTTP_RESPONSE.INTERNAL_SERVER_ERROR);
-  expect(captured.sendBody).toBe(GENERIC_HASH_FAILURE_MESSAGE);
+  expect(captured.sendBody).toEqual({ error: 'Internal server error' });
 };
 
 const propagatesJwtFailure = async (): Promise<void> => {
@@ -314,9 +314,9 @@ const propagatesJwtFailure = async (): Promise<void> => {
     await handler(req, res, vi.fn());
   });
 
-  // Assert
+  // Assert — AC1.3: InternalServerError mapper returns generic message
   expect(captured.statusCode).toBe(HTTP_RESPONSE.INTERNAL_SERVER_ERROR);
-  expect(captured.sendBody).toBe(JWT_SIGN_FAILURE_MESSAGE);
+  expect(captured.sendBody).toEqual({ error: 'Internal server error' });
 };
 
 describe('registerRequestHandler', () => {

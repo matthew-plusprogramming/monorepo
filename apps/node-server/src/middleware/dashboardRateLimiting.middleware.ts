@@ -15,6 +15,9 @@ import {
 const MAX_ATTEMPTS_PER_MINUTE = 5;
 const LOCKOUT_DURATION_MS = 5 * 60 * 1000; // 5 minutes
 
+// AC2.7: Capacity bounds to prevent memory exhaustion from unbounded growth
+const MAX_ENTRIES = 10000;
+
 // In-memory rate limiting storage
 // In production, this could be moved to Redis for distributed deployments
 type RateLimitEntry = {
@@ -24,6 +27,21 @@ type RateLimitEntry = {
 };
 
 const rateLimitStore = new Map<string, RateLimitEntry>();
+
+/**
+ * AC2.7: Enforces capacity bounds on the rate limit store.
+ * Evicts oldest entries (FIFO by Map insertion order) when limit is exceeded.
+ */
+const enforceCapacityBounds = (): void => {
+  while (rateLimitStore.size > MAX_ENTRIES) {
+    const oldestKey = rateLimitStore.keys().next().value;
+    if (oldestKey !== undefined) {
+      rateLimitStore.delete(oldestKey);
+    } else {
+      break;
+    }
+  }
+};
 
 /**
  * Cleans up expired entries from the rate limit store.
@@ -114,6 +132,7 @@ export const recordLoginAttempt = (
       lockedUntil: null,
     };
     rateLimitStore.set(ip, entry);
+    enforceCapacityBounds(); // AC2.7: Evict oldest if over capacity
     return { allowed: true, lockedUntil: null };
   }
 

@@ -169,7 +169,8 @@ export const healthRequestHandler = generateRequestHandler<
   statusCodesToErrors: {
     [HTTP_RESPONSE.INTERNAL_SERVER_ERROR]: {
       errorType: InternalServerError,
-      mapper: (error) => error.message,
+      // AC1.3: Return generic message, real error logged by generateRequestHandler
+      mapper: () => ({ error: 'Internal server error' }),
     },
   },
   successCode: HTTP_RESPONSE.OK,

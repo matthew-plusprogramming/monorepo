@@ -51,6 +51,7 @@ import {
   loggingErrorMiddleware,
   loggingMiddleware,
 } from '@/middleware/logging.middleware';
+import { validateRouteParam } from '@/middleware/validateRouteParam.middleware';
 import { webhookAuthMiddleware } from '@/middleware/webhookAuth.middleware';
 import { initializeWebSocket } from '@/services/websocket.service';
 import { EnvironmentSchema } from '@/types/environment';
@@ -97,7 +98,8 @@ app.use(
 app.use(cookieParser());
 app.use(loggingMiddleware);
 app.use(ipRateLimitingMiddlewareRequestHandler);
-app.use(express.json());
+// AC2.6: Limit JSON body size to prevent oversized payloads reaching any endpoint
+app.use(express.json({ limit: '1mb' }));
 app.use(jsonErrorMiddleware);
 
 // CSRF protection: Set token cookie and validate on state-changing requests
@@ -114,7 +116,12 @@ app.get(
 );
 app.post('/register', registerRequestHandler);
 app.post('/login', loginRequestHandler);
-app.get('/user/:identifier', getUserRequestHandler);
+// AC4.3: Route parameter validation for :identifier
+app.get(
+  '/user/:identifier',
+  validateRouteParam('identifier'),
+  getUserRequestHandler,
+);
 
 // Dashboard authentication endpoints (AS-009)
 app.post(
@@ -123,9 +130,13 @@ app.post(
   dashboardLoginRequestHandler,
 );
 app.post('/api/auth/logout', dashboardLogoutRequestHandler);
-app.get('/api/auth/session', dashboardSessionMiddlewareRequestHandler, (req, res) => {
-  res.json({ authenticated: true });
-});
+app.get(
+  '/api/auth/session',
+  dashboardSessionMiddlewareRequestHandler,
+  (req, res) => {
+    res.json({ authenticated: true });
+  },
+);
 
 // Projects endpoints (AS-001)
 app.get(
@@ -133,8 +144,10 @@ app.get(
   dashboardSessionMiddlewareRequestHandler,
   listProjectsRequestHandler,
 );
+// AC4.3: All :id routes have validateRouteParam('id') for defense-in-depth
 app.get(
   '/api/projects/:id',
+  validateRouteParam('id'),
   dashboardSessionMiddlewareRequestHandler,
   getProjectRequestHandler,
 );
@@ -142,16 +155,19 @@ app.get(
 // Spec Groups endpoints (AS-003)
 app.get(
   '/api/spec-groups/:id',
+  validateRouteParam('id'),
   dashboardSessionMiddlewareRequestHandler,
   getSpecGroupRequestHandler,
 );
 app.post(
   '/api/spec-groups/:id/transition',
+  validateRouteParam('id'),
   dashboardSessionMiddlewareRequestHandler,
   transitionStateRequestHandler,
 );
 app.put(
   '/api/spec-groups/:id/flags',
+  validateRouteParam('id'),
   dashboardSessionMiddlewareRequestHandler,
   updateFlagsRequestHandler,
 );
@@ -159,6 +175,7 @@ app.put(
 // GitHub Issues endpoint (AS-004)
 app.get(
   '/api/projects/:id/github/issues',
+  validateRouteParam('id'),
   dashboardSessionMiddlewareRequestHandler,
   getGitHubIssuesRequestHandler,
 );
@@ -166,6 +183,7 @@ app.get(
 // GitHub Pull Requests endpoint (AS-005)
 app.get(
   '/api/projects/:id/github/pulls',
+  validateRouteParam('id'),
   dashboardSessionMiddlewareRequestHandler,
   getGitHubPRsRequestHandler,
 );
@@ -173,11 +191,13 @@ app.get(
 // Agent Dispatch endpoints (AS-006)
 app.post(
   '/api/spec-groups/:id/dispatch',
+  validateRouteParam('id'),
   dashboardSessionMiddlewareRequestHandler,
   dispatchAgentTaskRequestHandler,
 );
 app.get(
   '/api/agent-tasks/:id',
+  validateRouteParam('id'),
   dashboardSessionMiddlewareRequestHandler,
   getAgentTaskRequestHandler,
 );
@@ -185,16 +205,23 @@ app.get(
 // Agent Task Status endpoints (AS-007)
 // POST /api/agent-tasks/:id/status - Update task status (agent callback, webhook auth required)
 // Security fix: Added HMAC webhook authentication to prevent unauthorized status updates
-app.post('/api/agent-tasks/:id/status', webhookAuthMiddleware, updateAgentTaskStatusRequestHandler);
+app.post(
+  '/api/agent-tasks/:id/status',
+  validateRouteParam('id'),
+  webhookAuthMiddleware,
+  updateAgentTaskStatusRequestHandler,
+);
 // GET /api/agent-tasks/:id/status - Get task status (polling fallback, AC7.7)
 app.get(
   '/api/agent-tasks/:id/status',
+  validateRouteParam('id'),
   dashboardSessionMiddlewareRequestHandler,
   getAgentTaskStatusRequestHandler,
 );
 // GET /api/agent-tasks/:id/logs - Get task logs (AC7.4)
 app.get(
   '/api/agent-tasks/:id/logs',
+  validateRouteParam('id'),
   dashboardSessionMiddlewareRequestHandler,
   getAgentTaskLogsRequestHandler,
 );
@@ -210,7 +237,9 @@ Effect.runSync(initializeWebSocket(server, { path: '/ws/agent-status' }));
 
 server.listen(process.env.PORT, () => {
   console.log(`Server listening on port ${process.env.PORT}`);
-  console.log(`WebSocket available at ws://localhost:${process.env.PORT}/ws/agent-status`);
+  console.log(
+    `WebSocket available at ws://localhost:${process.env.PORT}/ws/agent-status`,
+  );
 });
 
 export { app, server };

@@ -19,6 +19,10 @@ const ConsoleLoggerService: LoggerServiceSchema = {
         console.info(...input);
       }
     }),
+  logWarn: (...input: ReadonlyArray<unknown>): Effect.Effect<void, never> =>
+    Effect.sync(() => {
+      console.warn(...input);
+    }),
 };
 
 export const ApplicationLoggerService = Layer.succeed(

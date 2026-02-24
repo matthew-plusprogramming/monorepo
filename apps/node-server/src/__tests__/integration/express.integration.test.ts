@@ -116,7 +116,7 @@ describe('heartbeat integration', () => {
     });
   });
 
-  it('surfaces EventBridge failures when user context is present', async () => {
+  it('returns generic error for EventBridge failures when user context is present (AC1.3)', async () => {
     // Arrange
     const app = await buildHeartbeatApp();
     const eventBridgeFake = getEventBridgeFake();
@@ -135,9 +135,9 @@ describe('heartbeat integration', () => {
     // Act
     const response = await request(app).get('/heartbeat');
 
-    // Assert
+    // Assert — AC1.3: InternalServerError mapper returns generic message
     expect(response.status).toBe(HTTP_RESPONSE.INTERNAL_SERVER_ERROR);
-    expect(response.text).toBe('Failed to publish heartbeat analytics event');
+    expect(response.text).toBe('Internal server error');
     expect(eventBridgeFake.calls).toHaveLength(1);
   });
 

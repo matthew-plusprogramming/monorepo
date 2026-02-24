@@ -1,6 +1,7 @@
 import { execSync } from 'node:child_process';
 import { resolve } from 'node:path';
 
+import { buildChildEnv } from '../../../scripts/utils/child-env.mjs';
 import { STACK_PREFIX } from '../src/constants';
 import { monorepoRootDir, packageRootDir } from '../src/location';
 
@@ -29,7 +30,8 @@ try {
     `node "${dotenvxRunner}" run -f "${envFile}" -- tofu init -migrate-state`,
     {
       stdio: 'inherit',
-      env: process.env,
+      // AC3.6: Use minimal env allowlist instead of full process.env
+      env: buildChildEnv(['ENV']),
     },
   );
 } catch (err) {

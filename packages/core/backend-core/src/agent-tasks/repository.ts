@@ -20,16 +20,53 @@ import { InternalServerError } from '@/types/errors/http.js';
 import { AgentTaskNotFoundError } from './errors.js';
 import {
   AGENT_TASK_TTL_SECONDS,
+  AgentAction,
   AgentTaskStatus,
+  LogLevel,
+  TaskPhase,
+  type AgentActionType,
   type AgentTask,
   type AgentTaskLogEntry,
   type AgentTaskRealtimeStatus,
   type AgentTaskStatusType,
   type AgentTaskStatusUpdateInput,
   type CreateAgentTaskInput,
+  type LogLevelType,
   type TaskPhaseType,
   type UpdateAgentTaskStatusInput,
 } from './types.js';
+
+/**
+ * Allowlist of valid agent task statuses (AC3.5).
+ * Derived from the AgentTaskStatus const object.
+ */
+const VALID_AGENT_TASK_STATUSES: readonly AgentTaskStatusType[] = Object.values(
+  AgentTaskStatus,
+) as AgentTaskStatusType[];
+
+/**
+ * Allowlist of valid agent task actions (AC3.7).
+ * Derived from the AgentAction const object.
+ */
+const VALID_AGENT_TASK_ACTIONS: readonly AgentActionType[] = Object.values(
+  AgentAction,
+) as AgentActionType[];
+
+/**
+ * Allowlist of valid task phases (AC3.8).
+ * Derived from the TaskPhase const object.
+ */
+const VALID_TASK_PHASES: readonly TaskPhaseType[] = Object.values(
+  TaskPhase,
+) as TaskPhaseType[];
+
+/**
+ * Allowlist of valid log levels (AC3.9).
+ * Derived from the LogLevel const object.
+ */
+const VALID_LOG_LEVELS: readonly LogLevelType[] = Object.values(
+  LogLevel,
+) as LogLevelType[];
 
 /**
  * Extended agent task with real-time status fields (AS-007).
@@ -95,7 +132,11 @@ export type AgentTaskRepositorySchema = {
   readonly addLogEntry: (
     taskId: string,
     logEntry: AgentTaskLogEntry,
-  ) => Effect.Effect<void, AgentTaskNotFoundError | InternalServerError, DynamoDbService>;
+  ) => Effect.Effect<
+    void,
+    AgentTaskNotFoundError | InternalServerError,
+    DynamoDbService
+  >;
 
   /**
    * Get logs for a task (AS-007 AC7.4).
@@ -139,7 +180,12 @@ const itemToAgentTask = (
   const id = item.id?.S;
   const specGroupId = item.specGroupId?.S;
   const action = item.action?.S;
-  const status = item.status?.S as AgentTaskStatusType | undefined;
+  const rawStatus = item.status?.S;
+  const status: AgentTaskStatusType | undefined =
+    rawStatus &&
+    VALID_AGENT_TASK_STATUSES.includes(rawStatus as AgentTaskStatusType)
+      ? (rawStatus as AgentTaskStatusType)
+      : undefined;
   const webhookUrl = item.webhookUrl?.S;
   const createdAt = item.createdAt?.S;
   const updatedAt = item.updatedAt?.S;
@@ -173,7 +219,9 @@ const itemToAgentTask = (
   const task: AgentTask = {
     id,
     specGroupId,
-    action: action as AgentTask['action'],
+    action: VALID_AGENT_TASK_ACTIONS.includes(action as AgentActionType)
+      ? (action as AgentActionType)
+      : (AgentAction.IMPLEMENT as AgentActionType),
     status,
     context,
     webhookUrl,
@@ -322,7 +370,10 @@ export const createAgentTaskRepository = (): AgentTaskRepositorySchema => ({
       const now = new Date().toISOString();
 
       // Build the update expression dynamically
-      const updateParts: string[] = ['#updatedAt = :updatedAt', '#status = :status'];
+      const updateParts: string[] = [
+        '#updatedAt = :updatedAt',
+        '#status = :status',
+      ];
       const expressionAttributeNames: Record<string, string> = {
         '#updatedAt': 'updatedAt',
         '#status': 'status',
@@ -429,7 +480,9 @@ export const createAgentTaskRepository = (): AgentTaskRepositorySchema => ({
       if (input.progress !== undefined) {
         updateParts.push('#progress = :progress');
         expressionAttributeNames['#progress'] = 'progress';
-        expressionAttributeValues[':progress'] = { N: input.progress.toString() };
+        expressionAttributeValues[':progress'] = {
+          N: input.progress.toString(),
+        };
       }
 
       if (input.message) {
@@ -487,8 +540,14 @@ export const createAgentTaskRepository = (): AgentTaskRepositorySchema => ({
 
       const realtimeStatus: AgentTaskRealtimeStatus = {
         taskId: input.taskId,
-        phase: (attrs.phase?.S ?? input.phase) as TaskPhaseType,
-        progress: attrs.progress?.N ? parseInt(attrs.progress.N, 10) : undefined,
+        phase: VALID_TASK_PHASES.includes(
+          (attrs.phase?.S ?? input.phase) as TaskPhaseType,
+        )
+          ? ((attrs.phase?.S ?? input.phase) as TaskPhaseType)
+          : input.phase,
+        progress: attrs.progress?.N
+          ? parseInt(attrs.progress.N, 10)
+          : undefined,
         message: attrs.phaseMessage?.S,
         updatedAt: attrs.updatedAt?.S ?? now,
       };
@@ -537,7 +596,11 @@ export const createAgentTaskRepository = (): AgentTaskRepositorySchema => ({
       const logs: AgentTaskLogEntry[] = (result.Items ?? [])
         .map((item) => ({
           timestamp: item.timestamp?.S ?? '',
-          level: (item.level?.S ?? 'info') as AgentTaskLogEntry['level'],
+          level: VALID_LOG_LEVELS.includes(
+            (item.level?.S ?? 'info') as LogLevelType,
+          )
+            ? ((item.level?.S ?? 'info') as LogLevelType)
+            : ('info' as LogLevelType),
           message: item.message?.S ?? '',
           metadata: item.metadata?.S ? JSON.parse(item.metadata.S) : undefined,
         }))
@@ -578,13 +641,13 @@ export const createAgentTaskRepository = (): AgentTaskRepositorySchema => ({
       const item = result.Item;
       const phase = item.phase?.S;
 
-      if (!phase) {
+      if (!phase || !VALID_TASK_PHASES.includes(phase as TaskPhaseType)) {
         return Option.none();
       }
 
       const status: AgentTaskRealtimeStatus = {
         taskId,
-        phase: phase as TaskPhaseType,
+        phase: phase as TaskPhaseType, // Safe: validated by VALID_TASK_PHASES check above
         progress: item.progress?.N ? parseInt(item.progress.N, 10) : undefined,
         message: item.phaseMessage?.S,
         updatedAt: item.updatedAt?.S ?? new Date().toISOString(),
@@ -597,7 +660,8 @@ export const createAgentTaskRepository = (): AgentTaskRepositorySchema => ({
 /**
  * Table name for agent task logs.
  */
-const LOGS_TABLE_NAME = process.env.AGENT_TASK_LOGS_TABLE_NAME ?? 'AgentTaskLogs';
+const LOGS_TABLE_NAME =
+  process.env.AGENT_TASK_LOGS_TABLE_NAME ?? 'AgentTaskLogs';
 
 /**
  * Internal helper to add a log entry.

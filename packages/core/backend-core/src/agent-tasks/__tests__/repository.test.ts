@@ -108,7 +108,11 @@ const createMockDynamoDbItem = (
 
 describe('AgentTaskRepository', () => {
   let dynamoDbFake: DynamoDbServiceFake;
-  let repoLayer: Layer.Layer<AgentTaskRepository | DynamoDbService, never, never>;
+  let repoLayer: Layer.Layer<
+    AgentTaskRepository | DynamoDbService,
+    never,
+    never
+  >;
 
   beforeEach(() => {
     dynamoDbFake = createDynamoDbServiceFake();
@@ -118,7 +122,9 @@ describe('AgentTaskRepository', () => {
   });
 
   const withRepo = <R, E>(
-    use: (repo: AgentTaskRepositorySchema) => Effect.Effect<R, E, DynamoDbService>,
+    use: (
+      repo: AgentTaskRepositorySchema,
+    ) => Effect.Effect<R, E, DynamoDbService>,
   ): Promise<R> =>
     Effect.runPromise(
       Effect.gen(function* () {
@@ -177,9 +183,9 @@ describe('AgentTaskRepository', () => {
       dynamoDbFake.queueFailure('getItem', new Error('DynamoDB error'));
 
       // Act & Assert
-      await expect(
-        withRepo((repo) => repo.getById('some-id')),
-      ).rejects.toThrow('Failed to get agent task');
+      await expect(withRepo((repo) => repo.getById('some-id'))).rejects.toThrow(
+        'Failed to get agent task',
+      );
     });
   });
 
@@ -317,6 +323,156 @@ describe('AgentTaskRepository', () => {
           }),
         ),
       ).rejects.toThrow('Agent task with id non-existent-id not found');
+    });
+  });
+
+  describe('status field allowlist validation (AS-003 AC3.5)', () => {
+    it('should accept valid status "pending" (AC3.5)', async () => {
+      // Arrange
+      const item = createMockDynamoDbItem({
+        status: AgentTaskStatus.PENDING,
+      });
+      dynamoDbFake.queueSuccess('getItem', wrapGetItemOutput(item));
+
+      // Act
+      const result = await withRepo((repo) => repo.getById('test-task-id'));
+
+      // Assert
+      expect(Option.isSome(result)).toBe(true);
+      if (Option.isSome(result)) {
+        expect(result.value.status).toBe('pending');
+      }
+    });
+
+    it('should accept valid status "dispatched" (AC3.5)', async () => {
+      // Arrange
+      const item = createMockDynamoDbItem({
+        status: AgentTaskStatus.DISPATCHED,
+        dispatchedAt: '2024-01-01T12:00:00.000Z',
+      });
+      dynamoDbFake.queueSuccess('getItem', wrapGetItemOutput(item));
+
+      // Act
+      const result = await withRepo((repo) => repo.getById('test-task-id'));
+
+      // Assert
+      expect(Option.isSome(result)).toBe(true);
+      if (Option.isSome(result)) {
+        expect(result.value.status).toBe('dispatched');
+      }
+    });
+
+    it('should accept valid status "failed" (AC3.5)', async () => {
+      // Arrange
+      const item = createMockDynamoDbItem({
+        status: AgentTaskStatus.FAILED,
+        failedAt: '2024-01-01T12:00:00.000Z',
+      });
+      dynamoDbFake.queueSuccess('getItem', wrapGetItemOutput(item));
+
+      // Act
+      const result = await withRepo((repo) => repo.getById('test-task-id'));
+
+      // Assert
+      expect(Option.isSome(result)).toBe(true);
+      if (Option.isSome(result)) {
+        expect(result.value.status).toBe('failed');
+      }
+    });
+
+    it('should return None for invalid status value (AC3.5, AC3.10)', async () => {
+      // Arrange - construct raw item with invalid status
+      const item: Record<string, AttributeValue> = {
+        id: { S: 'test-task-id' },
+        specGroupId: { S: 'test-spec-group-id' },
+        action: { S: 'implement' },
+        status: { S: 'BOGUS_STATUS' },
+        webhookUrl: { S: 'http://localhost:3001/webhook' },
+        createdAt: { S: '2024-01-01T00:00:00.000Z' },
+        updatedAt: { S: '2024-01-01T00:00:00.000Z' },
+        ttl: { N: '9999999999' },
+        context: {
+          M: {
+            specGroupId: { S: 'test-spec-group-id' },
+            triggeredBy: { S: 'test-user' },
+            triggeredAt: { S: '2024-01-01T00:00:00.000Z' },
+          },
+        },
+      };
+      dynamoDbFake.queueSuccess('getItem', wrapGetItemOutput(item));
+
+      // Act
+      const result = await withRepo((repo) => repo.getById('test-task-id'));
+
+      // Assert - invalid status causes record rejection (None)
+      expect(Option.isNone(result)).toBe(true);
+    });
+  });
+
+  describe('action field allowlist validation (AS-003 AC3.7)', () => {
+    it('should accept valid action "implement" (AC3.7)', async () => {
+      // Arrange
+      const item = createMockDynamoDbItem({
+        action: AgentAction.IMPLEMENT,
+      });
+      dynamoDbFake.queueSuccess('getItem', wrapGetItemOutput(item));
+
+      // Act
+      const result = await withRepo((repo) => repo.getById('test-task-id'));
+
+      // Assert
+      expect(Option.isSome(result)).toBe(true);
+      if (Option.isSome(result)) {
+        expect(result.value.action).toBe('implement');
+      }
+    });
+
+    it('should accept valid action "test" (AC3.7)', async () => {
+      // Arrange
+      const item = createMockDynamoDbItem({
+        action: AgentAction.TEST,
+      });
+      dynamoDbFake.queueSuccess('getItem', wrapGetItemOutput(item));
+
+      // Act
+      const result = await withRepo((repo) => repo.getById('test-task-id'));
+
+      // Assert
+      expect(Option.isSome(result)).toBe(true);
+      if (Option.isSome(result)) {
+        expect(result.value.action).toBe('test');
+      }
+    });
+
+    it('should fall back to "implement" for invalid action value (AC3.7, AC3.10)', async () => {
+      // Arrange - raw item with invalid action
+      const item: Record<string, AttributeValue> = {
+        id: { S: 'test-task-id' },
+        specGroupId: { S: 'test-spec-group-id' },
+        action: { S: 'INVALID_ACTION' },
+        status: { S: 'pending' },
+        webhookUrl: { S: 'http://localhost:3001/webhook' },
+        createdAt: { S: '2024-01-01T00:00:00.000Z' },
+        updatedAt: { S: '2024-01-01T00:00:00.000Z' },
+        ttl: { N: '9999999999' },
+        context: {
+          M: {
+            specGroupId: { S: 'test-spec-group-id' },
+            triggeredBy: { S: 'test-user' },
+            triggeredAt: { S: '2024-01-01T00:00:00.000Z' },
+          },
+        },
+      };
+      dynamoDbFake.queueSuccess('getItem', wrapGetItemOutput(item));
+
+      // Act
+      const result = await withRepo((repo) => repo.getById('test-task-id'));
+
+      // Assert - invalid action should fall back to 'implement'
+      expect(Option.isSome(result)).toBe(true);
+      if (Option.isSome(result)) {
+        expect(result.value.action).toBe('implement');
+      }
     });
   });
 });

@@ -2,6 +2,8 @@ import { spawn } from 'node:child_process';
 import { existsSync, statSync } from 'node:fs';
 import path from 'node:path';
 
+import { buildChildEnv } from '../../../scripts/utils/child-env.mjs';
+import { processLimiter } from '../../../scripts/utils/process-limiter.mjs';
 import { packageRootDir } from '../src/location';
 
 const main = async (): Promise<void> => {
@@ -23,20 +25,27 @@ const main = async (): Promise<void> => {
     '.',
   ];
 
+  // AC5.6: Wrap async subprocess calls with acquire/release (try/finally)
   console.info(`Installing argon2 in ${distDir}...`);
-  await new Promise<void>((resolve, reject) => {
-    const child = spawn(npmCmd, npmCmdArgs, {
-      cwd: distDir,
-      stdio: 'inherit',
-      env: { ...process.env },
-    });
+  await processLimiter.acquire();
+  try {
+    await new Promise<void>((resolve, reject) => {
+      const child = spawn(npmCmd, npmCmdArgs, {
+        cwd: distDir,
+        stdio: 'inherit',
+        // AC3.9: Use minimal env allowlist instead of full process.env
+        env: buildChildEnv() as NodeJS.ProcessEnv,
+      });
 
-    child.on('error', reject);
-    child.on('close', (code) => {
-      if (code === 0) resolve();
-      else reject(new Error(`❌ npm install exited with code ${code}`));
+      child.on('error', reject);
+      child.on('close', (code) => {
+        if (code === 0) resolve();
+        else reject(new Error(`npm install exited with code ${code}`));
+      });
     });
-  });
+  } finally {
+    processLimiter.release();
+  }
 
   const rmCmd = 'rm';
   const rmCmdArgs = [
@@ -49,19 +58,25 @@ const main = async (): Promise<void> => {
   console.info(
     `Removing package.json and package-lock.json from ${distDir}...`,
   );
-  await new Promise<void>((resolve, reject) => {
-    const child = spawn(rmCmd, rmCmdArgs, {
-      cwd: distDir,
-      stdio: 'inherit',
-      env: { ...process.env },
-    });
+  await processLimiter.acquire();
+  try {
+    await new Promise<void>((resolve, reject) => {
+      const child = spawn(rmCmd, rmCmdArgs, {
+        cwd: distDir,
+        stdio: 'inherit',
+        // AC3.9: Use minimal env allowlist instead of full process.env
+        env: buildChildEnv() as NodeJS.ProcessEnv,
+      });
 
-    child.on('error', reject);
-    child.on('close', (code) => {
-      if (code === 0) resolve();
-      else reject(new Error(`❌ rm exited with code ${code}`));
+      child.on('error', reject);
+      child.on('close', (code) => {
+        if (code === 0) resolve();
+        else reject(new Error(`rm exited with code ${code}`));
+      });
     });
-  });
+  } finally {
+    processLimiter.release();
+  }
 
   console.info('✅ argon2 installed successfully in dist.');
 };

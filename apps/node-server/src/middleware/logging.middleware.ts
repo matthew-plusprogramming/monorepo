@@ -2,31 +2,7 @@ import { randomUUID } from 'crypto';
 
 import type { ErrorRequestHandler, RequestHandler } from 'express';
 
-/**
- * Fields that should be redacted from logs to prevent PII exposure.
- * These patterns match common sensitive field names.
- */
-const SENSITIVE_FIELDS = new Set([
-  'password',
-  'token',
-  'authorization',
-  'cookie',
-  'secret',
-  'apikey',
-  'api_key',
-  'api-key',
-  'accesstoken',
-  'access_token',
-  'access-token',
-  'refreshtoken',
-  'refresh_token',
-  'refresh-token',
-  'bearer',
-  'ssn',
-  'creditcard',
-  'credit_card',
-  'credit-card',
-]);
+import { SENSITIVE_KEYS } from '@packages/backend-core';
 
 /**
  * The header name for request IDs. If a request comes with this header,
@@ -65,7 +41,7 @@ export const redactSensitiveFields = (
   for (const [key, value] of Object.entries(obj)) {
     const lowerKey = key.toLowerCase();
 
-    if (SENSITIVE_FIELDS.has(lowerKey)) {
+    if (SENSITIVE_KEYS.has(lowerKey)) {
       result[key] = '[REDACTED]';
     } else if (value && typeof value === 'object' && !Array.isArray(value)) {
       result[key] = redactSensitiveFields(value as Record<string, unknown>);

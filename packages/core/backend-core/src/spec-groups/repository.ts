@@ -31,6 +31,14 @@ import {
 } from './types.js';
 
 /**
+ * Allowlist of valid spec group states (AC3.4).
+ * Derived from the SpecGroupState const object.
+ */
+const VALID_SPEC_GROUP_STATES: readonly SpecGroupStateType[] = Object.values(
+  SpecGroupState,
+) as SpecGroupStateType[];
+
+/**
  * Schema for the SpecGroupRepository service.
  */
 export type SpecGroupRepositorySchema = {
@@ -89,7 +97,11 @@ const itemToSpecGroup = (
 ): SpecGroup | undefined => {
   const id = item.id?.S;
   const name = item.name?.S;
-  const state = item.state?.S as SpecGroupStateType | undefined;
+  const rawState = item.state?.S;
+  const state: SpecGroupStateType | undefined =
+    rawState && VALID_SPEC_GROUP_STATES.includes(rawState as SpecGroupStateType)
+      ? (rawState as SpecGroupStateType)
+      : undefined;
   const createdAt = item.createdAt?.S;
   const updatedAt = item.updatedAt?.S;
   const createdBy = item.createdBy?.S;
@@ -107,8 +119,16 @@ const itemToSpecGroup = (
         timestamp: m.timestamp?.S ?? '',
         actor: m.actor?.S ?? '',
         action: 'STATE_TRANSITION' as const,
-        fromState: m.fromState?.S as SpecGroupStateType,
-        toState: m.toState?.S as SpecGroupStateType,
+        fromState: VALID_SPEC_GROUP_STATES.includes(
+          m.fromState?.S as SpecGroupStateType,
+        )
+          ? (m.fromState!.S as SpecGroupStateType)
+          : (SpecGroupState.DRAFT as SpecGroupStateType),
+        toState: VALID_SPEC_GROUP_STATES.includes(
+          m.toState?.S as SpecGroupStateType,
+        )
+          ? (m.toState!.S as SpecGroupStateType)
+          : (SpecGroupState.DRAFT as SpecGroupStateType),
       };
       if (m.reason?.S) {
         return { ...baseEntry, reason: m.reason.S };

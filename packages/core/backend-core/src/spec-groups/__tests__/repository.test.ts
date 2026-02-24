@@ -93,7 +93,11 @@ const createMockDynamoDbItem = (
 
 describe('SpecGroupRepository', () => {
   let dynamoDbFake: DynamoDbServiceFake;
-  let repoLayer: Layer.Layer<SpecGroupRepository | DynamoDbService, never, never>;
+  let repoLayer: Layer.Layer<
+    SpecGroupRepository | DynamoDbService,
+    never,
+    never
+  >;
 
   beforeEach(() => {
     dynamoDbFake = createDynamoDbServiceFake();
@@ -103,7 +107,9 @@ describe('SpecGroupRepository', () => {
   });
 
   const withRepo = <R, E>(
-    use: (repo: SpecGroupRepositorySchema) => Effect.Effect<R, E, DynamoDbService>,
+    use: (
+      repo: SpecGroupRepositorySchema,
+    ) => Effect.Effect<R, E, DynamoDbService>,
   ): Promise<R> =>
     Effect.runPromise(
       Effect.gen(function* () {
@@ -162,9 +168,9 @@ describe('SpecGroupRepository', () => {
       dynamoDbFake.queueFailure('getItem', new Error('DynamoDB error'));
 
       // Act & Assert
-      await expect(
-        withRepo((repo) => repo.getById('some-id')),
-      ).rejects.toThrow('Failed to get spec group');
+      await expect(withRepo((repo) => repo.getById('some-id'))).rejects.toThrow(
+        'Failed to get spec group',
+      );
     });
   });
 
@@ -410,6 +416,210 @@ describe('SpecGroupRepository', () => {
           repo.updateFlags('non-existent-id', { sectionsCompleted: true }),
         ),
       ).rejects.toThrow('Spec group with id non-existent-id not found');
+    });
+  });
+
+  describe('state field allowlist validation (AS-003 AC3.4)', () => {
+    it('should accept valid state DRAFT (AC3.4)', async () => {
+      // Arrange
+      const item = createMockDynamoDbItem({ state: SpecGroupState.DRAFT });
+      dynamoDbFake.queueSuccess('getItem', wrapGetItemOutput(item));
+
+      // Act
+      const result = await withRepo((repo) =>
+        repo.getById('test-spec-group-id'),
+      );
+
+      // Assert
+      expect(Option.isSome(result)).toBe(true);
+      if (Option.isSome(result)) {
+        expect(result.value.state).toBe('DRAFT');
+      }
+    });
+
+    it('should accept valid state REVIEWED (AC3.4)', async () => {
+      // Arrange
+      const item = createMockDynamoDbItem({ state: SpecGroupState.REVIEWED });
+      dynamoDbFake.queueSuccess('getItem', wrapGetItemOutput(item));
+
+      // Act
+      const result = await withRepo((repo) =>
+        repo.getById('test-spec-group-id'),
+      );
+
+      // Assert
+      expect(Option.isSome(result)).toBe(true);
+      if (Option.isSome(result)) {
+        expect(result.value.state).toBe('REVIEWED');
+      }
+    });
+
+    it('should accept valid state MERGED (AC3.4)', async () => {
+      // Arrange
+      const item = createMockDynamoDbItem({ state: SpecGroupState.MERGED });
+      dynamoDbFake.queueSuccess('getItem', wrapGetItemOutput(item));
+
+      // Act
+      const result = await withRepo((repo) =>
+        repo.getById('test-spec-group-id'),
+      );
+
+      // Assert
+      expect(Option.isSome(result)).toBe(true);
+      if (Option.isSome(result)) {
+        expect(result.value.state).toBe('MERGED');
+      }
+    });
+
+    it('should return None for invalid state value (AC3.4, AC3.10)', async () => {
+      // Arrange - construct raw DynamoDB item with invalid state
+      const item: Record<string, AttributeValue> = {
+        id: { S: 'test-id' },
+        name: { S: 'Test Group' },
+        state: { S: 'INVALID_STATE' },
+        decisionLog: { L: [] },
+        createdAt: { S: '2024-01-01T00:00:00.000Z' },
+        updatedAt: { S: '2024-01-01T00:00:00.000Z' },
+        createdBy: { S: 'test-user' },
+        sectionsCompleted: { BOOL: false },
+        allGatesPassed: { BOOL: false },
+        prMerged: { BOOL: false },
+      };
+      dynamoDbFake.queueSuccess('getItem', wrapGetItemOutput(item));
+
+      // Act
+      const result = await withRepo((repo) => repo.getById('test-id'));
+
+      // Assert - invalid state should cause record to be rejected (None)
+      expect(Option.isNone(result)).toBe(true);
+    });
+
+    it('should return None for empty state string (AC3.4)', async () => {
+      // Arrange
+      const item: Record<string, AttributeValue> = {
+        id: { S: 'test-id' },
+        name: { S: 'Test Group' },
+        state: { S: '' },
+        decisionLog: { L: [] },
+        createdAt: { S: '2024-01-01T00:00:00.000Z' },
+        updatedAt: { S: '2024-01-01T00:00:00.000Z' },
+        createdBy: { S: 'test-user' },
+        sectionsCompleted: { BOOL: false },
+        allGatesPassed: { BOOL: false },
+        prMerged: { BOOL: false },
+      };
+      dynamoDbFake.queueSuccess('getItem', wrapGetItemOutput(item));
+
+      // Act
+      const result = await withRepo((repo) => repo.getById('test-id'));
+
+      // Assert
+      expect(Option.isNone(result)).toBe(true);
+    });
+
+    it('should validate decision log fromState with allowlist (AC3.4)', async () => {
+      // Arrange - decision log with valid fromState and toState
+      const item = createMockDynamoDbItem({
+        state: SpecGroupState.REVIEWED,
+        decisionLog: [
+          {
+            timestamp: '2024-01-01T12:00:00.000Z',
+            actor: 'test-user',
+            action: 'STATE_TRANSITION' as const,
+            fromState: SpecGroupState.DRAFT,
+            toState: SpecGroupState.REVIEWED,
+          },
+        ],
+      });
+      dynamoDbFake.queueSuccess('getItem', wrapGetItemOutput(item));
+
+      // Act
+      const result = await withRepo((repo) =>
+        repo.getById('test-spec-group-id'),
+      );
+
+      // Assert
+      expect(Option.isSome(result)).toBe(true);
+      if (Option.isSome(result)) {
+        expect(result.value.decisionLog[0]?.fromState).toBe('DRAFT');
+        expect(result.value.decisionLog[0]?.toState).toBe('REVIEWED');
+      }
+    });
+
+    it('should fall back to DRAFT for invalid decision log fromState (AC3.4)', async () => {
+      // Arrange - decision log entry with invalid fromState
+      const item: Record<string, AttributeValue> = {
+        id: { S: 'test-id' },
+        name: { S: 'Test Group' },
+        state: { S: SpecGroupState.REVIEWED },
+        decisionLog: {
+          L: [
+            {
+              M: {
+                timestamp: { S: '2024-01-01T12:00:00.000Z' },
+                actor: { S: 'test-user' },
+                action: { S: 'STATE_TRANSITION' },
+                fromState: { S: 'BOGUS_STATE' },
+                toState: { S: SpecGroupState.REVIEWED },
+              },
+            },
+          ],
+        },
+        createdAt: { S: '2024-01-01T00:00:00.000Z' },
+        updatedAt: { S: '2024-01-01T00:00:00.000Z' },
+        createdBy: { S: 'test-user' },
+        sectionsCompleted: { BOOL: false },
+        allGatesPassed: { BOOL: false },
+        prMerged: { BOOL: false },
+      };
+      dynamoDbFake.queueSuccess('getItem', wrapGetItemOutput(item));
+
+      // Act
+      const result = await withRepo((repo) => repo.getById('test-id'));
+
+      // Assert - invalid fromState should fall back to DRAFT
+      expect(Option.isSome(result)).toBe(true);
+      if (Option.isSome(result)) {
+        expect(result.value.decisionLog[0]?.fromState).toBe('DRAFT');
+      }
+    });
+
+    it('should fall back to DRAFT for invalid decision log toState (AC3.4)', async () => {
+      // Arrange - decision log entry with invalid toState
+      const item: Record<string, AttributeValue> = {
+        id: { S: 'test-id' },
+        name: { S: 'Test Group' },
+        state: { S: SpecGroupState.REVIEWED },
+        decisionLog: {
+          L: [
+            {
+              M: {
+                timestamp: { S: '2024-01-01T12:00:00.000Z' },
+                actor: { S: 'test-user' },
+                action: { S: 'STATE_TRANSITION' },
+                fromState: { S: SpecGroupState.DRAFT },
+                toState: { S: 'NONEXISTENT_STATE' },
+              },
+            },
+          ],
+        },
+        createdAt: { S: '2024-01-01T00:00:00.000Z' },
+        updatedAt: { S: '2024-01-01T00:00:00.000Z' },
+        createdBy: { S: 'test-user' },
+        sectionsCompleted: { BOOL: false },
+        allGatesPassed: { BOOL: false },
+        prMerged: { BOOL: false },
+      };
+      dynamoDbFake.queueSuccess('getItem', wrapGetItemOutput(item));
+
+      // Act
+      const result = await withRepo((repo) => repo.getById('test-id'));
+
+      // Assert - invalid toState should fall back to DRAFT
+      expect(Option.isSome(result)).toBe(true);
+      if (Option.isSome(result)) {
+        expect(result.value.decisionLog[0]?.toState).toBe('DRAFT');
+      }
     });
   });
 });

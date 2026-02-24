@@ -5,14 +5,7 @@ import {
   setBundledRuntime,
 } from '@packages/backend-core/testing';
 import { Effect, Layer } from 'effect';
-import {
-  afterEach,
-  beforeEach,
-  describe,
-  expect,
-  it,
-  vi,
-} from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { makeCdkOutputsStub } from '@/__tests__/stubs/cdkOutputs';
 
@@ -26,6 +19,7 @@ const loggerState = vi.hoisted(() => ({
   logs: [] as LogEntry[],
   errors: [] as LogEntry[],
   debugs: [] as LogEntry[],
+  warns: [] as LogEntry[],
 }));
 
 // Mock @/clients/cdkOutputs
@@ -65,6 +59,10 @@ vi.mock('@/services/logger.service', async () => {
       Effect.sync(() => {
         loggerState.debugs.push(input);
       }),
+    logWarn: (...input: unknown[]) =>
+      Effect.sync(() => {
+        loggerState.warns.push(input);
+      }),
   };
 
   return {
@@ -76,6 +74,7 @@ const resetLoggerState = (): void => {
   loggerState.logs.length = 0;
   loggerState.errors.length = 0;
   loggerState.debugs.length = 0;
+  loggerState.warns.length = 0;
 };
 
 describe('health.handler', () => {
@@ -308,7 +307,10 @@ describe('health.handler', () => {
       const { determineOverallStatus } =
         await import('@/handlers/health.handler');
 
-      const result = determineOverallStatus({ status: 'healthy', latencyMs: 5 });
+      const result = determineOverallStatus({
+        status: 'healthy',
+        latencyMs: 5,
+      });
 
       expect(result).toBe('healthy');
     });

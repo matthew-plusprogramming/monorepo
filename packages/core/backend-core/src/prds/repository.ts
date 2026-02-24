@@ -19,7 +19,11 @@ import { DynamoDbService } from '@/services/dynamodb.js';
 import { GoogleDocsService } from '@/services/google-docs.js';
 import { InternalServerError } from '@/types/errors/http.js';
 
-import { GoogleDocsApiError, PrdConflictError, PrdNotFoundError } from './errors.js';
+import {
+  GoogleDocsApiError,
+  PrdConflictError,
+  PrdNotFoundError,
+} from './errors.js';
 import {
   PrdSyncStatus,
   type CreatePrdInput,
@@ -27,6 +31,14 @@ import {
   type PrdSyncStatusType,
   type SyncPrdResult,
 } from './types.js';
+
+/**
+ * Allowlist of valid PRD sync statuses (AC3.6).
+ * Derived from the PrdSyncStatus const object.
+ */
+const VALID_PRD_SYNC_STATUSES: readonly PrdSyncStatusType[] = Object.values(
+  PrdSyncStatus,
+) as PrdSyncStatusType[];
 
 /**
  * Schema for the PrdRepository service.
@@ -53,7 +65,11 @@ export type PrdRepositorySchema = {
    */
   readonly create: (
     input: CreatePrdInput,
-  ) => Effect.Effect<Prd, InternalServerError | PrdConflictError, DynamoDbService>;
+  ) => Effect.Effect<
+    Prd,
+    InternalServerError | PrdConflictError,
+    DynamoDbService
+  >;
 
   /**
    * Sync a PRD from Google Docs (AC2.3, AC2.4, AC2.5).
@@ -113,7 +129,12 @@ const itemToPrd = (item: Record<string, AttributeValue>): Prd | undefined => {
   const createdAt = item.createdAt?.S;
   const updatedAt = item.updatedAt?.S;
   const createdBy = item.createdBy?.S;
-  const syncStatus = item.syncStatus?.S as PrdSyncStatusType | undefined;
+  const rawSyncStatus = item.syncStatus?.S;
+  const syncStatus: PrdSyncStatusType | undefined =
+    rawSyncStatus &&
+    VALID_PRD_SYNC_STATUSES.includes(rawSyncStatus as PrdSyncStatusType)
+      ? (rawSyncStatus as PrdSyncStatusType)
+      : undefined;
 
   if (
     !id ||
@@ -329,7 +350,9 @@ export const createPrdRepository = (): PrdRepositorySchema => ({
       yield* updateSyncStatusInternal(dynamodb, prdId, PrdSyncStatus.SYNCING);
 
       // 3. Fetch content from Google Docs (AC2.3)
-      const docContent = yield* googleDocs.getDocContent(currentPrd.googleDocId);
+      const docContent = yield* googleDocs.getDocContent(
+        currentPrd.googleDocId,
+      );
 
       // 4. Compute new content hash for version comparison (AC2.5)
       const newContentHash = computeContentHash(docContent.content);
@@ -338,7 +361,9 @@ export const createPrdRepository = (): PrdRepositorySchema => ({
 
       // 5. Update the PRD with new content (AC2.4)
       const now = new Date().toISOString();
-      const newVersion = contentChanged ? currentPrd.version + 1 : currentPrd.version;
+      const newVersion = contentChanged
+        ? currentPrd.version + 1
+        : currentPrd.version;
 
       const updateInput: UpdateItemCommandInput = {
         TableName: TABLE_NAME,

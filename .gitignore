@@ -202,6 +202,9 @@ $RECYCLE.BIN/
 # Ephemeral agent state (active context and scratch files)
 agents/ephemeral/*
 
+# Claude session state (changes every session, not meaningful to track)
+.claude/context/session.json
+
 # Local git worktrees
 .worktrees/
 

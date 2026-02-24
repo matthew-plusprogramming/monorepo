@@ -13,7 +13,11 @@ import type {
 import { Context, Effect, Option } from 'effect';
 
 import { DynamoDbService } from '../services/dynamodb.js';
-import type { SpecGroup } from '../spec-groups/types.js';
+import {
+  SpecGroupState,
+  type SpecGroup,
+  type SpecGroupStateType,
+} from '../spec-groups/types.js';
 import { InternalServerError } from '../types/errors/http.js';
 
 import { ProjectNotFoundError } from './errors.js';
@@ -55,6 +59,24 @@ const SPEC_GROUPS_TABLE_NAME =
 const PROJECTS_TABLE_NAME = process.env.PROJECTS_TABLE_NAME ?? 'Projects';
 
 /**
+ * Allowlist of valid project statuses (AC3.1).
+ * Derived from the Project['status'] type definition.
+ */
+const VALID_PROJECT_STATUSES: readonly Project['status'][] = [
+  'active',
+  'archived',
+  'draft',
+] as const;
+
+/**
+ * Allowlist of valid spec group states (AC3.4).
+ * Derived from the SpecGroupState const object.
+ */
+const VALID_SPEC_GROUP_STATES: readonly SpecGroupStateType[] = Object.values(
+  SpecGroupState,
+) as SpecGroupStateType[];
+
+/**
  * Convert a DynamoDB item to a SpecGroup (for aggregation).
  */
 const itemToSpecGroup = (
@@ -62,7 +84,11 @@ const itemToSpecGroup = (
 ): SpecGroup | undefined => {
   const id = item.id?.S;
   const name = item.name?.S;
-  const state = item.state?.S as SpecGroup['state'] | undefined;
+  const rawState = item.state?.S;
+  const state: SpecGroupStateType | undefined =
+    rawState && VALID_SPEC_GROUP_STATES.includes(rawState as SpecGroupStateType)
+      ? (rawState as SpecGroupStateType)
+      : undefined;
   const createdAt = item.createdAt?.S;
   const updatedAt = item.updatedAt?.S;
   const createdBy = item.createdBy?.S;
@@ -105,7 +131,9 @@ const itemToProject = (
     id,
     name,
     description: item.description?.S,
-    status: (item.status?.S as Project['status']) ?? 'active',
+    status: VALID_PROJECT_STATUSES.includes(item.status?.S as Project['status'])
+      ? (item.status!.S as Project['status'])
+      : 'active',
     health: 'green',
     specGroupCount: 0,
     specGroupSummary: {
@@ -189,7 +217,9 @@ const aggregateByProject = (
 
     result.push({
       id: projectId,
-      name: projectId.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()),
+      name: projectId
+        .replace(/-/g, ' ')
+        .replace(/\b\w/g, (c) => c.toUpperCase()),
       status: 'active',
       health,
       specGroupCount: sgs.length,
@@ -239,9 +269,9 @@ export const createProjectRepository = (): ProjectRepositorySchema => ({
       };
 
       const projects: Project[] = [];
-      const projectsResultEither = yield* dynamodb.scan(projectsScanInput).pipe(
-        Effect.either,
-      );
+      const projectsResultEither = yield* dynamodb
+        .scan(projectsScanInput)
+        .pipe(Effect.either);
 
       if (projectsResultEither._tag === 'Right') {
         for (const item of projectsResultEither.right.Items ?? []) {

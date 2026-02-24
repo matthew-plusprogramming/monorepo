@@ -61,7 +61,9 @@ const validateWebhookSignature = (
       Buffer.from(expectedSignature),
     );
 
-    return valid ? { valid: true } : { valid: false, error: 'Invalid signature' };
+    return valid
+      ? { valid: true }
+      : { valid: false, error: 'Invalid signature' };
   } catch {
     return { valid: false, error: 'Signature validation failed' };
   }
@@ -71,7 +73,10 @@ const validateWebhookSignature = (
  * Creates a webhook signature for outgoing requests.
  * Used by the webhook dispatch service when calling agent containers.
  */
-export const createWebhookSignature = (body: string, secret: string): string => {
+export const createWebhookSignature = (
+  body: string,
+  secret: string,
+): string => {
   const timestamp = Date.now().toString();
   const payload = `${timestamp}:${body}`;
   const signature = crypto
@@ -81,8 +86,15 @@ export const createWebhookSignature = (body: string, secret: string): string => 
   return `${timestamp}:${signature}`;
 };
 
+// AC2.5: Configurable payload size limit with 1MB default
+const MAX_WEBHOOK_PAYLOAD_BYTES = parseInt(
+  process.env.MAX_WEBHOOK_PAYLOAD_BYTES ?? '1048576',
+  10,
+);
+
 /**
  * Middleware to authenticate webhook requests from agents.
+ * AC2.1, AC2.4: Checks Content-Length before HMAC verification to prevent CPU-based DoS.
  */
 export const webhookAuthMiddleware: RequestHandler = (req, res, next) => {
   const webhookSecret = process.env.WEBHOOK_SECRET;
@@ -93,6 +105,23 @@ export const webhookAuthMiddleware: RequestHandler = (req, res, next) => {
     return;
   }
 
+  // AC2.1, AC2.2, AC2.4: Check Content-Length BEFORE HMAC verification
+  const contentLength = req.headers['content-length'];
+  if (contentLength) {
+    const bodySize = parseInt(contentLength, 10);
+    if (!isNaN(bodySize) && bodySize > MAX_WEBHOOK_PAYLOAD_BYTES) {
+      res.status(413).json({ error: 'Payload too large' });
+      return;
+    }
+  }
+
+  // AC2.3: When Content-Length is missing, check actual body size
+  const rawBody = JSON.stringify(req.body);
+  if (Buffer.byteLength(rawBody, 'utf8') > MAX_WEBHOOK_PAYLOAD_BYTES) {
+    res.status(413).json({ error: 'Payload too large' });
+    return;
+  }
+
   const signatureHeader = req.headers['x-webhook-signature'];
 
   if (!signatureHeader || typeof signatureHeader !== 'string') {
@@ -100,11 +129,11 @@ export const webhookAuthMiddleware: RequestHandler = (req, res, next) => {
     return;
   }
 
-  // Get raw body for signature verification
-  // Note: body-parser must be configured to preserve raw body
-  const rawBody = JSON.stringify(req.body);
-
-  const result = validateWebhookSignature(rawBody, signatureHeader, webhookSecret);
+  const result = validateWebhookSignature(
+    rawBody,
+    signatureHeader,
+    webhookSecret,
+  );
 
   if (!result.valid) {
     console.warn('[WebhookAuth] Invalid signature:', result.error);

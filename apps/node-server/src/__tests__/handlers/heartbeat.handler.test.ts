@@ -167,9 +167,9 @@ const surfacesFailedEntriesWhenAuthenticated = async (): Promise<void> => {
   const { response, eventBridgeFake, loggerFake } =
     await runHeartbeatScenario(scenario);
 
-  // Assert
+  // Assert — AC1.3: InternalServerError mapper returns generic message
   expect(response.status).toBe(HTTP_RESPONSE.INTERNAL_SERVER_ERROR);
-  expect(response.text).toBe('Failed to publish heartbeat analytics event');
+  expect(response.text).toBe('Internal server error');
   expect(eventBridgeFake.calls).toHaveLength(1);
   expect(loggerFake.entries.logs).toHaveLength(0);
   const errorArgs = loggerFake.entries.errors[0] ?? [];
@@ -192,9 +192,9 @@ const surfacesPublishErrorsWhenAuthenticated = async (): Promise<void> => {
   // Act
   const { response, loggerFake } = await runHeartbeatScenario(scenario);
 
-  // Assert
+  // Assert — AC1.3: InternalServerError mapper returns generic message
   expect(response.status).toBe(HTTP_RESPONSE.INTERNAL_SERVER_ERROR);
-  expect(response.text).toBe('Failed to publish heartbeat analytics event');
+  expect(response.text).toBe('Internal server error');
   expect(loggerFake.entries.errors).toHaveLength(1);
 };
 
@@ -214,9 +214,9 @@ const surfacesFailuresWithoutEntryDetails = async (): Promise<void> => {
   // Act
   const { response, loggerFake } = await runHeartbeatScenario(scenario);
 
-  // Assert
+  // Assert — AC1.3: InternalServerError mapper returns generic message
   expect(response.status).toBe(HTTP_RESPONSE.INTERNAL_SERVER_ERROR);
-  expect(response.text).toBe('Failed to publish heartbeat analytics event');
+  expect(response.text).toBe('Internal server error');
   const errorArgs = loggerFake.entries.errors[0] ?? [];
   const firstError = errorArgs[0];
   expect(firstError).toBeInstanceOf(Error);
@@ -248,9 +248,9 @@ const surfacesFailuresWithFallbackDetails = async (): Promise<void> => {
   // Act
   const { response, loggerFake } = await runHeartbeatScenario(scenario);
 
-  // Assert
+  // Assert — AC1.3: InternalServerError mapper returns generic message
   expect(response.status).toBe(HTTP_RESPONSE.INTERNAL_SERVER_ERROR);
-  expect(response.text).toBe('Failed to publish heartbeat analytics event');
+  expect(response.text).toBe('Internal server error');
   const errorArgs = loggerFake.entries.errors[0] ?? [];
   const firstError = errorArgs[0];
   expect(firstError).toBeInstanceOf(Error);
@@ -276,9 +276,9 @@ const surfacesNonErrorPublishFailures = async (): Promise<void> => {
   // Act
   const { response, loggerFake } = await runHeartbeatScenario(scenario);
 
-  // Assert
+  // Assert — AC1.3: InternalServerError mapper returns generic message
   expect(response.status).toBe(HTTP_RESPONSE.INTERNAL_SERVER_ERROR);
-  expect(response.text).toBe('Failed to publish heartbeat analytics event');
+  expect(response.text).toBe('Internal server error');
   const errorArgs = loggerFake.entries.errors[0] ?? [];
   const firstError = errorArgs[0];
   expect(firstError).toBeInstanceOf(Error);
@@ -481,23 +481,23 @@ describe('heartbeatRequestHandler', () => {
     fallsBackToUnknownEnvAndVersion,
   );
   it(
-    'does not obfuscate when EventBridge reports failed entries',
+    'returns generic error when EventBridge reports failed entries (AC1.3)',
     surfacesFailedEntriesWhenAuthenticated,
   );
   it(
-    'does not obfuscate when publishing heartbeat event errors',
+    'returns generic error when publishing heartbeat event errors (AC1.3)',
     surfacesPublishErrorsWhenAuthenticated,
   );
   it(
-    'does not obfuscate when EventBridge reports failed entries with no detail',
+    'returns generic error when EventBridge reports failed entries with no detail (AC1.3)',
     surfacesFailuresWithoutEntryDetails,
   );
   it(
-    'does not obfuscate when EventBridge uses fallback code/message values',
+    'returns generic error when EventBridge uses fallback code/message values (AC1.3)',
     surfacesFailuresWithFallbackDetails,
   );
   it(
-    'does not obfuscate when EventBridge rejects with a non-error cause',
+    'returns generic error when EventBridge rejects with a non-error cause (AC1.3)',
     surfacesNonErrorPublishFailures,
   );
   it(

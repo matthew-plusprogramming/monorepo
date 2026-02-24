@@ -9,3 +9,4 @@ export * from '@/services/google-docs.js';
 export * from '@/services/logger.js';
 export * from '@/types/index.js';
 export * from '@/spec-groups/index.js';
+export * from '@/constants/sensitive-keys.js';

@@ -10,6 +10,8 @@ import {
 } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 
+import { buildChildEnv } from '../../../scripts/utils/child-env.mjs';
+
 import {
   listLambdaArtifactDefinitions,
   resolveSourceDistPath,
@@ -74,12 +76,7 @@ const countFiles = (root: string): number => {
 };
 
 const copyClientWebsiteAssets = (): WebsiteAssetsManifestEntry => {
-  const sourceDir = resolve(
-    monorepoRootDir,
-    'apps',
-    'client-website',
-    'out',
-  );
+  const sourceDir = resolve(monorepoRootDir, 'apps', 'client-website', 'out');
   const destinationDir = resolve(distDirectory, 'client-website');
 
   if (!existsSync(sourceDir)) {
@@ -117,9 +114,11 @@ const copyClientWebsiteAssets = (): WebsiteAssetsManifestEntry => {
 };
 
 const createZipArchive = (sourceDir: string, zipPath: string): void => {
+  // AC3.8: Use minimal env allowlist for spawnSync
   const zipResult = spawnSync('zip', ['-rq', zipPath, '.'], {
     cwd: sourceDir,
     stdio: 'ignore',
+    env: buildChildEnv(),
   });
   const zipError = zipResult.error as NodeJS.ErrnoException | undefined;
   const commandNotFound =
@@ -131,6 +130,7 @@ const createZipArchive = (sourceDir: string, zipPath: string): void => {
 
   if (commandNotFound && process.platform === 'win32') {
     const escapedDestination = zipPath.replace(/"/g, '""');
+    // AC3.8: Use minimal env allowlist for spawnSync
     const powershellResult = spawnSync(
       'powershell.exe',
       [
@@ -142,6 +142,7 @@ const createZipArchive = (sourceDir: string, zipPath: string): void => {
       {
         cwd: sourceDir,
         stdio: 'ignore',
+        env: buildChildEnv(),
       },
     );
 

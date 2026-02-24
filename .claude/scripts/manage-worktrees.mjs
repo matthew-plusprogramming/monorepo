@@ -11,6 +11,7 @@ import {
 import { basename, join, resolve, sep } from 'node:path';
 import { parseFrontMatter } from './spec-utils.mjs';
 import { syncEnvKeys } from './sync-worktree-env-keys.mjs';
+import { selectiveCopyClaudeDir } from './selective-claude-copy.mjs';
 
 const USAGE = `Usage: node .claude/scripts/manage-worktrees.mjs <command> [options]
 
@@ -448,6 +449,17 @@ const ensureWorktrees = async (repoRoot) => {
       });
     }
     created.push(id);
+
+    // AC4.1: Selectively copy .claude/ operational items into the new worktree
+    const sourceClaudeDir = join(repoRoot, '.claude');
+    const targetClaudeDir = join(worktreePath, '.claude');
+    const copyResult = selectiveCopyClaudeDir(sourceClaudeDir, targetClaudeDir);
+    if (copyResult.copied.length > 0) {
+      console.log(`  .claude/ selective copy: ${copyResult.copied.length} items copied`);
+    }
+    if (copyResult.skipped.length > 0) {
+      console.log(`  .claude/ selective copy: ${copyResult.skipped.length} items skipped (not found)`);
+    }
   }
 
   console.log(

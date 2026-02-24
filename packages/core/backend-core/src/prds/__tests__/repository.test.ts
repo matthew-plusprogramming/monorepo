@@ -96,7 +96,11 @@ const createMockDynamoDbItem = (
 describe('PrdRepository', () => {
   let dynamoDbFake: DynamoDbServiceFake;
   let googleDocsFake: GoogleDocsServiceFake;
-  let repoLayer: Layer.Layer<PrdRepository | DynamoDbService | GoogleDocsService, never, never>;
+  let repoLayer: Layer.Layer<
+    PrdRepository | DynamoDbService | GoogleDocsService,
+    never,
+    never
+  >;
 
   beforeEach(() => {
     dynamoDbFake = createDynamoDbServiceFake();
@@ -110,7 +114,9 @@ describe('PrdRepository', () => {
   });
 
   const withRepo = <R, E>(
-    use: (repo: PrdRepositorySchema) => Effect.Effect<R, E, DynamoDbService | GoogleDocsService>,
+    use: (
+      repo: PrdRepositorySchema,
+    ) => Effect.Effect<R, E, DynamoDbService | GoogleDocsService>,
   ): Promise<R> =>
     Effect.runPromise(
       Effect.gen(function* () {
@@ -169,9 +175,9 @@ describe('PrdRepository', () => {
       dynamoDbFake.queueFailure('getItem', new Error('DynamoDB error'));
 
       // Act & Assert
-      await expect(
-        withRepo((repo) => repo.getById('some-id')),
-      ).rejects.toThrow('Failed to get PRD');
+      await expect(withRepo((repo) => repo.getById('some-id'))).rejects.toThrow(
+        'Failed to get PRD',
+      );
     });
   });
 
@@ -232,20 +238,26 @@ describe('PrdRepository', () => {
 
     it('fetches content from Google Docs API (AC2.3)', async () => {
       // Arrange
-      const item = createMockDynamoDbItem({ id: 'prd-1', googleDocId: 'doc-123' });
+      const item = createMockDynamoDbItem({
+        id: 'prd-1',
+        googleDocId: 'doc-123',
+      });
       dynamoDbFake.queueSuccess('getItem', wrapGetItemOutput(item));
       dynamoDbFake.queueSuccess('updateItem', wrapUpdateItemOutput(item)); // For syncing status
       googleDocsFake.queueSuccess('doc-123', {
         title: 'Updated Title',
         content: 'New content from Google Docs',
       });
-      dynamoDbFake.queueSuccess('updateItem', wrapUpdateItemOutput({
-        ...item,
-        title: { S: 'Updated Title' },
-        content: { S: 'New content from Google Docs' },
-        version: { N: '2' },
-        syncStatus: { S: PrdSyncStatus.SYNCED },
-      }));
+      dynamoDbFake.queueSuccess(
+        'updateItem',
+        wrapUpdateItemOutput({
+          ...item,
+          title: { S: 'Updated Title' },
+          content: { S: 'New content from Google Docs' },
+          version: { N: '2' },
+          syncStatus: { S: PrdSyncStatus.SYNCED },
+        }),
+      );
 
       // Act
       const result = await withRepo((repo) => repo.sync('prd-1'));
@@ -281,7 +293,10 @@ describe('PrdRepository', () => {
         version: 2,
         syncStatus: PrdSyncStatus.SYNCED,
       });
-      dynamoDbFake.queueSuccess('updateItem', wrapUpdateItemOutput(updatedItem));
+      dynamoDbFake.queueSuccess(
+        'updateItem',
+        wrapUpdateItemOutput(updatedItem),
+      );
 
       // Act
       const result = await withRepo((repo) => repo.sync('prd-1'));
@@ -315,7 +330,10 @@ describe('PrdRepository', () => {
         version: 5, // Version should NOT change
         syncStatus: PrdSyncStatus.SYNCED,
       });
-      dynamoDbFake.queueSuccess('updateItem', wrapUpdateItemOutput(updatedItem));
+      dynamoDbFake.queueSuccess(
+        'updateItem',
+        wrapUpdateItemOutput(updatedItem),
+      );
 
       // Act
       const result = await withRepo((repo) => repo.sync('prd-1'));
@@ -352,7 +370,10 @@ describe('PrdRepository', () => {
         version: 4, // Version incremented
         syncStatus: PrdSyncStatus.SYNCED,
       });
-      dynamoDbFake.queueSuccess('updateItem', wrapUpdateItemOutput(updatedItem));
+      dynamoDbFake.queueSuccess(
+        'updateItem',
+        wrapUpdateItemOutput(updatedItem),
+      );
 
       // Act
       const result = await withRepo((repo) => repo.sync('prd-1'));
@@ -365,7 +386,10 @@ describe('PrdRepository', () => {
 
     it('propagates Google Docs API errors (AC2.6)', async () => {
       // Arrange
-      const item = createMockDynamoDbItem({ id: 'prd-1', googleDocId: 'doc-123' });
+      const item = createMockDynamoDbItem({
+        id: 'prd-1',
+        googleDocId: 'doc-123',
+      });
       dynamoDbFake.queueSuccess('getItem', wrapGetItemOutput(item));
       dynamoDbFake.queueSuccess('updateItem', wrapUpdateItemOutput(item)); // For syncing status
       googleDocsFake.queueFailure(
@@ -386,7 +410,10 @@ describe('PrdRepository', () => {
 
     it('marks retryable errors appropriately (AC2.6)', async () => {
       // Arrange
-      const item = createMockDynamoDbItem({ id: 'prd-1', googleDocId: 'doc-123' });
+      const item = createMockDynamoDbItem({
+        id: 'prd-1',
+        googleDocId: 'doc-123',
+      });
       dynamoDbFake.queueSuccess('getItem', wrapGetItemOutput(item));
       dynamoDbFake.queueSuccess('updateItem', wrapUpdateItemOutput(item)); // For syncing status
 
@@ -417,11 +444,18 @@ describe('PrdRepository', () => {
         syncStatus: PrdSyncStatus.ERROR,
         lastSyncError: 'API quota exceeded',
       });
-      dynamoDbFake.queueSuccess('updateItem', wrapUpdateItemOutput(updatedItem));
+      dynamoDbFake.queueSuccess(
+        'updateItem',
+        wrapUpdateItemOutput(updatedItem),
+      );
 
       // Act
       const result = await withRepo((repo) =>
-        repo.updateSyncStatus('prd-1', PrdSyncStatus.ERROR, 'API quota exceeded'),
+        repo.updateSyncStatus(
+          'prd-1',
+          PrdSyncStatus.ERROR,
+          'API quota exceeded',
+        ),
       );
 
       // Assert
@@ -441,6 +475,125 @@ describe('PrdRepository', () => {
           repo.updateSyncStatus('non-existent-id', PrdSyncStatus.ERROR),
         ),
       ).rejects.toThrow('PRD with id non-existent-id not found');
+    });
+  });
+
+  describe('syncStatus field allowlist validation (AS-003 AC3.6)', () => {
+    it('should accept valid syncStatus SYNCED (AC3.6)', async () => {
+      // Arrange
+      const item = createMockDynamoDbItem({
+        syncStatus: PrdSyncStatus.SYNCED,
+      });
+      dynamoDbFake.queueSuccess('getItem', wrapGetItemOutput(item));
+
+      // Act
+      const result = await withRepo((repo) => repo.getById('test-prd-id'));
+
+      // Assert
+      expect(Option.isSome(result)).toBe(true);
+      if (Option.isSome(result)) {
+        expect(result.value.syncStatus).toBe('SYNCED');
+      }
+    });
+
+    it('should accept valid syncStatus ERROR (AC3.6)', async () => {
+      // Arrange
+      const item = createMockDynamoDbItem({
+        syncStatus: PrdSyncStatus.ERROR,
+        lastSyncError: 'Some error',
+      });
+      dynamoDbFake.queueSuccess('getItem', wrapGetItemOutput(item));
+
+      // Act
+      const result = await withRepo((repo) => repo.getById('test-prd-id'));
+
+      // Assert
+      expect(Option.isSome(result)).toBe(true);
+      if (Option.isSome(result)) {
+        expect(result.value.syncStatus).toBe('ERROR');
+      }
+    });
+
+    it('should accept valid syncStatus NEVER_SYNCED (AC3.6)', async () => {
+      // Arrange
+      const item = createMockDynamoDbItem({
+        syncStatus: PrdSyncStatus.NEVER_SYNCED,
+      });
+      dynamoDbFake.queueSuccess('getItem', wrapGetItemOutput(item));
+
+      // Act
+      const result = await withRepo((repo) => repo.getById('test-prd-id'));
+
+      // Assert
+      expect(Option.isSome(result)).toBe(true);
+      if (Option.isSome(result)) {
+        expect(result.value.syncStatus).toBe('NEVER_SYNCED');
+      }
+    });
+
+    it('should accept valid syncStatus SYNCING (AC3.6)', async () => {
+      // Arrange
+      const item = createMockDynamoDbItem({
+        syncStatus: PrdSyncStatus.SYNCING,
+      });
+      dynamoDbFake.queueSuccess('getItem', wrapGetItemOutput(item));
+
+      // Act
+      const result = await withRepo((repo) => repo.getById('test-prd-id'));
+
+      // Assert
+      expect(Option.isSome(result)).toBe(true);
+      if (Option.isSome(result)) {
+        expect(result.value.syncStatus).toBe('SYNCING');
+      }
+    });
+
+    it('should return None for invalid syncStatus value (AC3.6, AC3.10)', async () => {
+      // Arrange - construct raw item with invalid syncStatus
+      const item: Record<string, AttributeValue> = {
+        id: { S: 'test-prd-id' },
+        googleDocId: { S: 'test-google-doc-id' },
+        title: { S: 'Test PRD' },
+        content: { S: 'Test content' },
+        contentHash: { S: computeContentHash('Test content') },
+        version: { N: '1' },
+        lastSyncedAt: { S: '2024-01-01T00:00:00.000Z' },
+        createdAt: { S: '2024-01-01T00:00:00.000Z' },
+        updatedAt: { S: '2024-01-01T00:00:00.000Z' },
+        createdBy: { S: 'test-user' },
+        syncStatus: { S: 'INVALID_SYNC_STATUS' },
+      };
+      dynamoDbFake.queueSuccess('getItem', wrapGetItemOutput(item));
+
+      // Act
+      const result = await withRepo((repo) => repo.getById('test-prd-id'));
+
+      // Assert - invalid syncStatus causes record rejection (None)
+      expect(Option.isNone(result)).toBe(true);
+    });
+
+    it('should return None for missing syncStatus field (AC3.6)', async () => {
+      // Arrange - construct raw item without syncStatus
+      const item: Record<string, AttributeValue> = {
+        id: { S: 'test-prd-id' },
+        googleDocId: { S: 'test-google-doc-id' },
+        title: { S: 'Test PRD' },
+        content: { S: 'Test content' },
+        contentHash: { S: computeContentHash('Test content') },
+        version: { N: '1' },
+        lastSyncedAt: { S: '2024-01-01T00:00:00.000Z' },
+        createdAt: { S: '2024-01-01T00:00:00.000Z' },
+        updatedAt: { S: '2024-01-01T00:00:00.000Z' },
+        createdBy: { S: 'test-user' },
+        // syncStatus intentionally omitted
+      };
+      dynamoDbFake.queueSuccess('getItem', wrapGetItemOutput(item));
+
+      // Act
+      const result = await withRepo((repo) => repo.getById('test-prd-id'));
+
+      // Assert - missing syncStatus causes record rejection (None)
+      expect(Option.isNone(result)).toBe(true);
     });
   });
 });
