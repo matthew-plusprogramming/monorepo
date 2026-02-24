@@ -175,9 +175,10 @@ The wrapper:
 
 ### PostToolUse Hooks (Bash)
 
-| Hook ID                | Script                     | Purpose                                                      |
-| ---------------------- | -------------------------- | ------------------------------------------------------------ |
-| `journal-commit-check` | `journal-commit-check.mjs` | Block commits when journal entry is required but not created |
+| Hook ID                | Script                     | Purpose                                                            |
+| ---------------------- | -------------------------- | ------------------------------------------------------------------ |
+| `journal-commit-check` | `journal-commit-check.mjs` | Warn on commits when journal entry is required but not created     |
+| `dirty-manifest-check` | `dirty-manifest-check.mjs` | Warn on commits when spec-group manifests have uncommitted changes |
 
 ### SubagentStop Hooks
 
@@ -424,13 +425,25 @@ All validation scripts are located in `.claude/scripts/`.
 
 ### journal-commit-check.mjs
 
-**Purpose**: Block git commits when a journal entry is required but not created.
+**Purpose**: Warn on git commits when a journal entry is required but not created.
 
 **Behavior**:
 
 1. Reads `session.json` phase checkpoint
-2. If `journal_required: true` and `journal_created` is not true, warns and blocks
+2. If `journal_required: true` and `journal_created` is not true, prints warning to stderr and exits with code 2
 3. Only triggers on Bash commands containing `git commit`
+4. Exit 2 causes PostToolUse to show the warning to Claude (soft warning, not a hard block)
+
+### dirty-manifest-check.mjs
+
+**Purpose**: Warn on git commits when spec-group manifest.json files have uncommitted changes.
+
+**Behavior**:
+
+1. Runs `git status --porcelain` scoped to `.claude/specs/groups/**/manifest.json`
+2. If dirty manifests found, prints warning to stderr and exits with code 2
+3. Only triggers on Bash commands containing `git commit`
+4. Exit 2 causes PostToolUse to show the warning to Claude (soft warning, not a hard block)
 
 ### convergence-gate-reminder.mjs
 

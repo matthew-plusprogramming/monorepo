@@ -1,6 +1,7 @@
 ---
 domain: agents
 tags: [agents, delegation, prompts]
+last_reviewed: 2026-02-14
 ---
 
 # Subagent Design Best Practices

@@ -1,0 +1,8 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "vote-type.schema.json",
+  "title": "VoteType",
+  "description": "Vote types for deliberation participation",
+  "type": "string",
+  "enum": ["approve", "approve-with-concerns", "reject", "abstain"]
+}

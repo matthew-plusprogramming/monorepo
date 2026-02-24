@@ -5,7 +5,7 @@ tags:
   - typescript
   - style
   - safety
-last_reviewed: 2025-12-22
+last_reviewed: 2026-02-14
 ---
 
 # TypeScript Best Practices

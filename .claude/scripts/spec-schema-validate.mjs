@@ -66,9 +66,34 @@ function parseFrontmatter(content) {
   let currentKey = null;
   let currentValue = [];
   let inArray = false;
+  let inBracketedArray = false;
+  let bracketedArrayContent = '';
 
   for (const line of yamlContent.split('\n')) {
-    // Handle array items
+    // Handle multi-line bracketed array collection (prettier format)
+    // e.g.:
+    //   requirements_refs:
+    //     [
+    //       REQ-SEC-014,
+    //       REQ-SEC-015,
+    //     ]
+    if (inBracketedArray) {
+      bracketedArrayContent += ' ' + line.trim();
+      if (line.trim().endsWith(']')) {
+        // End of bracketed array -- parse it
+        const inner = bracketedArrayContent.replace(/^\s*\[/, '').replace(/\]\s*$/, '');
+        fields[currentKey] = inner
+          .split(',')
+          .map((s) => s.trim())
+          .filter((s) => s);
+        inBracketedArray = false;
+        bracketedArrayContent = '';
+        inArray = false;
+      }
+      continue;
+    }
+
+    // Handle array items (YAML list format: - item)
     if (line.match(/^\s*-\s/)) {
       if (inArray && currentKey) {
         const value = line.replace(/^\s*-\s*/, '').trim();
@@ -83,6 +108,24 @@ function parseFrontmatter(content) {
           fields[currentKey].push(value);
         }
       }
+      continue;
+    }
+
+    // Check if this is the start of a multi-line bracketed array (indented "[")
+    if (inArray && currentKey && line.trim() === '[') {
+      inBracketedArray = true;
+      bracketedArrayContent = '[';
+      continue;
+    }
+
+    // Check if this is a single-line indented bracketed array: "  [item1, item2]"
+    if (inArray && currentKey && line.trim().startsWith('[') && line.trim().endsWith(']')) {
+      const arrayContent = line.trim().slice(1, -1);
+      fields[currentKey] = arrayContent
+        .split(',')
+        .map((s) => s.trim())
+        .filter((s) => s);
+      inArray = false;
       continue;
     }
 

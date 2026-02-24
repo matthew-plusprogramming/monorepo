@@ -3,11 +3,18 @@
   "title": "AtomicSpec",
   "description": "An independently testable, deployable, and reversible unit of work",
   "type": "object",
-  "required": ["id", "title", "requirements_refs", "description", "acceptance_criteria", "atomicity_justification"],
+  "required": [
+    "id",
+    "title",
+    "requirements_refs",
+    "description",
+    "acceptance_criteria",
+    "atomicity_justification"
+  ],
   "properties": {
     "id": {
       "type": "string",
-      "pattern": "^as-[0-9]{3}-[a-z0-9-]+$",
+      "pattern": "^as-[0-9]{3}[a-z]?-[a-z0-9-]+$",
       "description": "Unique identifier (as-001-<slug>)"
     },
     "title": {
@@ -62,11 +69,23 @@
         "independently_reviewable": { "type": "string" },
         "independently_reversible": { "type": "string" }
       },
-      "required": ["independently_testable", "independently_deployable", "independently_reviewable", "independently_reversible"]
+      "required": [
+        "independently_testable",
+        "independently_deployable",
+        "independently_reviewable",
+        "independently_reversible"
+      ]
     },
     "status": {
       "type": "string",
-      "enum": ["pending", "implementing", "implemented", "tested", "verified"],
+      "enum": [
+        "pending",
+        "implementing",
+        "implemented",
+        "tested",
+        "verified",
+        "superseded"
+      ],
       "default": "pending"
     },
     "implementation_evidence": {

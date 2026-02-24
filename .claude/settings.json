@@ -2,17 +2,6 @@
   "hooks": {
     "PostToolUse": [
       {
-        "matcher": "Read",
-        "hooks": [
-          {
-            "_source": "metaclaude",
-            "_id": "superseded-artifact-warn",
-            "type": "command",
-            "command": "cd \"$CLAUDE_PROJECT_DIR\" && node .claude/scripts/hook-wrapper.mjs '.claude/specs/**/*.md' 'node .claude/scripts/superseded-artifact-warn.mjs {{file}}'"
-          }
-        ]
-      },
-      {
         "matcher": "Bash",
         "hooks": [
           {
@@ -20,6 +9,23 @@
             "_id": "journal-commit-check",
             "type": "command",
             "command": "cd \"$CLAUDE_PROJECT_DIR\" && node .claude/scripts/journal-commit-check.mjs"
+          },
+          {
+            "_source": "metaclaude",
+            "_id": "dirty-manifest-check",
+            "type": "command",
+            "command": "cd \"$CLAUDE_PROJECT_DIR\" && node .claude/scripts/dirty-manifest-check.mjs"
+          }
+        ]
+      },
+      {
+        "matcher": "Read",
+        "hooks": [
+          {
+            "_source": "metaclaude",
+            "_id": "superseded-artifact-warn",
+            "type": "command",
+            "command": "cd \"$CLAUDE_PROJECT_DIR\" && node .claude/scripts/hook-wrapper.mjs '.claude/specs/**/*.md' 'node .claude/scripts/superseded-artifact-warn.mjs {{file}}'"
           }
         ]
       },

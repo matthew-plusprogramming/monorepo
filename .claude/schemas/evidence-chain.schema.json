@@ -1,0 +1,31 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "evidence-chain.schema.json",
+  "title": "EvidenceChain",
+  "description": "Links tool outputs to positions in deliberations",
+  "type": "object",
+  "required": ["tool_output_id", "citation_type", "excerpt"],
+  "properties": {
+    "tool_output_id": {
+      "type": "string",
+      "description": "Reference to tool output file (e.g., .claude/tool-outputs/{id}.json)"
+    },
+    "citation_type": {
+      "type": "string",
+      "enum": ["supports", "contradicts", "context"],
+      "description": "How this evidence relates to the position"
+    },
+    "excerpt": {
+      "type": "string",
+      "description": "Relevant excerpt from tool output"
+    },
+    "line_range": {
+      "type": "object",
+      "properties": {
+        "start": { "type": "integer" },
+        "end": { "type": "integer" }
+      },
+      "description": "Optional line range in source file"
+    }
+  }
+}

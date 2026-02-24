@@ -1,6 +1,7 @@
 ---
 domain: specs
 tags: [specs, atomicity, acceptance-criteria]
+last_reviewed: 2026-02-14
 ---
 
 # Spec Authoring Best Practices

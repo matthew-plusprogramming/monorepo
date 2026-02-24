@@ -1,5 +1,5 @@
 ---
-last_reviewed: 2026-01-07
+last_reviewed: 2026-02-14
 ---
 
 # Project Brief
@@ -27,7 +27,7 @@ Opinionated TypeScript monorepo: Express 5 server (optionally packaged for AWS L
 
 ## Project Stage
 
-Planning; initial scaffolding exists across app, packages, and CDKTF. Skills and subagents are integrated into the development workflow.
+Active Development; substantial implementation across 4 apps (node-server with Express handlers/middleware/services/tests, admin-portal and client-website as Next.js apps, analytics-lambda), 3 shared packages (configs, core, utils), and CDK infrastructure. Skills and subagents are integrated into the development workflow.
 
 ## Success Criteria
 

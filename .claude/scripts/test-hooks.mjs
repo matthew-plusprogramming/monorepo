@@ -569,26 +569,10 @@ function phase3PostToolUseHooks(settings) {
   // --- Session State Validate ---
   const sessionScript = resolve(SCRIPTS_DIR, 'session-validate.mjs');
   if (existsSync(sessionScript)) {
-    phaseTotal++;
-    const sessionFile = resolve(CLAUDE_DIR, 'context', 'session.json');
-    if (existsSync(sessionFile)) {
-      const result = spawnSync('sh', ['-c', `node ${sessionScript}`], {
-        encoding: 'utf-8',
-        timeout: 30000,
-        cwd: ROOT,
-      });
-      if (result.status === 0) {
-        pass('session-state-validate: session.json -> exit 0');
-        phasePassed++;
-      } else {
-        // Session might be invalid at test time -- that's OK, the script ran
-        pass('session-state-validate: session.json -> exit non-zero (validation ran)');
-        phasePassed++;
-      }
-    } else {
-      skip('session-state-validate', 'session.json not found');
-      phaseSkipped++;
-    }
+    testDirect('session-state-validate', sessionScript, 'valid-session.json', 0,
+      'valid-session.json -> exit 0');
+    testDirect('session-state-validate', sessionScript, 'invalid-session-missing-history.json', 1,
+      'invalid-session-missing-history.json -> exit 1 (missing history)');
   }
 
   // --- Spec-Manifest Sync ---

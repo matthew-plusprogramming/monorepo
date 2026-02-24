@@ -3,18 +3,19 @@
 /**
  * Journal Commit Check Hook
  *
- * PostToolUse hook that checks if a git commit is being made without
- * creating a required journal entry.
+ * PostToolUse hook that warns when git commit runs while a required
+ * journal entry has not been created.
  *
  * This hook:
  * 1. Reads the Bash command from stdin (JSON format from Claude Code hooks)
  * 2. Checks if the command contains 'git commit'
  * 3. If so, reads .claude/context/session.json
- * 4. If journal_required is true and journal_created is not true, blocks the commit
+ * 4. If journal_required is true and journal_created is not true, prints
+ *    warning to stderr and exits with code 2
  *
  * Exit codes:
- *   0 - Success (not a git commit, or journal requirements met)
- *   1 - Failure (journal required but not created, or processing error)
+ *   0 - No issues (non-commit command, or journal not required/already created)
+ *   2 - Warning: journal entry required but not created (stderr shown to Claude)
  *
  * Usage:
  *   Triggered automatically as a PostToolUse hook for Bash commands
@@ -116,16 +117,16 @@ async function main() {
     const stdinContent = await readStdin();
 
     if (!stdinContent.trim()) {
-      console.error('Error: No input provided to journal-commit-check hook');
-      process.exit(1);
+      // No input — exit silently
+      process.exit(0);
     }
 
     let inputData;
     try {
       inputData = JSON.parse(stdinContent);
     } catch (e) {
-      console.error(`Error: Invalid JSON input to journal-commit-check hook: ${e.message}`);
-      process.exit(1);
+      // Invalid JSON — exit silently
+      process.exit(0);
     }
 
     // Extract command from tool_input
@@ -143,30 +144,33 @@ async function main() {
     const status = checkJournalStatus(claudeDir);
 
     if (status.shouldWarn) {
-      console.error('');
-      console.error('========================================');
-      console.error('WARNING: Journal Entry Not Created');
-      console.error('========================================');
-      console.error('');
-      console.error('A journal entry is required for this workflow but has not been created.');
-      console.error('');
-      console.error(`Workflow: ${status.workflow}`);
-      console.error(`Current phase: ${status.phase}`);
-      console.error('');
-      console.error('Please create a journal entry before committing:');
-      console.error('  1. Create journal entry in .claude/journal/entries/');
-      console.error('  2. Run: node .claude/scripts/session-checkpoint.mjs journal-created <path>');
-      console.error('');
-      console.error('Blocking commit until journal entry is created.');
-      console.error('========================================');
-      console.error('');
-      process.exit(1);
+      // Print warning to stderr
+      process.stderr.write('\n');
+      process.stderr.write('========================================\n');
+      process.stderr.write('WARNING: Journal Entry Not Created\n');
+      process.stderr.write('========================================\n');
+      process.stderr.write('\n');
+      process.stderr.write('A journal entry is required for this workflow but has not been created.\n');
+      process.stderr.write('\n');
+      process.stderr.write(`Workflow: ${status.workflow}\n`);
+      process.stderr.write(`Current phase: ${status.phase}\n`);
+      process.stderr.write('\n');
+      process.stderr.write('Please create a journal entry before committing:\n');
+      process.stderr.write('  1. Create journal entry in .claude/journal/entries/\n');
+      process.stderr.write('  2. Run: node .claude/scripts/session-checkpoint.mjs journal-created <path>\n');
+      process.stderr.write('\n');
+      process.stderr.write('========================================\n');
+      process.stderr.write('\n');
+
+      // Exit 2 so PostToolUse shows stderr to Claude as a warning
+      process.exit(2);
     }
 
     process.exit(0);
   } catch (err) {
-    console.error(`Error in journal-commit-check hook: ${err.message}`);
-    process.exit(1);
+    process.stderr.write(`Error in journal-commit-check hook: ${err.message}\n`);
+    // Don't block on hook errors — exit cleanly
+    process.exit(0);
   }
 }
 

@@ -1,5 +1,5 @@
 ---
-last_reviewed: 2026-01-07
+last_reviewed: 2026-02-14
 domain: architecture
 tags: [design, principles, patterns]
 ---

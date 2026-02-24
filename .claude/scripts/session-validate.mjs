@@ -46,7 +46,7 @@ function findClaudeDir() {
 }
 
 const CLAUDE_DIR = findClaudeDir();
-const SESSION_PATH = join(CLAUDE_DIR, 'context', 'session.json');
+const SESSION_PATH = process.argv[2] || join(CLAUDE_DIR, 'context', 'session.json');
 const SCHEMA_PATH = join(CLAUDE_DIR, 'specs', 'schema', 'session.schema.json');
 
 /**

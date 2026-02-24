@@ -1,3 +1,7 @@
+---
+last_reviewed: 2026-02-14
+---
+
 # Skill Event Emission Pattern
 
 Skills emit lifecycle events to enable dashboard integration and workflow automation.

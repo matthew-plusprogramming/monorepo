@@ -64,10 +64,31 @@ function parseFrontmatter(content) {
 }
 
 /**
+ * Files that should be skipped by spec validation.
+ * These are non-spec markdown files that live in the specs directory.
+ */
+const SKIP_PATTERNS = [
+  /enforcement-report\.md$/,
+  /investigation-report\.md$/,
+  /requirements\.md$/,
+];
+
+/**
+ * Non-spec document types identified by frontmatter `type` field.
+ * These files get frontmatter validation only (no section checks).
+ */
+const NON_SPEC_TYPES = ['enforcement-report', 'requirements', 'investigation-report'];
+
+/**
  * Validate a single spec file.
  * Returns object with errors and warnings arrays.
  */
 function validateSpecFile(filePath) {
+  // Skip non-spec files entirely based on filename
+  if (SKIP_PATTERNS.some(pattern => pattern.test(filePath))) {
+    return { errors: [], warnings: [] };
+  }
+
   const errors = [];
   const warnings = [];
 
@@ -92,11 +113,18 @@ function validateSpecFile(filePath) {
     }
   }
 
+  // Skip section validation for non-spec document types (e.g., enforcement reports, requirements)
+  // These files live under .claude/specs/ but are not specs themselves.
+  if (frontmatter.type && NON_SPEC_TYPES.includes(frontmatter.type)) {
+    // Only frontmatter fields are validated for non-spec types; sections are not required
+    return { errors, warnings };
+  }
+
   // Validate status is a known value
   // Top-level specs use: draft, review, approved, implementing, complete, archived
   // Atomic specs use: pending, implementing, implemented, tested, verified
   const validStatuses = [
-    'draft', 'review', 'approved', 'implementing', 'complete', 'archived',
+    'draft', 'review', 'approved', 'implementing', 'complete', 'archived', 'superseded',
     'pending', 'implemented', 'tested', 'verified'
   ];
   if (frontmatter.status && !validStatuses.includes(frontmatter.status)) {

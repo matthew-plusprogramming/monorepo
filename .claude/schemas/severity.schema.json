@@ -1,0 +1,8 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "severity.schema.json",
+  "title": "Severity",
+  "description": "Standard severity levels for findings, issues, and assessments",
+  "type": "string",
+  "enum": ["critical", "high", "medium", "low", "info"]
+}

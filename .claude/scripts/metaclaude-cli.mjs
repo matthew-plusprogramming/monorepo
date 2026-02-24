@@ -507,6 +507,31 @@ async function cmdSync(projectArg, options) {
     log('');
     const prunedMsg = pruned > 0 ? `, ${pruned} pruned` : '';
     log(`Complete: ${synced} synced, ${skipped} skipped, ${conflicts} conflicts${prunedMsg}`);
+
+    // Auto-repair session.json if it exists but is missing required fields
+    const sessionJsonPath = join(projectPath, '.claude', 'context', 'session.json');
+    const sessionData = loadJson(sessionJsonPath);
+    if (sessionData) {
+      const defaults = {
+        version: '1.0.0',
+        updated_at: new Date().toISOString(),
+        active_work: null,
+        phase_checkpoint: null,
+        subagent_tasks: { in_flight: [], completed_this_session: [] },
+        history: [],
+      };
+      let repaired = false;
+      for (const [key, defaultValue] of Object.entries(defaults)) {
+        if (!(key in sessionData)) {
+          sessionData[key] = defaultValue;
+          repaired = true;
+        }
+      }
+      if (repaired) {
+        saveJson(sessionJsonPath, sessionData);
+        log(`  Repaired session.json (added missing fields)`, 'green');
+      }
+    }
   }
 
   log('');

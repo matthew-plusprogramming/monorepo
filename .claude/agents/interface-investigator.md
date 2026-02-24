@@ -158,6 +158,52 @@ grep -rh "const [A-Z_]" .claude/specs/ --include="*.md"
 | NAM-001 | API casing | camelCase vs snake_case | camelCase (matches existing) | ws-2     |
 ```
 
+### 7. Intra-Spec Wire Format & Contract Consistency
+
+Categories 1-6 check across specs and workstreams. This category checks **within** a single spec group — specifically when the same spec group contains both a producer (e.g., SSE service) and a consumer (e.g., test code or client code). These mismatches are invisible to cross-spec investigation because both sides live in the same workstream.
+
+**This category should be checked EVEN for single-spec-group investigations**, not just cross-workstream. It is the one category that applies when there is only one spec group in scope.
+
+**What to check**:
+
+- **SSE/WebSocket event type naming**: Does the emitter add prefixes (e.g., `sdlc:`) that the consumer doesn't expect? Compare `broadcastSdlcEvent` event names with consumer `EventSource` type checks.
+- **Payload nesting depth**: Does the producer wrap fields in a `payload` object that the consumer reads at the top level? Compare emitted shapes with consumed field access paths.
+- **Cookie/header encoding**: Does one side URL-encode values that the other reads raw? Compare `res.cookie()` output with `request.headers.cookie` parsing.
+- **Schema fixture alignment**: Do test fixtures match the runtime Zod/joi validation schemas? Compare test payloads field-by-field against validator schemas.
+- **Middleware bypass gaps**: Does a handler read data differently when accessed through middleware vs. directly? Compare `req.cookies` (parsed by cookie-parser) vs. `request.headers.cookie` (raw).
+
+**Grep patterns for detection**:
+
+```bash
+# SSE event type prefixing
+grep -rn "event:.*sdlc:" --include="*.ts" # producer prefixes
+grep -rn "event\.type\s*===\|\.type\s*===\|findSseEvent" --include="*.ts" # consumer checks
+
+# Payload nesting
+grep -rn "payload:" --include="*.ts" # where payload wrapping happens
+grep -rn "data\.\w\+\s*??" --include="*.ts" # where flat field access happens
+
+# Cookie encoding
+grep -rn "res\.cookie\|setCookie\|Set-Cookie" --include="*.ts" # cookie setters
+grep -rn "request\.headers\.cookie\|parseCookies" --include="*.ts" # raw cookie readers
+
+# Schema vs fixture
+grep -rn "z\.object\|z\.string\|Schema\s*=" --include="*.ts" # Zod schemas
+grep -rn "body:\s*{\\|payload:\s*{" tests/ --include="*.ts" # test fixtures
+```
+
+**Severity**: Typically **HIGH** (causes silent 401s, empty matches, timeouts — hard to debug because each side looks correct in isolation).
+
+**Example inconsistency (real-world)**:
+
+```markdown
+ISSUE: SSE event type prefix mismatch (HIGH)
+Producer: sse.service.ts:broadcastSdlcEvent() sends event: `sdlc:${event.type}`
+Consumer: smoke-test.ts:findSseEvent() checks event.type === 'team-status-changed'
+Impact: Consumer never matches events, test times out silently
+Decision: DEC-XXX — Normalize event types at consumer or remove prefix at producer
+```
+
 ## Your Responsibilities
 
 ### 1. Scope the Investigation
@@ -167,6 +213,8 @@ Determine what specs are in scope:
 - Single spec group: Investigate atomic specs within that group
 - Multiple spec groups: Investigate cross-group connections
 - MasterSpec: Investigate all workstream connections
+
+**Note on intra-spec checks**: Categories 1-6 are primarily cross-spec and cross-workstream checks. Category 7 (Intra-Spec Wire Format & Contract Consistency) applies even when investigating a single spec group. Always run Category 7 checks regardless of scope — producer/consumer mismatches within the same spec group are among the hardest bugs to diagnose because each side looks correct in isolation.
 
 ```bash
 # List all spec groups
