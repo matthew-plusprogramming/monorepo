@@ -199,4 +199,16 @@ async function main() {
   });
 }
 
-main();
+// Guard main() so it only runs when script is invoked directly (not when imported by vitest)
+import { fileURLToPath } from 'url';
+import { resolve } from 'path';
+
+const __filename = fileURLToPath(import.meta.url);
+const isDirectRun = process.argv[1] &&
+  __filename === resolve(process.argv[1]);
+if (isDirectRun) {
+  main();
+}
+
+// Named exports for unit testing (AC3.1)
+export { globToRegex, matchesPattern };

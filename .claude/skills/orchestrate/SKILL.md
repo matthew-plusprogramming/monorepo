@@ -1,10 +1,17 @@
 ---
 name: orchestrate
 description: Orchestrate large multi-workstream projects using git worktrees for parallel development. Load MasterSpec, allocate worktrees, dispatch implementers, monitor convergence, process merge queue.
+user-invocable: true
 allowed-tools: Read, Write, Edit, Glob, Grep, Bash, Task
 ---
 
 # Orchestrate Skill
+
+## Required Context
+
+Before beginning work, read these files for project-specific guidelines:
+
+- `.claude/memory-bank/best-practices/subagent-design.md`
 
 ## Purpose
 

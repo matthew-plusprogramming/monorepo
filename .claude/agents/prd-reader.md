@@ -31,7 +31,6 @@ PRDs are stored in-repo at `.claude/prds/<prd-id>/prd.md`. No external repositor
 ## When Invoked
 
 - When user runs `/prd sync <prd-id>`
-- When checking for PRD drift (`/prd diff`)
 - When re-syncing after PRD updates
 - When reading a specific version of a PRD
 
@@ -367,7 +366,7 @@ Available PRDs:
 Options:
   1. Check PRD ID spelling
   2. Run: ls .claude/prds/
-  3. Create new PRD with /prd draft
+  3. Create new PRD with /prd
 ```
 
 ### PRD Directory Missing
@@ -381,7 +380,7 @@ The .claude/prds/ directory may not contain a directory for this PRD ID.
 Options:
   1. Check PRD ID spelling
   2. Run: ls .claude/prds/
-  3. Create new PRD with /prd draft
+  3. Create new PRD with /prd
 ```
 
 ### Document Empty or Minimal
@@ -394,7 +393,7 @@ No clear requirements section detected
 
 Options:
   1. Extracting what's available (low confidence)
-  2. Recommend using /pm for requirements gathering
+  2. Recommend using /prd for requirements gathering
 ```
 
 ### Unsupported Format

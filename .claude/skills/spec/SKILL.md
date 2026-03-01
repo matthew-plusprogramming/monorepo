@@ -1,6 +1,6 @@
 ---
 name: spec
-description: Author specifications (TaskSpec for small-medium tasks, WorkstreamSpec for complex single-workstream tasks, or coordinate MasterSpec creation for multi-workstream efforts). Use after PM requirements gathering or when refining existing specs.
+description: Author specifications (TaskSpec for small-medium tasks, WorkstreamSpec for complex single-workstream tasks, or coordinate MasterSpec creation for multi-workstream efforts). Use after /prd requirements gathering or when refining existing specs.
 allowed-tools: Read, Write, Edit, Glob, Grep, Task
 user-invocable: true
 ---
@@ -31,7 +31,7 @@ Create specifications that serve as the authoritative contract for implementatio
 Before running `/spec`:
 
 1. Spec group must exist at `.claude/specs/groups/<spec-group-id>/`
-2. `requirements.md` must exist (from `/pm` or `/prd sync`)
+2. `requirements.md` must exist (from `/prd` or `/prd sync`)
 3. `manifest.json` must exist with valid metadata
 
 ## Output Location
@@ -41,7 +41,7 @@ All specs are written to the spec group directory:
 ```
 .claude/specs/groups/<spec-group-id>/
 ├── manifest.json      # Updated by /spec
-├── requirements.md    # Input (from /pm or /prd)
+├── requirements.md    # Input (from /prd or /prd sync)
 └── spec.md           # Output (created by /spec)
 ```
 
@@ -369,7 +369,7 @@ Start with high-level brief:
 cp .claude/templates/master-spec.template.md .claude/specs/groups/<spec-group-id>/spec.md
 ```
 
-Fill Problem Brief section from PM discovery.
+Fill Problem Brief section from /prd discovery.
 
 ### Step 2: Identify Workstreams
 
@@ -588,7 +588,7 @@ May I proceed with implementation?
 After spec creation:
 
 ```
-/pm → requirements.md
+/prd → requirements.md
   ↓
 /spec → spec.md (YOU ARE HERE)
   ↓

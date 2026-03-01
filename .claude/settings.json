@@ -15,6 +15,12 @@
             "_id": "dirty-manifest-check",
             "type": "command",
             "command": "cd \"$CLAUDE_PROJECT_DIR\" && node .claude/scripts/dirty-manifest-check.mjs"
+          },
+          {
+            "_source": "metaclaude",
+            "_id": "trace-commit-staleness",
+            "type": "command",
+            "command": "cd \"$CLAUDE_PROJECT_DIR\" && node .claude/scripts/trace-commit-staleness.mjs"
           }
         ]
       },
@@ -26,6 +32,12 @@
             "_id": "superseded-artifact-warn",
             "type": "command",
             "command": "cd \"$CLAUDE_PROJECT_DIR\" && node .claude/scripts/hook-wrapper.mjs '.claude/specs/**/*.md' 'node .claude/scripts/superseded-artifact-warn.mjs {{file}}'"
+          },
+          {
+            "_source": "metaclaude",
+            "_id": "trace-read-tracker",
+            "type": "command",
+            "command": "cd \"$CLAUDE_PROJECT_DIR\" && node .claude/scripts/trace-read-tracker.mjs"
           }
         ]
       },
@@ -181,6 +193,19 @@
             "_id": "journal-promotion-check",
             "type": "command",
             "command": "cd \"$CLAUDE_PROJECT_DIR\" && node .claude/scripts/journal-promotion-check.mjs"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "_source": "metaclaude",
+            "_id": "trace-read-enforcement",
+            "type": "command",
+            "command": "cd \"$CLAUDE_PROJECT_DIR\" && node .claude/scripts/trace-read-enforcement.mjs"
           }
         ]
       }

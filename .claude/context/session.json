@@ -34,7 +34,11 @@
         },
         "workflow": {
           "type": "string",
-          "enum": ["oneoff-vibe", "oneoff-spec", "orchestrator"],
+          "enum": [
+            "oneoff-vibe",
+            "oneoff-spec",
+            "orchestrator"
+          ],
           "description": "Current workflow type"
         },
         "phase": {
@@ -55,7 +59,11 @@
         },
         "status": {
           "type": "string",
-          "enum": ["in_progress", "blocked", "complete"],
+          "enum": [
+            "in_progress",
+            "blocked",
+            "complete"
+          ],
           "description": "Overall task status"
         }
       }
@@ -70,7 +78,11 @@
         },
         "workflow": {
           "type": "string",
-          "enum": ["oneoff-vibe", "oneoff-spec", "orchestrator"]
+          "enum": [
+            "oneoff-vibe",
+            "oneoff-spec",
+            "orchestrator"
+          ]
         },
         "rationale": {
           "type": "string",
@@ -78,7 +90,11 @@
         },
         "estimated_scope": {
           "type": "string",
-          "enum": ["small", "medium", "large"]
+          "enum": [
+            "small",
+            "medium",
+            "large"
+          ]
         },
         "estimated_files": {
           "type": "number",
@@ -134,7 +150,11 @@
           },
           "status": {
             "type": "string",
-            "enum": ["running", "completed", "failed"]
+            "enum": [
+              "running",
+              "completed",
+              "failed"
+            ]
           },
           "result_summary": {
             "type": "string",
@@ -153,7 +173,11 @@
         },
         "status": {
           "type": "string",
-          "enum": ["converged", "not_converged", "not_validated"]
+          "enum": [
+            "converged",
+            "not_converged",
+            "not_validated"
+          ]
         },
         "spec_complete": {
           "type": "boolean"
@@ -175,14 +199,23 @@
             "properties": {
               "type": {
                 "type": "string",
-                "enum": ["spec_gap", "impl_bug", "missing_test", "failing_test"]
+                "enum": [
+                  "spec_gap",
+                  "impl_bug",
+                  "missing_test",
+                  "failing_test"
+                ]
               },
               "description": {
                 "type": "string"
               },
               "priority": {
                 "type": "string",
-                "enum": ["high", "medium", "low"]
+                "enum": [
+                  "high",
+                  "medium",
+                  "low"
+                ]
               }
             }
           }
@@ -203,11 +236,19 @@
           },
           "priority": {
             "type": "string",
-            "enum": ["high", "medium", "low"]
+            "enum": [
+              "high",
+              "medium",
+              "low"
+            ]
           },
           "status": {
             "type": "string",
-            "enum": ["open", "resolved", "deferred"]
+            "enum": [
+              "open",
+              "resolved",
+              "deferred"
+            ]
           },
           "created_at": {
             "type": "string",
@@ -259,13 +300,23 @@
               },
               "workstreams": {
                 "type": "array",
-                "items": { "type": "string" },
+                "items": {
+                  "type": "string"
+                },
                 "description": "Workstream IDs using this worktree",
-                "example": ["ws-1", "ws-4"]
+                "example": [
+                  "ws-1",
+                  "ws-4"
+                ]
               },
               "status": {
                 "type": "string",
-                "enum": ["active", "converged", "merged", "cleanup"],
+                "enum": [
+                  "active",
+                  "converged",
+                  "merged",
+                  "cleanup"
+                ],
                 "description": "Current worktree status"
               },
               "created_at": {
@@ -274,7 +325,13 @@
                 "description": "When this worktree was created"
               }
             },
-            "required": ["id", "path", "branch", "workstreams", "status"]
+            "required": [
+              "id",
+              "path",
+              "branch",
+              "workstreams",
+              "status"
+            ]
           }
         }
       }
@@ -306,9 +363,13 @@
               },
               "dependencies": {
                 "type": "array",
-                "items": { "type": "string" },
+                "items": {
+                  "type": "string"
+                },
                 "description": "Workstream IDs this depends on",
-                "example": ["ws-1"]
+                "example": [
+                  "ws-1"
+                ]
               },
               "status": {
                 "type": "string",
@@ -330,11 +391,21 @@
                 "type": "object",
                 "description": "Latest convergence validation",
                 "properties": {
-                  "spec_complete": { "type": "boolean" },
-                  "implementation_aligned": { "type": "boolean" },
-                  "tests_passing": { "type": "boolean" },
-                  "security_reviewed": { "type": "boolean" },
-                  "browser_tested": { "type": "boolean" }
+                  "spec_complete": {
+                    "type": "boolean"
+                  },
+                  "implementation_aligned": {
+                    "type": "boolean"
+                  },
+                  "tests_passing": {
+                    "type": "boolean"
+                  },
+                  "security_reviewed": {
+                    "type": "boolean"
+                  },
+                  "browser_tested": {
+                    "type": "boolean"
+                  }
                 }
               },
               "merge_timestamp": {
@@ -343,7 +414,13 @@
                 "description": "When this workstream was merged to main"
               }
             },
-            "required": ["id", "title", "worktree_id", "dependencies", "status"]
+            "required": [
+              "id",
+              "title",
+              "worktree_id",
+              "dependencies",
+              "status"
+            ]
           }
         },
         "merge_queue": {
@@ -352,15 +429,38 @@
           "items": {
             "type": "object",
             "properties": {
-              "workstream_id": { "type": "string" },
-              "worktree_id": { "type": "string" },
-              "ready_at": { "type": "string", "format": "date-time" }
+              "workstream_id": {
+                "type": "string"
+              },
+              "worktree_id": {
+                "type": "string"
+              },
+              "ready_at": {
+                "type": "string",
+                "format": "date-time"
+              }
             },
-            "required": ["workstream_id", "worktree_id"]
+            "required": [
+              "workstream_id",
+              "worktree_id"
+            ]
           }
         }
       }
     }
   },
-  "required": ["session_id", "started_at", "updated_at"]
+  "required": [
+    "session_id",
+    "started_at",
+    "updated_at"
+  ],
+  "version": "1.0.0",
+  "updated_at": "2026-02-14T23:34:45.163Z",
+  "active_work": null,
+  "phase_checkpoint": null,
+  "subagent_tasks": {
+    "in_flight": [],
+    "completed_this_session": []
+  },
+  "history": []
 }

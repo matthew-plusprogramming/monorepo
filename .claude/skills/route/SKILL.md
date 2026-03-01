@@ -187,7 +187,7 @@ Would you like to resume this work? [Y/n]
    cat .claude/specs/groups/<spec_group_id>/manifest.json
    ```
 3. Continue from the current phase based on `current_phase` value:
-   - `pm_interview` → Continue PM interview with `/pm`
+   - `prd_gathering` → Continue PRD gathering with `/prd`
    - `spec_authoring` → Continue spec authoring with `/spec`
    - `atomizing` → Continue atomization with `/atomize`
    - `enforcing` → Continue enforcement with `/enforce`
@@ -419,7 +419,7 @@ Always output a clear routing decision:
 
 **Estimated Files**: 4 (controller, service, tests, types)
 
-**Next Action**: Use `/pm` skill to interview user about endpoint requirements, then create TaskSpec.
+**Next Action**: Use `/prd` skill to gather endpoint requirements, then create TaskSpec.
 ```
 
 For refactor workflows, include behavior preservation note:
@@ -473,8 +473,8 @@ For architectural decisions, use the decision-record template:
 After routing:
 
 - **oneoff-vibe**: Proceed directly to implementation
-- **oneoff-spec**: Use `/pm` to gather requirements → (optional) `/prd draft` to create PRD in git repo → `/spec` to create spec group → [If cross-boundary concerns: `/investigate`] → User approval → `/implement` + `/test` → `/unify` → `/code-review` → `/security` → (if PRD exists) `/prd push` to sync discoveries
-- **orchestrator**: Use `/pm` to create ProblemBrief → (optional) `/prd draft` to create PRD in git repo → `/spec` to create MasterSpec with workstream spec groups → For each workstream: `/atomize` + `/enforce` → **MANDATORY: `/investigate` to surface cross-workstream inconsistencies** → Resolve decisions → User approval → Facilitator orchestrates parallel execution → `/prd push` to sync discoveries
+- **oneoff-spec**: Use `/prd` to gather requirements → `/spec` to create spec group → [If cross-boundary concerns: `/investigate`] → User approval → `/implement` + `/test` → `/unify` → `/code-review` → `/security` → (if PRD exists) `/prd amend` to sync discoveries
+- **orchestrator**: Use `/prd` to create PRD with gather-criticize loop → `/spec` to create MasterSpec with workstream spec groups → For each workstream: `/atomize` + `/enforce` → **MANDATORY: `/investigate` to surface cross-workstream inconsistencies** → Resolve decisions → User approval → Facilitator orchestrates parallel execution → `/prd amend` to sync discoveries
 - **refactor**: Use `/refactor` skill → Define scope and patterns → Run tests (baseline) → Execute refactoring → Run tests (verification) → `/code-review` → `/security` (if applicable)
 - **journal-only**: Create appropriate journal entry → For decisions: use decision-record template at `.claude/templates/decision-record.template.md` → For investigations: document findings, root cause, resolution → For hotfixes: document fix, root cause, prevention measures → Store in `.claude/journals/` directory
 
@@ -518,7 +518,7 @@ For orchestrator workflows, investigation is MANDATORY before implementation. Fo
   - parallel_subtasks:
     - implementation: implementer
     - tests: test-writer
-- next_action: Use `/pm` to clarify loading states and error handling
+- next_action: Use `/prd` to clarify loading states and error handling
 
 ### Example 3: Standard Feature (oneoff-spec)
 
@@ -536,7 +536,7 @@ For orchestrator workflows, investigation is MANDATORY before implementation. Fo
     - tests: test-writer
   - sequential_dependencies:
     - spec approval must complete before implementation
-- next_action: Use `/pm` to gather UI/UX requirements
+- next_action: Use `/prd` to gather UI/UX requirements
 
 ### Example 4: Large Task (Full Orchestration)
 
@@ -561,7 +561,7 @@ For orchestrator workflows, investigation is MANDATORY before implementation. Fo
     - ws-1 must complete before ws-2 (client depends on server)
   - exploration_needed: true (investigate WebSocket library options)
   - investigation_required: true (MANDATORY for orchestrator - surface cross-workstream conflicts before implementation)
-- next_action: Use `/pm` to create ProblemBrief, dispatch Explore subagent for WebSocket research
+- next_action: Use `/prd` to create PRD with gather-criticize loop, dispatch Explore subagent for WebSocket research
 
 ### Example 4b: Orchestrator with Investigation Findings
 
@@ -584,7 +584,7 @@ For orchestrator workflows, investigation is MANDATORY before implementation. Fo
     - Investigation must complete before approval
     - Any blocker decisions must be resolved before implementation
   - investigation_required: true
-- next_action: Use `/pm` to gather requirements, create MasterSpec
+- next_action: Use `/prd` to gather requirements, create MasterSpec
 
 **Post-Investigation (example)**:
 
@@ -686,7 +686,7 @@ User must resolve decisions before implementation proceeds.
   - parallel_subtasks:
     - implementation: implementer
     - tests: test-writer
-- next_action: Use `/pm` to gather crypto payment requirements, then create TaskSpec
+- next_action: Use `/prd` to gather crypto payment requirements, then create TaskSpec
 
 **Note**: Mixed requests (refactor + feature) always route to oneoff-spec because behavior changes need formal specification.
 
@@ -735,6 +735,6 @@ User must resolve decisions before implementation proceeds.
 - workflow: oneoff-spec
 - rationale: "Fix it" indicates future work, not documentation of completed work. Bug fixes need acceptance criteria even when simple.
 - estimated_scope: small
-- next_action: Use `/pm` to clarify bug behavior and expected fix, then create TaskSpec
+- next_action: Use `/prd` to clarify bug behavior and expected fix, then create TaskSpec
 
 **Note**: Journal-only is for documenting **completed** work. If work remains to be done (fix, implement, change), use a spec workflow.

@@ -104,7 +104,7 @@
         },
         "source": {
           "type": "string",
-          "enum": ["prd", "pm-interview", "manual"],
+          "enum": ["prd", "prd-gathering", "manual"],
           "description": "Where requirements came from"
         }
       }
@@ -215,7 +215,7 @@
         "checkpoint_phase": {
           "type": "string",
           "enum": [
-            "pm_interview",
+            "prd_gathering",
             "spec_authoring",
             "atomizing",
             "enforcing",
@@ -225,6 +225,7 @@
             "testing",
             "verifying",
             "reviewing",
+            "journaling",
             "complete"
           ],
           "description": "Phase at last checkpoint"

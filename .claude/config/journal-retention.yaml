@@ -1,0 +1,23 @@
+# Journal Retention Configuration
+# Defines retention policies for journal entries.
+#
+# Automatic expiration is used for standard journal entries based on
+# the configured retention period. Decision-records and supersession
+# chains are permanently retained to preserve project history.
+
+# Default retention period in days for standard journal entries
+default_retention_days: 90
+
+# Journal entry types that are permanently retained (no expiration)
+permanent_types:
+  - decision-record
+  - supersession
+
+# Backup configuration
+backup:
+  # Enable automatic backups before cleanup
+  enabled: true
+  # Backup destination (relative to project root)
+  destination: .claude/journal/backups
+  # Maximum number of backup files to retain
+  max_backups: 10

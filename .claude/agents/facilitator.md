@@ -598,7 +598,7 @@ The facilitator is invoked during orchestrator workflow after MasterSpec approva
 
 ```
 1. Route → orchestrator
-2. PM Interview → Requirements
+2. /prd (gather-criticize loop) → Requirements
 3. Spec Authoring → MasterSpec + WorkstreamSpecs
 4. User approves MasterSpec
 5. **FACILITATOR INVOKED**:

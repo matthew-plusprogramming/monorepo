@@ -1,238 +1,53 @@
----
-domain: agents
-tags: [agents, delegation, prompts]
-last_reviewed: 2026-02-14
----
+# Subagent Dispatch Guide
 
-# Subagent Design Best Practices
+## Structured Return Contract
 
-## Subagent Philosophy
+Every subagent must return using this format:
 
-Each subagent is a **specialist** with:
+- **status**: `success` | `partial` | `failed` — machine-readable, not prose
+- **summary**: < 200 words (HARD BUDGET) — what was accomplished, key changes
+- **blockers**: List of blocking issues (empty if success)
+- **artifacts**: Files created or modified
 
-- A focused purpose (one job done well)
-- Appropriate tools (no more, no less)
-- Clear boundaries (knows what it doesn't do)
-- Structured output (summaries the main agent can use)
+Without explicit word limits, summaries drift toward 500+ words. The budget is the enforcement mechanism — it protects the orchestrator's context efficiency.
 
-## Agent Definition Structure
+### Error Escalation
 
-### Frontmatter Schema
+- `success` → proceed to next step
+- `partial` → list what completed vs. what didn't, orchestrator reviews and retries incomplete portion
+- `failed` → include error category; orchestrator retries once silently, then escalates to human
+- Never silently swallow failures
 
-```yaml
----
-agent_name: implementer
-model: opus
-tools: [Read, Write, Edit, Bash, Glob, Grep]
-delegatable: true
-purpose: Implement from approved specs with traceability
----
-```
+## Tool Assignment (Least Privilege)
 
-### Required Sections
+| Agent Type       | Tools                               | Rationale                  |
+| ---------------- | ----------------------------------- | -------------------------- |
+| Explore/research | Read, Glob, Grep                    | Information gathering only |
+| Implementer      | Read, Write, Edit, Bash, Glob, Grep | Full implementation        |
+| Reviewer         | Read, Glob, Grep                    | Read-only analysis         |
+| Validator        | Read, Glob, Grep, Bash              | Read + verify              |
 
-1. **Purpose**: One-sentence description of the agent's role
-2. **When You're Invoked**: Conditions that trigger this agent
-3. **Your Responsibilities**: What this agent does
-4. **Guidelines**: How to do it well
-5. **Constraints**: What this agent must NOT do
-6. **Output Contract**: What to return to main agent
+Read-only agents never get Write/Edit. Research agents never get Edit.
 
-## Tool Assignment
-
-### Principle of Least Privilege
-
-Give agents only the tools they need:
-
-| Agent               | Tools                               | Rationale                      |
-| ------------------- | ----------------------------------- | ------------------------------ |
-| `explore`           | Read, Glob, Grep                    | Information gathering only     |
-| `implementer`       | Read, Write, Edit, Bash, Glob, Grep | Full implementation capability |
-| `code-reviewer`     | Read, Glob, Grep                    | Read-only review               |
-| `security-reviewer` | Read, Glob, Grep                    | Read-only security analysis    |
-
-### Tool Exclusions
-
-- **Read-only agents** (reviewers): No Write, Edit
-- **Research agents** (explore): No Edit (report findings, don't change)
-- **Validation agents** (unifier): Read to verify, but flag issues rather than fix
-
-## Writing Effective Agent Prompts
-
-### Be Specific About Scope
-
-**Bad** (too vague):
-
-```markdown
-You implement features.
-```
-
-**Good** (clear scope):
-
-```markdown
-You implement code changes from approved atomic specs. Each atomic spec
-describes a single behavior to implement. You follow the spec exactly,
-escalating when requirements are unclear rather than making assumptions.
-```
-
-### Include Anti-Goals
-
-State what the agent should NOT do:
-
-```markdown
-## What This Agent Does NOT Do
-
-- Does not write tests (test-writer handles that)
-- Does not approve specs (user approval required)
-- Does not make architectural decisions (escalate to main agent)
-- Does not deviate from spec (propose amendments instead)
-```
-
-### Specify Output Format with Hard Budget
-
-Every subagent must return using the **structured return contract**:
-
-```markdown
-## Output Contract
-
-status: success | partial | failed
-summary: < 200 words (HARD BUDGET)
-blockers: [] # Empty if success; list of blocking issues otherwise
-artifacts: [] # Files created or modified
-
-Return to main agent:
-
-1. **status**: success/partial/failed — machine-readable, not prose
-2. **summary**: < 200 words — what was accomplished, key changes
-3. **blockers**: List of blocking issues (empty if success)
-4. **artifacts**: Files created or modified
-```
-
-**Why hard budgets matter**: Without explicit word limits, "summarize" drifts toward 500-word responses. The orchestrator's context efficiency erodes from 250x to 5x. The budget is the enforcement mechanism.
-
-**Error escalation**: `partial` → list what completed vs. what didn't. `failed` → include error category. Orchestrator retries once silently, then escalates to human. Never silently swallow failures.
-
-## Escalation Protocols
-
-### When Subagents Should Escalate
-
-Define clear escalation triggers:
-
-```markdown
 ## Escalation Triggers
 
-Escalate to main agent when:
+Subagents should escalate (not assume) when:
 
 - Spec is ambiguous about a requirement
 - Discovered behavior conflicts with spec assumption
 - Implementation would break existing functionality
 - Security concern not addressed in spec
 - Task scope expands beyond original spec
-```
 
-### How to Escalate
+### Escalation Format
 
-```markdown
-## Escalation Format
+Provide: (1) Issue, (2) Context — where this occurred, (3) Options — possible resolutions, (4) Recommendation, (5) Whether work is blocked
 
-When escalating, provide:
-
-1. **Issue**: What problem was discovered
-2. **Context**: Where in the implementation this occurred
-3. **Options**: Possible resolutions (if any)
-4. **Recommendation**: Your suggested path forward
-5. **Blocking**: Whether work can continue without resolution
-```
-
-## Parallel-Safe Design
-
-### Avoiding Conflicts
+## Parallel Safety
 
 When multiple agents work in parallel:
 
-```markdown
-## Parallel Execution Notes
-
-This agent may run in parallel with test-writer. To avoid conflicts:
-
 - Coordinate file access via spec's file list
-- Implementation writes to src/
-- Tests write to **tests**/
-- Both can read but only one modifies each file
-```
-
-### Contract Boundaries
-
-For orchestrated workstreams:
-
-```markdown
-## Contract Compliance
-
-This workstream produces:
-
-- Interface: AuthService with logout() method
-- Events: LOGOUT_SUCCESS, LOGOUT_FAILURE
-
-Other workstreams may depend on these contracts. Do not change
-signatures without updating MasterSpec contract registry.
-```
-
-## Agent Collaboration Patterns
-
-### Sequential Handoff
-
-```
-explore → findings → spec-author → spec → implementer → code
-```
-
-Each agent completes before the next starts.
-
-### Parallel Execution
-
-```
-         ┌→ implementer → code
-spec → ─┤
-         └→ test-writer → tests
-```
-
-Both work from same spec, different outputs.
-
-### Review Chain
-
-```
-code → code-reviewer → findings → security-reviewer → findings → main agent
-```
-
-Read-only agents in sequence, findings aggregated.
-
-## Quality Markers
-
-### What Makes a Good Subagent
-
-| Marker               | Description                                  |
-| -------------------- | -------------------------------------------- |
-| **Focused**          | Does one thing well                          |
-| **Predictable**      | Same input produces consistent output        |
-| **Bounded**          | Knows its limits and escalates appropriately |
-| **Traceable**        | Output links back to input requirements      |
-| **Self-documenting** | Logs what it did and why                     |
-
-### Testing Agent Behavior
-
-Validate agents with scenarios:
-
-```markdown
-## Test Scenarios
-
-1. **Happy path**: Spec is clear, implementation straightforward
-   - Expected: Complete implementation, all ACs satisfied
-
-2. **Ambiguous spec**: Requirement has multiple interpretations
-   - Expected: Escalation with options, not assumption
-
-3. **Conflicting requirement**: Spec conflicts with codebase reality
-   - Expected: Escalation with evidence, proposed amendment
-
-4. **Scope creep**: Discover needed change outside spec
-   - Expected: Complete spec scope, note additional work needed
-```
+- Implementation writes to `src/`, tests write to `__tests__/`
+- Both can read, only one modifies each file
+- Do not change contract signatures without updating the contract registry

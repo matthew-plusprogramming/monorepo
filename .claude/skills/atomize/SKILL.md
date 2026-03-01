@@ -25,7 +25,7 @@ Decompose a high-level spec (`spec.md`) into atomic specs—units that are indep
 Before running `/atomize`:
 
 1. Spec group must exist with `manifest.json`
-2. `requirements.md` must exist (from `/prd sync` or `/pm`)
+2. `requirements.md` must exist (from `/prd` or `/prd sync`)
 3. `spec.md` must exist (from `/spec`)
 
 ## Process
@@ -107,13 +107,13 @@ Next step: Run /enforce to validate atomicity criteria
 Atomization failed for sg-logout-feature
 
 Error: requirements.md not found
-Run /pm or /prd sync first to generate requirements
+Run /prd or /prd sync first to generate requirements
 ```
 
 ## Integration with Workflow
 
 ```
-/pm or /prd sync
+/prd or /prd sync
     ↓
 requirements.md created
     ↓
@@ -140,7 +140,7 @@ User reviews summary → APPROVED
 
 ```
 Error: No active spec group found
-Create one with /prd sync <doc-id> or /pm
+Create one with /prd or /prd sync <doc-id>
 ```
 
 ### Already Has Atomic Specs

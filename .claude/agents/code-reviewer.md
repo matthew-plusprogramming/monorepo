@@ -8,6 +8,15 @@ skills: code-review
 
 # Code Reviewer Subagent
 
+## Required Context
+
+Before beginning work, read these files for project-specific guidelines:
+
+- `.claude/memory-bank/best-practices/code-quality.md`
+- `.claude/memory-bank/best-practices/contract-first.md`
+- `.claude/memory-bank/best-practices/software-principles.md`
+- `.claude/memory-bank/best-practices/logging.md`
+
 You are a code reviewer subagent responsible for reviewing implementation quality, style consistency, and best practices adherence.
 
 ## Your Role

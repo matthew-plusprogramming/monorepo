@@ -26,8 +26,8 @@
  *   1 - Validation or operational error
  */
 
-import { randomUUID } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { randomUUID } from 'node:crypto';
 import { basename, dirname, join, resolve } from 'node:path';
 
 // Schema version for session.json
@@ -35,7 +35,7 @@ const SESSION_VERSION = '1.0.0';
 
 // Valid phases for workflow lifecycle
 const VALID_PHASES = [
-  'pm_interview',
+  'prd_gathering',
   'spec_authoring',
   'atomizing',
   'enforcing',
@@ -61,7 +61,6 @@ const VALID_WORKFLOWS = [
 // Valid subagent types
 const VALID_SUBAGENT_TYPES = [
   'explore',
-  'product-manager',
   'spec-author',
   'atomizer',
   'atomicity-enforcer',
@@ -75,9 +74,10 @@ const VALID_SUBAGENT_TYPES = [
   'refactorer',
   'facilitator',
   'browser-tester',
-  'prd-author',
+  'prd-writer',
+  'prd-critic',
   'prd-reader',
-  'prd-writer'
+  'prd-amender'
 ];
 
 /**
@@ -289,7 +289,7 @@ function opStartWork(specGroupId, workflow, objective) {
       break;
     case 'oneoff-spec':
     case 'orchestrator':
-      initialPhase = 'pm_interview';
+      initialPhase = 'prd_gathering';
       break;
     case 'refactor':
       initialPhase = 'spec_authoring';
@@ -298,7 +298,7 @@ function opStartWork(specGroupId, workflow, objective) {
       initialPhase = 'journaling';
       break;
     default:
-      initialPhase = 'pm_interview';
+      initialPhase = 'prd_gathering';
   }
 
   session.active_work = {

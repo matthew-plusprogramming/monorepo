@@ -53,13 +53,14 @@ The key field is `tool_input.file_path` which contains the absolute path to the 
 
 ### Trigger Points
 
-| Hook Event     | When Triggered                | Matchers      | Use Case                         |
-| -------------- | ----------------------------- | ------------- | -------------------------------- |
-| `PostToolUse`  | After Edit or Write completes | `Edit\|Write` | File validation                  |
-| `PostToolUse`  | After Read completes          | `Read`        | Superseded artifact warnings     |
-| `PostToolUse`  | After Bash completes          | `Bash`        | Commit policy enforcement        |
-| `SubagentStop` | When a subagent completes     | (none)        | Convergence gate reminders       |
-| `Stop`         | When session ends             | (none)        | Session logging and finalization |
+| Hook Event     | When Triggered                | Matchers      | Use Case                                          |
+| -------------- | ----------------------------- | ------------- | ------------------------------------------------- |
+| `PreToolUse`   | Before Edit or Write executes | `Edit\|Write` | Trace read enforcement                            |
+| `PostToolUse`  | After Edit or Write completes | `Edit\|Write` | File validation                                   |
+| `PostToolUse`  | After Read completes          | `Read`        | Superseded artifact warnings, trace read tracking |
+| `PostToolUse`  | After Bash completes          | `Bash`        | Commit policy enforcement, trace staleness checks |
+| `SubagentStop` | When a subagent completes     | (none)        | Convergence gate reminders                        |
+| `Stop`         | When session ends             | (none)        | Session logging and finalization                  |
 
 ### Configuration Location
 
@@ -142,6 +143,12 @@ The wrapper:
 
 ## Current Hooks
 
+### PreToolUse Hooks (Edit|Write)
+
+| Hook ID                  | Trigger Pattern | Script                       | Purpose                                                      |
+| ------------------------ | --------------- | ---------------------------- | ------------------------------------------------------------ |
+| `trace-read-enforcement` | `Edit\|Write`   | `trace-read-enforcement.mjs` | Block edits to files in traced modules unless trace was read |
+
 ### PostToolUse Hooks (Edit|Write)
 
 | Hook ID                      | Trigger Pattern         | Script                            | Purpose                                                |
@@ -169,16 +176,18 @@ The wrapper:
 
 ### PostToolUse Hooks (Read)
 
-| Hook ID                    | Trigger Pattern         | Script                         | Purpose                            |
-| -------------------------- | ----------------------- | ------------------------------ | ---------------------------------- |
-| `superseded-artifact-warn` | `.claude/specs/**/*.md` | `superseded-artifact-warn.mjs` | Warn when reading superseded specs |
+| Hook ID                    | Trigger Pattern         | Script                         | Purpose                                                    |
+| -------------------------- | ----------------------- | ------------------------------ | ---------------------------------------------------------- |
+| `superseded-artifact-warn` | `.claude/specs/**/*.md` | `superseded-artifact-warn.mjs` | Warn when reading superseded specs                         |
+| `trace-read-tracker`       | (all reads)             | `trace-read-tracker.mjs`       | Record which trace files the agent has read in the session |
 
 ### PostToolUse Hooks (Bash)
 
-| Hook ID                | Script                     | Purpose                                                            |
-| ---------------------- | -------------------------- | ------------------------------------------------------------------ |
-| `journal-commit-check` | `journal-commit-check.mjs` | Warn on commits when journal entry is required but not created     |
-| `dirty-manifest-check` | `dirty-manifest-check.mjs` | Warn on commits when spec-group manifests have uncommitted changes |
+| Hook ID                  | Script                       | Purpose                                                            |
+| ------------------------ | ---------------------------- | ------------------------------------------------------------------ |
+| `journal-commit-check`   | `journal-commit-check.mjs`   | Warn on commits when journal entry is required but not created     |
+| `dirty-manifest-check`   | `dirty-manifest-check.mjs`   | Warn on commits when spec-group manifests have uncommitted changes |
+| `trace-commit-staleness` | `trace-commit-staleness.mjs` | Block commits when staged files have stale traces                  |
 
 ### SubagentStop Hooks
 
@@ -478,6 +487,72 @@ All validation scripts are located in `.claude/scripts/`.
 2. Parses frontmatter tags and type fields
 3. Suggests promotion when a tag or type appears 3+ times
 4. Runs at session end, informational only (always exits 0)
+
+### trace-read-enforcement.mjs
+
+**Purpose**: Block edits to files in traced modules unless the agent has read that module's trace first.
+
+**Hook Type**: PreToolUse (runs before Edit/Write)
+
+**Matcher**: `Edit|Write`
+
+**Behavior**:
+
+1. Reads stdin JSON to get the target file path
+2. Loads `trace.config.json` to determine which module the file belongs to
+3. Checks `coordination/trace-reads.json` for whether the module's trace has been read
+4. If module is traced and trace has NOT been read: exits 2 (blocks the edit with instructions to read the trace first)
+5. If module is traced and trace HAS been read: exits 0 (allows the edit)
+6. If file is not in any traced module: exits 0 (allows with advisory)
+
+**Exit Codes**:
+
+- `0`: Allow the edit (trace was read, or file is untraced)
+- `2`: Block the edit (trace not read, provides instructions)
+
+### trace-read-tracker.mjs
+
+**Purpose**: Record which trace files the agent has read during the current session.
+
+**Hook Type**: PostToolUse (runs after Read)
+
+**Matcher**: `Read`
+
+**Behavior**:
+
+1. Reads stdin JSON to get the file path that was just read
+2. If the file is a trace file (under `.claude/traces/`), determines which module(s) it covers
+3. Updates `.claude/coordination/trace-reads.json` with the read timestamp
+4. High-level trace reads mark ALL modules as read; low-level trace reads mark only that module
+5. Always exits 0 (never blocks reads)
+
+**Exit Codes**:
+
+- `0`: Always (informational only, never blocks)
+
+**Session State**: Updates `.claude/coordination/trace-reads.json` (ephemeral, not committed to git)
+
+### trace-commit-staleness.mjs
+
+**Purpose**: Block commits when staged files belong to modules with stale traces.
+
+**Hook Type**: PostToolUse (runs after Bash)
+
+**Matcher**: `Bash`
+
+**Behavior**:
+
+1. Only activates when the Bash command contains `git commit`
+2. Checks which files are staged for commit
+3. For each staged file, determines its module from `trace.config.json`
+4. Checks if the module's trace is stale (source files modified after last trace generation)
+5. If any staged module has stale traces: exits 2 (blocks with regeneration instructions)
+6. If all traces are current: exits 0 (allows the commit)
+
+**Exit Codes**:
+
+- `0`: Allow the commit (all traces current, or no traced modules affected)
+- `2`: Block the commit (stale traces detected, provides `trace-generate` instructions)
 
 ---
 

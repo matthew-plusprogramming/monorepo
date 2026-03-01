@@ -123,8 +123,8 @@ minimal -> core-workflow -> full-workflow -> orchestrator
 
 **full-workflow** -- Extends core-workflow. Adds all review agents and remaining skills. **This is the default bundle for all projects** (set in `projects.json` defaults).
 
-- Agents: explore, product-manager, spec-author, code-reviewer, security-reviewer, documenter, browser-tester, interface-investigator, facilitator, refactorer, prd-author, prd-reader, prd-writer
-- Skills: route, pm, spec, code-review, security, docs, browser-test, investigate, prd, orchestrate, refactor
+- Agents: explore, spec-author, code-reviewer, security-reviewer, documenter, browser-tester, interface-investigator, facilitator, refactorer, prd-writer, prd-critic, prd-reader, prd-amender
+- Skills: route, spec, code-review, security, docs, browser-test, investigate, prd, orchestrate, refactor
 - Templates: prd, spec-group-summary, qa-checklist, integration-testing, git-issue, fix-report, investigation-report, decision-record, agent
 
 **orchestrator** -- Extends full-workflow. Adds multi-workstream orchestration.

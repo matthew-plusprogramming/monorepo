@@ -117,6 +117,8 @@ Identify security-sensitive aspects:
 
 ### 3. Security Requirements in EARS Format
 
+<!-- Source: .claude/memory-bank/best-practices/ears-format.md -->
+
 Author security requirements using EARS (Easy Approach to Requirements Syntax):
 
 #### EARS Format Reference

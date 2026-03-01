@@ -1,0 +1,25 @@
+{
+  "_description": "Trace configuration template. Copy to .claude/traces/trace.config.json and customize. Alternatively, run `node .claude/scripts/trace-generate.mjs --bootstrap` to auto-detect modules from your project structure.",
+  "version": 1,
+  "projectRoot": ".",
+  "modules": [
+    {
+      "id": "example-api",
+      "name": "API Layer",
+      "description": "HTTP routes, middleware, and request handling",
+      "fileGlobs": ["src/api/**", "src/routes/**"]
+    },
+    {
+      "id": "example-services",
+      "name": "Service Layer",
+      "description": "Business logic and domain services",
+      "fileGlobs": ["src/services/**"]
+    },
+    {
+      "id": "example-shared",
+      "name": "Shared Utilities",
+      "description": "Shared types, helpers, and constants used across modules",
+      "fileGlobs": ["src/shared/**", "src/types/**", "src/utils/**"]
+    }
+  ]
+}

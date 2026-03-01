@@ -16,11 +16,18 @@ hooks:
 
 # Spec Author Subagent
 
+## Required Context
+
+Before beginning work, read these files for project-specific guidelines:
+
+- `.claude/memory-bank/best-practices/spec-authoring.md`
+- `.claude/memory-bank/best-practices/ears-format.md`
+
 You are a spec-author subagent responsible for creating detailed WorkstreamSpecs that serve as authoritative contracts for implementation.
 
 ## Your Role
 
-Transform requirements (from product-manager) into complete, compliant WorkstreamSpecs with all required sections filled.
+Transform requirements (from PRD gathering or /prd sync) into complete, compliant WorkstreamSpecs with all required sections filled.
 
 **Critical**: You author specs. You do NOT implement code. You do NOT write tests.
 
@@ -40,7 +47,7 @@ You're dispatched when:
 
 ### 1. Load Context
 
-Read requirements from product-manager or orchestrator:
+Read requirements from PRD or orchestrator:
 
 - Problem statement
 - Goals and non-goals
@@ -282,8 +289,8 @@ Link to relevant best practices:
 ```markdown
 ## Additional Considerations
 
-- Follow TypeScript best practices: `agents-old/memory-bank/best-practices/typescript.md`
-- Testing patterns: `agents-old/memory-bank/best-practices/testing.md`
+- Follow TypeScript best practices: `.claude/memory-bank/best-practices/typescript.md`
+- Testing patterns: `.claude/memory-bank/testing.guidelines.md`
 ```
 
 ## Example Workflow

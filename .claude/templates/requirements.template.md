@@ -1,7 +1,7 @@
 ---
 spec_group: sg-<group-id>
 description: <One-sentence summary of the requirements>
-source: prd | pm-interview | manual
+source: prd | prd-gathering | manual
 prd_version: 1
 last_updated: <YYYY-MM-DD>
 ---

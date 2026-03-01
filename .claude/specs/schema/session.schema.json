@@ -45,7 +45,7 @@
         "current_phase": {
           "type": "string",
           "enum": [
-            "pm_interview",
+            "prd_gathering",
             "spec_authoring",
             "atomizing",
             "enforcing",
@@ -74,7 +74,7 @@
         "phase": {
           "type": "string",
           "enum": [
-            "pm_interview",
+            "prd_gathering",
             "spec_authoring",
             "atomizing",
             "enforcing",
@@ -171,7 +171,6 @@
           "type": "string",
           "enum": [
             "explore",
-            "product-manager",
             "spec-author",
             "atomizer",
             "atomicity-enforcer",
@@ -185,9 +184,10 @@
             "refactorer",
             "facilitator",
             "browser-tester",
-            "prd-author",
+            "prd-writer",
+            "prd-critic",
             "prd-reader",
-            "prd-writer"
+            "prd-amender"
           ],
           "description": "Type of subagent dispatched"
         },

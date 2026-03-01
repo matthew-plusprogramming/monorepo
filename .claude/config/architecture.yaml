@@ -1,0 +1,50 @@
+# Architecture Configuration Template
+# Defines thresholds and limits for architecture-related tooling.
+# All values have sensible defaults -- this file is usable out-of-the-box.
+# Customize per project as needed.
+
+# Complexity analysis thresholds
+# Used by complexity analyzers to flag components exceeding limits.
+complexity:
+  # Maximum allowed complexity score per component
+  threshold: 15
+  # Warning threshold (advisory, does not block)
+  warn_at: 10
+
+# Technical debt tracking thresholds
+# Used by debt inventory tools to prioritize remediation.
+debt:
+  # Maximum debt score allowed per component before flagging
+  threshold_per_component: 10
+  # Severity weights for debt item classification
+  severity_weights:
+    critical: 4
+    high: 3
+    medium: 2
+    low: 1
+
+# Deliberation cycle limits
+# Controls how many rounds of spec deliberation are allowed.
+deliberation:
+  # Maximum number of deliberation cycles before forcing a decision
+  max_cycles: 5
+  # Circuit breaker: halt deliberation after this many consecutive no-progress cycles
+  circuit_breaker_limit: 3
+
+# Atomization limits
+# Controls the spec decomposition and investigation process.
+atomization:
+  # Maximum refinement iterations for atomic spec decomposition
+  max_refinement_iterations: 3
+  # Number of consecutive clean investigation passes required before approval
+  investigation_clean_passes_required: 2
+
+# Standard project paths (relative to project root)
+# Override these if your project uses a non-standard directory layout.
+paths:
+  # Spec files directory
+  specs: .claude/specs
+  # Config files directory
+  config: .claude/config
+  # Technical debt inventory file
+  debt_inventory: .claude/debt-inventory.json

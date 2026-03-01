@@ -1,0 +1,45 @@
+# Agent Upgrade Strategy Configuration
+# Defines CLI version pinning and upgrade strategy parameters.
+#
+# Architecture: Fresh Claude CLI instances are spawned per job, so agents
+# inherently use the latest version on each dispatch. This provides rolling
+# upgrades without blue-green deployment.
+
+# Pinned Claude CLI version (semver)
+# Set to "latest" to skip version checking
+claude_cli_version: "latest"
+
+# Upgrade policy
+upgrade_policy:
+  # Strategy: "rolling" (default) - fresh instances use latest version
+  # Alternative: "pinned" - enforce exact version match
+  strategy: "rolling"
+  # Allow minor version differences (e.g., 1.2.x matches 1.2.y)
+  allow_minor_mismatch: true
+  # Allow patch version differences
+  allow_patch_mismatch: true
+
+# Version mismatch behavior
+mismatch_behavior:
+  # Log a warning on version mismatch
+  log_warning: true
+  # Emit event on version mismatch (transport-agnostic)
+  emit_event: true
+  # Block invocation on major version mismatch
+  block_on_major_mismatch: false
+
+# Rollback procedures
+rollback_procedures:
+  description: >
+    To roll back an agent upgrade:
+    1. Identify the last known good version from journal decision-records
+    2. Update claude_cli_version in this file to the target version
+    3. Set upgrade_policy.strategy to "pinned" to enforce exact version
+    4. Verify agents dispatch with the correct version
+    5. Once stable, optionally return strategy to "rolling"
+  steps:
+    - "Check journal for last known good version"
+    - "Update claude_cli_version in .claude/config/agent-upgrade.yaml"
+    - "Set strategy to pinned"
+    - "Verify agent dispatches use correct version"
+    - "Return to rolling strategy when stable"

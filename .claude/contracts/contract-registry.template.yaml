@@ -1,0 +1,36 @@
+# Contract Registry
+# =================
+# Cross-workstream integration boundary registry.
+# Tracks all contracts between workstreams so the /investigate skill
+# can surface inconsistencies before implementation begins.
+#
+# Schema: .claude/specs/schema/contract-registry.schema.json
+# Validates as a YAML array of objects.
+#
+# Required fields per entry:
+#   id       (string)  - Unique identifier for the contract (e.g., "ws1-ws2-user-api")
+#   type     (string)  - Contract type (see common types below)
+#   path     (string)  - Relative path to the contract definition file
+#   owner    (string)  - Spec or workstream that owns this boundary
+#   version  (integer) - Contract version, minimum 1; increment on breaking changes
+#
+# No additional properties are allowed (additionalProperties: false).
+#
+# Common contract types:
+#   rest-api        - REST API endpoint contract (OpenAPI, route definition)
+#   event-contract  - SSE, WebSocket, or pub/sub event shape
+#   data-model      - Shared database schema or data transfer object
+#   grpc            - gRPC service definition (protobuf)
+#   graphql         - GraphQL schema or operation contract
+#   shared-types    - Shared TypeScript interfaces or Zod schemas
+#
+# Example entry (uncomment and modify to use):
+#
+# - id: "ws1-ws2-user-api"
+#   type: "rest-api"
+#   path: "contracts/user-api.yaml"
+#   owner: "sg-user-service"
+#   version: 1
+
+# Default: empty array (valid YAML, no contracts registered yet)
+[]

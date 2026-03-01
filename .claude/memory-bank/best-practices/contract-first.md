@@ -1,9 +1,3 @@
----
-domain: development
-tags: [contracts, types, validation, evidence, wire-protocol, boundaries]
-last_reviewed: 2026-02-14
----
-
 # Contract-First Development Best Practices
 
 ## Core Principle
@@ -12,7 +6,7 @@ The schema defines truth. Types are generated from it. Agents must use what the 
 
 ## Evidence-Before-Edit (Practice 1.7)
 
-The single most common class of AI-generated bugs is "I assumed it was called X": snake*case vs camelCase mismatches, referencing fields that don't exist, using a route path that was renamed. These aren't logic errors — they're failures of *discovery\*.
+The single most common class of AI-generated bugs is "I assumed it was called X": snake_case vs camelCase mismatches, referencing fields that don't exist, using a route path that was renamed. These aren't logic errors — they're failures of discovery.
 
 ### The Rule
 
@@ -107,35 +101,7 @@ Contracts exist at four layers, each requiring different validation:
 
 Each layer is independently necessary. Failing to validate at one layer creates a gap even when all other layers pass. Agents excel at satisfying explicit contracts (types compile, symbols exist) but cannot validate implicit contracts (naming conventions, service addressing) unless those are made checkable.
 
-## Named Constants: Architectural Concerns
-
-- Share parsing logic between frontend and backend to prevent drift.
-- Use bounded data structures (ring buffers, capped arrays) to prevent unbounded memory growth in long-running processes.
-
 ## Validation at Boundaries
-
-### Pattern
-
-```typescript
-// Schema defines the shape
-const ConfigSchema = z.object({
-  port: z.number().min(1).max(65535),
-  host: z.string(),
-  logLevel: z.enum(['debug', 'info', 'warn', 'error']),
-});
-
-// Type is derived from schema — never hand-written
-type Config = z.infer<typeof ConfigSchema>;
-
-// Validate once at the boundary
-const config = ConfigSchema.parse(rawInput);
-
-// Internal code trusts the type
-function startServer(config: Config) {
-  // config.port is guaranteed to be a valid number
-  // No need to re-validate
-}
-```
 
 ### Rules
 
@@ -143,20 +109,3 @@ function startServer(config: Config) {
 - Use `z.infer<typeof Schema>` for type derivation — never maintain a parallel type definition
 - Internal code trusts the validated types — no re-validation deeper in the stack
 - Invalid state should be impossible to represent after the boundary layer
-
-## When to Apply
-
-- **Always**: Evidence-before-edit (zero infrastructure cost, immediately effective)
-- **When contracts exist**: Contract integrity guardrails
-- **When crossing boundaries**: Wire protocol contracts + boundary ownership assignment
-- **For spec authoring**: Contract stratification — identify which layers each spec touches
-- **When feasible**: Full schema → generate → read-only pipeline
-
-## Integration with Existing Practices
-
-- **Evidence-Before-Edit + Spec-as-Contract**: The evidence table makes spec conformance mechanically verifiable
-- **Evidence-Before-Edit + Recursive Conductor**: The DISCOVER phase is a mandatory explore-subagent dispatch before any implementer dispatch
-- **Contract-Generated Types + Code Review**: Reviewers check for hand-written DTOs that duplicate generated types
-- **Validation at Boundaries + Named Constants**: Schema-derived types enforce naming; constants enforce values
-- **Wire Protocol + Boundary Ownership**: Together they ensure cross-service specs never have ambiguous integration surfaces
-- **Contract Stratification + Investigation**: The `/investigate` skill validates all four layers across workstreams

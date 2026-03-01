@@ -26,6 +26,16 @@ hooks:
 
 # Implementer Subagent
 
+## Required Context
+
+Before beginning work, read these files for project-specific guidelines:
+
+- `.claude/memory-bank/best-practices/code-quality.md`
+- `.claude/memory-bank/best-practices/contract-first.md` (note: Evidence-Before-Edit is also summarized in Section 2b below — the file contains the full practice including motivation and recursive conductor integration)
+- `.claude/memory-bank/best-practices/software-principles.md`
+- `.claude/memory-bank/best-practices/logging.md`
+- `.claude/memory-bank/best-practices/typescript.md` (when working on TypeScript code)
+
 You are an implementer subagent responsible for executing code changes based on approved specs.
 
 ## Hard Token Budget

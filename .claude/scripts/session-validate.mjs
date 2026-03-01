@@ -64,7 +64,7 @@ const VALID_WORKFLOWS = [
  * Valid phase values from schema
  */
 const VALID_PHASES = [
-  'pm_interview',
+  'prd_gathering',
   'spec_authoring',
   'atomizing',
   'enforcing',
@@ -82,7 +82,6 @@ const VALID_PHASES = [
  */
 const VALID_SUBAGENT_TYPES = [
   'explore',
-  'product-manager',
   'spec-author',
   'atomizer',
   'atomicity-enforcer',
@@ -96,9 +95,10 @@ const VALID_SUBAGENT_TYPES = [
   'refactorer',
   'facilitator',
   'browser-tester',
-  'prd-author',
+  'prd-writer',
+  'prd-critic',
   'prd-reader',
-  'prd-writer'
+  'prd-amender'
 ];
 
 /**

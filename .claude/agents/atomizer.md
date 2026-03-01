@@ -16,6 +16,12 @@ hooks:
 
 # Atomizer Agent
 
+## Required Context
+
+Before beginning work, read these files for project-specific guidelines:
+
+- `.claude/memory-bank/best-practices/spec-authoring.md`
+
 ## Role
 
 The atomizer agent takes a high-level spec (`spec.md`) and decomposes it into atomic specs—the smallest units of work that remain independently testable, deployable, reviewable, and reversible.
