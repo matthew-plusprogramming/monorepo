@@ -11,7 +11,7 @@ user-invocable: true
 
 Orchestrate product discovery by dispatching the product-manager subagent to conduct interviews, gather requirements, and produce structured outputs.
 
-**Key Output**: Creates a spec group with `requirements.md` that feeds into `/spec` and `/atomize`.
+**Key Output**: Creates a spec group with `requirements.md` that feeds into `/spec`.
 
 ## Usage
 
@@ -178,9 +178,9 @@ Files created:
 1. Review requirements: `cat .claude/specs/groups/sg-<feature-slug>/requirements.md`
 2. (Optional) Run `/prd draft sg-<feature-slug>` to write PRD to git repository
 3. Run `/spec sg-<feature-slug>` to create spec.md
-4. Run `/atomize sg-<feature-slug>` to decompose into atomic specs
-5. Run `/enforce sg-<feature-slug>` to validate atomicity
-6. User approves → implementation begins
+4. User approves → implementation begins
+
+> **Note**: For orchestrator workflows with multiple workstreams, also run `/atomize` and `/enforce` after `/spec` to decompose into atomic specs.
 ```
 
 #### Feedback Complete
@@ -220,7 +220,7 @@ Spec group: `<spec-group-id>`
 **Next Steps**:
 
 1. Review updated requirements.md
-2. Continue with `/spec` or `/atomize`
+2. Continue with `/spec`
 ```
 
 ## State Transitions
@@ -243,9 +243,25 @@ After `/pm` completes:
               ↓
          /spec → spec.md
               ↓
+         User approves
+              ↓
+         /implement + /test
+```
+
+### In orchestrator Workflow
+
+```
+/route → /pm → requirements.md
+              ↓
+         /spec → spec.md
+              ↓
          /atomize → atomic/*.md
               ↓
          /enforce → validation
+              ↓
+         User approves
+              ↓
+         /implement + /test
 ```
 
 ### Linking to External PRD

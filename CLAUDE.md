@@ -135,11 +135,12 @@ The memory-bank provides persistent project knowledge that survives across sessi
 ├── tech.context.md         # Architecture, subagents, workflows, key locations
 ├── delegation.guidelines.md # Conductor philosophy, tool diet, context economics
 ├── testing.guidelines.md   # Testing boundaries, mocking rules, AAA conventions
+├── practice-index.md       # Practice number -> canonical file/line mapping
 └── best-practices/
     ├── code-quality.md     # Error handling, DI, validation patterns
     ├── contract-first.md   # Contract-first development practices
     ├── ears-format.md      # EARS format for security requirements
-    ├── skill-event-emission.md # Skill lifecycle event patterns
+    ├── logging.md          # Log design, structured logs, correlation, observability
     ├── software-principles.md # Core software engineering principles
     ├── spec-authoring.md   # How to write good specs
     ├── subagent-design.md  # How to design effective subagents
@@ -150,18 +151,19 @@ The memory-bank provides persistent project knowledge that survives across sessi
 
 Load memory-bank files based on task context:
 
-| File                                     | Load Trigger               | Consumers                      |
-| ---------------------------------------- | -------------------------- | ------------------------------ |
-| `project.brief.md`                       | Session start (always)     | Main agent                     |
-| `tech.context.md`                        | Implementation routed      | Implementer, Spec-author       |
-| `testing.guidelines.md`                  | Test work dispatched       | Test-writer, Implementer       |
-| `best-practices/code-quality.md`         | Implementation routed      | Implementer, Code-reviewer     |
-| `best-practices/spec-authoring.md`       | Spec work dispatched       | Spec-author, Atomizer          |
-| `best-practices/ears-format.md`          | Security requirements work | Security-reviewer, Spec-author |
-| `best-practices/contract-first.md`       | Implementation routed      | Implementer, Code-reviewer     |
-| `best-practices/skill-event-emission.md` | Skill development          | Skill authors                  |
-| `best-practices/software-principles.md`  | Implementation routed      | Implementer, Code-reviewer     |
-| `best-practices/typescript.md`           | TypeScript work dispatched | Implementer, Code-reviewer     |
+| File                                    | Load Trigger               | Consumers                                                               |
+| --------------------------------------- | -------------------------- | ----------------------------------------------------------------------- |
+| `project.brief.md`                      | Session start (always)     | Main agent                                                              |
+| `tech.context.md`                       | Implementation routed      | Implementer, Spec-author                                                |
+| `testing.guidelines.md`                 | Test work dispatched       | Test-writer, Implementer                                                |
+| `best-practices/code-quality.md`        | Implementation routed      | Implementer, Code-reviewer                                              |
+| `best-practices/spec-authoring.md`      | Spec work dispatched       | Spec-author, Atomizer                                                   |
+| `best-practices/ears-format.md`         | Security requirements work | Spec-author (Required Context); Security-reviewer (source ref only)     |
+| `best-practices/contract-first.md`      | Implementation routed      | Implementer, Code-reviewer                                              |
+| `best-practices/logging.md`             | Implementation routed      | Implementer, Code-reviewer                                              |
+| `best-practices/software-principles.md` | Implementation routed      | Implementer, Code-reviewer                                              |
+| `best-practices/typescript.md`          | TypeScript work dispatched | Implementer                                                             |
+| `best-practices/subagent-design.md`     | Subagent dispatch          | route/SKILL.md, implement/SKILL.md, orchestrate/SKILL.md, spec/SKILL.md |
 
 ### Usage & Maintenance
 
@@ -225,8 +227,8 @@ Every response must include:
 | `/route`        | Analyze task complexity and route to workflow                | Start of any new task                              |
 | `/pm`           | Interview user to gather requirements                        | Before spec authoring                              |
 | `/spec`         | Author specifications (TaskSpec, WorkstreamSpec, MasterSpec) | After requirements gathering                       |
-| `/atomize`      | Decompose high-level specs into atomic specs                 | After spec authoring                               |
-| `/enforce`      | Validate atomic specs meet atomicity criteria                | After atomization                                  |
+| `/atomize`      | Decompose high-level specs into atomic specs                 | Orchestrator workflows only (after spec authoring) |
+| `/enforce`      | Validate atomic specs meet atomicity criteria                | Orchestrator workflows only (after atomization)    |
 | `/investigate`  | Surface cross-spec inconsistencies                           | Before implementation when specs have dependencies |
 | `/implement`    | Implement from approved specs                                | After spec approval                                |
 | `/test`         | Write tests for acceptance criteria                          | Parallel with implementation or after              |
@@ -254,8 +256,8 @@ Request -> Route -> Delegate to subagent -> Synthesize -> Commit
 #### Medium Task (oneoff-spec)
 
 ```
-Request -> Route -> PM Interview -> [Optional: PRD Draft] -> Spec -> Atomize -> Enforce ->
-  [If dependencies: Investigate (loop)] -> Approve ->
+Request -> Route -> PM Interview -> [Optional: PRD Draft] -> Spec ->
+  [If cross-boundary concerns: Investigate (loop)] -> Approve ->
   [Parallel: Implement + Test] -> Integration Verify -> Unify (loop) -> Code Review (loop) -> Security (loop) ->
   [If UI: Browser Test] -> [If public API: Docs] -> [If PRD: PRD Push] -> Commit
 ```

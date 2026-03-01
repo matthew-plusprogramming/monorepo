@@ -7,6 +7,12 @@ user-invocable: true
 
 # Spec Author Skill
 
+## Required Context
+
+Before beginning work, read these files for project-specific guidelines:
+
+- `.claude/memory-bank/best-practices/subagent-design.md`
+
 ## Purpose
 
 Create specifications that serve as the authoritative contract for implementation. Specs document requirements, design decisions, task breakdowns, and test plans.
@@ -289,8 +295,19 @@ Update the spec group manifest:
 **Next Steps**:
 
 1. Review spec: `.claude/specs/groups/<spec-group-id>/spec.md`
+
+**For oneoff-spec workflow:**
+
+2. (Optional) Run `/investigate <spec-group-id>` if cross-spec dependencies exist
+3. User approves → `review_state: APPROVED`
+4. Run `/implement <spec-group-id>` + `/test <spec-group-id>` (parallel)
+
+**For orchestrator workflow:**
+
 2. Run `/atomize <spec-group-id>` to decompose into atomic specs
 3. Run `/enforce <spec-group-id>` to validate atomicity
+4. User approves → `review_state: APPROVED`
+5. Run `/implement <spec-group-id>` + `/test <spec-group-id>` (parallel)
 ```
 
 ## Process: Complex Specs (WorkstreamSpec-level detail)
@@ -575,13 +592,23 @@ After spec creation:
   ↓
 /spec → spec.md (YOU ARE HERE)
   ↓
-/atomize → atomic/*.md
-  ↓
-/enforce → validation
-  ↓
-User approves → review_state: APPROVED
-  ↓
-/implement + /test (parallel, per atomic spec)
+  ├── [oneoff-spec workflow]
+  │     ↓
+  │   (optional) /investigate
+  │     ↓
+  │   User approves → review_state: APPROVED
+  │     ↓
+  │   /implement + /test (parallel)
+  │
+  └── [orchestrator workflow]
+        ↓
+      /atomize → atomic/*.md
+        ↓
+      /enforce → validation
+        ↓
+      User approves → review_state: APPROVED
+        ↓
+      /implement + /test (parallel, per atomic spec)
   ↓
 /unify → convergence validation
   ↓
@@ -595,16 +622,25 @@ Merge
 ```json
 {
   "review_state": "DRAFT", // Still needs user review
-  "work_state": "PLAN_READY", // Ready for atomization
+  "work_state": "PLAN_READY", // Ready for approval (oneoff-spec) or atomization (orchestrator)
   "convergence": {
     "spec_complete": true // Spec authored
   }
 }
 ```
 
-### Handoff to /atomize
+### Handoff After /spec
 
 After `/spec` creates `spec.md`:
+
+**For oneoff-spec workflow:**
+
+1. User reviews spec
+2. (Optional) Run `/investigate <spec-group-id>` if cross-spec dependencies exist
+3. User approves → `review_state: APPROVED`
+4. Implementation begins with `/implement` + `/test`
+
+**For orchestrator workflow:**
 
 1. User reviews spec
 2. Run `/atomize <spec-group-id>` to decompose into atomic specs

@@ -7,6 +7,12 @@ user-invocable: true
 
 # Implementation Skill
 
+## Required Context
+
+Before beginning work, read these files for project-specific guidelines:
+
+- `.claude/memory-bank/best-practices/subagent-design.md`
+
 ## Purpose
 
 Execute implementation from approved atomic specs with full traceability to requirements.
@@ -28,7 +34,7 @@ Before using this skill, verify:
 1. **Spec group exists** at `.claude/specs/groups/<spec-group-id>/`
 2. **review_state** is `APPROVED` in manifest.json
 3. **Atomic specs exist** in `atomic/` directory
-4. **Enforcement passed** (`atomic_specs.enforcement_status: "passing"`)
+4. **Enforcement passed** (orchestrator workflows only): When `atomic_specs` exists in manifest, verify `atomic_specs.enforcement_status: "passing"`. For oneoff-spec workflows (no atomic specs), enforcement is not required — skip this check.
 5. **Open questions** are resolved or explicitly deferred
 
 If prerequisites not met → STOP and resolve before implementing.
@@ -71,7 +77,8 @@ List: .claude/specs/groups/<spec-group-id>/atomic/*.md
 Verify in manifest.json:
 
 - `review_state` is `APPROVED`
-- `atomic_specs.enforcement_status` is `passing`
+- If `atomic_specs` exists in manifest (orchestrator workflow): `atomic_specs.enforcement_status` is `passing`
+- If `atomic_specs` is absent (oneoff-spec workflow): skip enforcement check
 - No blocking open questions
 
 ### Step 2: List Atomic Specs
@@ -407,7 +414,7 @@ After implementation:
 2. `/security` - Security review (always)
 3. `/browser-test` - UI validation (if UI changes)
 4. `/docs` - Documentation generation (if public API)
-5. Commit
+5. Commit — Stage your spec group's `manifest.json` alongside implementation files in the commit. The manifest tracks convergence state and must always travel with the implementation it describes.
 
 ## Error Handling
 

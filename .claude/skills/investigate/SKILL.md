@@ -34,7 +34,7 @@ Investigate and surface connection points between different specs, systems, and 
 ### Recommended Checkpoints
 
 1. **After requirements gathering** - Early detection of assumption conflicts
-2. **Before atomization** - Ensure parent spec has consistent interfaces
+2. **Before implementation** - Ensure spec has consistent interfaces
 3. **During code review** - Validate implementation matches cross-spec contracts
 
 ## Prerequisites
@@ -190,11 +190,7 @@ Next steps:
 ### In oneoff-spec Workflow
 
 ```
-/route → PM → Spec → Atomize → Enforce
-                         ↓
-                   /investigate (if dependencies)
-                         ↓
-                    Implement
+/route → PM → Spec → /investigate (if dependencies) → Approve → Implement
 ```
 
 ### In orchestrator Workflow

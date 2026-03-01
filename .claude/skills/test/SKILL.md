@@ -28,7 +28,7 @@ Before using this skill, verify:
 1. **Spec group exists** at `.claude/specs/groups/<spec-group-id>/`
 2. **review_state** is `APPROVED` in manifest.json
 3. **Atomic specs exist** in `atomic/` directory
-4. **Enforcement passed** (`atomic_specs.enforcement_status: "passing"`)
+4. **Enforcement passed** (orchestrator workflows only): When `atomic_specs` exists in manifest, verify `atomic_specs.enforcement_status: "passing"`. For oneoff-spec workflows (no atomic specs), enforcement is not required — skip this check.
 
 If prerequisites not met → STOP and resolve before writing tests.
 
@@ -79,7 +79,8 @@ ls .claude/specs/groups/<spec-group-id>/atomic/
 Verify:
 
 - `review_state` is `APPROVED`
-- `atomic_specs.enforcement_status` is `passing`
+- If `atomic_specs` exists in manifest (orchestrator workflow): `atomic_specs.enforcement_status` is `passing`
+- If `atomic_specs` is absent (oneoff-spec workflow): skip enforcement check
 - No blocking open questions
 
 ### Step 2: Map Atomic Specs to Test Files

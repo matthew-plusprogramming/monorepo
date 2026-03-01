@@ -7,6 +7,12 @@ allowed-tools: Read, Glob, Grep
 
 # Route Skill
 
+## Required Context
+
+Before beginning work, read these files for project-specific guidelines:
+
+- `.claude/memory-bank/best-practices/subagent-design.md`
+
 ## Purpose
 
 Analyze the user request and determine the appropriate workflow path based on task complexity, scope, and estimated effort.
@@ -57,7 +63,7 @@ Route to spec group workflow for **most tasks**:
 - Documentation with new content
 - API changes
 - UI changes
-- **Needs spec group**: requirements.md, spec.md, atomic specs
+- **Needs spec group**: requirements.md, spec.md
 - **Spec location**: `.claude/specs/groups/<spec-group-id>/`
 - **Why default**: Specs create accountability, testability, and prevent scope creep
 
@@ -201,6 +207,42 @@ Would you like to resume this work? [Y/n]
    ```
 2. Proceed with normal routing (Step 1 onwards)
 
+**Check for handoff documents**:
+
+After the session.json check (regardless of its result), also check for handoff documents in `context/archive/`:
+
+```bash
+# List handoff documents, most recently modified first (silently skip if directory missing)
+ls -t .claude/context/archive/*.md 2>/dev/null
+```
+
+**If handoff documents exist**, display them alongside the session.json resume prompt:
+
+```markdown
+## Handoff Context Available
+
+**Most Recent**: [filename]
+**Title**: [first `# Handoff:` heading line from the file]
+**Path**: `.claude/context/archive/[filename]`
+
+[If additional handoff docs exist:]
+Other handoff documents:
+
+- [filename2]
+- [filename3]
+
+Read the handoff document for full context before resuming work.
+```
+
+To extract the title from the most recent handoff document:
+
+```bash
+# Get the title line from the most recent handoff doc
+head -30 "$(ls -t .claude/context/archive/*.md 2>/dev/null | head -1)" 2>/dev/null | grep "^# Handoff:"
+```
+
+**If no handoff documents exist or the directory is missing**, silently skip this check (no error, no message).
+
 ### Step 1: Load Context
 
 If the user references an existing spec group:
@@ -268,9 +310,9 @@ estimated_scope: small | medium | large
 estimated_files: <N>
 decomposition:
   human_provided: true | false # Did the human provide explicit task breakdown?
-  atomizer_needed: true | false # Only true if scope is ambiguous AND human didn't decompose
+  atomizer_needed: true | false # Only for orchestrator workflows. Always false for oneoff-spec.
   # When human_provided is true: skip /atomize, use the provided structure directly
-  # When atomizer_needed is true: run /atomize after spec authoring
+  # When atomizer_needed is true (orchestrator only): run /atomize after spec authoring
 delegation:
   parallel_subtasks:
     - <subtask 1>: <subagent type>
@@ -288,10 +330,10 @@ next_action: <Suggested next step>
 
 **Decomposition rules**:
 
-- If the user's prompt contains an explicit task list, numbered steps, or specific file targets → `human_provided: true`, `atomizer_needed: false`
-- If the user describes a feature without structure → `human_provided: false`, `atomizer_needed: true`
-- When `human_provided: true`, the workflow skips `/atomize` and `/enforce`. The human's decomposition becomes the atomic specs directly (or a single spec if the structure is simple enough).
-- The atomizer is a **fallback for ambiguous scope**, not the default. When humans already know the structure, agent-driven decomposition adds 5-10 turns of overhead with no benefit.
+- For **oneoff-spec**: `atomizer_needed` is always `false`. Specs go directly to approval without atomization.
+- For **orchestrator**: If the user provides explicit task breakdown → `human_provided: true`, `atomizer_needed: false`. If scope is ambiguous → `human_provided: false`, `atomizer_needed: true`.
+- When `atomizer_needed: true` (orchestrator only), run `/atomize` + `/enforce` after spec authoring.
+- The atomizer is reserved for **orchestrator workflows with ambiguous scope**. For oneoff-spec, the spec itself is the atomic unit — no decomposition needed.
 
 **Investigation rules**:
 
@@ -431,7 +473,7 @@ For architectural decisions, use the decision-record template:
 After routing:
 
 - **oneoff-vibe**: Proceed directly to implementation
-- **oneoff-spec**: Use `/pm` to gather requirements → (optional) `/prd draft` to create PRD in git repo → `/spec` to create spec group → `/atomize` to create atomic specs → `/enforce` to validate atomicity → [If spec has dependencies: `/investigate` to surface cross-spec inconsistencies] → User approval → `/implement` + `/test` → `/unify` → `/code-review` → `/security` → (if PRD exists) `/prd push` to sync discoveries
+- **oneoff-spec**: Use `/pm` to gather requirements → (optional) `/prd draft` to create PRD in git repo → `/spec` to create spec group → [If cross-boundary concerns: `/investigate`] → User approval → `/implement` + `/test` → `/unify` → `/code-review` → `/security` → (if PRD exists) `/prd push` to sync discoveries
 - **orchestrator**: Use `/pm` to create ProblemBrief → (optional) `/prd draft` to create PRD in git repo → `/spec` to create MasterSpec with workstream spec groups → For each workstream: `/atomize` + `/enforce` → **MANDATORY: `/investigate` to surface cross-workstream inconsistencies** → Resolve decisions → User approval → Facilitator orchestrates parallel execution → `/prd push` to sync discoveries
 - **refactor**: Use `/refactor` skill → Define scope and patterns → Run tests (baseline) → Execute refactoring → Run tests (verification) → `/code-review` → `/security` (if applicable)
 - **journal-only**: Create appropriate journal entry → For decisions: use decision-record template at `.claude/templates/decision-record.template.md` → For investigations: document findings, root cause, resolution → For hotfixes: document fix, root cause, prevention measures → Store in `.claude/journals/` directory

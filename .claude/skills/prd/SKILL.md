@@ -211,7 +211,8 @@ Created spec group: sg-logout-feature
 Next steps:
   1. Review requirements: .claude/specs/groups/sg-logout-feature/requirements.md
   2. Run /spec to create high-level spec
-  3. Run /atomize to decompose into atomic specs
+  3. For orchestrator workflows: Run /atomize to decompose into atomic specs
+     For oneoff-spec workflows: Optionally run /investigate, then approve and implement
 ```
 
 ### /prd status
@@ -379,7 +380,8 @@ User reviews PRD in .claude/prds/<prd-id>/prd.md
     ↓
 /spec (creates spec.md from requirements)
     ↓
-/atomize
+[oneoff-spec: optional /investigate → approve → implement]
+[orchestrator: /atomize → /enforce → /investigate → implement]
     ↓
 ... implementation ...
     ↓
@@ -404,7 +406,8 @@ User reviews extracted requirements
     ↓
 /spec (creates spec.md from requirements)
     ↓
-/atomize
+[oneoff-spec: optional /investigate → approve → implement]
+[orchestrator: /atomize → /enforce → /investigate → implement]
     ↓
 ... implementation ...
     ↓
