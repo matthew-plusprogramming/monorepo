@@ -309,6 +309,8 @@ Transition to verifying phase for cross-session tracking:
 node .claude/scripts/session-checkpoint.mjs transition-phase verifying
 ```
 
+**Commit preparation**: Stage your spec group's `manifest.json` alongside implementation files in the commit. The manifest tracks convergence state and must always travel with the implementation it describes.
+
 ### Step 8: Report Completion
 
 ```markdown
@@ -414,7 +416,6 @@ After implementation:
 2. `/security` - Security review (always)
 3. `/browser-test` - UI validation (if UI changes)
 4. `/docs` - Documentation generation (if public API)
-5. Commit — Stage your spec group's `manifest.json` alongside implementation files in the commit. The manifest tracks convergence state and must always travel with the implementation it describes.
 
 ## Error Handling
 
