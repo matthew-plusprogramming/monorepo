@@ -18,5 +18,4 @@ Canonical locations for all numbered practices in the metaclaude-assistant syste
 | 2.4      | Independent Verification      | `CLAUDE.md`                                            | 284  | Test-writer must not see implementation; tests verify contract only      |
 | 2.5      | Contract Stratification       | `CLAUDE.md`                                            | 323  | Four contract layers: type, symbol, wire protocol, behavioral            |
 | 4.2      | Progress Heartbeat Discipline | `.claude/memory-bank/tech.context.md`                  | 189  | Implementers must log progress updates; heartbeat monitors staleness     |
-| 4.3      | Content-Hash Versioning       | `.claude/memory-bank/tech.context.md`                  | 200  | Hash-based drift detection for registry-tracked artifacts                |
 | 4.5      | Integration Verification Gate | `CLAUDE.md`                                            | 305  | Cross-boundary wiring check after parallel implementation                |

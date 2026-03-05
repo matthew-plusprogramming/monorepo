@@ -159,7 +159,6 @@ The wrapper:
 | `claude-md-drift`            | `*CLAUDE.md`            | `verify-claude-md-base.mjs`       | Detect CLAUDE.md drift from canonical base             |
 | `manifest-validate`          | `*manifest.json`        | `validate-manifest.mjs`           | Validate manifest against spec-group schema            |
 | `template-validate`          | `.claude/templates/*`   | `template-validate.mjs`           | Validate template structure and placeholders           |
-| `registry-hash-verify`       | `.claude/**`            | `compute-hashes.mjs --verify`     | Artifact hash verification                             |
 | `agent-frontmatter-validate` | `.claude/agents/*.md`   | `validate-agent-frontmatter.mjs`  | Agent frontmatter schema validation                    |
 | `skill-frontmatter-validate` | `*SKILL.md`             | `validate-skill-frontmatter.mjs`  | Skill frontmatter schema validation                    |
 | `spec-schema-validate`       | `.claude/specs/**/*.md` | `spec-schema-validate.mjs`        | JSON schema validation for specs                       |
@@ -257,21 +256,6 @@ All validation scripts are located in `.claude/scripts/`.
 - `description`: One-line description (string)
 - `allowed-tools`: Comma-separated tool list (string)
 - `user-invocable`: Whether user can invoke directly (boolean)
-
-### compute-hashes.mjs
-
-**Purpose**: Compute and verify hashes for .claude artifacts.
-
-**Usage**:
-
-- `compute-hashes.mjs` - Compute hashes for all artifacts
-- `compute-hashes.mjs --verify` - Verify artifacts match expected hashes
-
-**Behavior with --verify**:
-
-- Compares current file hashes against stored hashes
-- Reports any modified files that should not have changed
-- Used to detect unauthorized modifications
 
 ### validate-manifest.mjs
 

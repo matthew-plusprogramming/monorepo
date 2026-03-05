@@ -145,7 +145,6 @@ PostToolUse hooks run automatically after Edit/Write operations to catch issues 
 | `claude-md-drift`            | `*CLAUDE.md`            | Detect CLAUDE.md drift from canonical base  |
 | `manifest-validate`          | `*manifest.json`        | Validate manifest against spec-group schema |
 | `template-validate`          | `.claude/templates/*`   | Validate template structure                 |
-| `registry-hash-verify`       | `.claude/**`            | Artifact hash verification                  |
 | `agent-frontmatter-validate` | `.claude/agents/*.md`   | Agent frontmatter schema validation         |
 | `skill-frontmatter-validate` | `*SKILL.md`             | Skill frontmatter schema validation         |
 | `spec-schema-validate`       | `.claude/specs/**/*.md` | JSON schema validation for specs            |
@@ -246,15 +245,6 @@ Long-running spec implementations must emit periodic progress signals. The `prog
 - Logging progress resets the warning counter to 0
 
 Agents working on spec-based tasks should update progress in the manifest before the heartbeat triggers. This prevents silent stalls where an agent appears active but has stopped making meaningful progress.
-
-### Content-Hash Versioning (Practice 4.3)
-
-Every artifact in `.claude/` is versioned by content hash in addition to semver. The `registry-hash-verify` hook validates hashes on every edit to `.claude/` files.
-
-- **Verify**: `node .claude/scripts/compute-hashes.mjs --verify` — checks all artifacts match their registered hashes
-- **Update**: `node .claude/scripts/compute-hashes.mjs --update` — recomputes hashes for modified artifacts
-
-When modifying scripts or other registered artifacts, always update the registry hash afterward. The hash is the source of truth for sync — consumers receive artifacts based on hash comparison, not file timestamps.
 
 ### Independent Verification (Practice 2.4)
 
