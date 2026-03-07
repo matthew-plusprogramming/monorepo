@@ -225,7 +225,7 @@ Every response must include:
 | Skill           | Purpose                                                      | When to Use                                        |
 | --------------- | ------------------------------------------------------------ | -------------------------------------------------- |
 | `/route`        | Analyze task complexity and route to workflow                | Start of any new task                              |
-| `/pm`           | Interview user to gather requirements                        | Before spec authoring                              |
+| `/prd`          | Create PRDs (gather-criticize loop), sync, amend, status     | Full PRD lifecycle management                      |
 | `/spec`         | Author specifications (TaskSpec, WorkstreamSpec, MasterSpec) | After requirements gathering                       |
 | `/atomize`      | Decompose high-level specs into atomic specs                 | Orchestrator workflows only (after spec authoring) |
 | `/enforce`      | Validate atomic specs meet atomicity criteria                | Orchestrator workflows only (after atomization)    |
@@ -239,7 +239,6 @@ Every response must include:
 | `/refactor`     | Code quality improvements                                    | Tech debt sprints, post-merge cleanup              |
 | `/orchestrate`  | Coordinate multi-workstream projects                         | For large tasks with 3+ workstreams                |
 | `/browser-test` | Browser-based UI testing                                     | For UI features, after security review             |
-| `/prd`          | Create, sync, manage PRDs in git repository                  | Drafting new PRDs or syncing external ones         |
 
 See `tech.context.md` for the full subagent list, directory structure, branch naming convention, and spec-is-contract principle.
 
@@ -256,7 +255,7 @@ Request -> Route -> Delegate to subagent -> Synthesize -> Commit
 #### Medium Task (oneoff-spec)
 
 ```
-Request -> Route -> PM Interview -> [Optional: PRD Draft] -> Spec ->
+Request -> Route -> /prd (gather-criticize loop) -> [Optional: PRD Draft] -> Spec ->
   [If cross-boundary concerns: Investigate (loop)] -> Approve ->
   [Parallel: Implement + Test] -> Integration Verify -> Unify (loop) -> Code Review (loop) -> Security (loop) ->
   [If UI: Browser Test] -> [If public API: Docs] -> [If PRD: PRD Push] -> Commit
@@ -265,7 +264,7 @@ Request -> Route -> PM Interview -> [Optional: PRD Draft] -> Spec ->
 #### Large Task (orchestrator)
 
 ```
-Request -> Route -> PM Interview -> [Optional: PRD Draft] -> ProblemBrief ->
+Request -> Route -> /prd (gather-criticize loop) -> [Optional: PRD Draft] -> ProblemBrief ->
   [Parallel: WorkstreamSpecs] -> MasterSpec ->
   Investigate (MANDATORY for multi-workstream) -> Resolve Decisions ->
   Approve -> /orchestrate (allocates worktrees, dispatches facilitator) ->
