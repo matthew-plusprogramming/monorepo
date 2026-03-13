@@ -1,5 +1,5 @@
 ---
-last_reviewed: 2026-02-14
+last_reviewed: 2026-03-12
 ---
 
 # Delegation Guidelines
@@ -216,6 +216,9 @@ Quality gates are not single-pass. Each gate runs in an iterative loop: **check 
 | Unifier Validation      | `unifier`                | `implementer` or `test-writer` | 2 consecutive clean |
 | Code Review             | `code-reviewer`          | `implementer`                  | 2 consecutive clean |
 | Security Review         | `security-reviewer`      | `implementer`                  | 2 consecutive clean |
+| Completion Verification | `completion-verifier`    | `implementer` or `documenter`  | 2 consecutive clean |
+
+**Note on direct dispatch:** The `completion-verifier` is dispatched directly as an agent without a skill wrapper, since its gate logic is self-contained in the agent definition. Most other check agents have corresponding skill files (e.g., `code-reviewer` has `/code-review`).
 
 **Why 2 consecutive passes:** A single clean pass after a fix may be coincidental — the fix addressed issue X but introduced issue Y, which the next pass catches. Two consecutive clean passes confirm the fix is stable and non-regressive.
 
