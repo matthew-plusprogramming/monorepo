@@ -1,5 +1,5 @@
 ---
-last_reviewed: 2026-02-14
+last_reviewed: 2026-03-12
 ---
 
 # Technical Context
@@ -79,7 +79,7 @@ The system is organized around the `.claude/` directory structure:
 
 ```
 .claude/
-├── agents/              # Subagent specifications (18 specialized agents)
+├── agents/              # Subagent specifications (20 specialized agents)
 ├── skills/              # Skill definitions (workflow stages)
 ├── specs/
 │   ├── groups/          # Active spec groups
@@ -101,28 +101,30 @@ The system is organized around the `.claude/` directory structure:
 
 ### Subagent Model
 
-18 specialized subagents, each with focused responsibilities:
+20 specialized subagents, each with focused responsibilities:
 
-| Subagent                 | Model | Purpose                                                                         |
-| ------------------------ | ----- | ------------------------------------------------------------------------------- |
-| `atomicity-enforcer`     | opus  | Validate atomic specs meet atomicity criteria                                   |
-| `atomizer`               | opus  | Decompose specs into atomic specs with single responsibility                    |
-| `explore`                | opus  | Investigate questions via web or codebase research; returns structured findings |
-| `interface-investigator` | opus  | Surface cross-spec inconsistencies (env vars, APIs, data shapes, assumptions)   |
-| `product-manager`        | opus  | Interview users, gather/refine requirements                                     |
-| `spec-author`            | opus  | Author workstream specs (no code)                                               |
-| `implementer`            | opus  | Implement from approved specs                                                   |
-| `test-writer`            | opus  | Write tests for acceptance criteria                                             |
-| `unifier`                | opus  | Validate convergence                                                            |
-| `code-reviewer`          | opus  | Code quality review (read-only, runs before security)                           |
-| `security-reviewer`      | opus  | Security review - PRDs (shift-left) and implementation (read-only)              |
-| `documenter`             | opus  | Generate docs from implementation                                               |
-| `refactorer`             | opus  | Code quality improvements with behavior preservation                            |
-| `facilitator`            | opus  | Orchestrate multi-workstream projects with git worktrees                        |
-| `browser-tester`         | opus  | Browser-based UI testing                                                        |
-| `prd-author`             | opus  | Author complete PRDs from requirements using template                           |
-| `prd-reader`             | opus  | Extract requirements from existing PRDs                                         |
-| `prd-writer`             | opus  | Push incremental discoveries back to PRDs                                       |
+| Subagent                 | Model | Purpose                                                                                    |
+| ------------------------ | ----- | ------------------------------------------------------------------------------------------ |
+| `atomicity-enforcer`     | opus  | Validate atomic specs meet atomicity criteria                                              |
+| `atomizer`               | opus  | Decompose specs into atomic specs with single responsibility                               |
+| `challenger`             | opus  | MANDATORY operational feasibility check for oneoff-spec and orchestrator workflows (pre-implementation/test/review/orchestration) |
+| `completion-verifier`    | opus  | Post-completion verification gates (docs, assumptions, registry, memory bank)              |
+| `explore`                | opus  | Investigate questions via web or codebase research; returns structured findings            |
+| `interface-investigator` | opus  | Surface cross-spec inconsistencies (env vars, APIs, data shapes, assumptions)              |
+| `spec-author`            | opus  | Author workstream specs (no code)                                                          |
+| `implementer`            | opus  | Implement from approved specs                                                              |
+| `test-writer`            | opus  | Write tests for acceptance criteria                                                        |
+| `unifier`                | opus  | Validate convergence                                                                       |
+| `code-reviewer`          | opus  | Code quality review (read-only, runs before security)                                      |
+| `security-reviewer`      | opus  | Security review - PRDs (shift-left) and implementation (read-only)                         |
+| `documenter`             | opus  | Generate docs from implementation                                                          |
+| `refactorer`             | opus  | Code quality improvements with behavior preservation                                       |
+| `facilitator`            | opus  | Orchestrate multi-workstream projects with git worktrees                                   |
+| `browser-tester`         | opus  | Browser-based UI testing                                                                   |
+| `prd-writer`             | opus  | Conduct discovery interviews and draft/amend PRDs (D-034 format)                           |
+| `prd-critic`             | opus  | Evaluate PRDs from one of four perspectives with severity ratings                          |
+| `prd-reader`             | opus  | Extract requirements from existing PRDs into EARS format                                   |
+| `prd-amender`            | opus  | Push implementation discoveries back to PRDs (D-028 amendment format)                      |
 
 ### Spec is Contract Principle
 
@@ -132,6 +134,29 @@ The system is organized around the `.claude/` directory structure:
 - Tests must verify spec requirements
 - Any deviation requires spec amendment first (never deviate silently)
 - Unifier validates alignment before approval
+
+### Spec System Workflow
+
+```
+oneoff-spec:  TaskSpec → Investigate (MANDATORY, mode: single-spec) → Approve → Challenge (MANDATORY, stage: pre-implementation) → Implement + Test → Challenge (MANDATORY, stage: pre-test) → Integration Verify → Unify → Challenge (MANDATORY, stage: pre-review) → Code Review → Security → Completion Verify
+orchestrator: WorkstreamSpecs → Atomize → Enforce → Investigate (MANDATORY, mode: standard) → Approve → Challenge (MANDATORY, stage: pre-orchestration) → Implement + Test → Challenge (MANDATORY, stage: pre-test) → Integration Verify → Unify → Challenge (MANDATORY, stage: pre-review) → Code Review → Security → Completion Verify
+```
+
+### Spec Types
+
+- **TaskSpec**: Single-feature specifications for medium tasks
+- **WorkstreamSpec**: Component of a larger orchestrated effort
+- **MasterSpec**: Coordinates multiple workstreams with contracts
+
+### Spec Lifecycle
+
+1. **Draft**: Initial authoring from requirements
+2. **Atomized**: Decomposed into atomic specs (orchestrator workflows only)
+3. **Enforced**: Validated against atomicity criteria (orchestrator workflows only)
+4. **Approved**: User-approved, ready for implementation
+5. **Implementing**: Work in progress
+6. **Implemented**: All atomic specs complete
+7. **Verified**: Unifier confirmed convergence
 
 ### Validation Hooks
 
@@ -145,6 +170,7 @@ PostToolUse hooks run automatically after Edit/Write operations to catch issues 
 | `claude-md-drift`            | `*CLAUDE.md`            | Detect CLAUDE.md drift from canonical base  |
 | `manifest-validate`          | `*manifest.json`        | Validate manifest against spec-group schema |
 | `template-validate`          | `.claude/templates/*`   | Validate template structure                 |
+| `registry-hash-verify`       | `.claude/**`            | Artifact hash verification                  |
 | `agent-frontmatter-validate` | `.claude/agents/*.md`   | Agent frontmatter schema validation         |
 | `skill-frontmatter-validate` | `*SKILL.md`             | Skill frontmatter schema validation         |
 | `spec-schema-validate`       | `.claude/specs/**/*.md` | JSON schema validation for specs            |
@@ -152,29 +178,7 @@ PostToolUse hooks run automatically after Edit/Write operations to catch issues 
 
 Hooks warn but don't block (graceful degradation). For full documentation, see `.claude/docs/HOOKS.md`.
 
-### Spec Lifecycle & Workflow Types
-
-#### Spec System Workflow
-
-```
-TaskSpec → Atomize → Enforce → Approve → Implement → Test → Unify → Review
-```
-
-#### Spec Types
-
-- **TaskSpec**: Single-feature specifications for medium tasks
-- **WorkstreamSpec**: Component of a larger orchestrated effort
-- **MasterSpec**: Coordinates multiple workstreams with contracts
-
-#### Spec Lifecycle
-
-1. **Draft**: Initial authoring from requirements
-2. **Atomized**: Decomposed into atomic specs (single responsibility each)
-3. **Enforced**: Validated against atomicity criteria
-4. **Approved**: User-approved, ready for implementation
-5. **Implementing**: Work in progress
-6. **Implemented**: All atomic specs complete
-7. **Verified**: Unifier confirmed convergence
+### Workflow Types
 
 #### oneoff-vibe (Small tasks)
 
@@ -189,32 +193,46 @@ Request → Route → Delegate to subagent → Synthesize → Commit
 #### oneoff-spec (Medium tasks)
 
 ```
-Request → Route → PM Interview → [Optional: PRD Draft] → Spec → Atomize → Enforce →
-  [If dependencies: Investigate] → Approve →
-  [Parallel: Implement + Test] → Unify → Code Review → Security →
+Request → Route → /prd (gather-criticize loop) → [Optional: PRD Draft] → Spec →
+  Investigate (MANDATORY, mode: single-spec) → Approve →
+  Challenge (MANDATORY, stage: pre-implementation) →
+  [Parallel: Implement + Test] →
+  Challenge (MANDATORY, stage: pre-test) → Integration Verify → Unify →
+  Challenge (MANDATORY, stage: pre-review) →
+  Code Review → Security →
+  Completion Verification →
   [If UI: Browser Test] → [If public API: Docs] → [If PRD: PRD Push] → Commit
 ```
 
 - Requires formal specification
+- No atomization step (TaskSpec is implemented directly)
+- Investigation is MANDATORY (single-spec mode: Category 7, env/dep, external surfaces)
 - Parallel implementation and testing
 - Full review chain
 
 #### orchestrator (Large tasks)
 
 ```
-Request → Route → PM Interview → [Optional: PRD Draft] → ProblemBrief →
+Request → Route → /prd (gather-criticize loop) → [Optional: PRD Draft] → ProblemBrief →
   [Parallel: WorkstreamSpecs] → MasterSpec →
   Investigate (MANDATORY for multi-workstream) → Resolve Decisions →
-  Approve → /orchestrate (allocates worktrees, dispatches facilitator) →
+  Approve → Challenge (MANDATORY, stage: pre-orchestration) →
+  /orchestrate (allocates worktrees, dispatches facilitator) →
   [Parallel per workstream: Implement + Test] →
-  Unify → Code Review → Security → Browser Test → Docs → [If PRD: PRD Push] → Commit
+  Challenge (MANDATORY, stage: pre-test) → Integration Verify →
+  Unify →
+  Challenge (MANDATORY, stage: pre-review) →
+  Code Review → Security → Completion Verification →
+  Browser Test → Docs → [If PRD: PRD Push] → Commit
 ```
 
 - 3+ workstreams
 - Git worktree isolation
 - Cross-workstream contract validation
 
-**Investigation Checkpoint**: For orchestrator workflows, `/investigate` is MANDATORY before implementation. It surfaces cross-workstream inconsistencies (env vars, API contracts, deployment assumptions) that would otherwise become runtime bugs.
+**Investigation Checkpoint**: `/investigate` is MANDATORY before implementation for both oneoff-spec (mode: `single-spec`) and orchestrator (mode: `standard`) workflows. It surfaces cross-boundary inconsistencies (env vars, API contracts, deployment assumptions) that would otherwise become runtime bugs.
+
+**Challenger Stages**: `/challenge` is MANDATORY at four workflow stages: `pre-implementation` (after approve, before impl), `pre-test` (after impl, before test verification), `pre-review` (after unify, before code review), and `pre-orchestration` (after approve, before /orchestrate -- orchestrator only). Each is a single-pass check, not a convergence gate.
 
 ### Branch Naming Convention
 
@@ -226,14 +244,33 @@ Spec-based work uses the branch naming pattern `sg-<feature-name>/<action>`:
   - `sg-auth-system/fix-logout` - Fix for auth system logout
   - `sg-e2e-add-file/implement` - E2E test implementation
 
-**Purpose**: This convention enables spec derivation from branch names. Use the `extractSpecGroupId(branchName)` utility from `.claude/scripts/selective-claude-copy.mjs` to extract the spec group ID:
+**Purpose**: This convention enables spec derivation from branch names. The spec group ID is the first path segment (e.g., `sg-auth-system` from `sg-auth-system/fix-logout`). Branches not matching the `sg-*` pattern are not spec-linked.
 
-```javascript
-import { extractSpecGroupId } from './.claude/scripts/selective-claude-copy.mjs';
+### Session State
 
-extractSpecGroupId('sg-auth-system/fix-logout'); // Returns: 'sg-auth-system'
-extractSpecGroupId('feature/random-branch'); // Returns: null
+Cross-session recovery via `.claude/context/session.json`:
+
+```json
+{
+  "phase_checkpoint": {
+    "phase": "implementing",
+    "atomic_specs_pending": ["as-003", "as-004"],
+    "atomic_specs_complete": ["as-001", "as-002"],
+    "last_completed": "as-002"
+  }
+}
 ```
+
+### Key File Locations
+
+| Artifact          | Location                                             |
+| ----------------- | ---------------------------------------------------- |
+| Active specs      | `.claude/specs/groups/<spec-group-id>/`              |
+| Atomic specs      | `.claude/specs/groups/<spec-group-id>/atomic/`       |
+| Manifest          | `.claude/specs/groups/<spec-group-id>/manifest.json` |
+| Session state     | `.claude/context/session.json`                       |
+| Agent definitions | `.claude/agents/<agent-name>.md`                     |
+| Skill definitions | `.claude/skills/<skill-name>/SKILL.md`               |
 
 ### Progress Heartbeat Discipline (Practice 4.2)
 
@@ -279,65 +316,39 @@ Before merge, all gates must pass. Each gate marked with **(loop)** runs under t
 - Unifier validation passed **(loop)**
 - Code review passed (no High/Critical issues) **(loop)**
 - Security review passed **(loop)**
+- Completion verification passed **(loop)**
 - Browser tests passed (if UI)
 - Documentation generated (if public API)
 
-### Session State Management
-
-Cross-session recovery via `.claude/context/session.json`:
-
-```json
-{
-  "phase_checkpoint": {
-    "phase": "implementing",
-    "atomic_specs_pending": ["as-003", "as-004"],
-    "atomic_specs_complete": ["as-001", "as-002"],
-    "last_completed": "as-002"
-  }
-}
-```
-
-### Key File Locations
-
-| Artifact          | Location                                             |
-| ----------------- | ---------------------------------------------------- |
-| Active specs      | `.claude/specs/groups/<spec-group-id>/`              |
-| Atomic specs      | `.claude/specs/groups/<spec-group-id>/atomic/`       |
-| Manifest          | `.claude/specs/groups/<spec-group-id>/manifest.json` |
-| Session state     | `.claude/context/session.json`                       |
-| Agent definitions | `.claude/agents/<agent-name>.md`                     |
-| Skill definitions | `.claude/skills/<skill-name>/SKILL.md`               |
-
-### Example Workflows
-
-#### oneoff-spec (Logout Button)
+### Example Workflow: oneoff-spec (Logout Button)
 
 ```markdown
 User: "Add a logout button to the dashboard"
 
 1. `/route` → oneoff-spec (medium complexity)
-2. Dispatch PM subagent → Interview user about placement, behavior, error handling
+2. Use `/prd` to gather requirements about placement, behavior, error handling
 3. Dispatch Spec-author subagent → Create TaskSpec with 4 ACs, 6 tasks
-4. Dispatch Atomizer subagent → Decompose into atomic specs
-5. Dispatch Atomicity-enforcer subagent → Validate atomicity
-6. [If spec references auth system] Dispatch Interface-investigator →
+4. [If spec references auth system] Dispatch Interface-investigator →
    Surface any conflicts with existing auth contracts
-7. User approves spec (after resolving any investigation findings)
-8. [Parallel] Dispatch Implementer + Test-writer subagents
-9. Dispatch Unifier subagent → Validate convergence
-10. [Parallel] Dispatch Code-reviewer + Security-reviewer subagents
-11. Dispatch Browser-tester subagent → UI testing
-12. Dispatch Documenter subagent → Generate API docs
-13. Synthesize results → Commit with spec evidence
+5. User approves spec (after resolving any investigation findings)
+6. `/challenge` → MANDATORY operational feasibility check (stage: pre-implementation)
+7. [Parallel] Dispatch Implementer + Test-writer subagents
+8. `/challenge` → MANDATORY operational feasibility check (stage: pre-test)
+9. Integration Verify → Dispatch Unifier subagent → Validate convergence
+10. `/challenge` → MANDATORY operational feasibility check (stage: pre-review)
+11. [Parallel] Dispatch Code-reviewer + Security-reviewer subagents
+12. Dispatch Browser-tester subagent → UI testing
+13. Dispatch Documenter subagent → Generate API docs
+14. Synthesize results → Commit with spec evidence
 ```
 
-#### Multi-Workstream with Investigation
+### Example Workflow: Multi-Workstream with Investigation
 
 ```markdown
 User: "Build a deployment pipeline with build, deploy, and monitoring"
 
 1. `/route` → orchestrator (3 workstreams)
-2. Dispatch PM subagent → Gather requirements for each workstream
+2. Use `/prd` to gather requirements for each workstream
 3. [Parallel] Dispatch 3 Spec-author subagents → Create WorkstreamSpecs
 4. Create MasterSpec linking workstreams
 5. `/investigate ms-deployment-pipeline` → MANDATORY checkpoint
@@ -348,8 +359,12 @@ User: "Build a deployment pipeline with build, deploy, and monitoring"
 7. Update affected specs with decisions
 8. Re-run `/investigate` → Clean (no issues)
 9. User approves MasterSpec
-10. [Parallel per workstream] Dispatch Implementer + Test-writer
-11. Continue with Unify → Code Review → Security → Docs → Commit
+10. `/challenge` → MANDATORY operational feasibility check (stage: pre-orchestration)
+11. [Parallel per workstream] Dispatch Implementer + Test-writer
+12. `/challenge` → MANDATORY operational feasibility check (stage: pre-test)
+13. Integration Verify → Unify → Validate convergence
+14. `/challenge` → MANDATORY operational feasibility check (stage: pre-review)
+15. Continue with Code Review → Security → Docs → Commit
 ```
 
 ### S-DLC Team Relationship
@@ -358,7 +373,7 @@ When the S-DLC system is active, teams operate as a coordination layer above the
 
 - Teams wrap existing agents (composition, not replacement)
 - Deliberation happens at team level; execution via agents
-- Skills emit lifecycle events for dashboard observability
+- Skills emit lifecycle events for dashboard observability (planned, not yet implemented)
 - Local development works identically with or without S-DLC
 
 See `.claude/journal/decisions/decision-001-sdlc-local-system-unification.md` for the full architectural decision.
