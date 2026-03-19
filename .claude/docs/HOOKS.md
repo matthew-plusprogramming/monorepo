@@ -53,14 +53,14 @@ The key field is `tool_input.file_path` which contains the absolute path to the 
 
 ### Trigger Points
 
-| Hook Event     | When Triggered                | Matchers      | Use Case                                          |
-| -------------- | ----------------------------- | ------------- | ------------------------------------------------- |
-| `PreToolUse`   | Before Edit or Write executes | `Edit\|Write` | Trace read enforcement                            |
-| `PostToolUse`  | After Edit or Write completes | `Edit\|Write` | File validation                                   |
-| `PostToolUse`  | After Read completes          | `Read`        | Superseded artifact warnings, trace read tracking |
-| `PostToolUse`  | After Bash completes          | `Bash`        | Commit policy enforcement, trace staleness checks |
-| `SubagentStop` | When a subagent completes     | (none)        | Convergence gate reminders                        |
-| `Stop`         | When session ends             | (none)        | Session logging and finalization                  |
+| Hook Event     | When Triggered                | Matchers      | Use Case                                                         |
+| -------------- | ----------------------------- | ------------- | ---------------------------------------------------------------- |
+| `PreToolUse`   | Before Edit or Write executes | `Edit\|Write` | Trace read enforcement                                           |
+| `PostToolUse`  | After Edit or Write completes | `Edit\|Write` | File validation                                                  |
+| `PostToolUse`  | After Read completes          | `Read`        | Superseded artifact warnings, trace read tracking                |
+| `PostToolUse`  | After Bash completes          | `Bash`        | Commit policy enforcement, trace staleness checks                |
+| `SubagentStop` | When a subagent completes     | (none)        | Convergence gate reminders, workflow enforcement advisory checks |
+| `Stop`         | When session ends             | (none)        | Session logging and finalization                                 |
 
 ### Configuration Location
 
@@ -149,6 +149,18 @@ The wrapper:
 | ------------------------ | --------------- | ---------------------------- | ------------------------------------------------------------ |
 | `trace-read-enforcement` | `Edit\|Write`   | `trace-read-enforcement.mjs` | Block edits to files in traced modules unless trace was read |
 
+### PreToolUse Hooks (Agent)
+
+| Hook ID                     | Trigger Pattern | Script                          | Purpose                                                                       |
+| --------------------------- | --------------- | ------------------------------- | ----------------------------------------------------------------------------- |
+| `workflow-gate-enforcement` | `Agent`         | `workflow-gate-enforcement.mjs` | Block dispatch of enforced subagent types when workflow prerequisites not met |
+
+### PreToolUse Hooks (Write - Enforcement File Protection)
+
+| Hook ID                    | Trigger Pattern | Script                         | Purpose                                                  |
+| -------------------------- | --------------- | ------------------------------ | -------------------------------------------------------- |
+| `workflow-file-protection` | `Write`         | `workflow-file-protection.mjs` | Block agent writes to gate-override.json and kill switch |
+
 ### PostToolUse Hooks (Edit|Write)
 
 | Hook ID                      | Trigger Pattern         | Script                            | Purpose                                                |
@@ -194,13 +206,16 @@ The wrapper:
 | --------------------------- | ------------------------------- | ----------------------------------------------------------------------- |
 | `convergence-gate-reminder` | `convergence-gate-reminder.mjs` | Remind main agent to update convergence gates after subagent completion |
 
+> **Note**: `workflow-enforcement-check` (advisory SubagentStop hook) has been deprecated and removed from settings.json. Its functionality is superseded by the coercive `workflow-gate-enforcement` (PreToolUse Agent) and `workflow-stop-enforcement` (Stop) hooks.
+
 ### Stop Hooks
 
-| Hook ID                   | Script / Command              | Purpose                                                          |
-| ------------------------- | ----------------------------- | ---------------------------------------------------------------- |
-| `session-log`             | inline `echo` command         | Logs session end time to `.claude/context/session.log`           |
-| `session-state-finalize`  | inline `node -e` command      | Mark session.json as interrupted if not completed gracefully     |
-| `journal-promotion-check` | `journal-promotion-check.mjs` | Suggest journal entries for memory-bank promotion at session end |
+| Hook ID                     | Script / Command                | Purpose                                                          |
+| --------------------------- | ------------------------------- | ---------------------------------------------------------------- |
+| `workflow-stop-enforcement` | `workflow-stop-enforcement.mjs` | Block session completion when mandatory dispatches are missing   |
+| `session-log`               | inline `echo` command           | Logs session end time to `.claude/context/session.log`           |
+| `session-state-finalize`    | inline `node -e` command        | Mark session.json as interrupted if not completed gracefully     |
+| `journal-promotion-check`   | `journal-promotion-check.mjs`   | Suggest journal entries for memory-bank promotion at session end |
 
 ---
 
@@ -445,7 +460,7 @@ All validation scripts are located in `.claude/scripts/`.
 **Behavior**:
 
 1. Reads SubagentStop event data from stdin (JSON with `agent_type` field)
-2. Maps agent type to convergence gate field (e.g., `implementer` → `all_acs_implemented`)
+2. Maps agent type to convergence gate field (e.g., `implementer` -> `all_acs_implemented`)
 3. Outputs JSON with `additionalContext` containing the reminder
 4. Returns empty JSON `{}` for unmapped agent types
 
@@ -460,6 +475,101 @@ All validation scripts are located in `.claude/scripts/`.
 | `security-reviewer` | `security_review_passed` |
 | `browser-tester`    | `browser_tests_passed`   |
 | `documenter`        | `docs_generated`         |
+
+### workflow-enforcement-check.mjs (DEPRECATED)
+
+> **Deprecated**: Replaced by coercive hooks `workflow-gate-enforcement.mjs` and `workflow-stop-enforcement.mjs`. Removed from settings.json. See REQ-036.
+
+**Purpose**: Previously verified that mandatory subagent dispatches occurred for the current workflow phase. Advisory-only (SubagentStop hooks cannot block).
+
+### workflow-gate-enforcement.mjs
+
+**Purpose**: Coercively block dispatch of enforced subagent types when workflow prerequisites are not met.
+
+**Hook Type**: PreToolUse (runs before Agent tool dispatch)
+
+**Matcher**: `Agent`
+
+**Behavior**:
+
+1. Reads stdin JSON for `session_id` and `tool_input.subagent_type`
+2. Checks kill switch (`gate-enforcement-disabled`) -- exits 0 if present
+3. Reads `session.json` for workflow type and dispatch history
+4. If exempt workflow (oneoff-vibe, refactor, journal-only): exits 0
+5. If non-enforced subagent type: exits 0
+6. Looks up prerequisites from enforcement table
+7. Checks dispatch history and convergence state against prerequisites
+8. If prerequisites met: exits 0
+9. If not met: checks `gate-override.json` for human override
+10. If override found: exits 0
+11. If no override: outputs BLOCKED message to stderr and exits 2
+
+**Enforcement Table**:
+
+| Blocked Subagent      | Prerequisites                                                                     |
+| --------------------- | --------------------------------------------------------------------------------- |
+| `implementer`         | `interface-investigator` + `challenger` (pre-implementation or pre-orchestration) |
+| `test-writer`         | `implementer` dispatched                                                          |
+| `code-reviewer`       | `challenger` (pre-review) + `unifier` dispatched                                  |
+| `security-reviewer`   | `convergence.code_review.clean_pass_count >= 2`                                   |
+| `documenter`          | `convergence.security_review.clean_pass_count >= 2`                               |
+| `completion-verifier` | `documenter` dispatched                                                           |
+
+**Fail-Open**: Missing session.json, malformed JSON, missing `active_work` -- all exit 0.
+**Fail-Closed Exception**: Missing convergence fields default to 0 (blocks downstream dispatch).
+
+**Exit Codes**:
+
+- `0`: Allow dispatch
+- `2`: Block dispatch (stderr message with missing prerequisites and override instructions)
+
+### workflow-file-protection.mjs
+
+**Purpose**: Block agent writes to enforcement files. Only human terminal writes are permitted.
+
+**Hook Type**: PreToolUse (runs before Write tool)
+
+**Matcher**: `Write`
+
+**Protected Files**:
+
+- `.claude/coordination/gate-override.json`
+- `.claude/coordination/gate-enforcement-disabled`
+
+**Key Property**: This hook does NOT check the kill switch. Write protection remains active even when `gate-enforcement-disabled` exists, preventing agents from self-bypassing enforcement.
+
+**Exit Codes**:
+
+- `0`: Allow write (not a protected file)
+- `2`: Block write (protected enforcement file)
+
+### workflow-stop-enforcement.mjs
+
+**Purpose**: Block session completion when mandatory dispatches have not occurred for spec-based workflows.
+
+**Hook Type**: Stop (runs on session completion)
+
+**Mandatory Dispatches**: `code-reviewer`, `security-reviewer`, `completion-verifier`, `documenter` (any status satisfies -- presence check only).
+
+**Behavior**:
+
+1. Checks kill switch -- exits 0 if present
+2. Reads `session.json` for workflow type and dispatch history
+3. Checks `stop-hook-active` sentinel -- exits 0 if present (re-entry prevention)
+4. If exempt workflow: exits 0
+5. Checks all 4 mandatory dispatch records in `subagent_tasks`
+6. If all present: exits 0
+7. If missing: checks `gate-override.json` for stop-gate override
+8. If override found: exits 0
+9. Creates `stop-hook-active` sentinel, then outputs `{"decision": "block", "reason": "..."}` via stdout
+
+**Blocking Mechanism**: stdout JSON `{"decision": "block", "reason": "..."}` -- NOT stderr + exit 2.
+
+**Re-Entry Prevention**: Creates `.claude/coordination/stop-hook-active` sentinel BEFORE blocking. On next fire, if sentinel exists, exits 0 and deletes sentinel.
+
+**Exit Codes**:
+
+- `0`: Always (blocking is via stdout JSON)
 
 ### journal-promotion-check.mjs
 
@@ -771,3 +881,5 @@ mv .claude/settings.json.bak .claude/settings.json
 ---
 
 ## Related Documentation
+
+- [Workflow Enforcement Architecture](.claude/docs/WORKFLOW-ENFORCEMENT.md) - DAG enforcement, operator overrides, completion checklist

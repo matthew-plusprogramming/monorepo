@@ -67,8 +67,9 @@ Capture the human's confirmation or correction. If corrected, note the correctio
 **Front-load irreplaceable human input**:
 
 1. **First**: Business intent, user empathy, success vision (only the human knows this)
-2. **Middle**: Scope boundaries, risks, edge cases (human input + codebase analysis)
-3. **Last**: Technical constraints, integration details (often answerable from codebase)
+2. **Early-middle**: Integration validation -- present the automated integration surface findings from Phase 1.5 and ask the human to validate, correct, or add context. Integration questions are partially pre-answered by codebase exploration, so the writer should confirm findings rather than starting cold.
+3. **Middle**: Scope boundaries, risks, edge cases (human input + codebase analysis)
+4. **Last**: Technical constraints, remaining integration details (often answerable from codebase)
 
 Questions answerable from codebase analysis (D-005 cold start) should be deferred or skipped entirely.
 
@@ -78,10 +79,10 @@ Use these as a probing guide. Cover highest-impact dimensions first. Do NOT exha
 
 1. **Product** -- What problem does this solve? Who benefits? What does success look like?
 2. **Business** -- Why now? What's the priority justification? ROI expectations?
-3. **Technical** -- Architecture impact? Integration complexity? Tech debt implications?
+3. **Integration & Dependency** -- What systems does this touch? What APIs are consumed/produced? _(Pre-populated by Phase 1.5 integration surface exploration. Present automated findings to the human for validation and refinement rather than asking from scratch.)_
 4. **User & UX** -- Who are the users? How do they interact? What's the learning curve?
 5. **Historical/Institutional** -- Has this been attempted before? What lessons exist?
-6. **Integration & Dependency** -- What systems does this touch? What APIs are consumed/produced?
+6. **Technical** -- Architecture impact? Integration complexity? Tech debt implications?
 7. **Failure Mode & Risk** -- What could go wrong? What are the failure modes? Recovery strategies?
 8. **Observability & Operations** -- How do we know it's working? Monitoring, logging, alerting?
 9. **Scale & Performance** -- Expected load? Growth trajectory? Performance requirements?
@@ -108,7 +109,7 @@ If the human chooses to stop mid-interview:
 
 Use the template at `.claude/templates/prd-phase1.template.md`.
 
-### Required Sections (9)
+### Required Sections (10)
 
 Every PRD MUST contain:
 
@@ -118,9 +119,10 @@ Every PRD MUST contain:
 4. **Scope Boundaries** -- Explicitly in-scope and out-of-scope
 5. **User Stories or Flows** -- How users interact with the feature
 6. **Non-Functional Requirements** -- Performance, security, scalability
-7. **Risks & Edge Cases** -- Known risks, failure modes
-8. **Decisions Log** -- Critic findings and resolutions (inline, structured table)
-9. **Amendment Log** -- Post-approval changes with version tracking
+7. **Integration Surface** -- Touched systems, new boundaries, config dependencies, cross-cutting concerns (pre-populated by Phase 1.5)
+8. **Risks & Edge Cases** -- Known risks, failure modes
+9. **Decisions Log** -- Critic findings and resolutions (inline, structured table)
+10. **Amendment Log** -- Post-approval changes with version tracking
 
 ### Conditional Sections
 

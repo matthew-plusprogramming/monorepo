@@ -126,7 +126,7 @@ _Status of gates required for merge._
 | Code review: no High/Critical           | ☐      |       |
 | Security review: no Critical/High       | ☐      |       |
 | Browser tests passed (if UI)            | ☐      | N/A   |
-| Documentation generated (if public API) | ☐      | N/A   |
+| Documentation generated                 | ☐      |       |
 
 ---
 

@@ -56,10 +56,14 @@ const GATE_MAP = {
     field: 'docs_generated',
     label: 'documenter',
   },
+  'completion-verifier': {
+    field: 'completion_verification_passed',
+    label: 'completion-verifier',
+  },
 };
 
-// AC1.10: All 8 canonical convergence gate fields (DEC-002).
-// GATE_MAP has 7 entries because spec_complete has no corresponding subagent
+// All 9 canonical convergence gate fields.
+// GATE_MAP has 8 entries because spec_complete has no corresponding subagent
 // (it is set by the spec-authoring workflow, not by a SubagentStop event).
 const CANONICAL_FIELDS = [
   'spec_complete',
@@ -70,6 +74,7 @@ const CANONICAL_FIELDS = [
   'security_review_passed',
   'browser_tests_passed',
   'docs_generated',
+  'completion_verification_passed',
 ];
 
 function buildReminder(agentType) {
@@ -82,7 +87,7 @@ function buildReminder(agentType) {
     `CONVERGENCE GATE REMINDER: The ${gate.label} subagent just completed. ` +
     `You should now update the spec group manifest's convergence object to set "${gate.field}": true. ` +
     `Find the active spec group manifest at .claude/specs/groups/<spec-group-id>/manifest.json and update the convergence object. ` +
-    `The 8 canonical gate fields are: ${CANONICAL_FIELDS.join(', ')}.`
+    `The ${CANONICAL_FIELDS.length} canonical gate fields are: ${CANONICAL_FIELDS.join(', ')}.`
   );
 }
 

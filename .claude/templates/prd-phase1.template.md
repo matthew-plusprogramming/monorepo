@@ -11,7 +11,7 @@ last_updated: <YYYY-MM-DD>
 # <Product/Feature Name>
 
 <!-- PRD Writer: This is the D-034 minimum structure template.
-     All 9 required sections MUST be present in every PRD.
+     All 10 required sections MUST be present in every PRD.
      Conditional sections are included when applicable.
      The PRD describes WHAT and WHY — never HOW (no implementation details). -->
 
@@ -101,7 +101,35 @@ last_updated: <YYYY-MM-DD>
 
 ---
 
-## 7. Risks & Edge Cases
+## 7. Integration Surface
+
+<!-- PRD Writer: This section is pre-populated by the integration surface exploration step (Phase 1.5).
+     Validate and refine automated findings with the human during discovery.
+     For oneoff-vibe workflows where Phase 1.5 is skipped, populate manually if integration points are known. -->
+
+### Touched Systems
+
+<!-- Populated by integration surface exploration. Lists existing systems, services, APIs, databases that this work touches. -->
+
+| System/Component            | How Touched                        | Existing Contract                       | Risk Level   |
+| --------------------------- | ---------------------------------- | --------------------------------------- | ------------ |
+| <!-- e.g., Auth service --> | <!-- Consumes /api/auth/verify --> | <!-- OpenAPI spec at docs/auth.yaml --> | <!-- Low --> |
+
+### New Boundaries Created
+
+<!-- Any new integration points this work introduces. -->
+
+### Configuration Dependencies
+
+<!-- Environment variables, feature flags, config files involved. -->
+
+### Cross-Cutting Concerns
+
+<!-- Shared state, caching layers, event systems, logging pipelines that span the boundary. -->
+
+---
+
+## 8. Risks & Edge Cases
 
 <!-- PRD Writer: Known risks, failure modes, and edge cases.
      Include likelihood, impact, and mitigation strategy for each risk.
@@ -120,7 +148,7 @@ last_updated: <YYYY-MM-DD>
 
 ---
 
-## 8. Decisions Log
+## 9. Decisions Log
 
 <!-- PRD Writer: This section tracks all critic findings and their resolutions.
      It is populated during the gather-criticize loop.
@@ -142,7 +170,7 @@ last_updated: <YYYY-MM-DD>
 
 ---
 
-## 9. Amendment Log
+## 10. Amendment Log
 
 <!-- PRD Writer: This section tracks post-approval changes to the PRD.
      Every change after the initial gather-criticize loop exits must be recorded here.

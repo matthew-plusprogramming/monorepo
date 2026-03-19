@@ -14,6 +14,10 @@
  * Global Options:
  *   --base-dir=<path>       - Override default base directory
  *   --force                 - Force overwrite on conflicts
+ *   --resolve-conflicts     - Accept upstream version for conflicting artifacts only
+ *
+ * Sync Overrides (per-project in projects.json):
+ *   "agent-assisted"        - Stage upstream to .claude/sync-pending/ for manual merge
  *
  * Usage:
  *   node metaclaude-cli.mjs <command> [project] [options]
@@ -188,8 +192,9 @@ function mergeSettings(sourceContent, targetPath) {
       let targetGroup = targetHookGroups.find(g => (g.matcher || '*') === matcher);
 
       if (!targetGroup) {
-        // No matching group in target, use source group directly
-        mergedHookGroups.push(sourceGroup);
+        // No matching group in target, use source group directly (excluding _sync: false hooks)
+        const syncableHooks = (sourceGroup.hooks || []).filter(h => h._sync !== false);
+        mergedHookGroups.push({ ...sourceGroup, hooks: syncableHooks });
         report.push(`  Added hook group [${hookType}] matcher="${matcher}"`);
       } else {
         // Merge hooks within the group
@@ -203,8 +208,8 @@ function mergeSettings(sourceContent, targetPath) {
           report.push(`  Removed ${removedCount} existing metaclaude hooks from [${hookType}] matcher="${matcher}"`);
         }
 
-        // Add all source hooks (all have _source: "metaclaude")
-        const metaclaudeHooks = sourceHooks.filter(h => h._source === 'metaclaude');
+        // Add all source hooks (all have _source: "metaclaude"), excluding _sync: false hooks
+        const metaclaudeHooks = sourceHooks.filter(h => h._source === 'metaclaude' && h._sync !== false);
 
         if (projectHooks.length > 0) {
           report.push(`  Preserved ${projectHooks.length} project-specific hooks in [${hookType}] matcher="${matcher}"`);
@@ -241,6 +246,100 @@ function mergeSettings(sourceContent, targetPath) {
   }
 
   return { merged: JSON.stringify(target, null, 2) + '\n', report };
+}
+
+// ============== GITIGNORE MERGE ==============
+
+const GITIGNORE_BLOCK_BEGIN = '# metaclaude:begin (managed by metaclaude sync - do not edit)';
+const GITIGNORE_BLOCK_END = '# metaclaude:end';
+
+/**
+ * Merge gitignore entries using a comment-delimited managed block.
+ *
+ * Strategy:
+ * 1. If no existing target .gitignore, create file with just the managed block
+ * 2. If existing file with no metaclaude block, append block to end
+ * 3. If existing file with metaclaude block, replace block contents wholesale
+ *
+ * Edge cases handled:
+ * - Missing # metaclaude:end (malformed): replace from begin to EOF
+ * - Target file without trailing newline: add separator newline before block
+ * - Source content with trailing newline: strip to avoid double-newline
+ * - CRLF line endings: preserve target file's line ending style
+ *
+ * @param {string} sourceContent - Content of gitignore-patch.txt (the managed entries)
+ * @param {string} targetPath - Path to the target .gitignore file
+ * @returns {{ merged: string, report: string[] }} Merged content and report messages
+ */
+function mergeGitignore(sourceContent, targetPath) {
+  const report = [];
+
+  // Strip trailing newline from source to avoid double-newline in block
+  const trimmedSource = sourceContent.replace(/\n$/, '');
+
+  // Build the managed block
+  const block = `${GITIGNORE_BLOCK_BEGIN}\n${trimmedSource}\n${GITIGNORE_BLOCK_END}`;
+
+  // If target doesn't exist, create with just the block
+  if (!existsSync(targetPath)) {
+    report.push('No existing .gitignore, creating with metaclaude block');
+    return { merged: block + '\n', report };
+  }
+
+  const targetContent = readFileSync(targetPath, 'utf-8');
+
+  // Detect line ending style from target
+  const usesCrlf = targetContent.includes('\r\n');
+  const lineEnding = usesCrlf ? '\r\n' : '\n';
+
+  const lines = targetContent.split(/\r?\n/);
+
+  // Find the begin marker
+  const beginIdx = lines.findIndex(line => line.trim() === GITIGNORE_BLOCK_BEGIN);
+
+  if (beginIdx !== -1) {
+    // Find the end marker
+    const endIdx = lines.findIndex((line, i) => i > beginIdx && line.trim() === GITIGNORE_BLOCK_END);
+
+    let beforeBlock = lines.slice(0, beginIdx);
+    let afterBlock;
+
+    if (endIdx !== -1) {
+      // Normal case: replace everything between begin and end (inclusive)
+      afterBlock = lines.slice(endIdx + 1);
+      report.push('Replaced existing metaclaude block');
+    } else {
+      // Malformed: no end marker, replace from begin to EOF
+      afterBlock = [];
+      report.push('Warning: Found # metaclaude:begin without # metaclaude:end, replacing to end of file');
+    }
+
+    // Rebuild with new block
+    const blockLines = block.split('\n');
+    const merged = [...beforeBlock, ...blockLines, ...afterBlock].join(lineEnding);
+
+    // Ensure trailing newline
+    const finalContent = merged.endsWith(lineEnding) ? merged : merged + lineEnding;
+    return { merged: finalContent, report };
+  }
+
+  // No existing block: append to end
+  // Ensure there's a newline separator before the block
+  let separator = '';
+  if (targetContent.length > 0 && !targetContent.endsWith('\n') && !targetContent.endsWith('\r\n')) {
+    separator = lineEnding;
+  }
+
+  // Add an extra blank line before the block for readability if the file has content
+  if (targetContent.trim().length > 0) {
+    separator += lineEnding;
+  }
+
+  const blockWithLineEndings = block.split('\n').join(lineEnding);
+  const merged = targetContent + separator + blockWithLineEndings + lineEnding;
+
+  report.push('Appended metaclaude block to .gitignore');
+  return { merged, report };
 }
 
 // ============== COMMANDS ==============
@@ -314,11 +413,26 @@ async function cmdStatus(projectArg, options) {
     let missing = 0;
     let current = 0;
     let modified = 0;
+    let agentAssisted = 0;
 
     for (const artifactPath of [...targetArtifacts].sort()) {
       const artifact = getArtifact(registry, artifactPath);
       if (!artifact) {
         log(`? ${artifactPath} - not found in registry`, 'yellow');
+        continue;
+      }
+
+      // Show agent-assisted artifacts with distinct indicator
+      if (projectConfig.sync_overrides?.[artifactPath] === 'agent-assisted') {
+        const installed = lock.installed[artifactPath];
+        const hasUpdate = installed ? installed.hash !== artifact.hash : true;
+        if (hasUpdate) {
+          log(`⊕ ${artifactPath}: ${artifact.version}@${artifact.hash} (agent-assisted merge needed)`, 'cyan');
+          agentAssisted++;
+        } else {
+          log(`⊕ ${artifactPath}: ${artifact.version}@${artifact.hash} (agent-assisted, up to date)`, 'dim');
+          current++;
+        }
         continue;
       }
 
@@ -347,8 +461,13 @@ async function cmdStatus(projectArg, options) {
         if (localExists) {
           const localHash = computeHash(readFileSync(localPath, 'utf-8'));
           if (localHash !== installed.hash) {
-            log(`* ${artifactPath}: ${artifact.version}@${artifact.hash} (locally modified)`, 'yellow');
-            modified++;
+            if (artifact.merge_strategy === 'settings-merge' || artifact.merge_strategy === 'gitignore-merge') {
+              log(`  ${artifactPath}: ${artifact.version}@${artifact.hash} (merged)`, 'dim');
+              // Don't increment modified count - merge-strategy artifacts are expected to differ
+            } else {
+              log(`* ${artifactPath}: ${artifact.version}@${artifact.hash} (locally modified)`, 'yellow');
+              modified++;
+            }
           } else {
             log(`✓ ${artifactPath}: ${artifact.version}@${artifact.hash}`, 'dim');
             current++;
@@ -361,7 +480,8 @@ async function cmdStatus(projectArg, options) {
     }
 
     log('');
-    log(`Summary: ${current} current, ${updatesAvailable} updates, ${missing} missing, ${modified} modified`);
+    const agentMsg = agentAssisted > 0 ? `, ${agentAssisted} agent-assisted` : '';
+    log(`Summary: ${current} current, ${updatesAvailable} updates, ${missing} missing, ${modified} modified${agentMsg}`);
   }
 
   log('');
@@ -414,6 +534,8 @@ async function cmdSync(projectArg, options) {
     let synced = 0;
     let skipped = 0;
     let conflicts = 0;
+    let resolved = 0;
+    const pendingMerges = [];
 
     for (const artifactPath of [...targetArtifacts].sort()) {
       const artifact = getArtifact(registry, artifactPath);
@@ -445,19 +567,63 @@ async function cmdSync(projectArg, options) {
         continue;
       }
 
+      // Check per-artifact sync override (e.g., agent-assisted)
+      if (projectConfig.sync_overrides?.[artifactPath] === 'agent-assisted') {
+        const srcContent = readFileSync(sourceFile, 'utf-8');
+        const srcHash = computeHash(srcContent);
+        const installed = lock.installed[artifactPath];
+
+        // Skip if upstream hasn't changed since last sync
+        if (installed && installed.hash === srcHash) {
+          log(`  Skip ${artifactPath}: agent-assisted (no upstream changes)`, 'dim');
+          skipped++;
+          continue;
+        }
+
+        // Stage upstream version for agent-assisted merge
+        const pendingDir = join(projectPath, '.claude', 'sync-pending');
+        const pendingFile = join(pendingDir, targetPath);
+        mkdirSync(dirname(pendingFile), { recursive: true });
+        copyFileSync(sourceFile, pendingFile);
+
+        // Update lock to record we've "seen" this upstream version
+        lock.installed[artifactPath] = {
+          version: artifact.version,
+          hash: srcHash,
+          installed_at: new Date().toISOString()
+        };
+
+        pendingMerges.push({
+          artifact: artifactPath,
+          upstream: join('.claude', 'sync-pending', targetPath),
+          local: targetPath,
+          version: artifact.version,
+          hash: srcHash,
+        });
+
+        log(`  ⊕ ${artifactPath}: staged for agent-assisted merge`, 'cyan');
+        continue;
+      }
+
       const sourceContent = readFileSync(sourceFile, 'utf-8');
       const sourceHash = computeHash(sourceContent);
 
       // Check for local modifications
       if (existsSync(targetFile) && lock.installed[artifactPath]) {
         const localHash = computeHash(readFileSync(targetFile, 'utf-8'));
-        if (localHash !== lock.installed[artifactPath].hash && !options.force) {
-          // Special case: settings.json uses merge strategy, not conflict
-          if (artifact.merge_strategy !== 'settings-merge') {
+        if (localHash !== lock.installed[artifactPath].hash && !options.force && !options.resolveConflicts) {
+          // Special case: merge-strategy artifacts handle their own merging, not conflict
+          if (artifact.merge_strategy !== 'settings-merge' && artifact.merge_strategy !== 'gitignore-merge') {
             log(`  Conflict ${artifactPath}: local modifications detected`, 'yellow');
-            log(`    Use --force to overwrite or add to protected list`, 'dim');
+            log(`    Use --force or --resolve-conflicts to overwrite`, 'dim');
             conflicts++;
             continue;
+          }
+        } else if (localHash !== lock.installed[artifactPath].hash && options.resolveConflicts) {
+          // --resolve-conflicts: accept upstream version for conflicting artifacts
+          if (artifact.merge_strategy !== 'settings-merge' && artifact.merge_strategy !== 'gitignore-merge') {
+            log(`  Resolving conflict ${artifactPath}: accepting upstream`, 'cyan');
+            resolved++;
           }
         }
       }
@@ -468,6 +634,12 @@ async function cmdSync(projectArg, options) {
       // Handle special merge strategies
       if (artifact.merge_strategy === 'settings-merge') {
         const { merged, report } = mergeSettings(sourceContent, targetFile);
+        writeFileSync(targetFile, merged);
+        for (const msg of report) {
+          log(msg, 'dim');
+        }
+      } else if (artifact.merge_strategy === 'gitignore-merge') {
+        const { merged, report } = mergeGitignore(sourceContent, targetFile);
         writeFileSync(targetFile, merged);
         for (const msg of report) {
           log(msg, 'dim');
@@ -505,8 +677,24 @@ async function cmdSync(projectArg, options) {
     saveJson(lockPath, lock);
 
     log('');
+    const pendingMsg = pendingMerges.length > 0 ? `, ${pendingMerges.length} pending merge` : '';
     const prunedMsg = pruned > 0 ? `, ${pruned} pruned` : '';
-    log(`Complete: ${synced} synced, ${skipped} skipped, ${conflicts} conflicts${prunedMsg}`);
+    const resolvedMsg = resolved > 0 ? `, ${resolved} resolved` : '';
+    log(`Complete: ${synced} synced, ${skipped} skipped, ${conflicts} conflicts${resolvedMsg}${pendingMsg}${prunedMsg}`);
+
+    // Report agent-assisted merges
+    if (pendingMerges.length > 0) {
+      log('');
+      log(`Agent-Assisted Merges Pending (${pendingMerges.length}):`, 'yellow');
+      for (const pm of pendingMerges) {
+        log(`  ${pm.artifact} (v${pm.version}):`, 'yellow');
+        log(`    Upstream staged: ${pm.upstream}`, 'dim');
+        log(`    Local file:      ${pm.local}`, 'dim');
+      }
+      log('');
+      log('Merge upstream changes into local files, preserving project-specific content.', 'dim');
+      log('Delete .claude/sync-pending/ after merging.', 'dim');
+    }
 
     // Auto-repair session.json if it exists but is missing required fields
     const sessionJsonPath = join(projectPath, '.claude', 'context', 'session.json');
@@ -585,8 +773,15 @@ async function cmdVerify(projectArg, options) {
 
       const localHash = computeHash(readFileSync(localPath, 'utf-8'));
       if (localHash !== installed.hash) {
-        log(`✗ ${artifactPath}: drift detected (expected ${installed.hash}, got ${localHash})`, 'red');
-        failed++;
+        // Merge-strategy artifacts (settings-merge, gitignore-merge) produce merged files
+        // whose hash will never match the source hash. Skip drift detection for these.
+        if (artifact.merge_strategy === 'settings-merge' || artifact.merge_strategy === 'gitignore-merge') {
+          log(`✓ ${artifactPath}: ${installed.version}@${installed.hash} (merge-managed)`, 'green');
+          passed++;
+        } else {
+          log(`✗ ${artifactPath}: drift detected (expected ${installed.hash}, got ${localHash})`, 'red');
+          failed++;
+        }
       } else {
         log(`✓ ${artifactPath}: ${installed.version}@${installed.hash}`, 'green');
         passed++;
@@ -690,6 +885,7 @@ async function main() {
   // Parse options
   const options = {
     force: args.includes('--force'),
+    resolveConflicts: args.includes('--resolve-conflicts'),
     baseDir: args.find(a => a.startsWith('--base-dir='))?.split('=')[1],
     path: args.find(a => a.startsWith('--path='))?.split('=')[1],
     bundle: args.find(a => a.startsWith('--bundle='))?.split('=')[1],
@@ -739,6 +935,7 @@ Commands:
 Options:
   --base-dir=<path>         Override default base directory for path resolution
   --force                   Force overwrite on conflicts
+  --resolve-conflicts       Accept upstream version for conflicting artifacts only
   --path=<path>             (add) Explicit path for project
   --bundle=<bundle>         (add) Bundle to use
 
@@ -748,6 +945,7 @@ Examples:
   metaclaude status my-project
   metaclaude sync
   metaclaude sync my-project --force
+  metaclaude sync my-project --resolve-conflicts
   metaclaude add my-project
   metaclaude add my-project --path=/custom/path --bundle=core-workflow
   metaclaude remove my-project

@@ -14,6 +14,18 @@ Investigate and surface connection points between different specs, systems, and 
 
 **Critical**: You investigate and report. You do NOT fix issues or modify specs. Your job is to surface problems for humans and other agents to resolve.
 
+## Mode Parameter
+
+This agent accepts a `mode` parameter:
+
+- **`standard`** (default): Full cross-spec investigation across all categories (1-7). Used for orchestrator workflows with multiple workstreams.
+- **`single-spec`**: Lightweight investigation for oneoff-spec workflows. Constrains investigation to:
+  - **Category 7**: Intra-spec wire format and contract consistency
+  - **Environment and dependency assumption validation**: Are env vars, packages, and services referenced in the spec actually available?
+  - **External integration surface checks**: Do external APIs, databases, or services referenced in the spec exist and match expected contracts?
+  - **Skips**: Cross-spec comparison categories (Categories 1-6 cross-spec aspects) since only one spec is in scope
+  - **Completes in one pass**: No iterative convergence loop (NFR-3)
+
 ## Hard Token Budget
 
 Your return to the orchestrator must be **< 300 words**. Include: scope, inconsistency count by severity, decisions required (as a table), and top blockers. Full investigation report goes in the output contract format below — the return is the executive summary. This is a hard budget.
@@ -267,12 +279,12 @@ Compare connection maps to find:
 
 ### 4. Categorize by Severity
 
-| Severity    | Description               | Example                                  |
-| ----------- | ------------------------- | ---------------------------------------- |
-| **Blocker** | Implementation will fail  | Spec expects endpoint that doesn't exist |
-| **High**    | Will cause runtime errors | Env var naming mismatch                  |
-| **Medium**  | Technical debt            | Inconsistent naming conventions          |
-| **Low**     | Documentation issue       | Missing assumption documentation         |
+| Severity     | Description               | Example                                  |
+| ------------ | ------------------------- | ---------------------------------------- |
+| **Critical** | Implementation will fail  | Spec expects endpoint that doesn't exist |
+| **High**     | Will cause runtime errors | Env var naming mismatch                  |
+| **Medium**   | Technical debt            | Inconsistent naming conventions          |
+| **Low**      | Documentation issue       | Missing assumption documentation         |
 
 ### 5. Surface Canonical Decisions Needed
 
@@ -297,6 +309,28 @@ For each inconsistency, identify the decision required:
 **Migration Required**: MS2 needs update
 ```
 
+## Finding Presentation Format
+
+When producing findings for human decision-making, use the **action-first** format:
+
+```
+**<FINDING-ID>** (<Severity>): <Recommended Action> -- <action verb>
+Impact: <One-sentence consequence if unaddressed>
+Finding: <Summary of what was identified>
+<Detail or evidence -- collapsed/optional for Medium and Low>
+```
+
+**Field order** (mandatory): (1) Recommended action, (2) Impact indicator, (3) Finding summary, (4) Detail
+
+### Batch Decision Rules
+
+- **Critical/High**: Individual confirmation required (no batch shortcuts)
+- **Medium**: Batch shortcuts offered (e.g., "accept all Medium findings")
+- **Low**: Single summary block, no individual action required
+- **Security-tagged**: Always surfaced separately, require explicit individual confirmation. Batch shortcuts NEVER include security-tagged findings.
+
+All batch-accepted decisions are logged individually in the Decisions Log with specific finding IDs. If a batch-accepted decision is later found incorrect, amendment follows the normal process. If implementation is in-flight, the affected workstream is halted, spec amendment applied, and pre-flight re-runs before resuming.
+
 ## Output Contract (MANDATORY)
 
 Every investigation report MUST include:
@@ -320,7 +354,7 @@ Every investigation report MUST include:
 
 ## Inconsistencies Found
 
-### Blocker (<count>)
+### Critical (<count>)
 
 <List with details>
 
@@ -449,7 +483,7 @@ Found 3 inconsistencies between MS2 and MS3 that will block MS4 implementation. 
 
 ## Inconsistencies Found
 
-### Blocker (1)
+### Critical (1)
 
 **INC-001: Missing .env Fields**
 

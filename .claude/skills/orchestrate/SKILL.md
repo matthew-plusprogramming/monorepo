@@ -13,6 +13,17 @@ Before beginning work, read these files for project-specific guidelines:
 
 - `.claude/memory-bank/best-practices/subagent-design.md`
 
+## Pre-Flight Challenge
+
+Before beginning work, address these operational feasibility questions:
+
+1. Are there cross-workstream conflicts in shared resources (env vars, ports, DB schemas)?
+2. Is there shared resource contention (file locks, build artifacts, test databases)?
+3. Are workstream sequencing risks identified (circular deps, missing prerequisites)?
+4. Are coordination gaps visible (unowned integration boundaries, unclear contracts)?
+
+If any question cannot be answered from available context, surface it as a finding -- do not skip.
+
 ## Purpose
 
 Orchestrate large multi-workstream projects (orchestrator workflow) using git worktrees for true parallel development. This skill coordinates the facilitator agent to manage worktree allocation, dependency ordering, subagent execution, and auto-merge after convergence gates pass.
@@ -641,6 +652,77 @@ Continue cycle for each workstream:
 9. Unblock dependents (step 11)
 
 Until all workstreams merged.
+
+### 12a. Mandatory Post-Merge Quality Gates
+
+After all workstreams are merged and before final validation, the following mandatory gates MUST be executed. Each gate uses the session checkpoint for enforcement tracking.
+
+#### Challenge Dispatches (MANDATORY at 4 stages)
+
+Challenge dispatches are tracked per-stage. The orchestration layer emits `--stage` when dispatching challenger subagents (DEC-008).
+
+```bash
+# Stage 1: Pre-orchestration (before dispatching implementers, after spec approval)
+node .claude/scripts/session-checkpoint.mjs dispatch-subagent challenge-pre-orch challenger "Pre-orchestration feasibility check" --stage pre-orchestration
+node .claude/scripts/session-checkpoint.mjs transition-phase challenging
+# Dispatch challenger subagent with stage: pre-orchestration
+# After challenger completes:
+node .claude/scripts/session-checkpoint.mjs complete-subagent challenge-pre-orch "Pre-orchestration challenge passed"
+
+# Stage 2: Pre-test (after implementation, before test verification)
+node .claude/scripts/session-checkpoint.mjs dispatch-subagent challenge-pre-test challenger "Pre-test feasibility check" --stage pre-test
+node .claude/scripts/session-checkpoint.mjs transition-phase challenging
+# After challenger completes:
+node .claude/scripts/session-checkpoint.mjs complete-subagent challenge-pre-test "Pre-test challenge passed"
+
+# Stage 3: Pre-review (after unify, before code review)
+node .claude/scripts/session-checkpoint.mjs dispatch-subagent challenge-pre-review challenger "Pre-review feasibility check" --stage pre-review
+node .claude/scripts/session-checkpoint.mjs transition-phase challenging
+# After challenger completes:
+node .claude/scripts/session-checkpoint.mjs complete-subagent challenge-pre-review "Pre-review challenge passed"
+```
+
+#### Code Review (MANDATORY)
+
+```javascript
+Task({
+  description: 'Code review for all workstreams',
+  prompt: `Review all workstream implementations for code quality...`,
+  subagent_type: 'code-reviewer',
+});
+```
+
+#### Completion Verification (MANDATORY)
+
+```javascript
+Task({
+  description: 'Completion verification for all workstreams',
+  prompt: `Verify all post-completion gates: docs, assumptions, registry, memory bank...`,
+  subagent_type: 'completion-verifier',
+});
+```
+
+#### Documentation Generation (MANDATORY)
+
+```javascript
+Task({
+  description: 'Generate documentation from implementation',
+  prompt: `Generate documentation from the completed implementation...`,
+  subagent_type: 'documenter',
+});
+```
+
+#### PRD Amendment (when PRD exists)
+
+If the implementation was driven by a PRD, push implementation discoveries back:
+
+```javascript
+Task({
+  description: 'Push implementation discoveries to PRD',
+  prompt: `Review implementation decisions and push amendments to the source PRD...`,
+  subagent_type: 'prd-amender',
+});
+```
 
 ### 13. Cleanup Worktrees
 

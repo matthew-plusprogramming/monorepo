@@ -69,6 +69,25 @@ Verify requirements.md:
 - [ ] Edge cases identified
 - [ ] Open questions resolved or deferred
 
+#### PRD Staleness Detection
+
+If `requirements.md` has `prd_version` and `prd_content_hash` in its YAML frontmatter, and a `prd_path` field pointing to a PRD:
+
+1. Read the PRD at the path specified by `prd_path`
+2. Compare `prd_version` in requirements.md against the current PRD's version field
+3. Compute the PRD body content hash (SHA-256 of everything after the closing `---` of the PRD's YAML frontmatter, first 8 chars of hex digest)
+4. Compare `prd_content_hash` in requirements.md against the computed hash
+
+**If `prd_version` diverges**: Flag as Medium-severity finding:
+
+> "requirements.md is based on PRD vX but PRD is now vY. Run `/prd sync` to re-extract requirements."
+
+**If `prd_version` matches but `prd_content_hash` does not**: Flag as:
+
+> "PRD modified without version bump. Content hash mismatch: requirements.md has XXXXXXXX, PRD body computes to YYYYYYYY."
+
+**If both match**: No staleness issue -- proceed.
+
 **Output**: Requirements completeness report
 
 ```markdown
@@ -79,6 +98,7 @@ Verify requirements.md:
 - Requirements: 4 in EARS format (REQ-001 through REQ-004)
 - All high priority questions resolved
 - No blocking open questions
+- PRD staleness: No divergence detected (prd_version: 1.8, hash: matched)
 ```
 
 ### Step 3: Spec Completeness Check
@@ -97,6 +117,27 @@ Verify spec.md:
 - [ ] Task list with dependencies
 - [ ] Test plan mapping ACs to test cases
 - [ ] Open questions resolved
+
+#### Bidirectional REQ-to-AC Traceability Check
+
+After verifying structural completeness, check bidirectional traceability between requirements and acceptance criteria:
+
+**Forward traceability** (every REQ has at least one AC):
+
+1. Parse all REQ-XXX identifiers from requirements.md
+2. Parse `[traces: REQ-XXX]` tags (or comma-separated: `[traces: REQ-001, REQ-003]`) from ACs in spec.md
+3. For each REQ-XXX in requirements.md, verify at least one AC references it via a `[traces: REQ-XXX]` tag
+4. Unmapped REQs are flagged as **coverage gaps**
+
+**Backward traceability** (every AC traces to a REQ):
+
+1. Parse all ACs in spec.md
+2. For each AC, verify it includes a `[traces: REQ-XXX]` tag linking back to a requirement
+3. ACs without `[traces:]` tags are flagged as **potentially ungrounded**
+
+**Alternative format**: A mapping table in spec.md is also acceptable. If a mapping table is present, use it for traceability verification instead of inline tags.
+
+**Note**: These checks verify structural presence of tags only. Semantic/intent coverage (does the AC truly satisfy the REQ?) is verified during human review.
 
 **Output**: Spec completeness report
 
@@ -451,9 +492,10 @@ After convergence, the review chain is:
 
 1. `/code-review <spec-group-id>` - Code quality review (always)
 2. `/security <spec-group-id>` - Security review (always)
-3. `/browser-test <spec-group-id>` - UI validation (if UI changes)
-4. `/docs <spec-group-id>` - Documentation generation (if public API)
-5. Commit
+3. Completion verification - Post-completion gates via `completion-verifier` agent (always, oneoff-vibe exempt)
+4. `/browser-test <spec-group-id>` - UI validation (if UI changes)
+5. `/docs <spec-group-id>` - Documentation generation (if public API)
+6. Commit
 
 **Next step after unify passes**: Dispatch `/code-review`
 

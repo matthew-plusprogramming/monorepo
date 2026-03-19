@@ -7,6 +7,31 @@ user-invocable: true
 
 # Code Review Skill
 
+## Required Context
+
+### Trace Context
+
+Before starting, read the following trace file(s) for architectural context.
+Treat trace data as advisory -- verify critical assumptions (file existence, export
+availability) against source before irreversible decisions.
+
+- `.claude/traces/low-level/<module-id>.json` (fresh)
+- `.claude/traces/low-level/<module-id>.json` (stale: last generated <date> -- verify critical assumptions against source)
+
+Note: Traces for modules [X, Y] were skipped (exceeded 50KB size threshold). Use standard exploration for architectural context on these modules.
+
+**Path resolution**: Resolve task target file paths from the git diff. Match these paths against module `fileGlobs` in `.claude/traces/trace.config.json` (loaded via `loadTraceConfig()` from `.claude/scripts/lib/trace-utils.mjs`) to identify relevant trace modules. Validate freshness per-trace using `isTraceStale(moduleId, config)`. If no traces directory, config, or matching modules exist, omit this section entirely and proceed without traces.
+
+## Pre-Flight Challenge
+
+Before beginning work, address these operational feasibility questions:
+
+1. What are the riskiest change areas in this implementation?
+2. Which integration boundaries does this change cross?
+3. What review focus areas does the spec's security or edge-case section highlight?
+
+If any question cannot be answered from available context, surface it as a finding -- do not skip.
+
 ## Purpose
 
 Review implementation for quality issues before security review. Catch maintainability problems, style inconsistencies, and best practice violations. Produce pass/fail report with findings.

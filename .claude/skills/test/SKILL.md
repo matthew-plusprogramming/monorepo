@@ -7,6 +7,32 @@ user-invocable: true
 
 # Test Writing Skill
 
+## Required Context
+
+### Trace Context
+
+Before starting, read the following trace file(s) for architectural context.
+Treat trace data as advisory -- verify critical assumptions (file existence, export
+availability) against source before irreversible decisions.
+
+- `.claude/traces/low-level/<module-id>.json` (fresh)
+- `.claude/traces/low-level/<module-id>.json` (stale: last generated <date> -- verify critical assumptions against source)
+
+Note: Traces for modules [X, Y] were skipped (exceeded 50KB size threshold). Use standard exploration for architectural context on these modules.
+
+**Path resolution**: Resolve task target file paths from the spec evidence table. Match these paths against module `fileGlobs` in `.claude/traces/trace.config.json` (loaded via `loadTraceConfig()` from `.claude/scripts/lib/trace-utils.mjs`) to identify relevant trace modules. Validate freshness per-trace using `isTraceStale(moduleId, config)`. If no traces directory, config, or matching modules exist, omit this section entirely and proceed without traces.
+
+## Pre-Flight Challenge
+
+Before beginning work, address these operational feasibility questions:
+
+1. Is the test infrastructure (test runner, assertion library) installed and functional?
+2. Are required test fixtures and seed data available or creatable?
+3. Is the test execution environment ready (env vars, mock services, ports)?
+4. Does the test command (`npm test`) run successfully on existing tests?
+
+If any question cannot be answered from available context, surface it as a finding -- do not skip.
+
 ## Purpose
 
 Write tests that verify atomic spec requirements with full traceability to acceptance criteria. Tests serve as executable validation of the spec contract.

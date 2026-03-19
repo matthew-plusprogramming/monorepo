@@ -178,6 +178,12 @@
         "hooks": [
           {
             "_source": "metaclaude",
+            "_id": "workflow-stop-enforcement",
+            "type": "command",
+            "command": "cd \"$CLAUDE_PROJECT_DIR\" && node .claude/scripts/workflow-stop-enforcement.mjs"
+          },
+          {
+            "_source": "metaclaude",
             "_id": "session-log",
             "type": "command",
             "command": "cd \"$CLAUDE_PROJECT_DIR\" && echo \"Session ended at $(date)\" >> .claude/context/session.log 2>/dev/null || true"
@@ -206,6 +212,28 @@
             "_id": "trace-read-enforcement",
             "type": "command",
             "command": "cd \"$CLAUDE_PROJECT_DIR\" && node .claude/scripts/trace-read-enforcement.mjs"
+          }
+        ]
+      },
+      {
+        "matcher": "Agent",
+        "hooks": [
+          {
+            "_source": "metaclaude",
+            "_id": "workflow-gate-enforcement",
+            "type": "command",
+            "command": "cd \"$CLAUDE_PROJECT_DIR\" && node .claude/scripts/workflow-gate-enforcement.mjs"
+          }
+        ]
+      },
+      {
+        "matcher": "Write",
+        "hooks": [
+          {
+            "_source": "metaclaude",
+            "_id": "workflow-file-protection",
+            "type": "command",
+            "command": "cd \"$CLAUDE_PROJECT_DIR\" && node .claude/scripts/workflow-file-protection.mjs"
           }
         ]
       }

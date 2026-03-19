@@ -13,6 +13,30 @@ Before beginning work, read these files for project-specific guidelines:
 
 - `.claude/memory-bank/best-practices/subagent-design.md`
 
+### Trace Context
+
+Before starting, read the following trace file(s) for architectural context.
+Treat trace data as advisory -- verify critical assumptions (file existence, export
+availability) against source before irreversible decisions.
+
+- `.claude/traces/low-level/<module-id>.json` (fresh)
+- `.claude/traces/low-level/<module-id>.json` (stale: last generated <date> -- verify critical assumptions against source)
+
+Note: Traces for modules [X, Y] were skipped (exceeded 50KB size threshold). Use standard exploration for architectural context on these modules.
+
+**Path resolution**: Resolve task target file paths from the spec evidence table or task list. Match these paths against module `fileGlobs` in `.claude/traces/trace.config.json` (loaded via `loadTraceConfig()` from `.claude/scripts/lib/trace-utils.mjs`) to identify relevant trace modules. Validate freshness per-trace using `isTraceStale(moduleId, config)`. If no traces directory, config, or matching modules exist, omit this section entirely and proceed without traces.
+
+## Pre-Flight Challenge
+
+Before beginning work, address these operational feasibility questions:
+
+1. Are all required environment variables configured for this feature?
+2. Are external dependencies (APIs, services, databases) available and accessible?
+3. Are infrastructure prerequisites (build tools, runtimes, packages) in place?
+4. Is the execution environment ready (correct Node version, disk space, permissions)?
+
+If any question cannot be answered from available context, surface it as a finding -- do not skip.
+
 ## Purpose
 
 Execute implementation from approved atomic specs with full traceability to requirements.
@@ -414,8 +438,9 @@ After implementation:
 
 1. `/code-review` - Code quality review (always)
 2. `/security` - Security review (always)
-3. `/browser-test` - UI validation (if UI changes)
-4. `/docs` - Documentation generation (if public API)
+3. Completion verification - Post-completion gates via `completion-verifier` agent (always, oneoff-vibe exempt)
+4. `/browser-test` - UI validation (if UI changes)
+5. `/docs` - Documentation generation (if public API)
 
 ## Error Handling
 

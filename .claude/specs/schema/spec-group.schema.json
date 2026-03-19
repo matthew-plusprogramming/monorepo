@@ -150,6 +150,10 @@
         "docs_generated": {
           "type": ["boolean", "null"],
           "description": "null if not applicable"
+        },
+        "completion_verification_passed": {
+          "type": ["boolean", "null"],
+          "description": "null if not applicable"
         }
       }
     },
@@ -174,7 +178,8 @@
               "code-reviewer",
               "security-reviewer",
               "facilitator",
-              "interface-investigator"
+              "interface-investigator",
+              "completion-verifier"
             ]
           },
           "action": { "type": "string" },

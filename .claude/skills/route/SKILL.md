@@ -320,7 +320,7 @@ delegation:
   sequential_dependencies:
     - <subtask that must complete first>
   exploration_needed: true | false
-  investigation_required: true | false # MANDATORY true for orchestrator
+  investigation_required: true | false # MANDATORY true for orchestrator AND oneoff-spec
 workstreams:
   - <workstream 1> (for orchestrator only)
   - <workstream 2>
@@ -337,8 +337,8 @@ next_action: <Suggested next step>
 
 **Investigation rules**:
 
-- `orchestrator`: Investigation is MANDATORY before implementation
-- `oneoff-spec`: Investigation recommended if spec has dependencies or references existing systems
+- `orchestrator`: Investigation is MANDATORY before implementation (mode: `standard`)
+- `oneoff-spec`: Investigation is MANDATORY before implementation (mode: `single-spec`). Dispatches interface-investigator with `mode: "single-spec"` which constrains to Category 7 (intra-spec consistency), env/dependency validation, and external integration surface checks. Completes in one pass.
 - `oneoff-vibe`, `refactor`, `journal-only`: Investigation typically not needed
 
 ### Step 6: Persist Decision
@@ -472,9 +472,9 @@ For architectural decisions, use the decision-record template:
 
 After routing:
 
-- **oneoff-vibe**: Proceed directly to implementation
-- **oneoff-spec**: Use `/prd` to gather requirements → `/spec` to create spec group → [If cross-boundary concerns: `/investigate`] → User approval → `/implement` + `/test` → `/unify` → `/code-review` → `/security` → (if PRD exists) `/prd amend` to sync discoveries
-- **orchestrator**: Use `/prd` to create PRD with gather-criticize loop → `/spec` to create MasterSpec with workstream spec groups → For each workstream: `/atomize` + `/enforce` → **MANDATORY: `/investigate` to surface cross-workstream inconsistencies** → Resolve decisions → User approval → Facilitator orchestrates parallel execution → `/prd amend` to sync discoveries
+- **oneoff-vibe**: Proceed directly to implementation (exempt from completion verification gates)
+- **oneoff-spec**: Use `/prd` to gather requirements → `/spec` to create spec group → `/investigate` (MANDATORY, mode: single-spec) → User approval → `/challenge` (MANDATORY, stage: pre-implementation, via `dispatch-subagent --stage pre-implementation`) → `/implement` + `/test` → `/challenge` (MANDATORY, stage: pre-test, via `dispatch-subagent --stage pre-test`) → Integration Verify → `/unify` → `/challenge` (MANDATORY, stage: pre-review, via `dispatch-subagent --stage pre-review`) → `/code-review` → `/security` → completion verification (loop) → `/docs` → (if PRD exists) `/prd amend` to sync discoveries
+- **orchestrator**: Use `/prd` to create PRD with gather-criticize loop → `/spec` to create MasterSpec with workstream spec groups → For each workstream: `/atomize` + `/enforce` → **MANDATORY: `/investigate` to surface cross-workstream inconsistencies** → Resolve decisions → User approval → `/challenge` (MANDATORY, stage: pre-orchestration, via `dispatch-subagent --stage pre-orchestration`) → Facilitator orchestrates parallel execution → `/challenge` (MANDATORY, stage: pre-test, via `dispatch-subagent --stage pre-test`) → Integration Verify → `/unify` → `/challenge` (MANDATORY, stage: pre-review, via `dispatch-subagent --stage pre-review`) → Code Review → Security → completion verification (loop) → `/docs` → `/prd amend` to sync discoveries
 - **refactor**: Use `/refactor` skill → Define scope and patterns → Run tests (baseline) → Execute refactoring → Run tests (verification) → `/code-review` → `/security` (if applicable)
 - **journal-only**: Create appropriate journal entry → For decisions: use decision-record template at `.claude/templates/decision-record.template.md` → For investigations: document findings, root cause, resolution → For hotfixes: document fix, root cause, prevention measures → Store in `.claude/journals/` directory
 
@@ -488,7 +488,7 @@ The `/investigate` skill surfaces inconsistencies that would otherwise become ru
 - **Deployment assumptions**: CDK vs Terraform, SSM vs .env conflicts
 - **Missing fields**: Template completeness across workstreams
 
-For orchestrator workflows, investigation is MANDATORY before implementation. For oneoff-spec, it's recommended when the spec references existing systems or has declared dependencies.
+Investigation is MANDATORY before implementation for both orchestrator and oneoff-spec workflows. For orchestrator, use `mode: "standard"` (full cross-spec). For oneoff-spec, use `mode: "single-spec"` (Category 7 + env/dep validation + external surfaces, one pass). The `investigation_scope` for oneoff-spec defaults to the spec group ID.
 
 ## Examples
 
@@ -592,7 +592,7 @@ After `/investigate ms-deployment-pipeline`:
 
 ```
 Issues Found:
-  - BLOCKER: ws-monitor missing HMAC_SECRET, LOG_LEVEL from ws-build template
+  - CRITICAL: ws-monitor missing HMAC_SECRET, LOG_LEVEL from ws-build template
   - HIGH: GIT_SSH_KEY_PATH (ws-build) vs GIT_SSH_KEY_BASE64 (ws-deploy) conflict
   - HIGH: Container image format inconsistency
 

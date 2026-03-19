@@ -79,6 +79,64 @@ Creates a new PRD through the full gather-criticize loop.
 
 4. **PRD Writer produces draft**: Saved to `.claude/prds/<prd-id>/prd.md`
 
+#### Phase 1.5: Integration Surface Exploration
+
+> **Applicability**: MANDATORY for oneoff-spec and orchestrator workflows. SKIP for oneoff-vibe.
+
+After the PRD Writer saves the draft (end of Phase 1), explore the codebase to pre-populate the PRD's Integration Surface section before critics see the document.
+
+4a. **Parse the draft PRD** for mentioned systems, APIs, services, databases, and configuration:
+
+- Scan all sections for references to existing services, endpoints, data stores, and external systems
+- Extract module/package names, route paths, config keys, and event names mentioned or implied
+
+4b. **Dispatch Explore subagent** to scan the codebase for integration surfaces:
+
+```
+Task: explore
+Prompt: |
+  Investigate the codebase for integration surfaces relevant to the PRD at .claude/prds/<prd-id>/prd.md.
+
+  Search for:
+  1. Existing API endpoints, routes, or service interfaces that the proposal touches or extends
+  2. Shared database tables, schemas, or data models referenced
+  3. Configuration and environment variables involved (e.g., in .env files, config modules)
+  4. Event systems at boundaries (SSE, WebSocket, pub/sub, message queues)
+  5. Import/export relationships with modules the feature touches
+
+  Return a structured Integration Surface Report with:
+  - Touched Systems: list of existing systems/services with how they are touched
+  - Existing Contracts: API specs, type definitions, schemas already in place
+  - Potential Conflicts: areas where the proposed feature may conflict with existing behavior
+  - Configuration Dependencies: env vars, feature flags, config files involved
+  - Cross-Cutting Concerns: shared state, caching, event systems, logging pipelines
+
+  Budget: < 200 words. Return structured findings, not raw code.
+```
+
+4c. **Dispatch PRD Writer** (amendment mode) to add exploration findings:
+
+```
+Task: prd-writer
+Prompt: |
+  <context>
+  Mode: amendment
+  PRD path: .claude/prds/<prd-id>/prd.md
+  Pass number: 0 (pre-critique integration surface population)
+  Integration Surface Report:
+    <structured findings from Explore subagent>
+  </context>
+
+  Add the exploration findings to the "Integration Surface" section of the PRD.
+  Populate: Touched Systems table, New Boundaries Created, Configuration Dependencies,
+  and Cross-Cutting Concerns subsections.
+
+  Do NOT modify any other section of the PRD.
+  Save the complete amended PRD to disk.
+```
+
+4d. **Proceed to Phase 2** (Critique Loop) -- critics now evaluate the PRD with integration context already populated.
+
 #### Phase 2: Critique Loop
 
 5. **Initialize pass counter**: `pass = 1`
@@ -111,7 +169,10 @@ Creates a new PRD through the full gather-criticize loop.
 
 10. **If any Medium findings exist**:
     - Present Medium findings to the human (after Critical/High are resolved)
-    - Human resolves each
+    - Offer batch shortcut: "Accept all Medium findings" (excludes security-tagged findings)
+    - Security-tagged findings at any severity are surfaced separately and require explicit individual confirmation
+    - If batch-accepted, log each decision individually in the Decisions Log with specific finding IDs
+    - Human resolves each (or uses batch shortcut)
 
 11. **Low findings**: Summarize in a single block. Do NOT present individually.
 
@@ -184,9 +245,9 @@ Resumes an interrupted PRD session or refines an existing PRD.
 
 ### /prd sync <prd-id> (Import Existing PRD)
 
-Creates a spec group from an existing PRD. Kept from the old `/prd` skill.
+Creates a spec group from an existing PRD, or updates an existing spec group's requirements.md from the current PRD state. Kept from the old `/prd` skill.
 
-**Process**:
+**Process (new spec group)**:
 
 1. Read PRD from `.claude/prds/<prd-id>/prd.md`
 2. Dispatch `prd-reader` agent to extract requirements:
@@ -201,7 +262,22 @@ Creates a spec group from an existing PRD. Kept from the old `/prd` skill.
 3. Create spec group directory: `.claude/specs/groups/sg-<prd-id>/`
 4. Generate `manifest.json` with PRD link
 5. Generate `requirements.md` from extracted requirements
-6. Set `review_state: DRAFT`
+6. Set `prd_version` and `prd_content_hash` in requirements.md YAML frontmatter:
+   - `prd_version`: The PRD's version field value
+   - `prd_content_hash`: First 8 characters of SHA-256 hex digest computed over the PRD body content (everything after the closing `---` of the YAML frontmatter block; frontmatter itself is excluded)
+7. Set `review_state: DRAFT`
+
+**Process (update mode -- existing requirements.md)**:
+
+When `/prd sync` is run on a spec group that already has a `requirements.md`:
+
+1. Read PRD from `.claude/prds/<prd-id>/prd.md`
+2. Re-extract requirements from the current PRD
+3. Compare newly extracted requirements against existing `requirements.md`:
+   - **Preserved**: Manual additions (requirements not present in the PRD but added by the spec author) are kept
+   - **Flagged**: Changed or removed PRD requirements are flagged for human review (not silently deleted)
+   - **Conflicts**: When a manual addition conflicts with a newly extracted PRD requirement (both cover the same concern with different constraints), flag for human review with both versions presented side by side
+4. Update `prd_version` and `prd_content_hash` in frontmatter to reflect the current PRD state
 
 **Output**:
 
@@ -211,6 +287,8 @@ PRD synced: .claude/prds/<prd-id>/prd.md
 Created spec group: sg-<prd-id>
   - N requirements extracted
   - requirements.md generated
+  - prd_version: <version>
+  - prd_content_hash: <8-char hash>
 
 Next steps:
   1. Review requirements: .claude/specs/groups/sg-<prd-id>/requirements.md
@@ -239,6 +317,13 @@ Pushes implementation discoveries back to the PRD. Renamed from old `/prd push`.
      Update Amendment Log with D-028 format entries
    ```
 4. Report changes
+5. **Staleness warning**: After the PRD version is incremented, check for linked spec groups:
+   - Find spec groups where `requirements.md` has `prd_path` pointing to this PRD
+   - Compare `prd_version` in the spec group's `requirements.md` to the new PRD version
+   - If versions do not match, emit a warning:
+     > "Spec group sg-XXX requirements.md is based on PRD vX but PRD is now vY. Run `/prd sync` to re-extract requirements."
+   - Include a diff summary of what changed in the PRD (sections added, modified, or removed)
+   - **Cosmetic amendments**: Even cosmetic changes (wording, formatting) trigger the staleness warning because the version/hash mechanism does not distinguish cosmetic from substantive changes. The diff summary enables the human to quickly judge whether re-sync is needed or the warning can be dismissed.
 
 ### /prd status <prd-id> (Check PRD State)
 
@@ -316,29 +401,35 @@ The PRD Writer's assumption confirmation pattern handles corrections:
 
 ## Finding Presentation Format
 
-When presenting findings to the human, use this batch format:
+When presenting findings to the human, use the **action-first** format. Findings are grouped by severity with the recommended action front-loaded:
 
 ```markdown
 ## Critique Pass <N> Results
 
-### Critical Findings (must resolve)
+### Critical Findings (individual confirmation required)
 
-**TECH-001** (Critical): <summary>
-<detail>
-Suggested resolution: <suggestion>
+**TECH-001** (Critical): Accept -- add error response schema
+Impact: Without this, Dev and QA will assume different formats, causing integration failures.
+Finding: No error response format specified for API endpoints.
+Detail: The PRD describes 5 API endpoints but does not specify the error response shape.
 
-**SEC-001** (Critical): <summary>
-<detail>
+**SEC-001** (Critical): Accept -- define auth token rotation policy
+Impact: Stale tokens could be reused indefinitely, creating a session hijacking vector.
+Finding: Token expiration policy not specified.
 
-### High Findings (must resolve)
+### High Findings (individual confirmation required)
 
-**BIZ-001** (High): <summary>
-<detail>
+**BIZ-001** (High): Accept -- add rollback success criteria
+Impact: Feature launch without rollback criteria risks unrecoverable state.
+Finding: No rollback plan defined for the migration.
 
-### Medium Findings
+### Medium Findings (batch shortcut available)
 
-**EDGE-001** (Medium): <summary>
-<detail>
+**EDGE-001** (Medium): Accept -- document retry behavior
+Impact: Users may see inconsistent behavior on transient failures.
+Finding: Retry policy not specified for external API calls.
+
+> **Batch shortcut**: "Accept all Medium findings" (excludes security-tagged findings)
 
 ### Low Findings (summary only)
 
@@ -351,12 +442,24 @@ Suggested resolution: <suggestion>
 
 ---
 
-For each Critical/High/Medium finding, please provide:
+For each Critical/High finding, please provide:
 
 - **accept**: Amend the PRD to address this
 - **reject**: Not a real gap (provide rationale)
 - **defer**: Acknowledged but out of scope for this PRD
+
+For Medium findings: use batch shortcut or provide individual decisions.
+Security-tagged findings at any severity are surfaced separately and require individual confirmation.
 ```
+
+### Action-First Field Order (Mandatory)
+
+Each finding MUST follow this field order:
+
+1. **Recommended action** (accept/reject/defer verb)
+2. **Impact indicator** (one-sentence consequence if unaddressed)
+3. **Finding summary** (what was identified)
+4. **Detail/evidence** (collapsed/optional for Medium and Low)
 
 ## Agents
 
@@ -381,6 +484,10 @@ Cold start: load tech.context, org-context, existing PRDs
 PRD Writer: conversational discovery interview
     ↓
 PRD draft saved to .claude/prds/<prd-id>/prd.md
+    ↓
+[Phase 1.5] Explore codebase for integration surfaces (oneoff-spec/orchestrator only)
+    ↓
+PRD Writer amends Integration Surface section with exploration findings
     ↓
 Loop: 4 critics evaluate in parallel
     ↓

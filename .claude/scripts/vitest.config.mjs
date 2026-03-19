@@ -10,5 +10,9 @@ export default defineConfig({
     environment: 'node',
     include: ['**/*.test.{mjs,js}'],
     globals: false,
+    // Disable file-level parallelism: workflow enforcement tests share the
+    // real .claude/context/session.json via backup/restore in beforeEach/afterEach,
+    // which breaks when multiple test files run concurrently.
+    fileParallelism: false,
   },
 });

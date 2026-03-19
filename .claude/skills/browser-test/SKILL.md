@@ -1,6 +1,7 @@
 ---
 name: browser-test
 description: Execute browser-based UI testing using Chrome MCP tools. Tests user interactions, visual outcomes, captures evidence. Use for UI features after implementation and security review.
+user-invocable: true
 allowed-tools: Read, mcp__claude-in-chrome__tabs_context_mcp, mcp__claude-in-chrome__tabs_create_mcp, mcp__claude-in-chrome__navigate, mcp__claude-in-chrome__read_page, mcp__claude-in-chrome__find, mcp__claude-in-chrome__computer, mcp__claude-in-chrome__form_input, mcp__claude-in-chrome__javascript_tool
 ---
 
@@ -574,8 +575,7 @@ tabs_create_mcp();
 
 After browser testing:
 
-- If PASS with public API → Trigger `/docs` for documentation, then commit
-- If PASS (no public API) → Ready for commit
+- If PASS → Trigger `/docs` for documentation (mandatory for all spec-based workflows), then commit
 - If FAIL → Use `/implement` to fix, then re-test
 
 Before browser testing:
@@ -584,7 +584,7 @@ Before browser testing:
 - Run `/security` for security review
 - Browser testing validates UI before final gates
 
-**Documentation trigger**: If the implementation adds or modifies public APIs, user-facing features, or configuration options, dispatch the documenter subagent after browser tests pass (before commit).
+**Documentation trigger**: Documentation is mandatory for all spec-based workflows (oneoff-spec and orchestrator). Dispatch the documenter subagent after browser tests pass (before commit).
 
 ## Example Test Suite
 

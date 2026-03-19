@@ -72,6 +72,18 @@ Evaluate through: feasibility, architecture impact, integration complexity, perf
 - Are there tech debt implications not addressed?
 - Are non-functional requirements complete (scalability, reliability, observability)?
 
+#### Integration Surface Checks
+
+The Integration Surface section is pre-populated by automated codebase exploration (Phase 1.5). Evaluate it with extra scrutiny -- the implementation team depends on this section to know what they are connecting to.
+
+- **Completeness**: Does the Integration Surface section identify ALL systems this work touches? Cross-reference against the Scope section and User Stories for any systems mentioned there but missing from Integration Surface.
+- **Contract accuracy**: Are existing contracts and APIs accurately described? Do the stated endpoints, schemas, and interfaces match what the codebase actually exposes?
+- **Failure modes at boundaries**: Are cross-boundary failure modes addressed in the Risks section? Every touched system is a potential failure point -- check that degraded/unavailable states are covered.
+- **Configuration completeness**: Are configuration dependencies complete? Check that environment variables, feature flags, and config files needed for each touched system are listed.
+- **New boundary documentation**: Are new boundaries documented with both sides' contracts? Each new integration point needs: the data shape, the transport mechanism, error semantics, and which side owns the contract.
+
+> **Calibration note**: If the Integration Surface section is empty or contains only placeholder text, that is a **High** severity finding. An empty Integration Surface means the implementation team will not know what existing systems they are connecting to, leading to integration failures discovered late in development.
+
 ### Security Perspective (`security`)
 
 Evaluate through: threat vectors, authentication/authorization gaps, data exposure, input validation, compliance.

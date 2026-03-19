@@ -56,7 +56,10 @@
             "verifying",
             "reviewing",
             "journaling",
-            "complete"
+            "complete",
+            "challenging",
+            "completion_verifying",
+            "documenting"
           ],
           "description": "Current phase in the workflow lifecycle"
         },
@@ -85,9 +88,39 @@
             "verifying",
             "reviewing",
             "journaling",
-            "complete"
+            "complete",
+            "challenging",
+            "completion_verifying",
+            "documenting"
           ],
           "description": "Phase this checkpoint represents (should match active_work.current_phase)"
+        },
+        "phase_skip_warnings": {
+          "type": "object",
+          "description": "Phase name to skip count mapping for graduated enforcement",
+          "additionalProperties": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "default": {}
+        },
+        "enforcement_counter": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 0,
+          "description": "Monotonic counter incremented on every enforcement state mutation via official operations"
+        },
+        "enforcement_level": {
+          "type": "string",
+          "enum": ["off", "warn-only", "graduated"],
+          "default": "graduated",
+          "description": "Enforcement level: off (skip all), warn-only (always warn, never block), graduated (warn first, block on repeat)"
+        },
+        "override_count": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 0,
+          "description": "Number of overrides used this session (shared cap with reset-enforcement, max 3)"
         },
         "atomic_specs_completed": {
           "type": "array",
@@ -187,9 +220,21 @@
             "prd-writer",
             "prd-critic",
             "prd-reader",
-            "prd-amender"
+            "prd-amender",
+            "challenger",
+            "completion-verifier"
           ],
           "description": "Type of subagent dispatched"
+        },
+        "stage": {
+          "type": "string",
+          "enum": [
+            "pre-implementation",
+            "pre-test",
+            "pre-review",
+            "pre-orchestration"
+          ],
+          "description": "Stage identifier for challenger subagent dispatches (REQ-003)"
         },
         "description": {
           "type": "string",
@@ -254,7 +299,11 @@
             "checkpoint_saved",
             "work_completed",
             "work_abandoned",
-            "error_occurred"
+            "error_occurred",
+            "override_skip",
+            "reset_enforcement",
+            "enforcement_level_change",
+            "completion_checklist"
           ],
           "description": "Type of event that occurred"
         },

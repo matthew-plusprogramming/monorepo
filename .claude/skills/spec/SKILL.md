@@ -13,6 +13,16 @@ Before beginning work, read these files for project-specific guidelines:
 
 - `.claude/memory-bank/best-practices/subagent-design.md`
 
+## Pre-Flight Challenge
+
+Before beginning work, address these operational feasibility questions:
+
+1. Are the requirements operationally feasible given the current environment?
+2. Do requirements assume infrastructure (services, databases, APIs) that may not exist?
+3. Are there implicit execution dependencies not captured in the requirements?
+
+If any question cannot be answered from available context, surface it as a finding -- do not skip.
+
 ## Purpose
 
 Create specifications that serve as the authoritative contract for implementation. Specs document requirements, design decisions, task breakdowns, and test plans.

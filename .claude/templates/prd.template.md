@@ -92,7 +92,41 @@ _Performance, security, scalability, accessibility, etc._
 
 ---
 
-## 5. Assumptions
+## 5. Integration Surface
+
+_Pre-populated by the integration surface exploration step (Phase 1.5) during the gather-criticize loop. Validate and refine automated findings with stakeholders. This section captures what existing systems, contracts, and boundaries this work touches — critical context for the implementation team._
+
+### Touched Systems
+
+_Existing systems, services, APIs, and databases that this work interacts with. Each entry describes how the system is touched and what contract governs the interaction._
+
+| System/Component     | How Touched                 | Existing Contract                | Risk Level     |
+| -------------------- | --------------------------- | -------------------------------- | -------------- |
+| <e.g., Auth service> | <Consumes /api/auth/verify> | <OpenAPI spec at docs/auth.yaml> | <Low/Med/High> |
+
+### New Boundaries Created
+
+_Any new integration points this work introduces. Each new boundary needs both sides' contracts documented._
+
+- <New boundary description> -- <Owning side> -- <Contract format>
+
+### Configuration Dependencies
+
+_Environment variables, feature flags, and config files involved. Include both existing config that must be present and new config this work introduces._
+
+| Config Key               | Type      | Source | New/Existing | Required By        |
+| ------------------------ | --------- | ------ | ------------ | ------------------ |
+| <e.g., AUTH_SERVICE_URL> | <env var> | <.env> | <Existing>   | <Auth integration> |
+
+### Cross-Cutting Concerns
+
+_Shared state, caching layers, event systems, and logging pipelines that span integration boundaries. These are the most common source of subtle cross-boundary bugs._
+
+- <Concern description> -- <Which boundaries it spans> -- <Coordination needed>
+
+---
+
+## 6. Assumptions
 
 _What are we assuming to be true? These will be monitored in production._
 
@@ -105,7 +139,7 @@ _What are we assuming to be true? These will be monitored in production._
 
 ---
 
-## 6. Tradeoffs
+## 7. Tradeoffs
 
 _What decisions have been made and why?_
 
@@ -117,7 +151,7 @@ _What decisions have been made and why?_
 
 ---
 
-## 7. User Experience
+## 8. User Experience
 
 ### Target Users
 
@@ -139,7 +173,7 @@ _What decisions have been made and why?_
 
 ---
 
-## 8. Scope
+## 9. Scope
 
 ### In Scope
 
@@ -160,7 +194,7 @@ _What decisions have been made and why?_
 
 ---
 
-## 9. Risks & Mitigations
+## 10. Risks & Mitigations
 
 | Risk               | Likelihood   | Impact       | Mitigation            | Owner  |
 | ------------------ | ------------ | ------------ | --------------------- | ------ |
@@ -168,7 +202,7 @@ _What decisions have been made and why?_
 
 ---
 
-## 10. Success Criteria
+## 11. Success Criteria
 
 ### Metrics
 
@@ -183,7 +217,7 @@ _What decisions have been made and why?_
 
 ---
 
-## 11. Rollout & Monitoring
+## 12. Rollout & Monitoring
 
 ### Rollout Strategy
 
@@ -197,7 +231,7 @@ _What decisions have been made and why?_
 
 ---
 
-## 12. Open Questions
+## 13. Open Questions
 
 | ID  | Question        | Status   | Resolution | Resolved By |
 | --- | --------------- | -------- | ---------- | ----------- |

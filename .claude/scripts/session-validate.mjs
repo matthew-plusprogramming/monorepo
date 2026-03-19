@@ -74,7 +74,11 @@ const VALID_PHASES = [
   'testing',
   'verifying',
   'reviewing',
-  'complete'
+  'journaling',
+  'complete',
+  'challenging',
+  'completion_verifying',
+  'documenting'
 ];
 
 /**
@@ -98,7 +102,9 @@ const VALID_SUBAGENT_TYPES = [
   'prd-writer',
   'prd-critic',
   'prd-reader',
-  'prd-amender'
+  'prd-amender',
+  'challenger',
+  'completion-verifier'
 ];
 
 /**
@@ -114,7 +120,11 @@ const VALID_EVENT_TYPES = [
   'checkpoint_saved',
   'work_completed',
   'work_abandoned',
-  'error_occurred'
+  'error_occurred',
+  'override_skip',
+  'reset_enforcement',
+  'enforcement_level_change',
+  'completion_checklist'
 ];
 
 /**

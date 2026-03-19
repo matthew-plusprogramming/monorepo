@@ -394,6 +394,22 @@ Lock files at `.claude/locks/<project>.lock.json` track what was installed in ea
 
 Without `--force`, locally modified files are reported as conflicts and skipped.
 
+### The `--resolve-conflicts` Flag
+
+`--resolve-conflicts` accepts upstream versions for conflicting artifacts only. It has the same effect as `--force` for artifacts that have local modifications, but leaves non-conflicting artifacts untouched. This provides clearer intent than `--force` when you specifically want to accept upstream changes for known conflicts rather than doing a blanket overwrite.
+
+```bash
+node .claude/scripts/metaclaude-cli.mjs sync <project> --resolve-conflicts
+```
+
+The output includes a resolved count showing how many conflicting artifacts were updated:
+
+```
+Synced: 3 updated, 2 resolved, 0 skipped
+```
+
+Use `--resolve-conflicts` instead of `--force` when you have reviewed the conflicts (via `status`) and decided to accept upstream versions. Use `--force` when you want a clean slate regardless of local state.
+
 ---
 
 ## Hash System

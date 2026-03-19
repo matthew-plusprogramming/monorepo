@@ -24,7 +24,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-// AC2.3: Exactly 8 canonical convergence field names
+// Canonical convergence field names (9 fields including completion verification)
 const CANONICAL_FIELDS = new Set([
   'spec_complete',
   'all_acs_implemented',
@@ -34,6 +34,7 @@ const CANONICAL_FIELDS = new Set([
   'security_review_passed',
   'browser_tests_passed',
   'docs_generated',
+  'completion_verification_passed',
 ]);
 
 // AC2.4: 20+ known non-canonical variants with alias suggestions
@@ -81,6 +82,12 @@ const ALIASES = {
   documentation_complete: 'docs_generated',
   docs_complete: 'docs_generated',
   documented: 'docs_generated',
+
+  // -> completion_verification_passed
+  completion_verified: 'completion_verification_passed',
+  completion_gates_passed: 'completion_verification_passed',
+  completion_check_passed: 'completion_verification_passed',
+  post_completion_passed: 'completion_verification_passed',
 };
 
 // Special case: test_coverage is not a convergence gate

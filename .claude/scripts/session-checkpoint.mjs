@@ -9,12 +9,15 @@
  * Operations:
  *   init                                          - Initialize session.json if it doesn't exist
  *   start-work <spec_group_id> <workflow> <obj>   - Start tracking work on a spec group
- *   transition-phase <new_phase>                  - Update current phase
+ *   transition-phase <new_phase>                  - Update current phase (with DAG enforcement)
  *   complete-atomic-spec <atomic_spec_id>         - Mark an atomic spec as done
- *   dispatch-subagent <task_id> <type> <desc>     - Track subagent dispatch
+ *   dispatch-subagent <id> <type> <desc> [--stage]- Track subagent dispatch (--stage for challengers)
  *   complete-subagent <task_id> <result_summary>  - Mark subagent as complete
  *   journal-created <path-to-journal>             - Mark journal entry as created
- *   complete-work                                 - Finalize completed work
+ *   override-skip --phase <p> --rationale "<r>"   - Override a phase skip block (main-agent-only)
+ *   reset-enforcement --rationale "<r>"           - Reset all skip counters (main-agent-only)
+ *   set-enforcement-level <level>                 - Change enforcement level (main-agent-only)
+ *   complete-work                                 - Finalize completed work (with completion checklist)
  *   archive-incomplete                            - Archive incomplete work to history
  *   get-status                                    - Output current session state summary (JSON)
  *
@@ -26,9 +29,21 @@
  *   1 - Validation or operational error
  */
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync, renameSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { basename, dirname, join, resolve } from 'node:path';
+import {
+  ORCHESTRATOR_PREDECESSORS,
+  ONEOFF_SPEC_PREDECESSORS,
+  EXEMPT_WORKFLOWS,
+  VALID_SUBAGENT_TYPES,
+  MANDATORY_DISPATCHES,
+  REQUIRED_CHALLENGER_STAGES,
+  VALID_CONVERGENCE_GATES,
+  getWorkflowType,
+  getPredecessorGraph,
+  wasPredecessorVisited,
+} from './lib/workflow-dag.mjs';
 
 // Schema version for session.json
 const SESSION_VERSION = '1.0.0';
@@ -46,7 +61,10 @@ const VALID_PHASES = [
   'verifying',
   'reviewing',
   'journaling',
-  'complete'
+  'complete',
+  'challenging',
+  'completion_verifying',
+  'documenting'
 ];
 
 // Valid workflow types
@@ -58,27 +76,89 @@ const VALID_WORKFLOWS = [
   'journal-only'
 ];
 
-// Valid subagent types
-const VALID_SUBAGENT_TYPES = [
-  'explore',
-  'spec-author',
-  'atomizer',
-  'atomicity-enforcer',
-  'interface-investigator',
-  'implementer',
-  'test-writer',
-  'unifier',
-  'code-reviewer',
-  'security-reviewer',
-  'documenter',
-  'refactorer',
-  'facilitator',
-  'browser-tester',
-  'prd-writer',
-  'prd-critic',
-  'prd-reader',
-  'prd-amender'
+// Valid challenger stage values (REQ-003, DEC-004)
+const VALID_STAGES = [
+  'pre-implementation',
+  'pre-test',
+  'pre-review',
+  'pre-orchestration'
 ];
+
+// VALID_SUBAGENT_TYPES imported from ./lib/workflow-dag.mjs
+
+// =============================================================================
+// Workflow Enforcement: DAG constants and query functions imported from shared module
+// (ORCHESTRATOR_PREDECESSORS, ONEOFF_SPEC_PREDECESSORS, EXEMPT_WORKFLOWS,
+//  MANDATORY_DISPATCHES, REQUIRED_CHALLENGER_STAGES imported from ./lib/workflow-dag.mjs)
+// =============================================================================
+
+// Per-session override cap shared between override-skip and reset-enforcement (REQ-008, REQ-009)
+const MAX_OVERRIDES_PER_SESSION = 3;
+
+// Valid enforcement levels (REQ-010)
+const VALID_ENFORCEMENT_LEVELS = ['off', 'warn-only', 'graduated'];
+
+// Magic constant for enforcement_counter integrity checksum (REQ-012, EC-9)
+const COUNTER_CHECKSUM_MAGIC = 0xA3F5;
+
+/**
+ * Compute a simple checksum for the enforcement_counter to detect out-of-band edits.
+ * Returns the expected _counter_checksum value for a given counter.
+ */
+function computeCounterChecksum(counter) {
+  return (counter ^ COUNTER_CHECKSUM_MAGIC);
+}
+
+/**
+ * Verify enforcement_counter integrity by comparing stored checksum (REQ-012, EC-9).
+ * If mismatch detected, emits a warning and degrades enforcement to warn-only mode.
+ * Returns true if integrity check passed, false if mismatch detected.
+ */
+function verifyCounterIntegrity(session) {
+  const checkpoint = session.phase_checkpoint;
+  if (!checkpoint || checkpoint.enforcement_counter === undefined) {
+    return true; // No counter to verify
+  }
+  const storedChecksum = checkpoint._counter_checksum;
+  if (storedChecksum === undefined) {
+    // No checksum yet (legacy session) -- initialize it
+    checkpoint._counter_checksum = computeCounterChecksum(checkpoint.enforcement_counter);
+    return true;
+  }
+  const expectedChecksum = computeCounterChecksum(checkpoint.enforcement_counter);
+  if (storedChecksum !== expectedChecksum) {
+    console.error(
+      'Warning: Enforcement state integrity check failed: monotonic counter mismatch. ' +
+      'Out-of-band session.json edit detected. Degrading to warn-only mode.'
+    );
+    checkpoint.enforcement_level = 'warn-only';
+    // Re-sync checksum to current counter value so future operations are not stuck
+    checkpoint._counter_checksum = expectedChecksum;
+    return false;
+  }
+  return true;
+}
+
+// MANDATORY_DISPATCHES and REQUIRED_CHALLENGER_STAGES imported from ./lib/workflow-dag.mjs
+
+// getPredecessorGraph and getWorkflowType imported from ./lib/workflow-dag.mjs
+
+/**
+ * Get enforcement level from session, with backward-compatible default.
+ */
+function getEnforcementLevel(session) {
+  return session?.phase_checkpoint?.enforcement_level || 'graduated';
+}
+
+// wasPredecessorVisited imported from ./lib/workflow-dag.mjs
+
+/**
+ * Check if the main agent is calling (no subagents in-flight).
+ * Used for access control on override-skip, reset-enforcement, enforcement level changes.
+ */
+function isMainAgent(session) {
+  return (session.subagent_tasks?.in_flight || []).length === 0;
+}
 
 /**
  * Find the .claude directory by walking up from script location.
@@ -148,12 +228,16 @@ function loadSession() {
 }
 
 /**
- * Save session.json atomically.
+ * Save session.json atomically using write-to-temp-then-rename pattern (AC-1.9).
+ * Writes to a temporary file first, then atomically renames to prevent partial writes.
  */
 function saveSession(session) {
   ensureContextDir();
   session.updated_at = now();
-  writeFileSync(SESSION_PATH, JSON.stringify(session, null, 2) + '\n');
+  const data = JSON.stringify(session, null, 2) + '\n';
+  const tempPath = SESSION_PATH + '.tmp.' + process.pid;
+  writeFileSync(tempPath, data);
+  renameSync(tempPath, SESSION_PATH);
 }
 
 /**
@@ -312,7 +396,13 @@ function opStartWork(specGroupId, workflow, objective) {
     phase: initialPhase,
     atomic_specs_completed: [],
     atomic_specs_pending: [],
-    next_actions: []
+    next_actions: [],
+    // Enforcement fields (REQ-005) -- backward-compatible defaults
+    phase_skip_warnings: {},
+    enforcement_counter: 0,
+    _counter_checksum: computeCounterChecksum(0),
+    enforcement_level: 'graduated',
+    override_count: 0
   };
 
   // Initialize journal tracking fields for journal-only workflow
@@ -353,19 +443,6 @@ function opTransitionPhase(newPhase) {
 
   const oldPhase = session.active_work.current_phase;
 
-  // Validate phase transition makes sense (basic ordering)
-  const oldIndex = VALID_PHASES.indexOf(oldPhase);
-  const newIndex = VALID_PHASES.indexOf(newPhase);
-
-  // Allow forward progression or staying in same phase
-  // Allow backward only for certain cases (e.g., returning to spec_authoring after review feedback)
-  if (newIndex < oldIndex && newPhase !== 'spec_authoring' && newPhase !== 'atomizing') {
-    console.error(
-      `Warning: Transitioning backward from '${oldPhase}' to '${newPhase}'. ` +
-      `Ensure this is intentional.`
-    );
-  }
-
   // Warn if transitioning from journaling to complete without journal created
   if (oldPhase === 'journaling' && newPhase === 'complete') {
     if (session.phase_checkpoint?.journal_required === true &&
@@ -376,6 +453,83 @@ function opTransitionPhase(newPhase) {
       );
     }
   }
+
+  // --- DAG-based predecessor validation (DEC-001: replaces linear index ordering) ---
+  const workflow = getWorkflowType(session);
+  const enforcementLevel = getEnforcementLevel(session);
+
+  // Ensure enforcement fields exist (backward compatibility)
+  if (!session.phase_checkpoint.phase_skip_warnings) {
+    session.phase_checkpoint.phase_skip_warnings = {};
+  }
+  if (session.phase_checkpoint.enforcement_counter === undefined) {
+    session.phase_checkpoint.enforcement_counter = 0;
+    session.phase_checkpoint._counter_checksum = computeCounterChecksum(0);
+  }
+
+  // Verify enforcement_counter integrity before processing (REQ-012, EC-9)
+  verifyCounterIntegrity(session);
+  // Re-read enforcement level in case integrity check degraded it to warn-only
+  const effectiveEnforcementLevel = getEnforcementLevel(session);
+
+  // Check enforcement: exempt workflows skip entirely (REQ-013)
+  if (!EXEMPT_WORKFLOWS.includes(workflow) && effectiveEnforcementLevel !== 'off') {
+    const graph = getPredecessorGraph(workflow);
+
+    if (graph) {
+      // Find all mandatory predecessors for the target phase
+      const predecessors = graph[newPhase] || [];
+      const skippedPredecessors = [];
+
+      for (const pred of predecessors) {
+        if (!wasPredecessorVisited(pred, session)) {
+          skippedPredecessors.push(pred);
+        }
+      }
+
+      if (skippedPredecessors.length > 0) {
+        // Format skipped predecessors for human-readable output
+        const skippedNames = skippedPredecessors.map(p => {
+          const match = p.match(/^challenging:(.+)$/);
+          return match ? `challenging (${match[1]})` : p;
+        });
+
+        // Check if any of these have been warned about before (graduated enforcement)
+        let shouldBlock = false;
+
+        for (const pred of skippedPredecessors) {
+          const currentCount = session.phase_checkpoint.phase_skip_warnings[pred] || 0;
+
+          if (currentCount > 0 && effectiveEnforcementLevel === 'graduated') {
+            // Repeated skip in graduated mode: block (REQ-007)
+            shouldBlock = true;
+          }
+
+          // Increment skip counter
+          session.phase_checkpoint.phase_skip_warnings[pred] = currentCount + 1;
+          session.phase_checkpoint.enforcement_counter++;
+          session.phase_checkpoint._counter_checksum = computeCounterChecksum(session.phase_checkpoint.enforcement_counter);
+        }
+
+        if (shouldBlock) {
+          // Save updated counters before blocking
+          saveSession(session);
+          console.error(
+            `Error: Mandatory predecessor phase(s) skipped repeatedly: ${skippedNames.join(', ')}. ` +
+            `Cannot transition to '${newPhase}'. Use 'override-skip' to bypass or 'reset-enforcement' to clear.`
+          );
+          process.exit(1);
+        }
+
+        // First occurrence: warn but allow (REQ-007)
+        console.error(
+          `Warning: Skipping mandatory predecessor phase(s) for '${newPhase}': ${skippedNames.join(', ')}. ` +
+          `Transition allowed (first occurrence). Repeated skips will be blocked.`
+        );
+      }
+    }
+  }
+  // --- End DAG validation ---
 
   session.active_work.current_phase = newPhase;
   session.phase_checkpoint.phase = newPhase;
@@ -443,16 +597,26 @@ function opCompleteAtomicSpec(atomicSpecId) {
 
 /**
  * dispatch-subagent - Track subagent dispatch.
+ *
+ * Supports optional --stage flag for challenger subagent dispatches (DEC-004).
+ * Usage: dispatch-subagent <task_id> <type> <description> [--stage <stage>]
  */
-function opDispatchSubagent(taskId, subagentType, description) {
+function opDispatchSubagent(taskId, subagentType, description, stage) {
   if (!subagentType || !description) {
-    throw new Error('Usage: dispatch-subagent <task_id> <subagent_type> <description>');
+    throw new Error('Usage: dispatch-subagent <task_id> <subagent_type> <description> [--stage <stage>]');
   }
 
   // If taskId not provided, generate one
   const finalTaskId = taskId || generateTaskId();
 
   validateSubagentType(subagentType);
+
+  // Validate stage if provided (REQ-003)
+  if (stage) {
+    if (!VALID_STAGES.includes(stage)) {
+      throw new Error(`Invalid stage '${stage}'. Valid stages: ${VALID_STAGES.join(', ')}`);
+    }
+  }
 
   const session = loadSession();
   if (!session) {
@@ -479,17 +643,30 @@ function opDispatchSubagent(taskId, subagentType, description) {
     atomic_spec_id: null
   };
 
+  // Store stage on dispatch record for challenger subagents (REQ-003, DEC-004)
+  if (stage) {
+    task.stage = stage;
+  }
+
   session.subagent_tasks.in_flight.push(task);
 
-  addHistoryEntry(session, 'subagent_dispatched', {
+  const historyDetails = {
     task_id: finalTaskId,
     subagent_type: subagentType,
     spec_group_id: session.active_work?.spec_group_id,
     message: `Dispatched ${subagentType}: ${description}`
-  });
+  };
+
+  // Include stage in history for traceability
+  if (stage) {
+    historyDetails.stage = stage;
+    historyDetails.message = `Dispatched ${subagentType} (stage: ${stage}): ${description}`;
+  }
+
+  addHistoryEntry(session, 'subagent_dispatched', historyDetails);
 
   saveSession(session);
-  console.error(`Dispatched subagent '${subagentType}' with task_id '${finalTaskId}'`);
+  console.error(`Dispatched subagent '${subagentType}' with task_id '${finalTaskId}'${stage ? ` (stage: ${stage})` : ''}`);
 }
 
 /**
@@ -558,6 +735,7 @@ function opCompleteWork() {
 
   const specGroupId = session.active_work.spec_group_id;
   const objective = session.active_work.objective;
+  const workflow = getWorkflowType(session);
 
   // Ensure we're in a completion state
   if (session.active_work.current_phase !== 'complete') {
@@ -566,6 +744,129 @@ function opCompleteWork() {
       `Consider transitioning to 'complete' first.`
     );
   }
+
+  // --- Completion checklist (REQ-018, REQ-019, REQ-020) ---
+  // Must read enforcement fields from phase_checkpoint BEFORE clearing it (INC-008)
+  const enforcementLevel = getEnforcementLevel(session);
+  const overrideCount = session.phase_checkpoint?.override_count || 0;
+  const enforcementCounter = session.phase_checkpoint?.enforcement_counter || 0;
+  const isInformationalOnly = enforcementLevel === 'off';
+
+  if (!EXEMPT_WORKFLOWS.includes(workflow)) {
+    const checklistItems = [];
+    const allTasks = [
+      ...(session.subagent_tasks?.in_flight || []),
+      ...(session.subagent_tasks?.completed_this_session || [])
+    ];
+
+    // Build override history from session events
+    const overrideHistory = (session.history || []).filter(
+      h => h.event_type === 'override_skip'
+    );
+    const overriddenPhases = new Set(overrideHistory.map(h => h.details?.phase));
+
+    // Check per-stage challenger dispatches (REQ-011)
+    const requiredStages = REQUIRED_CHALLENGER_STAGES[workflow] || REQUIRED_CHALLENGER_STAGES['orchestrator'];
+    for (const stage of requiredStages) {
+      const dispatched = allTasks.some(
+        t => t.subagent_type === 'challenger' && t.stage === stage
+      );
+
+      const phaseKey = `challenging:${stage}`;
+      if (dispatched) {
+        checklistItems.push({ label: `challenger (${stage})`, status: 'completed' });
+      } else if (overriddenPhases.has(phaseKey) || overriddenPhases.has('challenging')) {
+        const override = overrideHistory.find(
+          h => h.details?.phase === phaseKey || h.details?.phase === 'challenging'
+        );
+        checklistItems.push({
+          label: `challenger (${stage})`,
+          status: 'overridden',
+          rationale: override?.details?.rationale || 'No rationale recorded'
+        });
+      } else {
+        checklistItems.push({ label: `challenger (${stage})`, status: 'missing' });
+      }
+    }
+
+    // Check other mandatory dispatches
+    const mandatoryTypes = [
+      { type: 'code-reviewer', label: 'code-reviewer' },
+      { type: 'security-reviewer', label: 'security-reviewer' },
+      { type: 'completion-verifier', label: 'completion-verifier' },
+      { type: 'documenter', label: 'documenter' }
+    ];
+
+    for (const { type, label } of mandatoryTypes) {
+      const dispatched = allTasks.some(t => t.subagent_type === type);
+      if (dispatched) {
+        checklistItems.push({ label, status: 'completed' });
+      } else if (overriddenPhases.has(type)) {
+        const override = overrideHistory.find(h => h.details?.phase === type);
+        checklistItems.push({
+          label,
+          status: 'overridden',
+          rationale: override?.details?.rationale || 'No rationale recorded'
+        });
+      } else {
+        checklistItems.push({ label, status: 'missing' });
+      }
+    }
+
+    // Check for enforcement resets
+    const enforcementResets = (session.history || []).filter(
+      h => h.event_type === 'reset_enforcement'
+    ).length;
+
+    // Apply informational-only mode (REQ-020)
+    if (isInformationalOnly) {
+      for (const item of checklistItems) {
+        if (item.status === 'missing') {
+          item.status = 'informational';
+        }
+      }
+    }
+
+    // Output checklist (advisory -- does not block complete-work)
+    const prefix = isInformationalOnly ? 'INFO' : 'COMPLETION CHECKLIST';
+    console.error(`\n${prefix} (workflow: ${workflow}):`);
+    for (const item of checklistItems) {
+      switch (item.status) {
+        case 'completed':
+          console.error(`  [x] ${item.label}`);
+          break;
+        case 'overridden':
+          console.error(`  [OVERRIDE] ${item.label} -- overridden: "${item.rationale}"`);
+          break;
+        case 'missing':
+          console.error(`  [ ] ${item.label} -- MISSING`);
+          break;
+        case 'informational':
+          console.error(`  [i] ${item.label} -- not dispatched (informational)`);
+          break;
+      }
+    }
+    if (enforcementResets > 0) {
+      console.error(`  Enforcement resets: ${enforcementResets}`);
+    }
+    if (overrideCount > 0) {
+      console.error(`  Overrides used: ${overrideCount}/${MAX_OVERRIDES_PER_SESSION}`);
+    }
+    console.error('');
+
+    // Record checklist as completion_checklist event in session history (DEC-007, REQ-018)
+    addHistoryEntry(session, 'completion_checklist', {
+      workflow,
+      items: checklistItems,
+      enforcement_level: enforcementLevel,
+      enforcement_resets: enforcementResets,
+      override_count: overrideCount,
+      enforcement_counter: enforcementCounter,
+      spec_group_id: specGroupId,
+      message: `Completion checklist generated for workflow '${workflow}'`
+    });
+  }
+  // --- End completion checklist ---
 
   addHistoryEntry(session, 'work_completed', {
     spec_group_id: specGroupId,
@@ -668,6 +969,174 @@ function opJournalCreated(journalPath) {
 }
 
 /**
+ * override-skip - Clear skip counter for a specific phase with audit trail (REQ-008).
+ * Main-agent-only, subject to per-session override cap (shared with reset-enforcement).
+ */
+function opOverrideSkip(phase, rationale) {
+  if (!phase || !rationale) {
+    throw new Error('Usage: override-skip --phase <phase> --rationale "<reason>"');
+  }
+
+  const session = loadSession();
+  if (!session) {
+    throw new Error('No session.json exists. Run "init" first.');
+  }
+
+  if (!session.active_work) {
+    throw new Error('No active work. Run "start-work" first.');
+  }
+
+  // Access control: main-agent-only (REQ-008)
+  if (!isMainAgent(session)) {
+    throw new Error('Only the main agent (no subagents in-flight) may override-skip.');
+  }
+
+  // Ensure enforcement fields exist (backward compatibility)
+  if (!session.phase_checkpoint) {
+    throw new Error('No phase checkpoint. Run "start-work" first.');
+  }
+  const overrideCount = session.phase_checkpoint.override_count || 0;
+
+  // Check per-session cap (shared with reset-enforcement, max 3) (REQ-008)
+  if (overrideCount >= MAX_OVERRIDES_PER_SESSION) {
+    console.error(`Error: Override cap reached (${MAX_OVERRIDES_PER_SESSION}/${MAX_OVERRIDES_PER_SESSION}). Escalate to human with full context.`);
+    process.exit(1);
+  }
+
+  // Clear skip counter for the specified phase
+  if (!session.phase_checkpoint.phase_skip_warnings) {
+    session.phase_checkpoint.phase_skip_warnings = {};
+  }
+  delete session.phase_checkpoint.phase_skip_warnings[phase];
+
+  // Increment counters
+  session.phase_checkpoint.enforcement_counter = (session.phase_checkpoint.enforcement_counter || 0) + 1;
+  session.phase_checkpoint._counter_checksum = computeCounterChecksum(session.phase_checkpoint.enforcement_counter);
+  session.phase_checkpoint.override_count = overrideCount + 1;
+
+  // Log to session history (DEC-007)
+  addHistoryEntry(session, 'override_skip', {
+    phase,
+    rationale,
+    override_number: overrideCount + 1,
+    cap: MAX_OVERRIDES_PER_SESSION,
+    spec_group_id: session.active_work.spec_group_id,
+    message: `Override-skip for phase '${phase}': ${rationale}`
+  });
+
+  saveSession(session);
+  console.error(`Override-skip applied for phase '${phase}' (${overrideCount + 1}/${MAX_OVERRIDES_PER_SESSION} overrides used).`);
+}
+
+/**
+ * reset-enforcement - Clear ALL skip counters with audit trail (REQ-009).
+ * Main-agent-only, subject to per-session override cap (shared with override-skip).
+ */
+function opResetEnforcement(rationale) {
+  if (!rationale) {
+    throw new Error('Usage: reset-enforcement --rationale "<reason>"');
+  }
+
+  const session = loadSession();
+  if (!session) {
+    throw new Error('No session.json exists. Run "init" first.');
+  }
+
+  if (!session.active_work) {
+    throw new Error('No active work. Run "start-work" first.');
+  }
+
+  // Access control: main-agent-only (REQ-009)
+  if (!isMainAgent(session)) {
+    throw new Error('Only the main agent (no subagents in-flight) may reset-enforcement.');
+  }
+
+  if (!session.phase_checkpoint) {
+    throw new Error('No phase checkpoint. Run "start-work" first.');
+  }
+  const overrideCount = session.phase_checkpoint.override_count || 0;
+
+  // Check per-session cap (shared with override-skip, max 3) (REQ-009)
+  if (overrideCount >= MAX_OVERRIDES_PER_SESSION) {
+    console.error(`Error: Override cap reached (${MAX_OVERRIDES_PER_SESSION}/${MAX_OVERRIDES_PER_SESSION}). Escalate to human with full context.`);
+    process.exit(1);
+  }
+
+  // Clear ALL skip counters
+  session.phase_checkpoint.phase_skip_warnings = {};
+
+  // Increment counters
+  session.phase_checkpoint.enforcement_counter = (session.phase_checkpoint.enforcement_counter || 0) + 1;
+  session.phase_checkpoint._counter_checksum = computeCounterChecksum(session.phase_checkpoint.enforcement_counter);
+  session.phase_checkpoint.override_count = overrideCount + 1;
+
+  // Log to session history (DEC-007)
+  addHistoryEntry(session, 'reset_enforcement', {
+    rationale,
+    override_number: overrideCount + 1,
+    cap: MAX_OVERRIDES_PER_SESSION,
+    spec_group_id: session.active_work.spec_group_id,
+    message: `Reset enforcement: ${rationale}`
+  });
+
+  saveSession(session);
+  console.error(`Enforcement reset applied (${overrideCount + 1}/${MAX_OVERRIDES_PER_SESSION} overrides used). All skip counters cleared.`);
+}
+
+/**
+ * set-enforcement-level - Change enforcement level with audit trail (REQ-010).
+ * Main-agent-only. Does NOT count toward override cap. Does NOT reset skip counters.
+ */
+function opSetEnforcementLevel(level) {
+  if (!level) {
+    throw new Error('Usage: set-enforcement-level <off|warn-only|graduated>');
+  }
+
+  if (!VALID_ENFORCEMENT_LEVELS.includes(level)) {
+    throw new Error(`Invalid enforcement level '${level}'. Valid levels: ${VALID_ENFORCEMENT_LEVELS.join(', ')}`);
+  }
+
+  const session = loadSession();
+  if (!session) {
+    throw new Error('No session.json exists. Run "init" first.');
+  }
+
+  if (!session.active_work) {
+    throw new Error('No active work. Run "start-work" first.');
+  }
+
+  // Access control: main-agent-only (REQ-010)
+  if (!isMainAgent(session)) {
+    throw new Error('Only the main agent (no subagents in-flight) may change enforcement level.');
+  }
+
+  if (!session.phase_checkpoint) {
+    throw new Error('No phase checkpoint. Run "start-work" first.');
+  }
+
+  const oldLevel = session.phase_checkpoint.enforcement_level || 'graduated';
+
+  if (oldLevel === level) {
+    console.error(`Enforcement level is already '${level}'.`);
+    return;
+  }
+
+  // Change level -- does NOT reset skip counters (EC-11)
+  session.phase_checkpoint.enforcement_level = level;
+
+  // Log to session history (DEC-007) -- does NOT count toward override cap
+  addHistoryEntry(session, 'enforcement_level_change', {
+    from_level: oldLevel,
+    to_level: level,
+    spec_group_id: session.active_work.spec_group_id,
+    message: `Enforcement level changed from '${oldLevel}' to '${level}'`
+  });
+
+  saveSession(session);
+  console.error(`Enforcement level changed from '${oldLevel}' to '${level}'.`);
+}
+
+/**
  * get-status - Output current session state summary as JSON.
  */
 function opGetStatus() {
@@ -720,6 +1189,63 @@ function opGetStatus() {
   console.error(JSON.stringify(status, null, 2));
 }
 
+/**
+ * update-convergence - Write convergence state to session.json (AC-5.1 through AC-5.6).
+ *
+ * Usage: update-convergence <gate_name> <clean_pass_count>
+ * Valid gate_name: code_review, security_review
+ * clean_pass_count: non-negative integer
+ *
+ * Implements: REQ-016, REQ-017, REQ-018, REQ-019
+ */
+function opUpdateConvergence(gateName, countStr) {
+  if (!gateName || countStr === undefined || countStr === null || countStr === '') {
+    throw new Error('Usage: update-convergence <gate_name> <clean_pass_count>');
+  }
+
+  // AC-5.3: Validate gate_name against enum (REQ-018)
+  if (!VALID_CONVERGENCE_GATES.includes(gateName)) {
+    throw new Error(
+      `Invalid gate_name '${gateName}'. Valid gate names: ${VALID_CONVERGENCE_GATES.join(', ')}`
+    );
+  }
+
+  // AC-5.4: Validate clean_pass_count is non-negative integer (REQ-018)
+  const cleanPassCount = Number(countStr);
+  if (!Number.isInteger(cleanPassCount) || cleanPassCount < 0) {
+    throw new Error(
+      `Invalid clean_pass_count '${countStr}'. Must be a non-negative integer.`
+    );
+  }
+
+  // AC-5.5: Atomic read-modify-write via saveSession (REQ-019)
+  const session = loadSession();
+  if (!session) {
+    throw new Error('No session.json exists. Run "init" first.');
+  }
+
+  // AC-5.6: Create convergence object if it doesn't exist (backward compatibility)
+  if (!session.convergence) {
+    session.convergence = {};
+  }
+
+  if (!session.convergence[gateName]) {
+    session.convergence[gateName] = {};
+  }
+
+  session.convergence[gateName].clean_pass_count = cleanPassCount;
+
+  addHistoryEntry(session, 'convergence_update', {
+    gate_name: gateName,
+    clean_pass_count: cleanPassCount,
+    spec_group_id: session.active_work?.spec_group_id,
+    message: `Updated convergence: ${gateName}.clean_pass_count = ${cleanPassCount}`
+  });
+
+  saveSession(session);
+  console.error(`Updated convergence: ${gateName}.clean_pass_count = ${cleanPassCount}`);
+}
+
 // =============================================================================
 // Main
 // =============================================================================
@@ -735,11 +1261,15 @@ Operations:
   start-work <spec_group_id> <workflow> <obj>     Start tracking work
   transition-phase <new_phase>                    Update current phase
   complete-atomic-spec <atomic_spec_id>           Mark atomic spec as done
-  dispatch-subagent <task_id> <type> <desc>       Track subagent dispatch
+  dispatch-subagent <id> <type> <desc> [--stage]  Track subagent dispatch
   complete-subagent <task_id> <result_summary>    Mark subagent complete
   journal-created <path-to-journal>               Mark journal entry as created
+  override-skip --phase <p> --rationale "<r>"     Override a phase skip block
+  reset-enforcement --rationale "<r>"             Reset all skip counters
+  set-enforcement-level <off|warn-only|graduated> Change enforcement level
   complete-work                                   Finalize completed work
   archive-incomplete                              Archive incomplete work
+  update-convergence <gate_name> <count>           Update convergence state
   get-status                                      Output session state (JSON)
 
 Phases:
@@ -750,6 +1280,12 @@ Workflows:
 
 Subagent Types:
   ${VALID_SUBAGENT_TYPES.join(', ')}
+
+Stages (for --stage flag with dispatch-subagent):
+  ${VALID_STAGES.join(', ')}
+
+Enforcement Levels:
+  ${VALID_ENFORCEMENT_LEVELS.join(', ')}
 `);
 }
 
@@ -781,9 +1317,30 @@ function main() {
         opCompleteAtomicSpec(args[1]);
         break;
 
-      case 'dispatch-subagent':
-        opDispatchSubagent(args[1], args[2], args.slice(3).join(' '));
+      case 'dispatch-subagent': {
+        // Parse --stage flag from args before joining remainder as description (DEC-004)
+        const dispatchArgs = args.slice(1);
+        const stageIdx = dispatchArgs.indexOf('--stage');
+        let dispatchStage = null;
+        const filteredArgs = [];
+
+        for (let i = 0; i < dispatchArgs.length; i++) {
+          if (dispatchArgs[i] === '--stage' && i + 1 < dispatchArgs.length) {
+            dispatchStage = dispatchArgs[i + 1];
+            i++; // skip the stage value
+          } else {
+            filteredArgs.push(dispatchArgs[i]);
+          }
+        }
+
+        opDispatchSubagent(
+          filteredArgs[0],
+          filteredArgs[1],
+          filteredArgs.slice(2).join(' '),
+          dispatchStage
+        );
         break;
+      }
 
       case 'complete-subagent':
         opCompleteSubagent(args[1], args.slice(2).join(' '));
@@ -799,6 +1356,50 @@ function main() {
 
       case 'archive-incomplete':
         opArchiveIncomplete();
+        break;
+
+      case 'override-skip': {
+        // Parse --phase and --rationale flags
+        const osArgs = args.slice(1);
+        let osPhase = null;
+        let osRationale = null;
+
+        for (let i = 0; i < osArgs.length; i++) {
+          if (osArgs[i] === '--phase' && i + 1 < osArgs.length) {
+            osPhase = osArgs[i + 1];
+            i++;
+          } else if (osArgs[i] === '--rationale' && i + 1 < osArgs.length) {
+            osRationale = osArgs.slice(i + 1).join(' ');
+            break;
+          }
+        }
+
+        opOverrideSkip(osPhase, osRationale);
+        break;
+      }
+
+      case 'reset-enforcement': {
+        // Parse --rationale flag
+        const reArgs = args.slice(1);
+        let reRationale = null;
+
+        for (let i = 0; i < reArgs.length; i++) {
+          if (reArgs[i] === '--rationale' && i + 1 < reArgs.length) {
+            reRationale = reArgs.slice(i + 1).join(' ');
+            break;
+          }
+        }
+
+        opResetEnforcement(reRationale);
+        break;
+      }
+
+      case 'set-enforcement-level':
+        opSetEnforcementLevel(args[1]);
+        break;
+
+      case 'update-convergence':
+        opUpdateConvergence(args[1], args[2]);
         break;
 
       case 'get-status':

@@ -80,7 +80,7 @@ const TEMPLATE_REQUIREMENTS = {
     frontmatterFields: ['id:', 'title:', 'owner:', 'status:'],
   },
 
-  'prd.template.md': {
+  'prd-phase1.template.md': {
     placeholders: [],
     sections: [
       '## 1. Title & Summary',
@@ -89,9 +89,30 @@ const TEMPLATE_REQUIREMENTS = {
       '## 4. Scope Boundaries',
       '## 5. User Stories or Flows',
       '## 6. Non-Functional Requirements',
-      '## 7. Risks & Edge Cases',
-      '## 8. Decisions Log',
-      '## 9. Amendment Log',
+      '## 7. Integration Surface',
+      '## 8. Risks & Edge Cases',
+      '## 9. Decisions Log',
+      '## 10. Amendment Log',
+    ],
+    frontmatterFields: ['id:', 'title:', 'version:', 'state:'],
+  },
+
+  'prd.template.md': {
+    placeholders: [],
+    sections: [
+      '## 1. Problem Statement',
+      '## 2. Product Intent',
+      '## 3. Requirements',
+      '## 4. Constraints',
+      '## 5. Integration Surface',
+      '## 6. Assumptions',
+      '## 7. Tradeoffs',
+      '## 8. User Experience',
+      '## 9. Scope',
+      '## 10. Risks & Mitigations',
+      '## 11. Success Criteria',
+      '## 12. Rollout & Monitoring',
+      '## 13. Open Questions',
     ],
     frontmatterFields: ['id:', 'title:', 'version:', 'state:'],
   },

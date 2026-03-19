@@ -1,6 +1,7 @@
 ---
 name: docs
-description: Generate documentation from implementation. Creates user docs, API docs, and architecture docs. HIGHLY RECOMMENDED for substantial changes, especially public APIs.
+description: Generate documentation from implementation. Creates user docs, API docs, and architecture docs. MANDATORY for all spec-based workflows (oneoff-spec, orchestrator). Only skipped for oneoff-vibe.
+user-invocable: true
 allowed-tools: Read, Write, Glob, Grep
 ---
 
@@ -12,25 +13,23 @@ Generate documentation artifacts from implemented code. Create durable external 
 
 ## When to Use
 
-### Highly Recommended (Should Use)
+### Mandatory (Always Run)
 
-- **Public API additions**: New endpoints, methods, or interfaces
-- **User-facing features**: Features end users will interact with
-- **Substantial changes**: Multi-file implementations, new services
-- **Complex logic**: Non-obvious algorithms or workflows
-- **Configuration options**: New environment variables or settings
+Documentation is mandatory for all spec-based workflows (oneoff-spec and orchestrator). Run after security review, before commit.
 
-### Optional
+### What to Document (scope varies by change)
 
-- Internal refactoring (no API changes)
-- Bug fixes (unless they change documented behavior)
-- Test-only changes
-- Minor UI tweaks
+- **Public API additions**: Full API docs (endpoints, methods, interfaces)
+- **User-facing features**: User-oriented docs for features end users interact with
+- **Substantial changes**: Architecture docs for multi-file implementations, new services
+- **Complex logic**: Explanatory docs for non-obvious algorithms or workflows
+- **Configuration options**: Document new environment variables or settings
+- **Bug fixes / minor changes**: Lightweight docs (update existing docs if behavior changed, or a brief changelog entry)
 
-### Skip
+### Skip (docs step still runs but produces minimal output)
 
 - Documentation-only changes (already documented)
-- Trivial single-line fixes
+- Trivial single-line fixes within oneoff-vibe (docs not dispatched for oneoff-vibe)
 
 ## Documentation Types
 

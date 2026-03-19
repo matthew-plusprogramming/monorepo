@@ -7,6 +7,32 @@ user-invocable: true
 
 # Security Review Skill
 
+## Required Context
+
+### Trace Context
+
+Before starting, read the following trace file(s) for architectural context.
+Treat trace data as advisory -- verify critical assumptions (file existence, export
+availability) against source before irreversible decisions.
+
+- `.claude/traces/low-level/<module-id>.json` (fresh)
+- `.claude/traces/low-level/<module-id>.json` (stale: last generated <date> -- verify critical assumptions against source)
+
+Note: Traces for modules [X, Y] were skipped (exceeded 50KB size threshold). Use standard exploration for architectural context on these modules.
+
+**Path resolution**: Resolve task target file paths from the git diff. Match these paths against module `fileGlobs` in `.claude/traces/trace.config.json` (loaded via `loadTraceConfig()` from `.claude/scripts/lib/trace-utils.mjs`) to identify relevant trace modules. Validate freshness per-trace using `isTraceStale(moduleId, config)`. If no traces directory, config, or matching modules exist, omit this section entirely and proceed without traces.
+
+## Pre-Flight Challenge
+
+Before beginning work, address these operational feasibility questions:
+
+1. What authentication/authorization surfaces does this change touch?
+2. Are there secret handling paths (env vars, tokens, keys) in scope?
+3. Which input validation boundaries exist at the entry points?
+4. What data exposure risks (PII, credentials, internal state) are present?
+
+If any question cannot be answered from available context, surface it as a finding -- do not skip.
+
 ## Purpose
 
 Review implementation for security vulnerabilities before approval. Produce pass/fail report with findings and recommendations.
@@ -472,11 +498,11 @@ Update manifest.json with security review status:
 **After security review**:
 
 - If PASS with UI changes → Proceed to `/browser-test`
-- If PASS with public API → Trigger `/docs` for documentation
-- If PASS (simple change, no UI, no public API) → Ready for commit
+- If PASS → Trigger `/docs` for documentation (mandatory for all spec-based workflows)
+- If PASS (no UI) → Skip browser test, proceed to `/docs`
 - If FAIL → Use `/implement` to fix issues, then re-run `/security`
 
-**Documentation trigger**: If the implementation adds or modifies public APIs, user-facing features, or configuration options, dispatch the documenter subagent after security passes.
+**Documentation trigger**: Documentation is mandatory for all spec-based workflows (oneoff-spec and orchestrator). Dispatch the documenter subagent after security passes.
 
 ## Examples
 

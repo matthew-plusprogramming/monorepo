@@ -27,15 +27,15 @@ Investigate and surface connection points between different specs, systems, and 
 
 ### Mandatory Checkpoints
 
-1. **Before MasterSpec implementation** - After workstream specs written, before any implementation
-2. **Before spec group depends on another** - When sg-B references sg-A outputs
-3. **After consistency issues found** - When manual review reveals conflicts
+1. **Before MasterSpec implementation** - After workstream specs written, before any implementation (mode: `standard`)
+2. **Before oneoff-spec implementation** - After spec approval, before implementation begins (mode: `single-spec`)
+3. **Before spec group depends on another** - When sg-B references sg-A outputs
+4. **After consistency issues found** - When manual review reveals conflicts
 
 ### Recommended Checkpoints
 
 1. **After requirements gathering** - Early detection of assumption conflicts
-2. **Before implementation** - Ensure spec has consistent interfaces
-3. **During code review** - Validate implementation matches cross-spec contracts
+2. **During code review** - Validate implementation matches cross-spec contracts
 
 ## Prerequisites
 
@@ -67,7 +67,7 @@ Prompt: |
   Investigate connection points in scope: <scope>
 
   Spec groups: <list>
-  Mode: <single | cross | master>
+  Mode: <single-spec | cross | master>
 
   Focus on:
   1. Environment variable naming consistency
@@ -82,7 +82,7 @@ Prompt: |
 Agent produces a structured report with:
 
 - Connection map (inputs/outputs/assumptions per spec)
-- Inconsistencies by severity (Blocker/High/Medium/Low)
+- Inconsistencies by severity (Critical/High/Medium/Low)
 - Decisions required (with options and recommendations)
 - Proposed canonical contracts
 
@@ -94,7 +94,7 @@ Surface findings for human decision-making:
 Interface Investigation: sg-auth-system + sg-user-management
 
 Inconsistencies Found:
-  Blocker: 1  (must resolve before implementation)
+  Critical: 1  (must resolve before implementation)
   High: 2     (will cause runtime errors)
   Medium: 1   (technical debt)
   Low: 0
@@ -139,7 +139,7 @@ Scope: 3 workstreams (ws-build, ws-deploy, ws-monitor)
 
 Inconsistencies Found:
 
-BLOCKER (1):
+CRITICAL (1):
   INC-001: Missing .env fields in ws-monitor
     - ws-build defines: HMAC_SECRET, LOG_LEVEL, LOG_MAX_BYTES
     - ws-monitor template missing all three
@@ -177,7 +177,7 @@ Decisions Required: 3
 
 Full report: .claude/specs/groups/ms-deployment-pipeline/investigation-report.md
 
-BLOCKED: Cannot proceed to implementation until Blocker resolved.
+BLOCKED: Cannot proceed to implementation until Critical issue resolved.
 
 Next steps:
   1. Decide on DEC-001, DEC-002, DEC-003
@@ -190,7 +190,7 @@ Next steps:
 ### In oneoff-spec Workflow
 
 ```
-/route → PM → Spec → /investigate (if dependencies) → Approve → Implement
+/route → PM → Spec → /investigate (MANDATORY, mode: single-spec) → Approve → Implement
 ```
 
 ### In orchestrator Workflow
