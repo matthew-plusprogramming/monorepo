@@ -29,6 +29,7 @@ import { existsSync, writeFileSync, unlinkSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   STOP_MANDATORY_DISPATCHES,
+  STOP_PHASE_REQUIREMENTS,
   OVERRIDE_GATE_NAMES,
   getWorkflowTypeStrict,
   isExemptWorkflow,
@@ -134,11 +135,27 @@ async function main() {
       process.exit(0); // Exempt workflow -- no enforcement
     }
 
-    // Step 7: Check all 4 mandatory dispatches (AC-4.1 through AC-4.5)
+    // Step 7: Phase-aware mandatory dispatch check (REQ-001 through REQ-008)
+    // Determine which dispatches are required based on current session phase.
+    // Phases not in STOP_PHASE_REQUIREMENTS require zero dispatches (exit 0).
+    const currentPhase = session.active_work.current_phase;
+
+    if (!currentPhase || typeof currentPhase !== 'string') {
+      // REQ-008: Missing or non-string phase -- fail-open
+      process.exit(0);
+    }
+
+    const requiredDispatches = STOP_PHASE_REQUIREMENTS[currentPhase] || [];
+
+    if (requiredDispatches.length === 0) {
+      // REQ-002/REQ-003: Pre-implementation or implementation phase -- no dispatches required
+      process.exit(0);
+    }
+
     const allTasks = getAllTasks(session);
     const missingDispatches = [];
 
-    for (const requiredType of STOP_MANDATORY_DISPATCHES) {
+    for (const requiredType of requiredDispatches) {
       // AC-4.11: Any status satisfies (presence check only)
       const found = allTasks.some(t => t.subagent_type === requiredType);
       if (!found) {

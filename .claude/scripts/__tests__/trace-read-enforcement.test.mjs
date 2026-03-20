@@ -13,11 +13,10 @@
  *   6. Trace read within TTL -> exit 0
  *   7. Trace read outside TTL (expired) -> exit 2 with expiry message
  *
- * Run with: node --test .claude/scripts/__tests__/trace-read-enforcement.test.mjs
+ * Run with: npx vitest run --config .claude/scripts/vitest.config.mjs trace-read-enforcement.test.mjs
  */
 
-import { describe, it, beforeEach, afterEach } from 'node:test';
-import assert from 'node:assert/strict';
+import { describe, it, beforeEach, afterEach, expect } from 'vitest';
 import {
   mkdirSync,
   writeFileSync,
@@ -216,13 +215,10 @@ describe('AC-7.1: Block edit when trace not read', () => {
       testRoot,
     );
 
-    assert.equal(result.exitCode, 2, `Expected exit 2 but got ${result.exitCode}. stderr: ${result.stderr}`);
-    assert.ok(result.stderr.includes('app-core'), 'Should mention module ID');
-    assert.ok(result.stderr.includes('BLOCKED'), 'Should include BLOCKED header');
-    assert.ok(
-      result.stderr.includes('.claude/traces/low-level/app-core.md'),
-      'Should include path to trace file',
-    );
+    expect(result.exitCode).toBe(2);
+    expect(result.stderr.includes('app-core')).toBeTruthy();
+    expect(result.stderr.includes('BLOCKED')).toBeTruthy();
+    expect(result.stderr.includes('.claude/traces/low-level/app-core.md')).toBeTruthy();
   });
 
   it('should exit 2 when editing a file in app-ui without reading trace', async () => {
@@ -236,9 +232,9 @@ describe('AC-7.1: Block edit when trace not read', () => {
       testRoot,
     );
 
-    assert.equal(result.exitCode, 2);
-    assert.ok(result.stderr.includes('app-ui'), 'Should mention module ID');
-    assert.ok(result.stderr.includes('App UI'), 'Should mention module name');
+    expect(result.exitCode).toBe(2);
+    expect(result.stderr.includes('app-ui')).toBeTruthy();
+    expect(result.stderr.includes('App UI')).toBeTruthy();
   });
 
   it('should exit 2 when trace-reads.json has reads for a different module only', async () => {
@@ -255,7 +251,7 @@ describe('AC-7.1: Block edit when trace not read', () => {
       testRoot,
     );
 
-    assert.equal(result.exitCode, 2, 'Should block -- only app-ui was read, not app-core');
+    expect(result.exitCode).toBe(2);
   });
 
   it('should suggest reading the high-level trace as alternative', async () => {
@@ -269,11 +265,8 @@ describe('AC-7.1: Block edit when trace not read', () => {
       testRoot,
     );
 
-    assert.equal(result.exitCode, 2);
-    assert.ok(
-      result.stderr.includes('high-level.md'),
-      'Should suggest high-level trace as alternative',
-    );
+    expect(result.exitCode).toBe(2);
+    expect(result.stderr.includes('high-level.md')).toBeTruthy();
   });
 
   it('should include the instruction format specified in the spec', async () => {
@@ -287,12 +280,9 @@ describe('AC-7.1: Block edit when trace not read', () => {
       testRoot,
     );
 
-    assert.equal(result.exitCode, 2);
+    expect(result.exitCode).toBe(2);
     // AC-7.1: message containing the module name and instruction to read the trace file
-    assert.ok(
-      result.stderr.includes("Read `.claude/traces/low-level/app-core.md` before editing files in module 'app-core'"),
-      'Should include exact instruction format',
-    );
+    expect(result.stderr.includes("Read `.claude/traces/low-level/app-core.md` before editing files in module 'app-core'")).toBeTruthy();
   });
 });
 
@@ -330,7 +320,7 @@ describe('AC-7.2: Allow edit when trace has been read', () => {
       testRoot,
     );
 
-    assert.equal(result.exitCode, 0, `Expected exit 0 but got ${result.exitCode}. stderr: ${result.stderr}`);
+    expect(result.exitCode).toBe(0);
   });
 
   it('should exit 0 when app-ui trace has been read', async () => {
@@ -346,7 +336,7 @@ describe('AC-7.2: Allow edit when trace has been read', () => {
       testRoot,
     );
 
-    assert.equal(result.exitCode, 0);
+    expect(result.exitCode).toBe(0);
   });
 
   it('should exit 0 when multiple modules have been read', async () => {
@@ -363,14 +353,14 @@ describe('AC-7.2: Allow edit when trace has been read', () => {
       makeStdinJson('test-session', join(testRoot, 'src', 'core', 'a.ts')),
       testRoot,
     );
-    assert.equal(result1.exitCode, 0);
+    expect(result1.exitCode).toBe(0);
 
     // Edit a file in app-ui
     const result2 = await runHook(
       makeStdinJson('test-session', join(testRoot, 'src', 'ui', 'b.tsx')),
       testRoot,
     );
-    assert.equal(result2.exitCode, 0);
+    expect(result2.exitCode).toBe(0);
   });
 
   it('should exit 0 with Write tool as well', async () => {
@@ -386,7 +376,7 @@ describe('AC-7.2: Allow edit when trace has been read', () => {
       testRoot,
     );
 
-    assert.equal(result.exitCode, 0);
+    expect(result.exitCode).toBe(0);
   });
 });
 
@@ -422,7 +412,7 @@ describe('AC-7.3: Untraced file advisory', () => {
       testRoot,
     );
 
-    assert.equal(result.exitCode, 0);
+    expect(result.exitCode).toBe(0);
   });
 
   it('should emit advisory to stderr for untraced files', async () => {
@@ -436,11 +426,8 @@ describe('AC-7.3: Untraced file advisory', () => {
       testRoot,
     );
 
-    assert.equal(result.exitCode, 0);
-    assert.ok(
-      result.stderr.includes('not covered by any trace module'),
-      'Should emit advisory about untraced file',
-    );
+    expect(result.exitCode).toBe(0);
+    expect(result.stderr.includes('not covered by any trace module')).toBeTruthy();
   });
 
   it('should exit 0 for root-level files not in any glob', async () => {
@@ -449,7 +436,7 @@ describe('AC-7.3: Untraced file advisory', () => {
       testRoot,
     );
 
-    assert.equal(result.exitCode, 0);
+    expect(result.exitCode).toBe(0);
   });
 });
 
@@ -478,7 +465,7 @@ describe('AC-7.4: No trace system configured', () => {
       testRoot,
     );
 
-    assert.equal(result.exitCode, 0, 'Should not block when no trace system configured');
+    expect(result.exitCode).toBe(0);
   });
 
   it('should exit 0 when .claude/traces/ directory does not exist', async () => {
@@ -493,7 +480,7 @@ describe('AC-7.4: No trace system configured', () => {
       testRoot,
     );
 
-    assert.equal(result.exitCode, 0, 'Should not block when no traces directory');
+    expect(result.exitCode).toBe(0);
   });
 });
 
@@ -528,8 +515,8 @@ describe('AC-7.5: Missing trace-reads.json', () => {
       testRoot,
     );
 
-    assert.equal(result.exitCode, 2, 'Should block when trace-reads.json does not exist');
-    assert.ok(result.stderr.includes('app-core'), 'Should mention module name');
+    expect(result.exitCode).toBe(2);
+    expect(result.stderr.includes('app-core')).toBeTruthy();
   });
 
   it('should still exit 0 for untraced files even without trace-reads.json', async () => {
@@ -540,7 +527,7 @@ describe('AC-7.5: Missing trace-reads.json', () => {
       testRoot,
     );
 
-    assert.equal(result.exitCode, 0, 'Untraced files should pass regardless of trace-reads.json');
+    expect(result.exitCode).toBe(0);
   });
 });
 
@@ -579,7 +566,7 @@ describe('Session ID matching', () => {
       testRoot,
     );
 
-    assert.equal(result.exitCode, 2, 'Should block when session_id does not match');
+    expect(result.exitCode).toBe(2);
   });
 
   it('should allow when session_id matches', async () => {
@@ -595,7 +582,7 @@ describe('Session ID matching', () => {
       testRoot,
     );
 
-    assert.equal(result.exitCode, 0, 'Should allow when session_id matches');
+    expect(result.exitCode).toBe(0);
   });
 });
 
@@ -622,12 +609,12 @@ describe('Input validation and edge cases', () => {
 
   it('should exit 0 for empty stdin', async () => {
     const result = await runHook('', testRoot);
-    assert.equal(result.exitCode, 0);
+    expect(result.exitCode).toBe(0);
   });
 
   it('should exit 0 for malformed JSON stdin', async () => {
     const result = await runHook('not valid json {{{', testRoot);
-    assert.equal(result.exitCode, 0, 'Should fail open on malformed input');
+    expect(result.exitCode).toBe(0);
   });
 
   it('should exit 0 when tool_input is missing', async () => {
@@ -635,7 +622,7 @@ describe('Input validation and edge cases', () => {
       { session_id: 'test', something_else: true },
       testRoot,
     );
-    assert.equal(result.exitCode, 0);
+    expect(result.exitCode).toBe(0);
   });
 
   it('should exit 0 when file_path is missing', async () => {
@@ -643,7 +630,7 @@ describe('Input validation and edge cases', () => {
       { session_id: 'test', tool_input: {} },
       testRoot,
     );
-    assert.equal(result.exitCode, 0);
+    expect(result.exitCode).toBe(0);
   });
 
   it('should exit 0 when file_path is not a string', async () => {
@@ -651,7 +638,7 @@ describe('Input validation and edge cases', () => {
       { session_id: 'test', tool_input: { file_path: 42 } },
       testRoot,
     );
-    assert.equal(result.exitCode, 0);
+    expect(result.exitCode).toBe(0);
   });
 
   it('should handle malformed trace-reads.json gracefully', async () => {
@@ -666,7 +653,7 @@ describe('Input validation and edge cases', () => {
       testRoot,
     );
 
-    assert.equal(result.exitCode, 2, 'Should block when trace-reads.json is malformed');
+    expect(result.exitCode).toBe(2);
   });
 
   it('should handle trace-reads.json with null reads field', async () => {
@@ -680,7 +667,7 @@ describe('Input validation and edge cases', () => {
       testRoot,
     );
 
-    assert.equal(result.exitCode, 2, 'Should block when reads is null');
+    expect(result.exitCode).toBe(2);
   });
 });
 
@@ -719,7 +706,7 @@ describe('TTL enforcement: trace reads expire after 5 minutes', () => {
       testRoot,
     );
 
-    assert.equal(result.exitCode, 0, `Expected exit 0 (within TTL) but got ${result.exitCode}. stderr: ${result.stderr}`);
+    expect(result.exitCode).toBe(0);
   });
 
   it('should exit 0 when trace was read 4 minutes ago (still within TTL)', async () => {
@@ -737,7 +724,7 @@ describe('TTL enforcement: trace reads expire after 5 minutes', () => {
       testRoot,
     );
 
-    assert.equal(result.exitCode, 0, `Expected exit 0 (4min < 5min TTL) but got ${result.exitCode}. stderr: ${result.stderr}`);
+    expect(result.exitCode).toBe(0);
   });
 
   it('should exit 2 when trace was read more than 5 minutes ago (expired)', async () => {
@@ -754,7 +741,7 @@ describe('TTL enforcement: trace reads expire after 5 minutes', () => {
       testRoot,
     );
 
-    assert.equal(result.exitCode, 2, `Expected exit 2 (TTL expired) but got ${result.exitCode}. stderr: ${result.stderr}`);
+    expect(result.exitCode).toBe(2);
   });
 
   it('should exit 2 when trace was read 10 minutes ago (well past expiry)', async () => {
@@ -772,7 +759,7 @@ describe('TTL enforcement: trace reads expire after 5 minutes', () => {
       testRoot,
     );
 
-    assert.equal(result.exitCode, 2, 'Should block when trace was read 10 minutes ago');
+    expect(result.exitCode).toBe(2);
   });
 
   it('should show expiry-specific message when trace read has expired', async () => {
@@ -788,15 +775,9 @@ describe('TTL enforcement: trace reads expire after 5 minutes', () => {
       testRoot,
     );
 
-    assert.equal(result.exitCode, 2);
-    assert.ok(
-      result.stderr.includes('Trace Read Expired'),
-      'Should show "Trace Read Expired" header for expired reads',
-    );
-    assert.ok(
-      result.stderr.includes('expire after 5 minutes'),
-      'Should mention the 5-minute expiry duration',
-    );
+    expect(result.exitCode).toBe(2);
+    expect(result.stderr.includes('Trace Read Expired')).toBeTruthy();
+    expect(result.stderr.includes('expire after 5 minutes')).toBeTruthy();
   });
 
   it('should show "Trace Not Read" message when module was never read', async () => {
@@ -811,16 +792,10 @@ describe('TTL enforcement: trace reads expire after 5 minutes', () => {
       testRoot,
     );
 
-    assert.equal(result.exitCode, 2);
-    assert.ok(
-      result.stderr.includes('Trace Not Read'),
-      'Should show "Trace Not Read" header when module was never read',
-    );
+    expect(result.exitCode).toBe(2);
+    expect(result.stderr.includes('Trace Not Read')).toBeTruthy();
     // Should NOT show the expired-specific header
-    assert.ok(
-      !result.stderr.includes('Trace Read Expired'),
-      'Should NOT show expired header when module was never read',
-    );
+    expect(result.stderr.includes('Trace Read Expired')).toBeFalsy();
   });
 
   it('should include re-read instruction in block message for expired reads', async () => {
@@ -836,11 +811,8 @@ describe('TTL enforcement: trace reads expire after 5 minutes', () => {
       testRoot,
     );
 
-    assert.equal(result.exitCode, 2);
-    assert.ok(
-      result.stderr.includes('Re-read the trace to continue editing'),
-      'Should instruct agent to re-read the trace',
-    );
+    expect(result.exitCode).toBe(2);
+    expect(result.stderr.includes('Re-read the trace to continue editing')).toBeTruthy();
   });
 
   it('should handle mixed TTL states across modules correctly', async () => {
@@ -858,14 +830,14 @@ describe('TTL enforcement: trace reads expire after 5 minutes', () => {
       makeStdinJson('test-session', join(testRoot, 'src', 'core', 'service.ts')),
       testRoot,
     );
-    assert.equal(result1.exitCode, 0, 'Fresh module should be allowed');
+    expect(result1.exitCode).toBe(0);
 
     // app-ui should be blocked (expired)
     const result2 = await runHook(
       makeStdinJson('test-session', join(testRoot, 'src', 'ui', 'button.tsx')),
       testRoot,
     );
-    assert.equal(result2.exitCode, 2, 'Expired module should be blocked');
+    expect(result2.exitCode).toBe(2);
   });
 });
 
@@ -905,7 +877,7 @@ describe('Performance', () => {
     );
 
     const elapsed = Date.now() - start;
-    assert.equal(result.exitCode, 0);
-    assert.ok(elapsed < 2000, `Hook took ${elapsed}ms, target is <200ms (allowing warm-up overhead for child process spawn)`);
+    expect(result.exitCode).toBe(0);
+    expect(elapsed < 2000).toBeTruthy();
   });
 });

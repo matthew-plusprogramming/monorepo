@@ -9,11 +9,10 @@
  * - AC-5.3: If .claude/traces/ directory structure does not exist, the command creates it.
  * - AC-5.4: The command outputs a summary reporting modules processed and files generated.
  *
- * Run with: node --test .claude/scripts/__tests__/trace-generate-command.test.mjs
+ * Run with: npx vitest run --config .claude/scripts/vitest.config.mjs trace-generate-command.test.mjs
  */
 
-import { describe, it, beforeEach, afterEach } from 'node:test';
-import assert from 'node:assert/strict';
+import { describe, it, beforeEach, afterEach, expect } from 'vitest';
 import { mkdirSync, writeFileSync, readFileSync, rmSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -126,24 +125,24 @@ describe('AC-5.1: Full generation produces all expected trace files', () => {
     generateAllTraces({ projectRoot: testRoot });
 
     const jsonPath = join(testRoot, '.claude', 'traces', 'high-level.json');
-    assert.ok(existsSync(jsonPath), 'high-level.json should exist');
+    expect(existsSync(jsonPath)).toBeTruthy();
 
     const parsed = JSON.parse(readFileSync(jsonPath, 'utf-8'));
     const validation = validateHighLevelTrace(parsed);
-    assert.ok(validation.valid, `high-level.json should validate: ${validation.errors.join(', ')}`);
+    expect(validation.valid).toBeTruthy();
   });
 
   it('should produce high-level.md', () => {
     generateAllTraces({ projectRoot: testRoot });
 
     const mdPath = join(testRoot, '.claude', 'traces', 'high-level.md');
-    assert.ok(existsSync(mdPath), 'high-level.md should exist');
+    expect(existsSync(mdPath)).toBeTruthy();
 
     const content = readFileSync(mdPath, 'utf-8');
-    assert.ok(content.includes('<!-- trace-id: high-level -->'), 'Should have trace-id metadata');
-    assert.ok(content.includes('# Architecture Trace: High-Level'), 'Should have main heading');
-    assert.ok(content.includes('## Module: Module Alpha'), 'Should have Module Alpha section');
-    assert.ok(content.includes('## Module: Module Beta'), 'Should have Module Beta section');
+    expect(content.includes('<!-- trace-id: high-level -->')).toBeTruthy();
+    expect(content.includes('# Architecture Trace: High-Level')).toBeTruthy();
+    expect(content.includes('## Module: Module Alpha')).toBeTruthy();
+    expect(content.includes('## Module: Module Beta')).toBeTruthy();
   });
 
   it('should produce per-module low-level JSON files', () => {
@@ -152,19 +151,19 @@ describe('AC-5.1: Full generation produces all expected trace files', () => {
     const alphaJsonPath = join(testRoot, '.claude', 'traces', 'low-level', 'module-alpha.json');
     const betaJsonPath = join(testRoot, '.claude', 'traces', 'low-level', 'module-beta.json');
 
-    assert.ok(existsSync(alphaJsonPath), 'module-alpha.json should exist');
-    assert.ok(existsSync(betaJsonPath), 'module-beta.json should exist');
+    expect(existsSync(alphaJsonPath)).toBeTruthy();
+    expect(existsSync(betaJsonPath)).toBeTruthy();
 
     // Validate JSON schema
     const alphaTrace = JSON.parse(readFileSync(alphaJsonPath, 'utf-8'));
     const alphaValidation = validateLowLevelTrace(alphaTrace);
-    assert.ok(alphaValidation.valid, `module-alpha.json should validate: ${alphaValidation.errors.join(', ')}`);
-    assert.equal(alphaTrace.moduleId, 'module-alpha');
+    expect(alphaValidation.valid).toBeTruthy();
+    expect(alphaTrace.moduleId).toBe('module-alpha');
 
     const betaTrace = JSON.parse(readFileSync(betaJsonPath, 'utf-8'));
     const betaValidation = validateLowLevelTrace(betaTrace);
-    assert.ok(betaValidation.valid, `module-beta.json should validate: ${betaValidation.errors.join(', ')}`);
-    assert.equal(betaTrace.moduleId, 'module-beta');
+    expect(betaValidation.valid).toBeTruthy();
+    expect(betaTrace.moduleId).toBe('module-beta');
   });
 
   it('should produce per-module low-level markdown files', () => {
@@ -173,25 +172,25 @@ describe('AC-5.1: Full generation produces all expected trace files', () => {
     const alphaMdPath = join(testRoot, '.claude', 'traces', 'low-level', 'module-alpha.md');
     const betaMdPath = join(testRoot, '.claude', 'traces', 'low-level', 'module-beta.md');
 
-    assert.ok(existsSync(alphaMdPath), 'module-alpha.md should exist');
-    assert.ok(existsSync(betaMdPath), 'module-beta.md should exist');
+    expect(existsSync(alphaMdPath)).toBeTruthy();
+    expect(existsSync(betaMdPath)).toBeTruthy();
 
     const alphaContent = readFileSync(alphaMdPath, 'utf-8');
-    assert.ok(alphaContent.includes('<!-- trace-id: module-alpha -->'), 'Should have trace-id');
-    assert.ok(alphaContent.includes('# Low-Level Trace: Module Alpha'), 'Should have heading');
-    assert.ok(alphaContent.includes('## File: src/alpha/service.ts'), 'Should have service.ts entry');
-    assert.ok(alphaContent.includes('## File: src/alpha/index.ts'), 'Should have index.ts entry');
+    expect(alphaContent.includes('<!-- trace-id: module-alpha -->')).toBeTruthy();
+    expect(alphaContent.includes('# Low-Level Trace: Module Alpha')).toBeTruthy();
+    expect(alphaContent.includes('## File: src/alpha/service.ts')).toBeTruthy();
+    expect(alphaContent.includes('## File: src/alpha/index.ts')).toBeTruthy();
 
     const betaContent = readFileSync(betaMdPath, 'utf-8');
-    assert.ok(betaContent.includes('<!-- trace-id: module-beta -->'), 'Should have trace-id');
-    assert.ok(betaContent.includes('## File: src/beta/handler.ts'), 'Should have handler.ts entry');
+    expect(betaContent.includes('<!-- trace-id: module-beta -->')).toBeTruthy();
+    expect(betaContent.includes('## File: src/beta/handler.ts')).toBeTruthy();
   });
 
   it('should produce exactly 6 trace files (2 high-level + 2x2 low-level)', () => {
     const result = generateAllTraces({ projectRoot: testRoot });
 
-    assert.equal(result.filesGenerated, 6, 'Should generate 6 files total');
-    assert.equal(result.modulesProcessed, 2, 'Should process 2 modules');
+    expect(result.filesGenerated).toBe(6);
+    expect(result.modulesProcessed).toBe(2);
 
     // Verify all 6 files exist
     const expectedFiles = [
@@ -204,7 +203,7 @@ describe('AC-5.1: Full generation produces all expected trace files', () => {
     ];
 
     for (const filePath of expectedFiles) {
-      assert.ok(existsSync(filePath), `Expected file should exist: ${filePath}`);
+      expect(existsSync(filePath)).toBeTruthy();
     }
   });
 
@@ -216,20 +215,20 @@ describe('AC-5.1: Full generation produces all expected trace files', () => {
     );
 
     // module-alpha has 2 source files
-    assert.equal(alphaTrace.files.length, 2, 'Module Alpha should have 2 file entries');
+    expect(alphaTrace.files.length).toBe(2);
     const filePaths = alphaTrace.files.map(f => f.filePath).sort();
-    assert.deepEqual(filePaths, ['src/alpha/index.ts', 'src/alpha/service.ts']);
+    expect(filePaths).toEqual(['src/alpha/index.ts', 'src/alpha/service.ts']);
 
     // Verify service.ts has expected imports/exports
     const serviceEntry = alphaTrace.files.find(f => f.filePath === 'src/alpha/service.ts');
-    assert.ok(serviceEntry, 'Should find service.ts entry');
-    assert.ok(serviceEntry.exports.length > 0, 'service.ts should have exports');
-    assert.ok(serviceEntry.imports.length > 0, 'service.ts should have imports');
+    expect(serviceEntry).toBeTruthy();
+    expect(serviceEntry.exports.length > 0).toBeTruthy();
+    expect(serviceEntry.imports.length > 0).toBeTruthy();
 
     const exportSymbols = serviceEntry.exports.map(e => e.symbol);
-    assert.ok(exportSymbols.includes('loadData'), 'Should export loadData');
-    assert.ok(exportSymbols.includes('DataService'), 'Should export DataService');
-    assert.ok(exportSymbols.includes('VERSION'), 'Should export VERSION');
+    expect(exportSymbols.includes('loadData')).toBeTruthy();
+    expect(exportSymbols.includes('DataService')).toBeTruthy();
+    expect(exportSymbols.includes('VERSION')).toBeTruthy();
   });
 });
 
@@ -266,8 +265,7 @@ describe('AC-5.3: Directory auto-creation', () => {
     );
 
     // Remove low-level directory to simulate first run
-    assert.ok(!existsSync(join(testRoot, '.claude', 'traces', 'low-level')),
-      'low-level/ should not exist yet');
+    expect(existsSync(join(testRoot, '.claude', 'traces', 'low-level'))).toBeFalsy();
 
     execSync('git init', { cwd: testRoot });
     execSync('git config user.email "test@test.com"', { cwd: testRoot });
@@ -278,12 +276,9 @@ describe('AC-5.3: Directory auto-creation', () => {
     generateAllTraces({ projectRoot: testRoot });
 
     // Verify directories were created
-    assert.ok(existsSync(join(testRoot, '.claude', 'traces', 'low-level')),
-      'low-level/ should be created');
-    assert.ok(existsSync(join(testRoot, '.claude', 'traces', 'high-level.json')),
-      'high-level.json should be created');
-    assert.ok(existsSync(join(testRoot, '.claude', 'traces', 'low-level', 'module-alpha.json')),
-      'module-alpha.json should be created');
+    expect(existsSync(join(testRoot, '.claude', 'traces', 'low-level'))).toBeTruthy();
+    expect(existsSync(join(testRoot, '.claude', 'traces', 'high-level.json'))).toBeTruthy();
+    expect(existsSync(join(testRoot, '.claude', 'traces', 'low-level', 'module-alpha.json'))).toBeTruthy();
   });
 
   it('should handle already-existing directory structure gracefully', () => {
@@ -294,7 +289,7 @@ describe('AC-5.3: Directory auto-creation', () => {
 
     // Second generation should work without error
     const result = generateAllTraces({ projectRoot: testRoot });
-    assert.equal(result.modulesProcessed, 2, 'Should still process all modules');
+    expect(result.modulesProcessed).toBe(2);
   });
 });
 
@@ -317,48 +312,48 @@ describe('AC-5.4: Summary reports modules processed and files generated', () => 
 
   it('should report correct modulesProcessed count', () => {
     const result = generateAllTraces({ projectRoot: testRoot });
-    assert.equal(result.modulesProcessed, 2, 'Should report 2 modules');
+    expect(result.modulesProcessed).toBe(2);
   });
 
   it('should report correct filesGenerated count', () => {
     const result = generateAllTraces({ projectRoot: testRoot });
     // 2 high-level files + 2 modules * 2 files each = 6
-    assert.equal(result.filesGenerated, 6, 'Should report 6 files generated');
+    expect(result.filesGenerated).toBe(6);
   });
 
   it('should report positive durationMs', () => {
     const result = generateAllTraces({ projectRoot: testRoot });
-    assert.ok(typeof result.durationMs === 'number', 'durationMs should be a number');
-    assert.ok(result.durationMs >= 0, 'durationMs should be non-negative');
+    expect(typeof result.durationMs === 'number').toBeTruthy();
+    expect(result.durationMs >= 0).toBeTruthy();
   });
 
   it('should report highLevelVersion', () => {
     const result = generateAllTraces({ projectRoot: testRoot });
-    assert.equal(result.highLevelVersion, 1, 'First generation should be version 1');
+    expect(result.highLevelVersion).toBe(1);
   });
 
   it('should report per-module low-level results', () => {
     const result = generateAllTraces({ projectRoot: testRoot });
 
-    assert.equal(result.lowLevelResults.length, 2, 'Should have 2 low-level results');
+    expect(result.lowLevelResults.length).toBe(2);
 
     const alphaResult = result.lowLevelResults.find(r => r.moduleId === 'module-alpha');
     const betaResult = result.lowLevelResults.find(r => r.moduleId === 'module-beta');
 
-    assert.ok(alphaResult, 'Should have result for module-alpha');
-    assert.ok(betaResult, 'Should have result for module-beta');
+    expect(alphaResult).toBeTruthy();
+    expect(betaResult).toBeTruthy();
 
-    assert.equal(alphaResult.fileCount, 2, 'module-alpha should have 2 files');
-    assert.equal(betaResult.fileCount, 1, 'module-beta should have 1 file');
-    assert.equal(alphaResult.version, 1, 'First gen version should be 1');
-    assert.equal(betaResult.version, 1, 'First gen version should be 1');
+    expect(alphaResult.fileCount).toBe(2);
+    expect(betaResult.fileCount).toBe(1);
+    expect(alphaResult.version).toBe(1);
+    expect(betaResult.version).toBe(1);
   });
 
   it('should report null highLevelVersion when --low-level-only', () => {
     const result = generateAllTraces({ projectRoot: testRoot, lowLevelOnly: true });
-    assert.equal(result.highLevelVersion, null, 'Should be null when low-level-only');
+    expect(result.highLevelVersion).toBe(null);
     // Files: only low-level (2 modules * 2 files = 4)
-    assert.equal(result.filesGenerated, 4, 'Should generate 4 files in low-level-only mode');
+    expect(result.filesGenerated).toBe(4);
   });
 });
 
@@ -381,20 +376,20 @@ describe('re-run behavior', () => {
 
   it('should increment high-level version on re-run', () => {
     const result1 = generateAllTraces({ projectRoot: testRoot });
-    assert.equal(result1.highLevelVersion, 1);
+    expect(result1.highLevelVersion).toBe(1);
 
     const result2 = generateAllTraces({ projectRoot: testRoot });
-    assert.equal(result2.highLevelVersion, 2, 'Second run should increment to version 2');
+    expect(result2.highLevelVersion).toBe(2);
   });
 
   it('should increment low-level versions on re-run', () => {
     const result1 = generateAllTraces({ projectRoot: testRoot });
     const alphaV1 = result1.lowLevelResults.find(r => r.moduleId === 'module-alpha');
-    assert.equal(alphaV1.version, 1);
+    expect(alphaV1.version).toBe(1);
 
     const result2 = generateAllTraces({ projectRoot: testRoot });
     const alphaV2 = result2.lowLevelResults.find(r => r.moduleId === 'module-alpha');
-    assert.equal(alphaV2.version, 2, 'Low-level version should increment to 2');
+    expect(alphaV2.version).toBe(2);
   });
 
   it('should update files on re-run', () => {
@@ -403,13 +398,13 @@ describe('re-run behavior', () => {
     // Read version from high-level.json
     const jsonPath = join(testRoot, '.claude', 'traces', 'high-level.json');
     const v1 = JSON.parse(readFileSync(jsonPath, 'utf-8')).version;
-    assert.equal(v1, 1);
+    expect(v1).toBe(1);
 
     // Re-run
     generateAllTraces({ projectRoot: testRoot });
 
     const v2 = JSON.parse(readFileSync(jsonPath, 'utf-8')).version;
-    assert.equal(v2, 2, 'File should be updated with new version');
+    expect(v2).toBe(2);
   });
 
   it('should update markdown metadata on re-run', () => {
@@ -417,12 +412,12 @@ describe('re-run behavior', () => {
 
     const mdPath = join(testRoot, '.claude', 'traces', 'high-level.md');
     const md1 = readFileSync(mdPath, 'utf-8');
-    assert.ok(md1.includes('<!-- trace-version: 1 -->'));
+    expect(md1.includes('<!-- trace-version: 1 -->')).toBeTruthy();
 
     generateAllTraces({ projectRoot: testRoot });
 
     const md2 = readFileSync(mdPath, 'utf-8');
-    assert.ok(md2.includes('<!-- trace-version: 2 -->'), 'Markdown should reflect updated version');
+    expect(md2.includes('<!-- trace-version: 2 -->')).toBeTruthy();
   });
 });
 
@@ -458,13 +453,13 @@ describe('CLI execution (child process)', () => {
     );
 
     // AC-5.4: Verify summary output
-    assert.ok(output.includes('Trace generation complete'), 'Should print completion message');
-    assert.ok(output.includes('Modules processed: 2'), 'Should report 2 modules');
-    assert.ok(output.includes('Files generated: 6'), 'Should report 6 files');
-    assert.ok(output.includes('Duration:'), 'Should report duration');
-    assert.ok(output.includes('High-level trace: version 1'), 'Should report high-level version');
-    assert.ok(output.includes('module-alpha:'), 'Should report module-alpha results');
-    assert.ok(output.includes('module-beta:'), 'Should report module-beta results');
+    expect(output.includes('Trace generation complete')).toBeTruthy();
+    expect(output.includes('Modules processed: 2')).toBeTruthy();
+    expect(output.includes('Files generated: 6')).toBeTruthy();
+    expect(output.includes('Duration:')).toBeTruthy();
+    expect(output.includes('High-level trace: version 1')).toBeTruthy();
+    expect(output.includes('module-alpha:')).toBeTruthy();
+    expect(output.includes('module-beta:')).toBeTruthy();
   });
 
   it('should produce all expected files when run via CLI', () => {
@@ -481,12 +476,12 @@ describe('CLI execution (child process)', () => {
     );
 
     // AC-5.1: Verify all expected files exist
-    assert.ok(existsSync(join(testRoot, '.claude', 'traces', 'high-level.json')));
-    assert.ok(existsSync(join(testRoot, '.claude', 'traces', 'high-level.md')));
-    assert.ok(existsSync(join(testRoot, '.claude', 'traces', 'low-level', 'module-alpha.json')));
-    assert.ok(existsSync(join(testRoot, '.claude', 'traces', 'low-level', 'module-alpha.md')));
-    assert.ok(existsSync(join(testRoot, '.claude', 'traces', 'low-level', 'module-beta.json')));
-    assert.ok(existsSync(join(testRoot, '.claude', 'traces', 'low-level', 'module-beta.md')));
+    expect(existsSync(join(testRoot, '.claude', 'traces', 'high-level.json'))).toBeTruthy();
+    expect(existsSync(join(testRoot, '.claude', 'traces', 'high-level.md'))).toBeTruthy();
+    expect(existsSync(join(testRoot, '.claude', 'traces', 'low-level', 'module-alpha.json'))).toBeTruthy();
+    expect(existsSync(join(testRoot, '.claude', 'traces', 'low-level', 'module-alpha.md'))).toBeTruthy();
+    expect(existsSync(join(testRoot, '.claude', 'traces', 'low-level', 'module-beta.json'))).toBeTruthy();
+    expect(existsSync(join(testRoot, '.claude', 'traces', 'low-level', 'module-beta.md'))).toBeTruthy();
   });
 
   it('should support --low-level-only flag', () => {
@@ -503,12 +498,11 @@ describe('CLI execution (child process)', () => {
     );
 
     // Low-level files should exist
-    assert.ok(existsSync(join(testRoot, '.claude', 'traces', 'low-level', 'module-alpha.json')));
-    assert.ok(existsSync(join(testRoot, '.claude', 'traces', 'low-level', 'module-beta.json')));
+    expect(existsSync(join(testRoot, '.claude', 'traces', 'low-level', 'module-alpha.json'))).toBeTruthy();
+    expect(existsSync(join(testRoot, '.claude', 'traces', 'low-level', 'module-beta.json'))).toBeTruthy();
 
     // High-level files should NOT exist (since it's --low-level-only)
-    assert.ok(!existsSync(join(testRoot, '.claude', 'traces', 'high-level.json')),
-      'high-level.json should NOT exist with --low-level-only');
+    expect(existsSync(join(testRoot, '.claude', 'traces', 'high-level.json'))).toBeFalsy();
   });
 });
 
@@ -548,10 +542,10 @@ describe('edge cases', () => {
 
     const result = generateAllTraces({ projectRoot: testRoot });
 
-    assert.equal(result.modulesProcessed, 0, 'No modules to process');
-    assert.equal(result.filesGenerated, 2, 'Only high-level files generated');
-    assert.equal(result.lowLevelResults.length, 0);
-    assert.equal(result.highLevelVersion, 1);
+    expect(result.modulesProcessed).toBe(0);
+    expect(result.filesGenerated).toBe(2);
+    expect(result.lowLevelResults.length).toBe(0);
+    expect(result.highLevelVersion).toBe(1);
   });
 
   it('should handle modules with no matching files', () => {
@@ -584,15 +578,15 @@ describe('edge cases', () => {
 
     const result = generateAllTraces({ projectRoot: testRoot });
 
-    assert.equal(result.modulesProcessed, 1);
-    assert.equal(result.lowLevelResults[0].fileCount, 0, 'Empty module should have 0 files');
+    expect(result.modulesProcessed).toBe(1);
+    expect(result.lowLevelResults[0].fileCount).toBe(0);
 
     // JSON should still be valid
     const trace = JSON.parse(
       readFileSync(join(testRoot, '.claude', 'traces', 'low-level', 'empty-module.json'), 'utf-8'),
     );
     const validation = validateLowLevelTrace(trace);
-    assert.ok(validation.valid, `Empty module trace should validate: ${validation.errors.join(', ')}`);
-    assert.equal(trace.files.length, 0);
+    expect(validation.valid).toBeTruthy();
+    expect(trace.files.length).toBe(0);
   });
 });

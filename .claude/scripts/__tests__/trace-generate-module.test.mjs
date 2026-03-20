@@ -9,11 +9,10 @@
  *   the command exits with a non-zero code and a descriptive error message
  *   listing available modules.
  *
- * Run with: node --test .claude/scripts/__tests__/trace-generate-module.test.mjs
+ * Run with: npx vitest run --config .claude/scripts/vitest.config.mjs trace-generate-module.test.mjs
  */
 
-import { describe, it, beforeEach, afterEach } from 'node:test';
-import assert from 'node:assert/strict';
+import { describe, it, beforeEach, afterEach, expect } from 'vitest';
 import {
   mkdirSync,
   writeFileSync,
@@ -151,7 +150,7 @@ describe('AC-5.2: Single-module generation updates only the specified module', (
     // Record the initial version of module-alpha
     const alphaJsonPath = join(testRoot, '.claude', 'traces', 'low-level', 'module-alpha.json');
     const beforeAlpha = JSON.parse(readFileSync(alphaJsonPath, 'utf-8'));
-    assert.equal(beforeAlpha.version, 1, 'Initial version should be 1');
+    expect(beforeAlpha.version).toBe(1);
 
     // Run single-module generation for module-alpha
     const result = generateAllTraces({
@@ -159,19 +158,19 @@ describe('AC-5.2: Single-module generation updates only the specified module', (
       targetModuleId: 'module-alpha',
     });
 
-    assert.equal(result.modulesProcessed, 1, 'Should process only 1 module');
-    assert.equal(result.lowLevelResults.length, 1, 'Should have 1 low-level result');
-    assert.equal(result.lowLevelResults[0].moduleId, 'module-alpha');
+    expect(result.modulesProcessed).toBe(1);
+    expect(result.lowLevelResults.length).toBe(1);
+    expect(result.lowLevelResults[0].moduleId).toBe('module-alpha');
 
     // Verify module-alpha was updated (version incremented)
     const afterAlpha = JSON.parse(readFileSync(alphaJsonPath, 'utf-8'));
-    assert.equal(afterAlpha.version, 2, 'Alpha version should increment to 2');
+    expect(afterAlpha.version).toBe(2);
   });
 
   it('should update the targeted module low-level markdown', () => {
     const alphaMdPath = join(testRoot, '.claude', 'traces', 'low-level', 'module-alpha.md');
     const beforeMd = readFileSync(alphaMdPath, 'utf-8');
-    assert.ok(beforeMd.includes('<!-- trace-version: 1 -->'));
+    expect(beforeMd.includes('<!-- trace-version: 1 -->')).toBeTruthy();
 
     generateAllTraces({
       projectRoot: testRoot,
@@ -179,8 +178,7 @@ describe('AC-5.2: Single-module generation updates only the specified module', (
     });
 
     const afterMd = readFileSync(alphaMdPath, 'utf-8');
-    assert.ok(afterMd.includes('<!-- trace-version: 2 -->'),
-      'Markdown should reflect updated version');
+    expect(afterMd.includes('<!-- trace-version: 2 -->')).toBeTruthy();
   });
 
   it('should NOT modify other modules low-level JSON files', () => {
@@ -201,10 +199,8 @@ describe('AC-5.2: Single-module generation updates only the specified module', (
     const afterBeta = readFileSync(betaJsonPath, 'utf-8');
     const afterGamma = readFileSync(gammaJsonPath, 'utf-8');
 
-    assert.equal(afterBeta, beforeBeta,
-      'module-beta.json should be unchanged after module-alpha regeneration');
-    assert.equal(afterGamma, beforeGamma,
-      'module-gamma.json should be unchanged after module-alpha regeneration');
+    expect(afterBeta).toBe(beforeBeta);
+    expect(afterGamma).toBe(beforeGamma);
   });
 
   it('should NOT modify other modules low-level markdown files', () => {
@@ -222,16 +218,14 @@ describe('AC-5.2: Single-module generation updates only the specified module', (
     const afterBetaMd = readFileSync(betaMdPath, 'utf-8');
     const afterGammaMd = readFileSync(gammaMdPath, 'utf-8');
 
-    assert.equal(afterBetaMd, beforeBetaMd,
-      'module-beta.md should be unchanged');
-    assert.equal(afterGammaMd, beforeGammaMd,
-      'module-gamma.md should be unchanged');
+    expect(afterBetaMd).toBe(beforeBetaMd);
+    expect(afterGammaMd).toBe(beforeGammaMd);
   });
 
   it('should update the high-level trace when regenerating a single module', () => {
     const highJsonPath = join(testRoot, '.claude', 'traces', 'high-level.json');
     const beforeHigh = JSON.parse(readFileSync(highJsonPath, 'utf-8'));
-    assert.equal(beforeHigh.version, 1);
+    expect(beforeHigh.version).toBe(1);
 
     const result = generateAllTraces({
       projectRoot: testRoot,
@@ -240,16 +234,14 @@ describe('AC-5.2: Single-module generation updates only the specified module', (
 
     // High-level trace should be updated (version incremented)
     const afterHigh = JSON.parse(readFileSync(highJsonPath, 'utf-8'));
-    assert.equal(afterHigh.version, 2,
-      'High-level trace version should increment');
-    assert.ok(result.highLevelVersion === 2,
-      'Result should report high-level version 2');
+    expect(afterHigh.version).toBe(2);
+    expect(result.highLevelVersion === 2).toBeTruthy();
   });
 
   it('should update high-level markdown when regenerating a single module', () => {
     const highMdPath = join(testRoot, '.claude', 'traces', 'high-level.md');
     const beforeMd = readFileSync(highMdPath, 'utf-8');
-    assert.ok(beforeMd.includes('<!-- trace-version: 1 -->'));
+    expect(beforeMd.includes('<!-- trace-version: 1 -->')).toBeTruthy();
 
     generateAllTraces({
       projectRoot: testRoot,
@@ -257,8 +249,7 @@ describe('AC-5.2: Single-module generation updates only the specified module', (
     });
 
     const afterMd = readFileSync(highMdPath, 'utf-8');
-    assert.ok(afterMd.includes('<!-- trace-version: 2 -->'),
-      'High-level markdown version should increment');
+    expect(afterMd.includes('<!-- trace-version: 2 -->')).toBeTruthy();
   });
 
   it('should produce valid JSON for the regenerated module', () => {
@@ -270,8 +261,7 @@ describe('AC-5.2: Single-module generation updates only the specified module', (
     const betaJsonPath = join(testRoot, '.claude', 'traces', 'low-level', 'module-beta.json');
     const trace = JSON.parse(readFileSync(betaJsonPath, 'utf-8'));
     const validation = validateLowLevelTrace(trace);
-    assert.ok(validation.valid,
-      `Regenerated module-beta.json should validate: ${validation.errors.join(', ')}`);
+    expect(validation.valid).toBeTruthy();
   });
 
   it('should produce valid high-level JSON after single-module regeneration', () => {
@@ -283,8 +273,7 @@ describe('AC-5.2: Single-module generation updates only the specified module', (
     const highJsonPath = join(testRoot, '.claude', 'traces', 'high-level.json');
     const trace = JSON.parse(readFileSync(highJsonPath, 'utf-8'));
     const validation = validateHighLevelTrace(trace);
-    assert.ok(validation.valid,
-      `High-level JSON should validate after single-module regen: ${validation.errors.join(', ')}`);
+    expect(validation.valid).toBeTruthy();
   });
 
   it('should report correct filesGenerated count for single-module mode', () => {
@@ -294,8 +283,7 @@ describe('AC-5.2: Single-module generation updates only the specified module', (
     });
 
     // Should generate: 2 high-level files (json + md) + 1 module * 2 files (json + md) = 4
-    assert.equal(result.filesGenerated, 4,
-      'Single module should generate 4 files (2 high-level + 2 low-level)');
+    expect(result.filesGenerated).toBe(4);
   });
 
   it('should be faster than full generation', () => {
@@ -309,10 +297,9 @@ describe('AC-5.2: Single-module generation updates only the specified module', (
     });
 
     // Single module should process fewer modules
-    assert.ok(singleResult.modulesProcessed < fullResult.modulesProcessed,
-      'Single-module should process fewer modules than full generation');
-    assert.equal(singleResult.modulesProcessed, 1);
-    assert.equal(fullResult.modulesProcessed, 3);
+    expect(singleResult.modulesProcessed < fullResult.modulesProcessed).toBeTruthy();
+    expect(singleResult.modulesProcessed).toBe(1);
+    expect(fullResult.modulesProcessed).toBe(3);
   });
 
   it('should work for each module individually', () => {
@@ -323,8 +310,8 @@ describe('AC-5.2: Single-module generation updates only the specified module', (
         targetModuleId: moduleId,
       });
 
-      assert.equal(result.modulesProcessed, 1, `Should process only ${moduleId}`);
-      assert.equal(result.lowLevelResults[0].moduleId, moduleId);
+      expect(result.modulesProcessed).toBe(1);
+      expect(result.lowLevelResults[0].moduleId).toBe(moduleId);
     }
   });
 });
@@ -347,18 +334,10 @@ describe('AC-6.1: Invalid module ID produces descriptive error with available mo
   });
 
   it('should throw error for unknown module ID', () => {
-    assert.throws(
-      () => generateAllTraces({
-        projectRoot: testRoot,
-        targetModuleId: 'nonexistent-module',
-      }),
-      (err) => {
-        assert.ok(err instanceof Error);
-        assert.ok(err.message.includes('nonexistent-module'),
-          'Error should mention the requested module ID');
-        return true;
-      },
-    );
+    expect(() => generateAllTraces({
+      projectRoot: testRoot,
+      targetModuleId: 'nonexistent-module',
+    })).toThrow(/nonexistent-module/);
   });
 
   it('should list available module IDs in the error message', () => {
@@ -367,17 +346,13 @@ describe('AC-6.1: Invalid module ID produces descriptive error with available mo
         projectRoot: testRoot,
         targetModuleId: 'nonexistent-module',
       });
-      assert.fail('Should have thrown an error');
+      throw new Error('Should have thrown an error');
     } catch (err) {
       // Should list all 3 available modules
-      assert.ok(err.message.includes('module-alpha'),
-        'Error should list module-alpha as available');
-      assert.ok(err.message.includes('module-beta'),
-        'Error should list module-beta as available');
-      assert.ok(err.message.includes('module-gamma'),
-        'Error should list module-gamma as available');
-      assert.ok(err.message.includes('Available modules'),
-        'Error should have "Available modules" label');
+      expect(err.message.includes('module-alpha')).toBeTruthy();
+      expect(err.message.includes('module-beta')).toBeTruthy();
+      expect(err.message.includes('module-gamma')).toBeTruthy();
+      expect(err.message.includes('Available modules')).toBeTruthy();
     }
   });
 
@@ -394,14 +369,12 @@ describe('AC-6.1: Invalid module ID produces descriptive error with available mo
           timeout: 30000,
         },
       );
-      assert.fail('Should have exited with non-zero code');
+      throw new Error('Should have exited with non-zero code');
     } catch (err) {
       // execSync throws on non-zero exit code
-      assert.ok(err.status !== 0, 'Should exit with non-zero code');
-      assert.ok(err.stderr.includes('nonexistent-module'),
-        'stderr should mention the invalid module');
-      assert.ok(err.stderr.includes('Available modules'),
-        'stderr should list available modules');
+      expect(err.status !== 0).toBeTruthy();
+      expect(err.stderr.includes('nonexistent-module')).toBeTruthy();
+      expect(err.stderr.includes('Available modules')).toBeTruthy();
     }
   });
 
@@ -413,8 +386,7 @@ describe('AC-6.1: Invalid module ID produces descriptive error with available mo
       targetModuleId: '',
     });
 
-    assert.equal(result.modulesProcessed, 3,
-      'Empty string should fall back to full generation');
+    expect(result.modulesProcessed).toBe(3);
   });
 });
 
@@ -448,12 +420,9 @@ describe('CLI: single-module generation via command line', () => {
       },
     );
 
-    assert.ok(output.includes('Trace generation complete'),
-      'Should print completion message');
-    assert.ok(output.includes('module-alpha'),
-      'Should mention the targeted module');
-    assert.ok(output.includes('Modules processed: 1'),
-      'Should report 1 module processed');
+    expect(output.includes('Trace generation complete')).toBeTruthy();
+    expect(output.includes('module-alpha')).toBeTruthy();
+    expect(output.includes('Modules processed: 1')).toBeTruthy();
   });
 
   it('should only update targeted module files via CLI', () => {
@@ -480,16 +449,13 @@ describe('CLI: single-module generation via command line', () => {
     const afterBeta = readFileSync(betaJsonPath, 'utf-8');
     const afterGamma = readFileSync(gammaJsonPath, 'utf-8');
 
-    assert.equal(afterBeta, beforeBeta,
-      'module-beta.json should be unchanged after CLI module-alpha generation');
-    assert.equal(afterGamma, beforeGamma,
-      'module-gamma.json should be unchanged after CLI module-alpha generation');
+    expect(afterBeta).toBe(beforeBeta);
+    expect(afterGamma).toBe(beforeGamma);
 
     // Verify targeted module was updated
     const alphaJsonPath = join(testRoot, '.claude', 'traces', 'low-level', 'module-alpha.json');
     const afterAlpha = JSON.parse(readFileSync(alphaJsonPath, 'utf-8'));
-    assert.equal(afterAlpha.version, 2,
-      'module-alpha.json version should increment to 2');
+    expect(afterAlpha.version).toBe(2);
   });
 
   it('backward compatibility: no args still runs full generation', () => {
@@ -505,10 +471,8 @@ describe('CLI: single-module generation via command line', () => {
       },
     );
 
-    assert.ok(output.includes('Modules processed: 3'),
-      'Full generation should process all 3 modules');
-    assert.ok(output.includes('Trace generation complete.'),
-      'Should show completion without module label');
+    expect(output.includes('Modules processed: 3')).toBeTruthy();
+    expect(output.includes('Trace generation complete.')).toBeTruthy();
   });
 });
 
@@ -554,15 +518,13 @@ describe('edge cases: single-module generation', () => {
       targetModuleId: 'module-alpha',
     });
 
-    assert.equal(result.modulesProcessed, 1);
-    assert.equal(result.lowLevelResults[0].fileCount, 1);
+    expect(result.modulesProcessed).toBe(1);
+    expect(result.lowLevelResults[0].fileCount).toBe(1);
 
     // Verify only module-alpha files exist in low-level
-    assert.ok(existsSync(join(testRoot, '.claude', 'traces', 'low-level', 'module-alpha.json')));
-    assert.ok(!existsSync(join(testRoot, '.claude', 'traces', 'low-level', 'module-beta.json')),
-      'module-beta should not have trace files');
-    assert.ok(!existsSync(join(testRoot, '.claude', 'traces', 'low-level', 'module-gamma.json')),
-      'module-gamma should not have trace files');
+    expect(existsSync(join(testRoot, '.claude', 'traces', 'low-level', 'module-alpha.json'))).toBeTruthy();
+    expect(existsSync(join(testRoot, '.claude', 'traces', 'low-level', 'module-beta.json'))).toBeFalsy();
+    expect(existsSync(join(testRoot, '.claude', 'traces', 'low-level', 'module-gamma.json'))).toBeFalsy();
   });
 
   it('should work when targeted module has no matching files', () => {
@@ -590,9 +552,8 @@ describe('edge cases: single-module generation', () => {
       targetModuleId: 'module-alpha',
     });
 
-    assert.equal(result.modulesProcessed, 1);
-    assert.equal(result.lowLevelResults[0].fileCount, 0,
-      'Module with no files should still succeed with 0 files');
+    expect(result.modulesProcessed).toBe(1);
+    expect(result.lowLevelResults[0].fileCount).toBe(0);
   });
 
   it('should handle repeated single-module regeneration (version incrementing)', () => {
@@ -610,7 +571,6 @@ describe('edge cases: single-module generation', () => {
     const trace = JSON.parse(readFileSync(betaJsonPath, 'utf-8'));
 
     // Initial full gen = v1, then 3 single-module regens = v4
-    assert.equal(trace.version, 4,
-      'Version should increment with each regeneration (1 + 3 = 4)');
+    expect(trace.version).toBe(4);
   });
 });

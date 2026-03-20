@@ -154,6 +154,12 @@
           },
           {
             "_source": "metaclaude",
+            "_id": "structured-docs-validate",
+            "type": "command",
+            "command": "cd \"$CLAUDE_PROJECT_DIR\" && node .claude/scripts/hook-wrapper.mjs '.claude/docs/**/*.yaml' 'node .claude/scripts/docs-validate.mjs --hook'"
+          },
+          {
+            "_source": "metaclaude",
             "_id": "prettier-format",
             "type": "command",
             "command": "cd \"$CLAUDE_PROJECT_DIR\" && node .claude/scripts/hook-wrapper.mjs '*.{ts,tsx,js,jsx,json,md,css,scss,yml,yaml}' 'npx prettier --write {{file}} 2>/dev/null || true'"

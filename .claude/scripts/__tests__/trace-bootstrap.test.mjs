@@ -10,11 +10,10 @@
  * - AC-13.3: Bootstrap outputs a message to stdout prompting the user to review module boundaries.
  * - AC-13.4: After bootstrap, running trace generate again does NOT re-enter bootstrap mode.
  *
- * Run with: node --test .claude/scripts/__tests__/trace-bootstrap.test.mjs
+ * Run with: npx vitest run --config .claude/scripts/vitest.config.mjs trace-bootstrap.test.mjs
  */
 
-import { describe, it, beforeEach, afterEach } from 'node:test';
-import assert from 'node:assert/strict';
+import { describe, it, beforeEach, afterEach, expect } from 'vitest';
 import { mkdirSync, writeFileSync, readFileSync, rmSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -34,19 +33,19 @@ import {
 
 describe('dirNameToModuleName', () => {
   it('should convert kebab-case to Title Case', () => {
-    assert.equal(dirNameToModuleName('node-server'), 'Node Server');
+    expect(dirNameToModuleName('node-server')).toBe('Node Server');
   });
 
   it('should convert snake_case to Title Case', () => {
-    assert.equal(dirNameToModuleName('agent_orchestrator'), 'Agent Orchestrator');
+    expect(dirNameToModuleName('agent_orchestrator')).toBe('Agent Orchestrator');
   });
 
   it('should handle single word', () => {
-    assert.equal(dirNameToModuleName('core'), 'Core');
+    expect(dirNameToModuleName('core')).toBe('Core');
   });
 
   it('should handle already capitalized', () => {
-    assert.equal(dirNameToModuleName('Utils'), 'Utils');
+    expect(dirNameToModuleName('Utils')).toBe('Utils');
   });
 });
 
@@ -56,23 +55,23 @@ describe('dirNameToModuleName', () => {
 
 describe('dirNameToModuleId', () => {
   it('should return lowercase kebab-case', () => {
-    assert.equal(dirNameToModuleId('node-server'), 'node-server');
+    expect(dirNameToModuleId('node-server')).toBe('node-server');
   });
 
   it('should convert uppercase to lowercase', () => {
-    assert.equal(dirNameToModuleId('MyApp'), 'myapp');
+    expect(dirNameToModuleId('MyApp')).toBe('myapp');
   });
 
   it('should convert underscores to hyphens', () => {
-    assert.equal(dirNameToModuleId('agent_orchestrator'), 'agent-orchestrator');
+    expect(dirNameToModuleId('agent_orchestrator')).toBe('agent-orchestrator');
   });
 
   it('should add prefix when provided', () => {
-    assert.equal(dirNameToModuleId('core', 'pkg'), 'pkg-core');
+    expect(dirNameToModuleId('core', 'pkg')).toBe('pkg-core');
   });
 
   it('should strip non-alphanumeric-hyphen characters', () => {
-    assert.equal(dirNameToModuleId('my.app!'), 'myapp');
+    expect(dirNameToModuleId('my.app!')).toBe('myapp');
   });
 });
 
@@ -104,11 +103,11 @@ describe('autoDetectModules', () => {
     const modules = autoDetectModules(testRoot);
 
     const ids = modules.map((m) => m.id);
-    assert.ok(ids.includes('node-server'), 'Should detect node-server');
-    assert.ok(ids.includes('client-website'), 'Should detect client-website');
+    expect(ids.includes('node-server')).toBeTruthy();
+    expect(ids.includes('client-website')).toBeTruthy();
 
     const nodeServer = modules.find((m) => m.id === 'node-server');
-    assert.deepEqual(nodeServer.fileGlobs, ['apps/node-server/**']);
+    expect(nodeServer.fileGlobs).toEqual(['apps/node-server/**']);
   });
 
   it('should detect packages/ subdirectories as modules with pkg- prefix (AC-13.2)', () => {
@@ -122,12 +121,12 @@ describe('autoDetectModules', () => {
     const modules = autoDetectModules(testRoot);
 
     const ids = modules.map((m) => m.id);
-    assert.ok(ids.includes('pkg-core'), 'Should detect pkg-core');
-    assert.ok(ids.includes('pkg-utils'), 'Should detect pkg-utils');
+    expect(ids.includes('pkg-core')).toBeTruthy();
+    expect(ids.includes('pkg-utils')).toBeTruthy();
 
     const pkgCore = modules.find((m) => m.id === 'pkg-core');
-    assert.deepEqual(pkgCore.fileGlobs, ['packages/core/**']);
-    assert.ok(pkgCore.name.includes('Package'), 'Name should include Package');
+    expect(pkgCore.fileGlobs).toEqual(['packages/core/**']);
+    expect(pkgCore.name.includes('Package')).toBeTruthy();
   });
 
   it('should detect .claude/scripts/ as a module (AC-13.2)', () => {
@@ -140,7 +139,7 @@ describe('autoDetectModules', () => {
     const modules = autoDetectModules(testRoot);
 
     const ids = modules.map((m) => m.id);
-    assert.ok(ids.includes('claude-scripts'), 'Should detect claude-scripts');
+    expect(ids.includes('claude-scripts')).toBeTruthy();
   });
 
   it('should detect src/ as a fallback for non-monorepo projects', () => {
@@ -153,7 +152,7 @@ describe('autoDetectModules', () => {
     const modules = autoDetectModules(testRoot);
 
     const ids = modules.map((m) => m.id);
-    assert.ok(ids.includes('src'), 'Should detect src as a module');
+    expect(ids.includes('src')).toBeTruthy();
   });
 
   it('should skip hidden directories in apps/', () => {
@@ -167,11 +166,8 @@ describe('autoDetectModules', () => {
     const modules = autoDetectModules(testRoot);
 
     const ids = modules.map((m) => m.id);
-    assert.ok(
-      !ids.some((id) => id.includes('hidden')),
-      'Should not detect hidden directories',
-    );
-    assert.ok(ids.includes('visible'), 'Should detect visible directories');
+    expect(ids.some((id) => id.includes('hidden'))).toBeFalsy();
+    expect(ids.includes('visible')).toBeTruthy();
   });
 
   it('should return empty array for project with no recognizable structure', () => {
@@ -182,7 +178,7 @@ describe('autoDetectModules', () => {
     mkdirSync(testRoot, { recursive: true });
 
     const modules = autoDetectModules(testRoot);
-    assert.equal(modules.length, 0, 'Should return no modules');
+    expect(modules.length).toBe(0);
   });
 });
 
@@ -213,15 +209,15 @@ describe('bootstrapTraceConfig', () => {
 
     const { config, configPath } = bootstrapTraceConfig(testRoot);
 
-    assert.ok(existsSync(configPath), 'trace.config.json should be created');
-    assert.equal(config.version, 1);
-    assert.equal(config.projectRoot, '.');
-    assert.ok(config.modules.length > 0, 'Should have auto-detected modules');
+    expect(existsSync(configPath)).toBeTruthy();
+    expect(config.version).toBe(1);
+    expect(config.projectRoot).toBe('.');
+    expect(config.modules.length > 0).toBeTruthy();
 
     // Verify the file is valid JSON
     const parsed = JSON.parse(readFileSync(configPath, 'utf-8'));
-    assert.equal(parsed.version, 1);
-    assert.ok(Array.isArray(parsed.modules));
+    expect(parsed.version).toBe(1);
+    expect(Array.isArray(parsed.modules)).toBeTruthy();
   });
 
   it('should create .claude/traces/ directory if it does not exist (AC-13.1)', () => {
@@ -231,21 +227,12 @@ describe('bootstrapTraceConfig', () => {
     );
     mkdirSync(join(testRoot, 'apps', 'my-app'), { recursive: true });
 
-    assert.ok(
-      !existsSync(join(testRoot, '.claude', 'traces')),
-      'traces/ should not exist yet',
-    );
+    expect(existsSync(join(testRoot, '.claude', 'traces'))).toBeFalsy();
 
     bootstrapTraceConfig(testRoot);
 
-    assert.ok(
-      existsSync(join(testRoot, '.claude', 'traces')),
-      'traces/ should be created',
-    );
-    assert.ok(
-      existsSync(join(testRoot, '.claude', 'traces', 'trace.config.json')),
-      'trace.config.json should exist',
-    );
+    expect(existsSync(join(testRoot, '.claude', 'traces'))).toBeTruthy();
+    expect(existsSync(join(testRoot, '.claude', 'traces', 'trace.config.json'))).toBeTruthy();
   });
 
   it('should throw if trace.config.json already exists (AC-13.4)', () => {
@@ -259,11 +246,7 @@ describe('bootstrapTraceConfig', () => {
       '{"version":1,"modules":[]}',
     );
 
-    assert.throws(
-      () => bootstrapTraceConfig(testRoot),
-      /already exists/,
-      'Should throw when config already exists',
-    );
+    expect(() => bootstrapTraceConfig(testRoot)).toThrow(/already exists/);
   });
 });
 
@@ -322,18 +305,9 @@ describe('--bootstrap CLI integration', () => {
     });
 
     // AC-13.3: Should prompt user to review
-    assert.ok(
-      output.includes('Bootstrap complete'),
-      'Should print bootstrap message',
-    );
-    assert.ok(
-      output.includes('Review and refine'),
-      'Should prompt to review config',
-    );
-    assert.ok(
-      output.includes('trace.config.json'),
-      'Should mention config file',
-    );
+    expect(output.includes('Bootstrap complete')).toBeTruthy();
+    expect(output.includes('Review and refine')).toBeTruthy();
+    expect(output.includes('trace.config.json')).toBeTruthy();
 
     // AC-13.1: Config should exist
     const configPath = join(
@@ -342,20 +316,14 @@ describe('--bootstrap CLI integration', () => {
       'traces',
       'trace.config.json',
     );
-    assert.ok(existsSync(configPath), 'trace.config.json should be created');
+    expect(existsSync(configPath)).toBeTruthy();
 
     const config = JSON.parse(readFileSync(configPath, 'utf-8'));
-    assert.ok(config.modules.length > 0, 'Should have modules');
+    expect(config.modules.length > 0).toBeTruthy();
 
     // Should have generated trace files
-    assert.ok(
-      output.includes('Trace generation complete'),
-      'Should complete generation',
-    );
-    assert.ok(
-      existsSync(join(testRoot, '.claude', 'traces', 'high-level.json')),
-      'high-level.json should exist after bootstrap',
-    );
+    expect(output.includes('Trace generation complete')).toBeTruthy();
+    expect(existsSync(join(testRoot, '.claude', 'traces', 'high-level.json'))).toBeTruthy();
   });
 
   it('should not re-bootstrap when config exists (AC-13.4)', () => {
@@ -413,20 +381,11 @@ describe('--bootstrap CLI integration', () => {
     });
 
     // AC-13.4: Should skip bootstrap
-    assert.ok(
-      output.includes('already exists'),
-      'Should note config already exists',
-    );
-    assert.ok(
-      output.includes('Skipping bootstrap'),
-      'Should skip bootstrap',
-    );
+    expect(output.includes('already exists')).toBeTruthy();
+    expect(output.includes('Skipping bootstrap')).toBeTruthy();
 
     // Should still generate traces
-    assert.ok(
-      output.includes('Trace generation complete'),
-      'Should still generate traces',
-    );
+    expect(output.includes('Trace generation complete')).toBeTruthy();
   });
 
   it('should detect modules from project structure in output (AC-13.2)', () => {
@@ -465,8 +424,8 @@ describe('--bootstrap CLI integration', () => {
     });
 
     // AC-13.2: Should list detected modules
-    assert.ok(output.includes('api-server'), 'Should detect api-server');
-    assert.ok(output.includes('web-client'), 'Should detect web-client');
-    assert.ok(output.includes('pkg-shared'), 'Should detect pkg-shared');
+    expect(output.includes('api-server')).toBeTruthy();
+    expect(output.includes('web-client')).toBeTruthy();
+    expect(output.includes('pkg-shared')).toBeTruthy();
   });
 });

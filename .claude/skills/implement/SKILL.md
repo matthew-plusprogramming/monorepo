@@ -15,16 +15,19 @@ Before beginning work, read these files for project-specific guidelines:
 
 ### Trace Context
 
-Before starting, read the following trace file(s) for architectural context.
+Before starting, read trace files for the modules you will be modifying.
 Treat trace data as advisory -- verify critical assumptions (file existence, export
 availability) against source before irreversible decisions.
 
-- `.claude/traces/low-level/<module-id>.json` (fresh)
-- `.claude/traces/low-level/<module-id>.json` (stale: last generated <date> -- verify critical assumptions against source)
+**How to resolve relevant traces:**
 
-Note: Traces for modules [X, Y] were skipped (exceeded 50KB size threshold). Use standard exploration for architectural context on these modules.
+1. Identify the file paths you will modify from the spec evidence table or task list
+2. Load `.claude/traces/trace.config.json` and match each file path against module `fileGlobs` to find the owning module ID
+3. For each matched module, read `.claude/traces/low-level/<module-id>.json`
+4. Check freshness: compare the trace file's `mtime` against the staleness threshold (use `isTraceStale(moduleId, config)` from `.claude/scripts/lib/trace-utils.mjs` if available). Stale traces are still useful but verify critical assumptions against source
+5. If no `.claude/traces/` directory, `trace.config.json`, or matching modules exist, skip this section entirely and proceed without traces -- no error or warning needed
 
-**Path resolution**: Resolve task target file paths from the spec evidence table or task list. Match these paths against module `fileGlobs` in `.claude/traces/trace.config.json` (loaded via `loadTraceConfig()` from `.claude/scripts/lib/trace-utils.mjs`) to identify relevant trace modules. Validate freshness per-trace using `isTraceStale(moduleId, config)`. If no traces directory, config, or matching modules exist, omit this section entirely and proceed without traces.
+**Token budget**: Keep total trace reads under 5K tokens in dispatch context.
 
 ## Pre-Flight Challenge
 

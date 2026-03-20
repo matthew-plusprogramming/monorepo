@@ -57,7 +57,11 @@ function makeStopStdin(sessionId = 'test-session') {
 function makeSessionJson(overrides = {}) {
   const tasks = overrides.subagent_tasks || [];
   return {
-    active_work: { workflow: 'oneoff-spec', ...(overrides.active_work || {}) },
+    active_work: {
+      workflow: 'oneoff-spec',
+      current_phase: 'complete',  // Default to terminal phase for backward compat
+      ...(overrides.active_work || {}),
+    },
     subagent_tasks: {
       in_flight: [],
       completed_this_session: tasks,

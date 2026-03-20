@@ -254,6 +254,23 @@ ls .claude/specs/groups/<spec-group-id>/manifest.json 2>/dev/null
 
 Load the spec group and continue from its current state based on `review_state` and `work_state`.
 
+### Step 1b: Read Architectural Trace (if available)
+
+Read `.claude/traces/high-level.md` for module landscape context before analyzing scope. This is permitted under the Pre-Computed Summary Exception -- trace files are automation-generated summaries, not source code.
+
+```bash
+# Read high-level trace if it exists (graceful degradation if not)
+cat .claude/traces/high-level.md 2>/dev/null
+```
+
+If the file exists, use the module landscape, dependency graph, and export summaries to inform:
+
+- Which modules are affected by the user's request
+- Cross-module dependency relationships that affect scope estimation
+- Available exports that may be relevant to the task
+
+If the file does not exist, proceed without trace context -- no error or warning needed.
+
 ### Step 2: Analyze Scope
 
 Use Glob and Grep to understand impact:

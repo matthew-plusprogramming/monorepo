@@ -28,8 +28,10 @@ import { join, dirname, basename } from 'node:path';
 import {
   loadTraceConfig,
   findFilesMatchingGlobs,
+  fileToModules,
   resolveProjectRoot,
   formatTimestamp,
+  sanitizeMarkdown,
   LOW_LEVEL_TRACE_DIR,
 } from './lib/trace-utils.mjs';
 
@@ -88,7 +90,8 @@ export function parseImports(source) {
     if (importMatch) {
       // Collect the full import statement (may span multiple lines)
       let fullStatement = line;
-      while (i < lines.length - 1 && !fullStatement.includes(';') && !fullStatement.match(/from\s+['"][^'"]+['"]/)) {
+      const importStartLine = i;
+      while (i < lines.length - 1 && !fullStatement.includes(';') && !fullStatement.match(/from\s+['"][^'"]+['"]/) && (i - importStartLine) < MULTI_LINE_IMPORT_BUFFER_LIMIT) {
         i++;
         fullStatement += ' ' + lines[i].trim();
       }
@@ -189,6 +192,151 @@ function parseImportStatement(statement) {
   return { source, symbols };
 }
 
+// =============================================================================
+// Signature Capture Constants
+// =============================================================================
+
+/** Maximum length for display-facing signature field */
+const SIGNATURE_DISPLAY_MAX_LENGTH = 200;
+
+/** Maximum length for raw signature field (hard cap) */
+const SIGNATURE_RAW_MAX_LENGTH = 500;
+
+/** Maximum number of additional lines to buffer for multi-line signatures */
+const MULTI_LINE_SIGNATURE_BUFFER_LIMIT = 5;
+
+/** Maximum number of additional lines to buffer for multi-line import/re-export collectors */
+const MULTI_LINE_IMPORT_BUFFER_LIMIT = 20;
+
+/**
+ * Truncate a string to maxLen characters, appending '...' suffix if exceeded.
+ *
+ * @param {string} text - Input text
+ * @param {number} maxLen - Maximum length before truncation
+ * @returns {string} Original or truncated text
+ */
+function truncateWithEllipsis(text, maxLen) {
+  if (text.length <= maxLen) {
+    return text;
+  }
+  return text.slice(0, maxLen) + '...';
+}
+
+/**
+ * Remove block comments from source while preserving line count.
+ *
+ * Replaces block comment content with equivalent newlines so that
+ * line numbers in the cleaned source correspond to the original source.
+ *
+ * @param {string} source - Raw source code
+ * @returns {string} Source with block comments replaced by newlines
+ */
+function removeBlockCommentsPreserveLines(source) {
+  return source.replace(/\/\*[\s\S]*?\*\//g, (match) => {
+    // Count newlines in the matched comment and produce that many newlines
+    const newlineCount = (match.match(/\n/g) || []).length;
+    return '\n'.repeat(newlineCount);
+  });
+}
+
+/**
+ * Capture function signature from an export line and subsequent lines.
+ *
+ * Extracts the text from the first `(` through the balanced closing `)`,
+ * plus any return type annotation (`: ReturnType`).
+ *
+ * For multi-line signatures, buffers up to MULTI_LINE_SIGNATURE_BUFFER_LIMIT
+ * additional lines until parentheses balance.
+ *
+ * @param {string} line - The export declaration line (trimmed)
+ * @param {string[]} allLines - All source lines (trimmed)
+ * @param {number} lineIndex - Index of current line in allLines
+ * @returns {{ signature: string, signatureRaw: string, linesConsumed: number }}
+ */
+function captureSignature(line, allLines, lineIndex) {
+  // Find the opening parenthesis
+  const parenIndex = line.indexOf('(');
+  if (parenIndex === -1) {
+    // No parenthesis found -- not a function-like export
+    return { signature: '', signatureRaw: '', linesConsumed: 0 };
+  }
+
+  // Assemble text starting from the opening paren
+  let assembled = line.slice(parenIndex);
+  let depth = 0;
+  let balanced = false;
+  let linesConsumed = 0;
+
+  // Count parens in assembled text
+  for (const ch of assembled) {
+    if (ch === '(') depth++;
+    if (ch === ')') depth--;
+    if (depth === 0) {
+      balanced = true;
+      break;
+    }
+  }
+
+  // If not balanced, buffer subsequent lines
+  if (!balanced) {
+    for (let extra = 1; extra <= MULTI_LINE_SIGNATURE_BUFFER_LIMIT; extra++) {
+      const nextIdx = lineIndex + extra;
+      if (nextIdx >= allLines.length) break;
+      assembled += ' ' + allLines[nextIdx].trim();
+      linesConsumed = extra;
+
+      // Re-check balance
+      depth = 0;
+      balanced = false;
+      for (const ch of assembled) {
+        if (ch === '(') depth++;
+        if (ch === ')') depth--;
+        if (depth === 0) {
+          balanced = true;
+          break;
+        }
+      }
+      if (balanced) break;
+    }
+  }
+
+  if (!balanced) {
+    // 5-line limit reached without balance -- store as unparseable in signatureRaw
+    const rawText = truncateWithEllipsis(assembled.replace(/\s+/g, ' ').trim(), SIGNATURE_RAW_MAX_LENGTH);
+    return { signature: '', signatureRaw: rawText, linesConsumed };
+  }
+
+  // Find the position of the balanced closing paren
+  let sigEnd = -1;
+  depth = 0;
+  for (let k = 0; k < assembled.length; k++) {
+    if (assembled[k] === '(') depth++;
+    if (assembled[k] === ')') depth--;
+    if (depth === 0) {
+      sigEnd = k;
+      break;
+    }
+  }
+
+  // Extract from '(' to ')' inclusive, plus any return type
+  let sigText = assembled.slice(0, sigEnd + 1);
+
+  // Capture return type: look for ': <type>' after the closing paren
+  const afterParen = assembled.slice(sigEnd + 1).trim();
+  const returnTypeMatch = afterParen.match(/^:\s*([^{;=]+)/);
+  if (returnTypeMatch) {
+    sigText += ': ' + returnTypeMatch[1].trim();
+  }
+
+  // Collapse whitespace for display
+  const collapsed = sigText.replace(/\s+/g, ' ').trim();
+
+  const signatureRaw = truncateWithEllipsis(collapsed, SIGNATURE_RAW_MAX_LENGTH);
+  const signature = truncateWithEllipsis(collapsed, SIGNATURE_DISPLAY_MAX_LENGTH);
+
+  return { signature, signatureRaw, linesConsumed };
+}
+
 /**
  * Parse export statements from TypeScript/JavaScript source code.
  *
@@ -204,20 +352,27 @@ function parseImportStatement(statement) {
  * - export { X, Y } from '...'
  * - export { X, Y }
  *
+ * Enhanced fields (additive optional properties):
+ * - lineNumber: 1-indexed source line number of the export declaration
+ * - signature: Display-facing function signature, truncated at 200 chars
+ * - signatureRaw: Extended capture, hard cap at 500 chars
+ *
  * @param {string} source - File source code
- * @returns {Array<{ symbol: string, type: string }>}
+ * @returns {Array<{ symbol: string, type: string, lineNumber: number, signature: string, signatureRaw: string }>}
  */
 export function parseExports(source) {
   const exports = [];
   const seen = new Set();
 
-  // Remove block comments to avoid false positives
-  const cleaned = source.replace(/\/\*[\s\S]*?\*\//g, '');
+  // Remove block comments while preserving line numbers
+  const cleaned = removeBlockCommentsPreserveLines(source);
 
   const lines = cleaned.split('\n');
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i].trim();
+    // 1-indexed line number
+    const lineNumber = i + 1;
 
     // Skip single-line comments
     if (line.startsWith('//')) {
@@ -232,9 +387,18 @@ export function parseExports(source) {
       const symbol = classMatch ? classMatch[1]
         : funcMatch ? funcMatch[1]
           : 'default';
+
+      let signature = '';
+      let signatureRaw = '';
+      if (funcMatch) {
+        const sigResult = captureSignature(line, lines, i);
+        signature = sigResult.signature;
+        signatureRaw = sigResult.signatureRaw;
+      }
+
       if (!seen.has('default')) {
         seen.add('default');
-        exports.push({ symbol, type: 'default' });
+        exports.push({ symbol, type: 'default', lineNumber, signature, signatureRaw });
       }
       continue;
     }
@@ -244,7 +408,8 @@ export function parseExports(source) {
     const reExportMatch = line.match(/^export\s+(?:type\s+)?\{/);
     if (reExportMatch) {
       let fullStatement = line;
-      while (i < lines.length - 1 && !fullStatement.includes('}')) {
+      const reExportStartLine = i;
+      while (i < lines.length - 1 && !fullStatement.includes('}') && (i - reExportStartLine) < MULTI_LINE_IMPORT_BUFFER_LIMIT) {
         i++;
         fullStatement += ' ' + lines[i].trim();
       }
@@ -261,20 +426,35 @@ export function parseExports(source) {
         for (const sym of symbols) {
           if (!seen.has(sym)) {
             seen.add(sym);
-            exports.push({ symbol: sym, type: isTypeExport ? 'type' : 'const' });
+            exports.push({ symbol: sym, type: isTypeExport ? 'type' : 'const', lineNumber, signature: '', signatureRaw: '' });
           }
         }
       }
       continue;
     }
 
-    // export function name
+    // export function name (including overloads)
     const funcMatch = line.match(/^export\s+(?:async\s+)?function\s+(\w+)/);
     if (funcMatch) {
       const symbol = funcMatch[1];
-      if (!seen.has(symbol)) {
-        seen.add(symbol);
-        exports.push({ symbol, type: 'function' });
+      const sigResult = captureSignature(line, lines, i);
+
+      // Support overloaded functions (REQ-004): allow multiple entries for the same
+      // symbol when they have different signatures (overload declarations).
+      // An overload declaration line typically ends with ';' (no body).
+      const isOverloadDecl = /;\s*$/.test(line);
+
+      if (isOverloadDecl || !seen.has(symbol)) {
+        if (!isOverloadDecl) {
+          seen.add(symbol);
+        }
+        exports.push({
+          symbol,
+          type: 'function',
+          lineNumber,
+          signature: sigResult.signature,
+          signatureRaw: sigResult.signatureRaw,
+        });
       }
       continue;
     }
@@ -285,7 +465,7 @@ export function parseExports(source) {
       const symbol = classMatch[1];
       if (!seen.has(symbol)) {
         seen.add(symbol);
-        exports.push({ symbol, type: 'class' });
+        exports.push({ symbol, type: 'class', lineNumber, signature: '', signatureRaw: '' });
       }
       continue;
     }
@@ -296,7 +476,7 @@ export function parseExports(source) {
       const symbol = interfaceMatch[1];
       if (!seen.has(symbol)) {
         seen.add(symbol);
-        exports.push({ symbol, type: 'interface' });
+        exports.push({ symbol, type: 'interface', lineNumber, signature: '', signatureRaw: '' });
       }
       continue;
     }
@@ -307,7 +487,7 @@ export function parseExports(source) {
       const symbol = typeMatch[1];
       if (!seen.has(symbol)) {
         seen.add(symbol);
-        exports.push({ symbol, type: 'type' });
+        exports.push({ symbol, type: 'type', lineNumber, signature: '', signatureRaw: '' });
       }
       continue;
     }
@@ -318,7 +498,7 @@ export function parseExports(source) {
       const symbol = enumMatch[1];
       if (!seen.has(symbol)) {
         seen.add(symbol);
-        exports.push({ symbol, type: 'enum' });
+        exports.push({ symbol, type: 'enum', lineNumber, signature: '', signatureRaw: '' });
       }
       continue;
     }
@@ -330,7 +510,7 @@ export function parseExports(source) {
       const symbol = constMatch[1];
       if (!seen.has(symbol)) {
         seen.add(symbol);
-        exports.push({ symbol, type: 'const' });
+        exports.push({ symbol, type: 'const', lineNumber, signature: '', signatureRaw: '' });
       }
       continue;
     }
@@ -451,13 +631,17 @@ export function generateLowLevelMarkdown(trace, moduleConfig) {
     lines.push(`## File: ${file.filePath}`);
     lines.push('');
 
-    // Exports section (AC-3.2: pipe-delimited format)
+    // Exports section (AC-3.2: pipe-delimited format, enhanced with line numbers and signatures)
     lines.push('### Exports');
     lines.push('');
     if (file.exports.length > 0) {
-      lines.push('symbol | type');
+      lines.push('symbol | type | line | signature');
+      lines.push('--- | --- | --- | ---');
       for (const exp of file.exports) {
-        lines.push(`${exp.symbol} | ${exp.type}`);
+        const lineNum = exp.lineNumber != null ? String(exp.lineNumber) : '';
+        // Sanitize signature for markdown output (AC-1.14)
+        const sig = exp.signature ? sanitizeMarkdown(exp.signature) : '';
+        lines.push(`${sanitizeMarkdown(exp.symbol)} | ${exp.type} | ${lineNum} | ${sig}`);
       }
     } else {
       lines.push('_No exports_');
@@ -469,6 +653,7 @@ export function generateLowLevelMarkdown(trace, moduleConfig) {
     lines.push('');
     if (file.imports.length > 0) {
       lines.push('source | symbols');
+      lines.push('--- | ---');
       for (const imp of file.imports) {
         const symbolsStr = imp.symbols.length > 0 ? imp.symbols.join(', ') : '(side-effect)';
         lines.push(`${imp.source} | ${symbolsStr}`);
@@ -483,6 +668,7 @@ export function generateLowLevelMarkdown(trace, moduleConfig) {
     lines.push('');
     if (file.calls.length > 0) {
       lines.push('target | function | context');
+      lines.push('--- | --- | ---');
       for (const call of file.calls) {
         lines.push(`${call.target} | ${call.function} | ${call.context || ''}`);
       }
@@ -496,6 +682,7 @@ export function generateLowLevelMarkdown(trace, moduleConfig) {
     lines.push('');
     if (file.events.length > 0) {
       lines.push('type | event-name | channel');
+      lines.push('--- | --- | ---');
       for (const evt of file.events) {
         lines.push(`${evt.type} | ${evt.eventName} | ${evt.channel}`);
       }
@@ -676,6 +863,187 @@ export function validateLowLevelTrace(trace) {
 }
 
 // =============================================================================
+// Cross-Module Dependency Aggregation (REQ-001, REQ-002, REQ-008, REQ-009)
+// =============================================================================
+
+/**
+ * Aggregate cross-module dependencies from low-level trace data.
+ *
+ * Iterates each module's files' imports and resolves each import path
+ * against all modules' fileGlobs using all-match semantics.
+ *
+ * - If exactly one module matches: records string moduleId as dependency
+ * - If multiple modules match: skips, emits error, records in skippedFiles[]
+ * - If no module matches: skips silently (external/untracked)
+ * - Circular dependencies are represented bidirectionally
+ * - Barrel re-exports are attributed to the re-exporting module
+ * - Dynamic imports are excluded (only static imports are processed)
+ *
+ * Implements: REQ-001, REQ-002, REQ-008, REQ-009, REQ-010, REQ-011, REQ-020
+ *
+ * @param {Array<{ moduleId: string, files: Array<{ filePath: string, imports: Array<{ source: string, symbols: string[] }> }> }>} lowLevelTraces
+ * @param {{ modules: Array<{ id: string, name: string, fileGlobs: string[] }> }} config
+ * @returns {{ dependencyData: Object<string, { dependencies: string[], dependents: string[] }>, skippedFiles: Array<{ path: string, matchedModules: string[] }> }}
+ */
+export function aggregateDependencies(lowLevelTraces, config) {
+  // Build a set of all module IDs for quick lookup
+  const moduleIds = new Set(config.modules.map(m => m.id));
+
+  // Maps: moduleId -> Set of dependent moduleIds
+  const depsMap = new Map();   // module -> modules it depends on
+  const revMap = new Map();    // module -> modules that depend on it
+  const skippedFiles = [];
+  const seenSkipped = new Set();
+
+  for (const modId of moduleIds) {
+    depsMap.set(modId, new Set());
+    revMap.set(modId, new Set());
+  }
+
+  for (const trace of lowLevelTraces) {
+    const sourceModuleId = trace.moduleId;
+    if (!moduleIds.has(sourceModuleId)) continue;
+
+    for (const file of trace.files) {
+      for (const imp of file.imports) {
+        // REQ-011: Skip dynamic imports. parseImports only captures static
+        // imports and require() statements, so dynamic import() calls
+        // are already excluded by design. No additional filtering needed.
+
+        // Resolve import source path. For relative imports, resolve against
+        // the importing file's directory. For bare specifiers (packages), skip.
+        const importSource = imp.source;
+
+        // Skip bare module specifiers (no ./ or ../ prefix, not an absolute path)
+        if (!importSource.startsWith('.') && !importSource.startsWith('/')) {
+          continue; // REQ-009: External package, skip silently
+        }
+
+        // Resolve relative import path against the importing file's directory
+        const importingDir = file.filePath.includes('/')
+          ? file.filePath.substring(0, file.filePath.lastIndexOf('/'))
+          : '.';
+
+        // Simple path resolution: join importing dir with import source
+        let resolvedPath = resolveImportPath(importingDir, importSource);
+
+        // Skip if resolution failed (e.g., excessive ../ escaping project root)
+        if (resolvedPath == null) {
+          continue;
+        }
+
+        // Try to find matching modules for the resolved path
+        // We need to try with common extensions if the import doesn't have one
+        const pathsToTry = [resolvedPath];
+        if (!/\.\w+$/.test(resolvedPath)) {
+          // No extension -- try common TS/JS extensions
+          pathsToTry.push(
+            resolvedPath + '.ts',
+            resolvedPath + '.tsx',
+            resolvedPath + '.js',
+            resolvedPath + '.jsx',
+            resolvedPath + '.mjs',
+            resolvedPath + '.cjs',
+            resolvedPath + '/index.ts',
+            resolvedPath + '/index.tsx',
+            resolvedPath + '/index.js',
+            resolvedPath + '/index.mjs',
+          );
+        }
+
+        let matchedModules = [];
+        for (const pathCandidate of pathsToTry) {
+          const matches = fileToModules(pathCandidate, config);
+          if (matches.length > 0) {
+            matchedModules = matches;
+            break;
+          }
+        }
+
+        if (matchedModules.length === 0) {
+          // REQ-009: No module matches, skip silently
+          continue;
+        }
+
+        if (matchedModules.length > 1) {
+          // REQ-002: Ambiguous match -- config error
+          const matchedIds = matchedModules.map(m => m.id).sort();
+          const skippedKey = `${resolvedPath}:${matchedIds.join(',')}`;
+          if (!seenSkipped.has(skippedKey)) {
+            seenSkipped.add(skippedKey);
+            process.stderr.write(
+              `[trace-generate] WARNING: File "${resolvedPath}" matches multiple modules: ${matchedIds.join(', ')}. Skipping.\n`,
+            );
+            skippedFiles.push({ path: resolvedPath, matchedModules: matchedIds });
+          }
+          continue;
+        }
+
+        const targetModuleId = matchedModules[0].id;
+
+        // Skip self-references (importing within the same module)
+        if (targetModuleId === sourceModuleId) {
+          continue;
+        }
+
+        // Record dependency: sourceModule depends on targetModule
+        depsMap.get(sourceModuleId).add(targetModuleId);
+        // Record reverse: targetModule is depended on by sourceModule
+        revMap.get(targetModuleId).add(sourceModuleId);
+      }
+    }
+  }
+
+  // Build dependency data object keyed by moduleId
+  const dependencyData = {};
+  for (const modId of moduleIds) {
+    dependencyData[modId] = {
+      dependencies: [...depsMap.get(modId)].sort(),
+      dependents: [...revMap.get(modId)].sort(),
+    };
+  }
+
+  return { dependencyData, skippedFiles };
+}
+
+/**
+ * Resolve a relative import path against an importing directory.
+ *
+ * Simple path resolution without filesystem access. Handles . and .. segments.
+ *
+ * @param {string} fromDir - Directory of the importing file (relative to project root)
+ * @param {string} importPath - The import specifier (e.g., '../utils' or './helper')
+ * @returns {string | null} Resolved path relative to project root, or null if resolution escapes root
+ */
+function resolveImportPath(fromDir, importPath) {
+  const parts = fromDir === '.' ? [] : fromDir.split('/');
+  const importParts = importPath.split('/');
+
+  for (const segment of importParts) {
+    if (segment === '.') {
+      // Current directory, no change
+      continue;
+    } else if (segment === '..') {
+      // Go up one directory; guard against escaping project root
+      if (parts.length === 0) {
+        continue;
+      }
+      parts.pop();
+    } else {
+      parts.push(segment);
+    }
+  }
+
+  const resolved = parts.join('/');
+  // If resolution produced an empty path, the import is invalid
+  if (resolved === '') {
+    return null;
+  }
+
+  return resolved;
+}
+
+// =============================================================================
 // Full Trace Generation (AC-5.1, AC-5.3, AC-5.4)
 // =============================================================================
 
@@ -706,16 +1074,39 @@ export function generateAllTraces(options = {}) {
   let filesGenerated = 0;
   let highLevelVersion = null;
 
-  // Generate high-level trace (unless --low-level-only)
+  // Step 1: Generate low-level traces for all modules (or target module)
+  // Must happen before high-level trace so dependency aggregation has import data.
+  const { modulesProcessed, results: lowLevelResults } = generateAllLowLevelTraces(targetModuleId, root);
+  filesGenerated += lowLevelResults.length * 2; // .json + .md per module
+
+  // Step 2: Generate high-level trace with dependency aggregation (unless --low-level-only)
   if (!lowLevelOnly) {
-    const highLevelResult = generateHighLevelTrace({ projectRoot: root });
+    const config = loadTraceConfig(root);
+
+    // Read all low-level traces for dependency aggregation
+    const lowLevelTraces = [];
+    for (const mod of config.modules) {
+      const tracePath = join(root, LOW_LEVEL_TRACE_DIR, `${mod.id}.json`);
+      try {
+        const traceData = JSON.parse(readFileSync(tracePath, 'utf-8'));
+        lowLevelTraces.push(traceData);
+      } catch {
+        // Module trace may not exist yet (no matching files, etc.) -- skip
+      }
+    }
+
+    // Aggregate cross-module dependencies from import data
+    const { dependencyData, skippedFiles } = aggregateDependencies(lowLevelTraces, config);
+
+    const highLevelResult = generateHighLevelTrace({
+      projectRoot: root,
+      config,
+      dependencyData,
+      skippedFiles,
+    });
     highLevelVersion = highLevelResult.version;
     filesGenerated += 2; // high-level.json + high-level.md
   }
-
-  // Generate low-level traces for all modules (or target module)
-  const { modulesProcessed, results: lowLevelResults } = generateAllLowLevelTraces(targetModuleId, root);
-  filesGenerated += lowLevelResults.length * 2; // .json + .md per module
 
   const durationMs = Date.now() - startTime;
 

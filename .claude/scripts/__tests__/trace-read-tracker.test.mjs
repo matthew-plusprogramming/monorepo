@@ -3,11 +3,10 @@
  *
  * Tests: as-007-trace-read-tracker (AC-6.1, AC-6.2, AC-6.3, AC-6.4)
  *
- * Run with: node --test .claude/scripts/__tests__/trace-read-tracker.test.mjs
+ * Run with: npx vitest run --config .claude/scripts/vitest.config.mjs trace-read-tracker.test.mjs
  */
 
-import { describe, it, beforeEach, afterEach } from 'node:test';
-import assert from 'node:assert/strict';
+import { describe, it, beforeEach, afterEach, expect } from 'vitest';
 import {
   mkdirSync,
   writeFileSync,
@@ -71,16 +70,12 @@ describe('traceFileToModuleIds', () => {
   // AC-6.1: Reading high-level.md records all modules as read
   it('AC-6.1: high-level.md should return all module IDs', () => {
     const result = traceFileToModuleIds('.claude/traces/high-level.md', config);
-    assert.deepEqual(
-      result.sort(),
-      ['claude-scripts', 'node-server-core', 'sdlc-dev-team', 'sdlc-qa-team'],
-      'Should return all module IDs from config',
-    );
+    expect(result.sort()).toEqual(['claude-scripts', 'node-server-core', 'sdlc-dev-team', 'sdlc-qa-team']);
   });
 
   it('AC-6.1: high-level.json should also return all module IDs', () => {
     const result = traceFileToModuleIds('.claude/traces/high-level.json', config);
-    assert.equal(result.length, 4, 'Should return all modules for high-level.json');
+    expect(result.length).toBe(4);
   });
 
   // AC-6.2: Reading low-level/<module-id>.md records only that module
@@ -89,7 +84,7 @@ describe('traceFileToModuleIds', () => {
       '.claude/traces/low-level/sdlc-dev-team.md',
       config,
     );
-    assert.deepEqual(result, ['sdlc-dev-team']);
+    expect(result).toEqual(['sdlc-dev-team']);
   });
 
   it('AC-6.2: low-level/sdlc-qa-team.md should return only sdlc-qa-team', () => {
@@ -97,7 +92,7 @@ describe('traceFileToModuleIds', () => {
       '.claude/traces/low-level/sdlc-qa-team.md',
       config,
     );
-    assert.deepEqual(result, ['sdlc-qa-team']);
+    expect(result).toEqual(['sdlc-qa-team']);
   });
 
   it('AC-6.2: low-level/sdlc-dev-team.json should also work', () => {
@@ -105,7 +100,7 @@ describe('traceFileToModuleIds', () => {
       '.claude/traces/low-level/sdlc-dev-team.json',
       config,
     );
-    assert.deepEqual(result, ['sdlc-dev-team']);
+    expect(result).toEqual(['sdlc-dev-team']);
   });
 
   it('should return empty array for unknown module in low-level dir', () => {
@@ -113,7 +108,7 @@ describe('traceFileToModuleIds', () => {
       '.claude/traces/low-level/nonexistent-module.md',
       config,
     );
-    assert.deepEqual(result, []);
+    expect(result).toEqual([]);
   });
 
   it('should return empty array for trace files in unknown subdirectory', () => {
@@ -121,7 +116,7 @@ describe('traceFileToModuleIds', () => {
       '.claude/traces/some-other-dir/file.md',
       config,
     );
-    assert.deepEqual(result, []);
+    expect(result).toEqual([]);
   });
 
   it('should return empty array for trace.config.json (not a trace view file)', () => {
@@ -129,7 +124,7 @@ describe('traceFileToModuleIds', () => {
       '.claude/traces/trace.config.json',
       config,
     );
-    assert.deepEqual(result, []);
+    expect(result).toEqual([]);
   });
 });
 
@@ -162,7 +157,7 @@ describe('loadOrCreateTraceReads', () => {
   // AC-6.3: Creates trace-reads.json if it does not exist
   it('AC-6.3: should return fresh state when file does not exist', () => {
     const result = loadOrCreateTraceReads(traceReadsPath, 'session-abc');
-    assert.deepEqual(result, {
+    expect(result).toEqual({
       session_id: 'session-abc',
       reads: {},
     });
@@ -182,7 +177,7 @@ describe('loadOrCreateTraceReads', () => {
     const result = loadOrCreateTraceReads(traceReadsPath, 'session-abc');
 
     // Assert
-    assert.deepEqual(result, existingState);
+    expect(result).toEqual(existingState);
   });
 
   it('should clear reads and return fresh state when session_id changes', () => {
@@ -199,7 +194,7 @@ describe('loadOrCreateTraceReads', () => {
     const result = loadOrCreateTraceReads(traceReadsPath, 'new-session');
 
     // Assert
-    assert.deepEqual(result, {
+    expect(result).toEqual({
       session_id: 'new-session',
       reads: {},
     });
@@ -209,7 +204,7 @@ describe('loadOrCreateTraceReads', () => {
     writeFileSync(traceReadsPath, 'not valid json {{{');
 
     const result = loadOrCreateTraceReads(traceReadsPath, 'session-abc');
-    assert.deepEqual(result, {
+    expect(result).toEqual({
       session_id: 'session-abc',
       reads: {},
     });
@@ -223,7 +218,7 @@ describe('loadOrCreateTraceReads', () => {
     writeFileSync(traceReadsPath, JSON.stringify(existingState));
 
     const result = loadOrCreateTraceReads(traceReadsPath, 'session-abc');
-    assert.deepEqual(result, {
+    expect(result).toEqual({
       session_id: 'session-abc',
       reads: {},
     });
@@ -259,7 +254,7 @@ describe('writeTraceReads', () => {
 
     writeTraceReads(filePath, data);
 
-    assert.ok(existsSync(filePath), 'File should be created');
+    expect(existsSync(filePath)).toBeTruthy();
   });
 
   it('should write valid JSON', () => {
@@ -273,7 +268,7 @@ describe('writeTraceReads', () => {
     writeTraceReads(filePath, data);
 
     const written = JSON.parse(readFileSync(filePath, 'utf-8'));
-    assert.deepEqual(written, data);
+    expect(written).toEqual(data);
   });
 
   it('should overwrite existing file', () => {
@@ -291,7 +286,7 @@ describe('writeTraceReads', () => {
     writeTraceReads(filePath, newData);
 
     const written = JSON.parse(readFileSync(filePath, 'utf-8'));
-    assert.deepEqual(written, newData);
+    expect(written).toEqual(newData);
   });
 
   it('should not leave temp file after successful write', () => {
@@ -301,7 +296,7 @@ describe('writeTraceReads', () => {
 
     writeTraceReads(filePath, { session_id: 'test', reads: {} });
 
-    assert.ok(!existsSync(tmpPath), 'Temp file should be cleaned up by rename');
+    expect(existsSync(tmpPath)).toBeFalsy();
   });
 });
 
@@ -361,11 +356,11 @@ describe('additive state updates (AC-6.4)', () => {
 
     // Verify both modules are recorded
     const final = JSON.parse(readFileSync(traceReadsPath, 'utf-8'));
-    assert.equal(final.session_id, sessionId);
-    assert.ok('sdlc-dev-team' in final.reads, 'Module A should still be recorded');
-    assert.ok('sdlc-qa-team' in final.reads, 'Module B should also be recorded');
-    assert.equal(final.reads['sdlc-dev-team'], now1);
-    assert.equal(final.reads['sdlc-qa-team'], now2);
+    expect(final.session_id).toBe(sessionId);
+    expect('sdlc-dev-team' in final.reads).toBeTruthy();
+    expect('sdlc-qa-team' in final.reads).toBeTruthy();
+    expect(final.reads['sdlc-dev-team']).toBe(now1);
+    expect(final.reads['sdlc-qa-team']).toBe(now2);
   });
 
   it('AC-6.4: re-reading same module updates its timestamp without losing others', () => {
@@ -388,16 +383,8 @@ describe('additive state updates (AC-6.4)', () => {
 
     // Verify: sdlc-dev-team updated, sdlc-qa-team preserved
     const final = JSON.parse(readFileSync(traceReadsPath, 'utf-8'));
-    assert.equal(
-      final.reads['sdlc-dev-team'],
-      '2026-02-22T11:00:00.000Z',
-      'sdlc-dev-team timestamp should be updated',
-    );
-    assert.equal(
-      final.reads['sdlc-qa-team'],
-      '2026-02-22T10:05:00.000Z',
-      'sdlc-qa-team timestamp should be preserved',
-    );
+    expect(final.reads['sdlc-dev-team']).toBe('2026-02-22T11:00:00.000Z');
+    expect(final.reads['sdlc-qa-team']).toBe('2026-02-22T10:05:00.000Z');
   });
 });
 
@@ -492,12 +479,12 @@ describe('trace-read-tracker integration (child process)', () => {
     });
 
     const result = readTraceReads();
-    assert.ok(result, 'trace-reads.json should be created');
-    assert.equal(result.session_id, 'integration-test');
-    assert.ok('sdlc-dev-team' in result.reads);
-    assert.ok('sdlc-qa-team' in result.reads);
-    assert.ok('node-server-core' in result.reads);
-    assert.ok('claude-scripts' in result.reads);
+    expect(result).toBeTruthy();
+    expect(result.session_id).toBe('integration-test');
+    expect('sdlc-dev-team' in result.reads).toBeTruthy();
+    expect('sdlc-qa-team' in result.reads).toBeTruthy();
+    expect('node-server-core' in result.reads).toBeTruthy();
+    expect('claude-scripts' in result.reads).toBeTruthy();
   });
 
   it('AC-6.2: reading low-level/sdlc-dev-team.md records only sdlc-dev-team', () => {
@@ -515,13 +502,10 @@ describe('trace-read-tracker integration (child process)', () => {
     });
 
     const result = readTraceReads();
-    assert.ok(result, 'trace-reads.json should be created');
-    assert.equal(result.session_id, 'integration-test');
-    assert.ok('sdlc-dev-team' in result.reads, 'sdlc-dev-team should be recorded');
-    assert.ok(
-      !('sdlc-qa-team' in result.reads),
-      'sdlc-qa-team should NOT be recorded',
-    );
+    expect(result).toBeTruthy();
+    expect(result.session_id).toBe('integration-test');
+    expect('sdlc-dev-team' in result.reads).toBeTruthy();
+    expect('sdlc-qa-team' in result.reads).toBeFalsy();
   });
 
   it('AC-6.3: creates trace-reads.json if it does not exist', () => {
@@ -545,8 +529,8 @@ describe('trace-read-tracker integration (child process)', () => {
     });
 
     const result = readTraceReads();
-    assert.ok(result, 'trace-reads.json should be created from scratch');
-    assert.equal(result.session_id, 'integration-test');
+    expect(result).toBeTruthy();
+    expect(result.session_id).toBe('integration-test');
   });
 
   it('AC-6.4: multiple reads preserve prior state', () => {
@@ -583,15 +567,9 @@ describe('trace-read-tracker integration (child process)', () => {
     });
 
     const result = readTraceReads();
-    assert.ok(result, 'trace-reads.json should exist');
-    assert.ok(
-      'sdlc-dev-team' in result.reads,
-      'First read (sdlc-dev-team) should be preserved',
-    );
-    assert.ok(
-      'sdlc-qa-team' in result.reads,
-      'Second read (sdlc-qa-team) should be added',
-    );
+    expect(result).toBeTruthy();
+    expect('sdlc-dev-team' in result.reads).toBeTruthy();
+    expect('sdlc-qa-team' in result.reads).toBeTruthy();
   });
 
   it('should exit 0 for non-trace files', () => {
@@ -603,7 +581,7 @@ describe('trace-read-tracker integration (child process)', () => {
     });
 
     const result = readTraceReads();
-    assert.equal(result, null, 'trace-reads.json should not be created for non-trace files');
+    expect(result).toBe(null);
   });
 
   it('should exit 0 for empty stdin', () => {
@@ -662,8 +640,8 @@ describe('trace-read-tracker integration (child process)', () => {
 
     // Verify first session recorded
     let result = readTraceReads();
-    assert.ok('sdlc-dev-team' in result.reads);
-    assert.equal(result.session_id, 'session-1');
+    expect('sdlc-dev-team' in result.reads).toBeTruthy();
+    expect(result.session_id).toBe('session-1');
 
     // New session reads a different module
     invokeTracker({
@@ -675,9 +653,9 @@ describe('trace-read-tracker integration (child process)', () => {
 
     // Verify old reads were cleared
     result = readTraceReads();
-    assert.equal(result.session_id, 'session-2');
+    expect(result.session_id).toBe('session-2');
     // The old sdlc-dev-team read from session-1 timestamp should be gone,
     // replaced by the high-level read which includes all modules
-    assert.ok('sdlc-dev-team' in result.reads, 'should have dev-team from high-level read');
+    expect('sdlc-dev-team' in result.reads).toBeTruthy();
   });
 });

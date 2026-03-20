@@ -402,6 +402,41 @@ to the login page. Any cached credentials are cleared.
 
 Documentation is typically the final step before commit for substantial changes.
 
+## Structured Documentation Nudge (AC-10.1, AC-10.2)
+
+After generating documentation artifacts, check whether the implementation touched modules defined in the project's structured documentation system.
+
+### How to Check
+
+1. **Read architecture.yaml**: If `.claude/docs/structured/architecture.yaml` exists, read it to get the list of modules and their `path` globs.
+2. **Identify touched files**: Use `git diff --name-only` or the spec's Implementation Evidence to get the list of files modified in this session.
+3. **Match files to modules**: For each modified file, check if it falls within any module's `path` glob pattern.
+4. **Check for doc updates**: For each matched module, check if `architecture.yaml` or any relevant flow files (in `.claude/docs/structured/flows/`) were also modified in this session.
+5. **Emit nudge if needed**: If implementation files within a module's scope were modified but the structured docs were NOT updated, emit a nudge message.
+
+### Nudge Format
+
+When structured docs may need updating, include this in your output:
+
+```markdown
+### Structured Documentation Review
+
+The following modules had implementation changes but no corresponding structured doc updates:
+
+- **module-name**: Files matching `path/glob/**` were modified
+  - Consider: Update architecture.yaml description or responsibilities
+  - Consider: Add/update flow steps if behavior changed
+  - Consider: Add new glossary terms if new concepts introduced
+
+Run `node .claude/scripts/docs-validate.mjs` to check for cross-reference issues.
+```
+
+### When to Skip
+
+- If `.claude/docs/structured/architecture.yaml` does not exist (structured docs not adopted)
+- If no implementation files match any module's path glob
+- If the structured docs were already updated in this session
+
 ## Constraints
 
 ### Read Implementation, Not Just Spec

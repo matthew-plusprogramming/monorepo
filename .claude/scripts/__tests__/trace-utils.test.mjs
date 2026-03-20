@@ -3,11 +3,10 @@
  *
  * Tests: as-002-trace-utils (AC-4.1, AC-4.2, AC-4.3, AC-4.4)
  *
- * Run with: node --test .claude/scripts/__tests__/trace-utils.test.mjs
+ * Run with: npx vitest run --config .claude/scripts/vitest.config.mjs trace-utils.test.mjs
  */
 
-import { describe, it, beforeEach, afterEach } from 'node:test';
-import assert from 'node:assert/strict';
+import { describe, it, beforeEach, afterEach, expect } from 'vitest';
 import { mkdirSync, writeFileSync, rmSync, utimesSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -124,32 +123,32 @@ function createTestConfig() {
 describe('globToRegex', () => {
   it('should convert ** to .* (match anything including /)', () => {
     const result = globToRegex('src/**');
-    assert.equal(result, 'src/.*');
+    expect(result).toBe('src/.*');
   });
 
   it('should convert * to [^/]* (match anything except /)', () => {
     const result = globToRegex('src/*.ts');
-    assert.equal(result, 'src/[^/]*\\.ts');
+    expect(result).toBe('src/[^/]*\\.ts');
   });
 
   it('should convert ? to [^/] (match single non-slash char)', () => {
     const result = globToRegex('src/?.ts');
-    assert.equal(result, 'src/[^/]\\.ts');
+    expect(result).toBe('src/[^/]\\.ts');
   });
 
   it('should escape regex special characters', () => {
     const result = globToRegex('src/file.test.ts');
-    assert.equal(result, 'src/file\\.test\\.ts');
+    expect(result).toBe('src/file\\.test\\.ts');
   });
 
   it('should handle patterns with no special characters', () => {
     const result = globToRegex('README');
-    assert.equal(result, 'README');
+    expect(result).toBe('README');
   });
 
   it('should handle complex patterns with mixed wildcards', () => {
     const result = globToRegex('apps/*/src/**/*.ts');
-    assert.equal(result, 'apps/[^/]*/src/.*/[^/]*\\.ts');
+    expect(result).toBe('apps/[^/]*/src/.*/[^/]*\\.ts');
   });
 });
 
@@ -159,42 +158,42 @@ describe('globToRegex', () => {
 
 describe('matchesGlob', () => {
   it('should match files under ** glob', () => {
-    assert.ok(matchesGlob('apps/node-server/src/index.ts', 'apps/node-server/src/**'));
+    expect(matchesGlob('apps/node-server/src/index.ts', 'apps/node-server/src/**')).toBeTruthy();
   });
 
   it('should match nested files under ** glob', () => {
-    assert.ok(matchesGlob('apps/node-server/src/handlers/auth.ts', 'apps/node-server/src/**'));
+    expect(matchesGlob('apps/node-server/src/handlers/auth.ts', 'apps/node-server/src/**')).toBeTruthy();
   });
 
   it('should NOT match files outside the glob boundary', () => {
-    assert.ok(!matchesGlob('apps/dashboard/src/index.ts', 'apps/node-server/src/**'));
+    expect(matchesGlob('apps/dashboard/src/index.ts', 'apps/node-server/src/**')).toBeFalsy();
   });
 
   it('should match files with * wildcard (single directory level)', () => {
-    assert.ok(matchesGlob('src/file.ts', 'src/*.ts'));
+    expect(matchesGlob('src/file.ts', 'src/*.ts')).toBeTruthy();
   });
 
   it('should NOT match nested files with * wildcard', () => {
-    assert.ok(!matchesGlob('src/nested/file.ts', 'src/*.ts'));
+    expect(matchesGlob('src/nested/file.ts', 'src/*.ts')).toBeFalsy();
   });
 
   it('should support comma-separated patterns (OR logic)', () => {
-    assert.ok(matchesGlob('apps/dashboard/src/page.tsx', 'apps/dashboard/src/**, apps/dashboard/public/**'));
-    assert.ok(matchesGlob('apps/dashboard/public/icon.png', 'apps/dashboard/src/**, apps/dashboard/public/**'));
-    assert.ok(!matchesGlob('apps/node-server/src/index.ts', 'apps/dashboard/src/**, apps/dashboard/public/**'));
+    expect(matchesGlob('apps/dashboard/src/page.tsx', 'apps/dashboard/src/**, apps/dashboard/public/**')).toBeTruthy();
+    expect(matchesGlob('apps/dashboard/public/icon.png', 'apps/dashboard/src/**, apps/dashboard/public/**')).toBeTruthy();
+    expect(matchesGlob('apps/node-server/src/index.ts', 'apps/dashboard/src/**, apps/dashboard/public/**')).toBeFalsy();
   });
 
   it('should match exact file paths', () => {
-    assert.ok(matchesGlob('package.json', 'package.json'));
+    expect(matchesGlob('package.json', 'package.json')).toBeTruthy();
   });
 
   it('should handle .claude/ prefixed paths', () => {
-    assert.ok(matchesGlob('.claude/scripts/hook-wrapper.mjs', '.claude/scripts/**'));
+    expect(matchesGlob('.claude/scripts/hook-wrapper.mjs', '.claude/scripts/**')).toBeTruthy();
   });
 
   it('should handle paths with leading ./', () => {
     // matchesGlob does not normalize -- caller (fileToModule) handles that
-    assert.ok(matchesGlob('apps/node-server/src/index.ts', 'apps/node-server/src/**'));
+    expect(matchesGlob('apps/node-server/src/index.ts', 'apps/node-server/src/**')).toBeTruthy();
   });
 });
 
@@ -221,11 +220,7 @@ describe('glob matching consistency with hook-wrapper.mjs (AC-4.4)', () => {
     it(`consistency: ${desc} -- "${filePath}" vs "${pattern}"`, () => {
       const traceResult = matchesGlob(filePath, pattern);
       const hookResult = hookWrapperMatchesPattern(filePath, pattern);
-      assert.equal(
-        traceResult,
-        hookResult,
-        `Mismatch for "${filePath}" vs "${pattern}": trace-utils=${traceResult}, hook-wrapper=${hookResult}`,
-      );
+      expect(traceResult).toBe(hookResult);
     });
   }
 
@@ -242,11 +237,7 @@ describe('glob matching consistency with hook-wrapper.mjs (AC-4.4)', () => {
 
   for (const pattern of patterns) {
     it(`globToRegex consistency: "${pattern}"`, () => {
-      assert.equal(
-        globToRegex(pattern),
-        hookWrapperGlobToRegex(pattern),
-        `globToRegex mismatch for "${pattern}"`,
-      );
+      expect(globToRegex(pattern)).toBe(hookWrapperGlobToRegex(pattern));
     });
   }
 });
@@ -261,65 +252,65 @@ describe('fileToModule', () => {
   // AC-4.1: Returns correct module for files within glob boundaries
   it('AC-4.1: should return node-server module for file in apps/node-server/src/', () => {
     const result = fileToModule('apps/node-server/src/index.ts', config);
-    assert.ok(result, 'Should find a module');
-    assert.equal(result.id, 'node-server');
-    assert.equal(result.name, 'Node Server');
+    expect(result).toBeTruthy();
+    expect(result.id).toBe('node-server');
+    expect(result.name).toBe('Node Server');
   });
 
   it('AC-4.1: should return dashboard module for file in apps/dashboard/src/', () => {
     const result = fileToModule('apps/dashboard/src/page.tsx', config);
-    assert.ok(result, 'Should find a module');
-    assert.equal(result.id, 'dashboard');
+    expect(result).toBeTruthy();
+    expect(result.id).toBe('dashboard');
   });
 
   it('AC-4.1: should return dashboard module for file in apps/dashboard/public/', () => {
     const result = fileToModule('apps/dashboard/public/favicon.ico', config);
-    assert.ok(result, 'Should find a module');
-    assert.equal(result.id, 'dashboard');
+    expect(result).toBeTruthy();
+    expect(result.id).toBe('dashboard');
   });
 
   it('AC-4.1: should return claude-scripts module for .claude/scripts/ files', () => {
     const result = fileToModule('.claude/scripts/hook-wrapper.mjs', config);
-    assert.ok(result, 'Should find a module');
-    assert.equal(result.id, 'claude-scripts');
+    expect(result).toBeTruthy();
+    expect(result.id).toBe('claude-scripts');
   });
 
   it('AC-4.1: should return platform-cdk module for cdk files', () => {
     const result = fileToModule('cdk/platform-cdk/src/stacks/api-stack.ts', config);
-    assert.ok(result, 'Should find a module');
-    assert.equal(result.id, 'platform-cdk');
+    expect(result).toBeTruthy();
+    expect(result.id).toBe('platform-cdk');
   });
 
   it('AC-4.1: should return correct module for deeply nested files', () => {
     const result = fileToModule('apps/node-server/src/handlers/auth/login.handler.ts', config);
-    assert.ok(result, 'Should find a module');
-    assert.equal(result.id, 'node-server');
+    expect(result).toBeTruthy();
+    expect(result.id).toBe('node-server');
   });
 
   // AC-4.2: Returns null for untraced files
   it('AC-4.2: should return null for files not in any module glob', () => {
     const result = fileToModule('README.md', config);
-    assert.equal(result, null, 'Root README.md should be untraced');
+    expect(result).toBe(null);
   });
 
   it('AC-4.2: should return null for package.json at root', () => {
     const result = fileToModule('package.json', config);
-    assert.equal(result, null, 'Root package.json should be untraced');
+    expect(result).toBe(null);
   });
 
   it('AC-4.2: should return null for files in unlisted directories', () => {
     const result = fileToModule('some-other-app/src/index.ts', config);
-    assert.equal(result, null, 'Files in unlisted dirs should be untraced');
+    expect(result).toBe(null);
   });
 
   it('AC-4.2: should return null for empty file path', () => {
     const result = fileToModule('', config);
-    assert.equal(result, null);
+    expect(result).toBe(null);
   });
 
   it('AC-4.2: should return null for null file path', () => {
     const result = fileToModule(null, config);
-    assert.equal(result, null);
+    expect(result).toBe(null);
   });
 
   // First-match-wins behavior (REQ-AT-022)
@@ -332,33 +323,33 @@ describe('fileToModule', () => {
       ],
     };
     const result = fileToModule('src/special/file.ts', overlappingConfig);
-    assert.ok(result, 'Should match a module');
-    assert.equal(result.id, 'first', 'First-match-wins: "first" module should win');
+    expect(result).toBeTruthy();
+    expect(result.id).toBe('first');
   });
 
   // Edge: path with leading ./
   it('should handle paths with leading ./', () => {
     const result = fileToModule('./apps/node-server/src/index.ts', config);
-    assert.ok(result, 'Should find module even with leading ./');
-    assert.equal(result.id, 'node-server');
+    expect(result).toBeTruthy();
+    expect(result.id).toBe('node-server');
   });
 
   // Edge: path with leading /
   it('should handle paths with leading /', () => {
     const result = fileToModule('/apps/node-server/src/index.ts', config);
-    assert.ok(result, 'Should find module even with leading /');
-    assert.equal(result.id, 'node-server');
+    expect(result).toBeTruthy();
+    expect(result.id).toBe('node-server');
   });
 
   // Edge: null/missing config
   it('should return null for null config', () => {
     const result = fileToModule('apps/node-server/src/index.ts', null);
-    assert.equal(result, null);
+    expect(result).toBe(null);
   });
 
   it('should return null for config with no modules array', () => {
     const result = fileToModule('apps/node-server/src/index.ts', { version: 1 });
-    assert.equal(result, null);
+    expect(result).toBe(null);
   });
 });
 
@@ -392,16 +383,13 @@ describe('loadTraceConfig', () => {
     );
 
     const loaded = loadTraceConfig(testRoot);
-    assert.equal(loaded.version, 1);
-    assert.equal(loaded.modules.length, 4);
-    assert.equal(loaded.modules[0].id, 'node-server');
+    expect(loaded.version).toBe(1);
+    expect(loaded.modules.length).toBe(4);
+    expect(loaded.modules[0].id).toBe('node-server');
   });
 
   it('should throw if config file does not exist', () => {
-    assert.throws(
-      () => loadTraceConfig(testRoot + '-nonexistent'),
-      /Trace config not found/,
-    );
+    expect(() => loadTraceConfig(testRoot + '-nonexistent')).toThrow(/Trace config not found/);
   });
 
   it('should throw for invalid JSON', () => {
@@ -410,10 +398,7 @@ describe('loadTraceConfig', () => {
       'not json {{{',
     );
 
-    assert.throws(
-      () => loadTraceConfig(testRoot),
-      /Failed to parse trace config JSON/,
-    );
+    expect(() => loadTraceConfig(testRoot)).toThrow(/Failed to parse trace config JSON/);
   });
 
   it('should throw if version is missing', () => {
@@ -422,10 +407,7 @@ describe('loadTraceConfig', () => {
       JSON.stringify({ modules: [] }),
     );
 
-    assert.throws(
-      () => loadTraceConfig(testRoot),
-      /"version" must be a number/,
-    );
+    expect(() => loadTraceConfig(testRoot)).toThrow(/"version" must be a number/);
   });
 
   it('should throw if modules is not an array', () => {
@@ -434,10 +416,7 @@ describe('loadTraceConfig', () => {
       JSON.stringify({ version: 1, modules: 'not-array' }),
     );
 
-    assert.throws(
-      () => loadTraceConfig(testRoot),
-      /"modules" must be an array/,
-    );
+    expect(() => loadTraceConfig(testRoot)).toThrow(/"modules" must be an array/);
   });
 
   it('should throw if a module has no id', () => {
@@ -449,10 +428,7 @@ describe('loadTraceConfig', () => {
       }),
     );
 
-    assert.throws(
-      () => loadTraceConfig(testRoot),
-      /modules\[0\]\.id must be a non-empty string/,
-    );
+    expect(() => loadTraceConfig(testRoot)).toThrow(/modules\[0\]\.id must be a non-empty string/);
   });
 
   it('should throw if a module has empty fileGlobs', () => {
@@ -464,10 +440,7 @@ describe('loadTraceConfig', () => {
       }),
     );
 
-    assert.throws(
-      () => loadTraceConfig(testRoot),
-      /modules\[0\]\.fileGlobs must be a non-empty array/,
-    );
+    expect(() => loadTraceConfig(testRoot)).toThrow(/modules\[0\]\.fileGlobs must be a non-empty array/);
   });
 });
 
@@ -505,7 +478,7 @@ describe('isTraceStale', () => {
   it('AC-4.3: should return true when trace file does not exist', () => {
     // No trace file -- treat as stale
     const result = isTraceStale('node-server', config, testRoot);
-    assert.equal(result, true, 'Missing trace file should be stale');
+    expect(result).toBe(true);
   });
 
   it('AC-4.3: should return true when lastGenerated is missing from trace', () => {
@@ -515,7 +488,7 @@ describe('isTraceStale', () => {
     );
 
     const result = isTraceStale('node-server', config, testRoot);
-    assert.equal(result, true, 'Missing lastGenerated should be stale');
+    expect(result).toBe(true);
   });
 
   it('AC-4.3: should return false when no matching files exist', () => {
@@ -531,12 +504,12 @@ describe('isTraceStale', () => {
     );
 
     const result = isTraceStale('node-server', config, testRoot);
-    assert.equal(result, false, 'No matching files means not stale');
+    expect(result).toBe(false);
   });
 
   it('should return false for modules not in config', () => {
     const result = isTraceStale('nonexistent-module', config, testRoot);
-    assert.equal(result, false, 'Unknown module should not be stale');
+    expect(result).toBe(false);
   });
 
   it('AC-4.3: should return true when source file is newer than lastGenerated', () => {
@@ -563,7 +536,7 @@ describe('isTraceStale', () => {
     utimesSync(srcFile, now, now);
 
     const result = isTraceStale('node-server', config, testRoot);
-    assert.equal(result, true, 'Source file newer than lastGenerated should be stale');
+    expect(result).toBe(true);
   });
 
   it('AC-4.3: should return false when source files are older than lastGenerated', () => {
@@ -591,7 +564,7 @@ describe('isTraceStale', () => {
     );
 
     const result = isTraceStale('node-server', config, testRoot);
-    assert.equal(result, false, 'Source file older than lastGenerated should not be stale');
+    expect(result).toBe(false);
   });
 });
 
@@ -602,7 +575,7 @@ describe('isTraceStale', () => {
 describe('formatTimestamp', () => {
   it('should return ISO 8601 format', () => {
     const result = formatTimestamp(new Date('2026-02-22T10:30:00Z'));
-    assert.equal(result, '2026-02-22T10:30:00.000Z');
+    expect(result).toBe('2026-02-22T10:30:00.000Z');
   });
 
   it('should use current time when no date provided', () => {
@@ -610,14 +583,14 @@ describe('formatTimestamp', () => {
     const result = formatTimestamp();
     const after = new Date().toISOString();
 
-    assert.ok(result >= before, 'Should be >= before timestamp');
-    assert.ok(result <= after, 'Should be <= after timestamp');
+    expect(result >= before).toBeTruthy();
+    expect(result <= after).toBeTruthy();
   });
 
   it('should produce a parseable ISO string', () => {
     const result = formatTimestamp();
     const parsed = new Date(result);
-    assert.ok(!Number.isNaN(parsed.getTime()), 'Should parse to valid date');
+    expect(Number.isNaN(parsed.getTime())).toBeFalsy();
   });
 });
 
@@ -628,19 +601,19 @@ describe('formatTimestamp', () => {
 describe('getTracePath', () => {
   it('should return path to low-level trace JSON', () => {
     const result = getTracePath('node-server', '/project');
-    assert.equal(result, '/project/.claude/traces/low-level/node-server.json');
+    expect(result).toBe('/project/.claude/traces/low-level/node-server.json');
   });
 
   it('should handle module IDs with hyphens', () => {
     const result = getTracePath('dev-team', '/project');
-    assert.equal(result, '/project/.claude/traces/low-level/dev-team.json');
+    expect(result).toBe('/project/.claude/traces/low-level/dev-team.json');
   });
 });
 
 describe('getHighLevelTracePath', () => {
   it('should return path to high-level trace JSON', () => {
     const result = getHighLevelTracePath('/project');
-    assert.equal(result, '/project/.claude/traces/high-level.json');
+    expect(result).toBe('/project/.claude/traces/high-level.json');
   });
 });
 
@@ -650,10 +623,10 @@ describe('getHighLevelTracePath', () => {
 
 describe('exported constants', () => {
   it('should export TRACE_CONFIG_PATH', () => {
-    assert.equal(TRACE_CONFIG_PATH, '.claude/traces/trace.config.json');
+    expect(TRACE_CONFIG_PATH).toBe('.claude/traces/trace.config.json');
   });
 
   it('should export LOW_LEVEL_TRACE_DIR', () => {
-    assert.equal(LOW_LEVEL_TRACE_DIR, '.claude/traces/low-level');
+    expect(LOW_LEVEL_TRACE_DIR).toBe('.claude/traces/low-level');
   });
 });

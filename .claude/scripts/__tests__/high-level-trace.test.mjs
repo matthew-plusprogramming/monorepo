@@ -3,11 +3,10 @@
  *
  * Tests: as-003-high-level-trace (AC-2.1, AC-2.2, AC-2.3, AC-2.4)
  *
- * Run with: node --test .claude/scripts/__tests__/high-level-trace.test.mjs
+ * Run with: npx vitest run --config .claude/scripts/vitest.config.mjs .claude/scripts/__tests__/high-level-trace.test.mjs
  */
 
-import { describe, it, beforeEach, afterEach } from 'node:test';
-import assert from 'node:assert/strict';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdirSync, writeFileSync, readFileSync, rmSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -51,50 +50,21 @@ function createTestConfig() {
   };
 }
 
-/** Sample dependency data for testing */
+/** Sample dependency data for testing (string moduleId arrays) */
 function createTestDependencyData() {
   return {
     'dev-team': {
-      dependencies: [
-        {
-          targetId: 'qa-team',
-          relationshipType: 'publishes-to',
-          description: 'Sends completed work items for QA review',
-        },
-        {
-          targetId: 'knowledge-team',
-          relationshipType: 'reads-from',
-          description: 'Reads knowledge base for context during development',
-        },
-      ],
-      dependents: [
-        {
-          targetId: 'qa-team',
-          relationshipType: 'subscribes-from',
-          description: 'Receives QA feedback for rework',
-        },
-      ],
+      dependencies: ['qa-team', 'knowledge-team'],
+      dependents: ['qa-team'],
     },
     'qa-team': {
-      dependencies: [
-        {
-          targetId: 'dev-team',
-          relationshipType: 'subscribes-from',
-          description: 'Receives completed work items from dev team',
-        },
-      ],
-      dependents: [
-        {
-          targetId: 'dev-team',
-          relationshipType: 'publishes-to',
-          description: 'Sends QA feedback to dev team',
-        },
-      ],
+      dependencies: ['dev-team'],
+      dependents: ['dev-team'],
     },
   };
 }
 
-/** Create a valid high-level trace object for testing */
+/** Create a valid high-level trace object for testing (string moduleId format) */
 function createValidTrace() {
   return {
     version: 1,
@@ -107,13 +77,7 @@ function createValidTrace() {
         name: 'Dev Team',
         description: 'Development work',
         fileGlobs: ['src/dev-team/**'],
-        dependencies: [
-          {
-            targetId: 'qa-team',
-            relationshipType: 'publishes-to',
-            description: 'Sends work items for QA',
-          },
-        ],
+        dependencies: ['qa-team'],
         dependents: [],
       },
     ],
@@ -146,70 +110,70 @@ describe('validateHighLevelTrace (AC-2.1)', () => {
   it('should validate a correctly-formed high-level trace', () => {
     const trace = createValidTrace();
     const result = validateHighLevelTrace(trace);
-    assert.ok(result.valid, `Should be valid. Errors: ${result.errors.join(', ')}`);
-    assert.equal(result.errors.length, 0);
+    expect(result.valid).toBeTruthy();
+    expect(result.errors.length).toBe(0);
   });
 
   it('should reject null input', () => {
     const result = validateHighLevelTrace(null);
-    assert.ok(!result.valid);
-    assert.ok(result.errors.some(e => e.includes('must be an object')));
+    expect(!result.valid).toBeTruthy();
+    expect(result.errors.some(e => e.includes('must be an object'))).toBeTruthy();
   });
 
   it('should reject missing version', () => {
     const trace = createValidTrace();
     delete trace.version;
     const result = validateHighLevelTrace(trace);
-    assert.ok(!result.valid);
-    assert.ok(result.errors.some(e => e.includes('version must be an integer')));
+    expect(!result.valid).toBeTruthy();
+    expect(result.errors.some(e => e.includes('version must be an integer'))).toBeTruthy();
   });
 
   it('should reject non-integer version', () => {
     const trace = createValidTrace();
     trace.version = 1.5;
     const result = validateHighLevelTrace(trace);
-    assert.ok(!result.valid);
-    assert.ok(result.errors.some(e => e.includes('version must be an integer')));
+    expect(!result.valid).toBeTruthy();
+    expect(result.errors.some(e => e.includes('version must be an integer'))).toBeTruthy();
   });
 
   it('should reject missing lastGenerated', () => {
     const trace = createValidTrace();
     delete trace.lastGenerated;
     const result = validateHighLevelTrace(trace);
-    assert.ok(!result.valid);
-    assert.ok(result.errors.some(e => e.includes('lastGenerated must be a string')));
+    expect(!result.valid).toBeTruthy();
+    expect(result.errors.some(e => e.includes('lastGenerated must be a string'))).toBeTruthy();
   });
 
   it('should reject invalid lastGenerated timestamp', () => {
     const trace = createValidTrace();
     trace.lastGenerated = 'not-a-date';
     const result = validateHighLevelTrace(trace);
-    assert.ok(!result.valid);
-    assert.ok(result.errors.some(e => e.includes('valid ISO 8601')));
+    expect(!result.valid).toBeTruthy();
+    expect(result.errors.some(e => e.includes('valid ISO 8601'))).toBeTruthy();
   });
 
   it('should reject empty generatedBy', () => {
     const trace = createValidTrace();
     trace.generatedBy = '';
     const result = validateHighLevelTrace(trace);
-    assert.ok(!result.valid);
-    assert.ok(result.errors.some(e => e.includes('generatedBy must be a non-empty string')));
+    expect(!result.valid).toBeTruthy();
+    expect(result.errors.some(e => e.includes('generatedBy must be a non-empty string'))).toBeTruthy();
   });
 
   it('should reject missing projectRoot', () => {
     const trace = createValidTrace();
     delete trace.projectRoot;
     const result = validateHighLevelTrace(trace);
-    assert.ok(!result.valid);
-    assert.ok(result.errors.some(e => e.includes('projectRoot must be a string')));
+    expect(!result.valid).toBeTruthy();
+    expect(result.errors.some(e => e.includes('projectRoot must be a string'))).toBeTruthy();
   });
 
   it('should reject non-array modules', () => {
     const trace = createValidTrace();
     trace.modules = 'not-array';
     const result = validateHighLevelTrace(trace);
-    assert.ok(!result.valid);
-    assert.ok(result.errors.some(e => e.includes('modules must be an array')));
+    expect(!result.valid).toBeTruthy();
+    expect(result.errors.some(e => e.includes('modules must be an array'))).toBeTruthy();
   });
 
   it('should validate all required fields on module nodes', () => {
@@ -225,80 +189,64 @@ describe('validateHighLevelTrace (AC-2.1)', () => {
       },
     ];
     const result = validateHighLevelTrace(trace);
-    assert.ok(result.valid, `Should be valid. Errors: ${result.errors.join(', ')}`);
+    expect(result.valid).toBeTruthy();
   });
 
   it('should reject module missing id', () => {
     const trace = createValidTrace();
     trace.modules = [{ name: 'Test', description: 'X', fileGlobs: [], dependencies: [], dependents: [] }];
     const result = validateHighLevelTrace(trace);
-    assert.ok(!result.valid);
-    assert.ok(result.errors.some(e => e.includes('id must be a non-empty string')));
+    expect(!result.valid).toBeTruthy();
+    expect(result.errors.some(e => e.includes('id must be a non-empty string'))).toBeTruthy();
   });
 
   it('should reject module missing name', () => {
     const trace = createValidTrace();
     trace.modules = [{ id: 'test', description: 'X', fileGlobs: [], dependencies: [], dependents: [] }];
     const result = validateHighLevelTrace(trace);
-    assert.ok(!result.valid);
-    assert.ok(result.errors.some(e => e.includes('name must be a non-empty string')));
+    expect(!result.valid).toBeTruthy();
+    expect(result.errors.some(e => e.includes('name must be a non-empty string'))).toBeTruthy();
   });
 
   it('should reject module missing dependencies array', () => {
     const trace = createValidTrace();
     trace.modules = [{ id: 'test', name: 'Test', description: 'X', fileGlobs: [], dependents: [] }];
     const result = validateHighLevelTrace(trace);
-    assert.ok(!result.valid);
-    assert.ok(result.errors.some(e => e.includes('dependencies must be an array')));
+    expect(!result.valid).toBeTruthy();
+    expect(result.errors.some(e => e.includes('dependencies must be an array'))).toBeTruthy();
   });
 
   it('should reject module missing dependents array', () => {
     const trace = createValidTrace();
     trace.modules = [{ id: 'test', name: 'Test', description: 'X', fileGlobs: [], dependencies: [] }];
     const result = validateHighLevelTrace(trace);
-    assert.ok(!result.valid);
-    assert.ok(result.errors.some(e => e.includes('dependents must be an array')));
+    expect(!result.valid).toBeTruthy();
+    expect(result.errors.some(e => e.includes('dependents must be an array'))).toBeTruthy();
   });
 
-  it('should reject invalid dependency relationship type', () => {
+  it('should reject non-string dependency entries', () => {
     const trace = createValidTrace();
     trace.modules[0].dependencies = [
-      { targetId: 'qa', relationshipType: 'invalid-type', description: 'test' },
+      { targetId: 'qa', relationshipType: 'imports', description: 'test' },
     ];
     const result = validateHighLevelTrace(trace);
-    assert.ok(!result.valid);
-    assert.ok(result.errors.some(e => e.includes('not valid')));
+    expect(!result.valid).toBeTruthy();
+    expect(result.errors.some(e => e.includes('must be a non-empty string moduleId'))).toBeTruthy();
   });
 
-  it('should accept all valid relationship types', () => {
-    for (const relType of VALID_RELATIONSHIP_TYPES) {
-      const trace = createValidTrace();
-      trace.modules[0].dependencies = [
-        { targetId: 'other', relationshipType: relType, description: `test ${relType}` },
-      ];
-      const result = validateHighLevelTrace(trace);
-      assert.ok(result.valid, `Relationship type "${relType}" should be valid. Errors: ${result.errors.join(', ')}`);
-    }
-  });
-
-  it('should reject dependency missing targetId', () => {
+  it('should accept valid string moduleId dependency entries', () => {
     const trace = createValidTrace();
-    trace.modules[0].dependencies = [
-      { relationshipType: 'imports', description: 'test' },
-    ];
+    trace.modules[0].dependencies = ['qa-team', 'knowledge-team'];
     const result = validateHighLevelTrace(trace);
-    assert.ok(!result.valid);
-    assert.ok(result.errors.some(e => e.includes('targetId must be a non-empty string')));
+    expect(result.valid).toBeTruthy();
   });
 
-  it('should reject dependency missing description', () => {
+  it('should reject empty string dependency entries', () => {
     const trace = createValidTrace();
-    trace.modules[0].dependencies = [
-      { targetId: 'qa', relationshipType: 'imports' },
-    ];
+    trace.modules[0].dependencies = [''];
     const result = validateHighLevelTrace(trace);
-    assert.ok(!result.valid);
-    assert.ok(result.errors.some(e => e.includes('description must be a string')));
+    expect(!result.valid).toBeTruthy();
+    expect(result.errors.some(e => e.includes('must be a non-empty string moduleId'))).toBeTruthy();
   });
 
   it('should validate trace with empty modules array', () => {
@@ -310,7 +258,7 @@ describe('validateHighLevelTrace (AC-2.1)', () => {
       modules: [],
     };
     const result = validateHighLevelTrace(trace);
-    assert.ok(result.valid, 'Empty modules array should be valid');
+    expect(result.valid).toBeTruthy();
   });
 
   it('should validate modules with empty dependencies and dependents', () => {
@@ -318,7 +266,7 @@ describe('validateHighLevelTrace (AC-2.1)', () => {
     trace.modules[0].dependencies = [];
     trace.modules[0].dependents = [];
     const result = validateHighLevelTrace(trace);
-    assert.ok(result.valid, 'Empty deps/dependents should be valid');
+    expect(result.valid).toBeTruthy();
   });
 });
 
@@ -336,7 +284,7 @@ describe('generateHighLevelTraceJSON', () => {
     });
 
     const validation = validateHighLevelTrace(trace);
-    assert.ok(validation.valid, `Schema validation failed: ${validation.errors.join(', ')}`);
+    expect(validation.valid).toBeTruthy();
   });
 
   it('AC-2.1: should include all required fields on each module node', () => {
@@ -347,14 +295,14 @@ describe('generateHighLevelTraceJSON', () => {
       existingTrace: null,
     });
 
-    assert.equal(trace.modules.length, 3, 'Should have 3 modules from config');
+    expect(trace.modules.length).toBe(3);
     for (const mod of trace.modules) {
-      assert.ok(typeof mod.id === 'string' && mod.id.length > 0, `Module must have id`);
-      assert.ok(typeof mod.name === 'string' && mod.name.length > 0, `Module must have name`);
-      assert.ok(typeof mod.description === 'string', `Module must have description`);
-      assert.ok(Array.isArray(mod.fileGlobs), `Module must have fileGlobs array`);
-      assert.ok(Array.isArray(mod.dependencies), `Module must have dependencies array`);
-      assert.ok(Array.isArray(mod.dependents), `Module must have dependents array`);
+      expect(typeof mod.id === 'string' && mod.id.length > 0).toBeTruthy();
+      expect(typeof mod.name === 'string' && mod.name.length > 0).toBeTruthy();
+      expect(typeof mod.description === 'string').toBeTruthy();
+      expect(Array.isArray(mod.fileGlobs)).toBeTruthy();
+      expect(Array.isArray(mod.dependencies)).toBeTruthy();
+      expect(Array.isArray(mod.dependents)).toBeTruthy();
     }
   });
 
@@ -365,7 +313,7 @@ describe('generateHighLevelTraceJSON', () => {
       projectRoot: '/fake/path',
       existingTrace: null,
     });
-    assert.equal(trace.version, 1, 'First generation should be version 1');
+    expect(trace.version).toBe(1);
   });
 
   it('AC-2.3: should increment version from existing trace', () => {
@@ -376,7 +324,7 @@ describe('generateHighLevelTraceJSON', () => {
       projectRoot: '/fake/path',
       existingTrace: existing,
     });
-    assert.equal(trace.version, 6, 'Should increment from 5 to 6');
+    expect(trace.version).toBe(6);
   });
 
   it('AC-2.3: should increment version from existing trace version 1 to 2', () => {
@@ -387,7 +335,7 @@ describe('generateHighLevelTraceJSON', () => {
       projectRoot: '/fake/path',
       existingTrace: existing,
     });
-    assert.equal(trace.version, 2, 'Should increment from 1 to 2');
+    expect(trace.version).toBe(2);
   });
 
   it('AC-2.4: lastGenerated should be a valid ISO 8601 timestamp', () => {
@@ -399,11 +347,11 @@ describe('generateHighLevelTraceJSON', () => {
     });
 
     const parsed = new Date(trace.lastGenerated);
-    assert.ok(!Number.isNaN(parsed.getTime()), 'lastGenerated must parse to valid date');
+    expect(!Number.isNaN(parsed.getTime())).toBeTruthy();
     // Verify it is a recent timestamp (within last 5 seconds)
     const now = Date.now();
     const diff = now - parsed.getTime();
-    assert.ok(diff >= 0 && diff < 5000, 'lastGenerated should be within last 5 seconds');
+    expect(diff >= 0 && diff < 5000).toBeTruthy();
   });
 
   it('should use provided generatedBy identifier', () => {
@@ -414,7 +362,7 @@ describe('generateHighLevelTraceJSON', () => {
       existingTrace: null,
       generatedBy: 'test-generator',
     });
-    assert.equal(trace.generatedBy, 'test-generator');
+    expect(trace.generatedBy).toBe('test-generator');
   });
 
   it('should default generatedBy to "trace generate"', () => {
@@ -424,7 +372,7 @@ describe('generateHighLevelTraceJSON', () => {
       projectRoot: '/fake/path',
       existingTrace: null,
     });
-    assert.equal(trace.generatedBy, 'trace generate');
+    expect(trace.generatedBy).toBe('trace generate');
   });
 
   it('should use projectRoot from config', () => {
@@ -434,7 +382,7 @@ describe('generateHighLevelTraceJSON', () => {
       projectRoot: '/fake/path',
       existingTrace: null,
     });
-    assert.equal(trace.projectRoot, '.');
+    expect(trace.projectRoot).toBe('.');
   });
 
   it('should merge manual dependency data', () => {
@@ -448,20 +396,20 @@ describe('generateHighLevelTraceJSON', () => {
     });
 
     const devTeam = trace.modules.find(m => m.id === 'dev-team');
-    assert.ok(devTeam, 'Should find dev-team module');
-    assert.equal(devTeam.dependencies.length, 2, 'Dev team should have 2 dependencies');
-    assert.equal(devTeam.dependents.length, 1, 'Dev team should have 1 dependent');
+    expect(devTeam).toBeTruthy();
+    expect(devTeam.dependencies.length).toBe(2);
+    expect(devTeam.dependents.length).toBe(1);
 
     const qaTeam = trace.modules.find(m => m.id === 'qa-team');
-    assert.ok(qaTeam, 'Should find qa-team module');
-    assert.equal(qaTeam.dependencies.length, 1, 'QA team should have 1 dependency');
-    assert.equal(qaTeam.dependents.length, 1, 'QA team should have 1 dependent');
+    expect(qaTeam).toBeTruthy();
+    expect(qaTeam.dependencies.length).toBe(1);
+    expect(qaTeam.dependents.length).toBe(1);
 
     // knowledge-team has no manual deps, should be empty
     const knowledgeTeam = trace.modules.find(m => m.id === 'knowledge-team');
-    assert.ok(knowledgeTeam, 'Should find knowledge-team module');
-    assert.equal(knowledgeTeam.dependencies.length, 0, 'Knowledge team should have 0 dependencies');
-    assert.equal(knowledgeTeam.dependents.length, 0, 'Knowledge team should have 0 dependents');
+    expect(knowledgeTeam).toBeTruthy();
+    expect(knowledgeTeam.dependencies.length).toBe(0);
+    expect(knowledgeTeam.dependents.length).toBe(0);
   });
 
   it('should preserve existing dependency data when no manual data provided', () => {
@@ -471,9 +419,7 @@ describe('generateHighLevelTraceJSON', () => {
       modules: [
         {
           id: 'dev-team',
-          dependencies: [
-            { targetId: 'qa-team', relationshipType: 'publishes-to', description: 'existing dep' },
-          ],
+          dependencies: ['qa-team'],
           dependents: [],
         },
       ],
@@ -485,9 +431,9 @@ describe('generateHighLevelTraceJSON', () => {
     });
 
     const devTeam = trace.modules.find(m => m.id === 'dev-team');
-    assert.ok(devTeam);
-    assert.equal(devTeam.dependencies.length, 1, 'Should preserve existing dependency');
-    assert.equal(devTeam.dependencies[0].description, 'existing dep');
+    expect(devTeam).toBeTruthy();
+    expect(devTeam.dependencies.length).toBe(1);
+    expect(devTeam.dependencies[0]).toBe('qa-team');
   });
 
   it('manual dependency data should override existing trace data', () => {
@@ -497,18 +443,14 @@ describe('generateHighLevelTraceJSON', () => {
       modules: [
         {
           id: 'dev-team',
-          dependencies: [
-            { targetId: 'qa-team', relationshipType: 'publishes-to', description: 'old dep' },
-          ],
+          dependencies: ['qa-team'],
           dependents: [],
         },
       ],
     };
     const depData = {
       'dev-team': {
-        dependencies: [
-          { targetId: 'knowledge-team', relationshipType: 'reads-from', description: 'new dep' },
-        ],
+        dependencies: ['knowledge-team'],
         dependents: [],
       },
     };
@@ -520,10 +462,9 @@ describe('generateHighLevelTraceJSON', () => {
     });
 
     const devTeam = trace.modules.find(m => m.id === 'dev-team');
-    assert.ok(devTeam);
-    assert.equal(devTeam.dependencies.length, 1, 'Should use manual data, not existing');
-    assert.equal(devTeam.dependencies[0].targetId, 'knowledge-team');
-    assert.equal(devTeam.dependencies[0].description, 'new dep');
+    expect(devTeam).toBeTruthy();
+    expect(devTeam.dependencies.length).toBe(1);
+    expect(devTeam.dependencies[0]).toBe('knowledge-team');
   });
 
   it('should set empty description from config description that is undefined', () => {
@@ -545,7 +486,7 @@ describe('generateHighLevelTraceJSON', () => {
       existingTrace: null,
     });
 
-    assert.equal(trace.modules[0].description, '', 'Missing description should default to empty string');
+    expect(trace.modules[0].description).toBe('');
   });
 });
 
@@ -558,16 +499,16 @@ describe('generateHighLevelTraceMarkdown (AC-2.2)', () => {
     const trace = createValidTrace();
     const md = generateHighLevelTraceMarkdown(trace);
 
-    assert.ok(md.includes('<!-- trace-id: high-level -->'), 'Should have trace-id comment');
-    assert.ok(md.includes('<!-- trace-version: 1 -->'), 'Should have trace-version comment');
-    assert.ok(md.includes('<!-- last-generated: 2026-02-22T10:30:00.000Z -->'), 'Should have last-generated comment');
-    assert.ok(md.includes('<!-- generated-by: trace generate -->'), 'Should have generated-by comment');
+    expect(md.includes('<!-- trace-id: high-level -->')).toBeTruthy();
+    expect(md.includes('<!-- trace-version: 1 -->')).toBeTruthy();
+    expect(md.includes('<!-- last-generated: 2026-02-22T10:30:00.000Z -->')).toBeTruthy();
+    expect(md.includes('<!-- generated-by: trace generate -->')).toBeTruthy();
   });
 
   it('should have # Architecture Trace: High-Level heading', () => {
     const trace = createValidTrace();
     const md = generateHighLevelTraceMarkdown(trace);
-    assert.ok(md.includes('# Architecture Trace: High-Level'));
+    expect(md.includes('# Architecture Trace: High-Level')).toBeTruthy();
   });
 
   it('should have ## Module: <Name> headings for each module', () => {
@@ -579,36 +520,31 @@ describe('generateHighLevelTraceMarkdown (AC-2.2)', () => {
     });
     const md = generateHighLevelTraceMarkdown(trace);
 
-    assert.ok(md.includes('## Module: Dev Team'), 'Should have Dev Team heading');
-    assert.ok(md.includes('## Module: QA Team'), 'Should have QA Team heading');
-    assert.ok(md.includes('## Module: Knowledge Team'), 'Should have Knowledge Team heading');
+    expect(md.includes('## Module: Dev Team')).toBeTruthy();
+    expect(md.includes('## Module: QA Team')).toBeTruthy();
+    expect(md.includes('## Module: Knowledge Team')).toBeTruthy();
   });
 
   it('should include module ID, description, and file globs', () => {
     const trace = createValidTrace();
     const md = generateHighLevelTraceMarkdown(trace);
 
-    assert.ok(md.includes('**ID**: dev-team'), 'Should have ID field');
-    assert.ok(md.includes('**Description**: Development work'), 'Should have Description field');
-    assert.ok(md.includes('`src/dev-team/**`'), 'Should have file globs');
+    expect(md.includes('**ID**: dev-team')).toBeTruthy();
+    expect(md.includes('**Description**: Development work')).toBeTruthy();
+    expect(md.includes('`src/dev-team/**`')).toBeTruthy();
   });
 
-  it('should have pipe-delimited dependency sections', () => {
+  it('should have dependency list sections with string moduleIds', () => {
     const trace = createValidTrace();
     const md = generateHighLevelTraceMarkdown(trace);
 
-    assert.ok(md.includes('### Dependencies'), 'Should have Dependencies heading');
-    assert.ok(
-      md.includes('target | relationship-type | description'),
-      'Should have pipe-delimited header for deps',
-    );
-    assert.ok(
-      md.includes('qa-team | publishes-to | Sends work items for QA'),
-      'Should have pipe-delimited dependency line',
-    );
+    expect(md.includes('### Dependencies')).toBeTruthy();
+    expect(
+      md.includes('- qa-team'),
+    ).toBeTruthy();
   });
 
-  it('should have pipe-delimited dependents sections', () => {
+  it('should have dependent list sections with string moduleIds', () => {
     const config = createTestConfig();
     const depData = createTestDependencyData();
     const trace = generateHighLevelTraceJSON({
@@ -619,12 +555,11 @@ describe('generateHighLevelTraceMarkdown (AC-2.2)', () => {
     });
     const md = generateHighLevelTraceMarkdown(trace);
 
-    assert.ok(md.includes('### Dependents'), 'Should have Dependents heading');
-    // Dev team has a dependent
-    assert.ok(
-      md.includes('qa-team | subscribes-from | Receives QA feedback for rework'),
-      'Should have pipe-delimited dependent line',
-    );
+    expect(md.includes('### Dependents')).toBeTruthy();
+    // Dev team has qa-team as a dependent
+    expect(
+      md.includes('- qa-team'),
+    ).toBeTruthy();
   });
 
   it('should show (none) for empty dependencies', () => {
@@ -634,8 +569,8 @@ describe('generateHighLevelTraceMarkdown (AC-2.2)', () => {
 
     // The dependents section should show (none)
     const dependentsSection = md.split('### Dependents')[1];
-    assert.ok(dependentsSection, 'Should have Dependents section');
-    assert.ok(dependentsSection.includes('(none)'), 'Empty dependents should show (none)');
+    expect(dependentsSection).toBeTruthy();
+    expect(dependentsSection.includes('(none)')).toBeTruthy();
   });
 
   it('should show (none) for empty dependents', () => {
@@ -661,8 +596,8 @@ describe('generateHighLevelTraceMarkdown (AC-2.2)', () => {
     // Both Dependencies and Dependents should show (none)
     const depsSection = sections.find(s => s.trim().startsWith('Dependencies'));
     const dependentsSection = sections.find(s => s.trim().startsWith('Dependents'));
-    assert.ok(depsSection.includes('(none)'), 'Empty dependencies should show (none)');
-    assert.ok(dependentsSection.includes('(none)'), 'Empty dependents should show (none)');
+    expect(depsSection.includes('(none)')).toBeTruthy();
+    expect(dependentsSection.includes('(none)')).toBeTruthy();
   });
 
   it('should render multiple modules correctly', () => {
@@ -678,22 +613,22 @@ describe('generateHighLevelTraceMarkdown (AC-2.2)', () => {
 
     // Count module headings
     const moduleHeadings = md.match(/## Module: /g);
-    assert.equal(moduleHeadings.length, 3, 'Should have 3 module headings');
+    expect(moduleHeadings.length).toBe(3);
 
     // Count Dependencies headings
     const depsHeadings = md.match(/### Dependencies/g);
-    assert.equal(depsHeadings.length, 3, 'Should have 3 Dependencies headings');
+    expect(depsHeadings.length).toBe(3);
 
     // Count Dependents headings
     const dependentsHeadings = md.match(/### Dependents/g);
-    assert.equal(dependentsHeadings.length, 3, 'Should have 3 Dependents headings');
+    expect(dependentsHeadings.length).toBe(3);
   });
 
   it('should reflect correct version in metadata', () => {
     const trace = createValidTrace();
     trace.version = 42;
     const md = generateHighLevelTraceMarkdown(trace);
-    assert.ok(md.includes('<!-- trace-version: 42 -->'));
+    expect(md.includes('<!-- trace-version: 42 -->')).toBeTruthy();
   });
 });
 
@@ -717,8 +652,8 @@ describe('version increment behavior (AC-2.3)', () => {
 
   it('should start at version 1 for new files', () => {
     const result = generateHighLevelTrace({ projectRoot: testRoot });
-    assert.equal(result.version, 1, 'First generation should produce version 1');
-    assert.equal(result.json.version, 1);
+    expect(result.version).toBe(1);
+    expect(result.json.version).toBe(1);
   });
 
   it('should increment to version 2 on second generation', () => {
@@ -727,7 +662,7 @@ describe('version increment behavior (AC-2.3)', () => {
 
     // Second generation (reads existing file)
     const result = generateHighLevelTrace({ projectRoot: testRoot });
-    assert.equal(result.version, 2, 'Second generation should produce version 2');
+    expect(result.version).toBe(2);
   });
 
   it('should increment to version 3 on third generation', () => {
@@ -735,7 +670,7 @@ describe('version increment behavior (AC-2.3)', () => {
     generateHighLevelTrace({ projectRoot: testRoot });
     generateHighLevelTrace({ projectRoot: testRoot });
     const result = generateHighLevelTrace({ projectRoot: testRoot });
-    assert.equal(result.version, 3, 'Third generation should produce version 3');
+    expect(result.version).toBe(3);
   });
 
   it('should correctly read version from existing file on disk', () => {
@@ -746,7 +681,7 @@ describe('version increment behavior (AC-2.3)', () => {
     );
 
     const result = generateHighLevelTrace({ projectRoot: testRoot });
-    assert.equal(result.version, 11, 'Should increment from 10 to 11');
+    expect(result.version).toBe(11);
   });
 });
 
@@ -770,21 +705,21 @@ describe('generateHighLevelTrace (disk write)', () => {
 
   it('should write high-level.json to disk', () => {
     const result = generateHighLevelTrace({ projectRoot: testRoot });
-    assert.ok(existsSync(result.jsonPath), 'high-level.json should exist');
+    expect(existsSync(result.jsonPath)).toBeTruthy();
 
     const raw = readFileSync(result.jsonPath, 'utf-8');
     const parsed = JSON.parse(raw);
-    assert.equal(parsed.version, 1);
-    assert.ok(Array.isArray(parsed.modules));
+    expect(parsed.version).toBe(1);
+    expect(Array.isArray(parsed.modules)).toBeTruthy();
   });
 
   it('should write high-level.md to disk', () => {
     const result = generateHighLevelTrace({ projectRoot: testRoot });
-    assert.ok(existsSync(result.mdPath), 'high-level.md should exist');
+    expect(existsSync(result.mdPath)).toBeTruthy();
 
     const content = readFileSync(result.mdPath, 'utf-8');
-    assert.ok(content.includes('<!-- trace-id: high-level -->'));
-    assert.ok(content.includes('# Architecture Trace: High-Level'));
+    expect(content.includes('<!-- trace-id: high-level -->')).toBeTruthy();
+    expect(content.includes('# Architecture Trace: High-Level')).toBeTruthy();
   });
 
   it('should create .claude/traces/ directory if it does not exist', () => {
@@ -799,16 +734,16 @@ describe('generateHighLevelTrace (disk write)', () => {
     // Remove and recreate without traces subdir to simulate fresh state
     // Actually, writeTestConfig already creates the dir. Test that it handles existing dir fine.
     const result = generateHighLevelTrace({ projectRoot: freshRoot });
-    assert.ok(existsSync(result.jsonPath));
-    assert.ok(existsSync(result.mdPath));
+    expect(existsSync(result.jsonPath)).toBeTruthy();
+    expect(existsSync(result.mdPath)).toBeTruthy();
 
     rmSync(freshRoot, { recursive: true, force: true });
   });
 
   it('should return correct paths', () => {
     const result = generateHighLevelTrace({ projectRoot: testRoot });
-    assert.equal(result.jsonPath, join(testRoot, '.claude', 'traces', 'high-level.json'));
-    assert.equal(result.mdPath, join(testRoot, '.claude', 'traces', 'high-level.md'));
+    expect(result.jsonPath).toBe(join(testRoot, '.claude', 'traces', 'high-level.json'));
+    expect(result.mdPath).toBe(join(testRoot, '.claude', 'traces', 'high-level.md'));
   });
 
   it('JSON on disk should validate against schema', () => {
@@ -817,7 +752,7 @@ describe('generateHighLevelTrace (disk write)', () => {
     const raw = readFileSync(join(testRoot, '.claude', 'traces', 'high-level.json'), 'utf-8');
     const parsed = JSON.parse(raw);
     const validation = validateHighLevelTrace(parsed);
-    assert.ok(validation.valid, `On-disk JSON should validate: ${validation.errors.join(', ')}`);
+    expect(validation.valid).toBeTruthy();
   });
 
   it('markdown on disk should contain metadata and module sections', () => {
@@ -827,16 +762,16 @@ describe('generateHighLevelTrace (disk write)', () => {
     const content = readFileSync(join(testRoot, '.claude', 'traces', 'high-level.md'), 'utf-8');
 
     // Metadata
-    assert.ok(content.includes('<!-- trace-id: high-level -->'));
-    assert.ok(content.includes('<!-- trace-version: 1 -->'));
-    assert.ok(content.includes('<!-- generated-by: trace generate -->'));
+    expect(content.includes('<!-- trace-id: high-level -->')).toBeTruthy();
+    expect(content.includes('<!-- trace-version: 1 -->')).toBeTruthy();
+    expect(content.includes('<!-- generated-by: trace generate -->')).toBeTruthy();
 
     // Module sections
-    assert.ok(content.includes('## Module: Dev Team'));
-    assert.ok(content.includes('## Module: QA Team'));
+    expect(content.includes('## Module: Dev Team')).toBeTruthy();
+    expect(content.includes('## Module: QA Team')).toBeTruthy();
 
-    // Pipe-delimited deps
-    assert.ok(content.includes('qa-team | publishes-to | Sends completed work items for QA review'));
+    // String moduleId deps rendered as list
+    expect(content.includes('- qa-team')).toBeTruthy();
   });
 
   it('should overwrite existing files on regeneration', () => {
@@ -844,14 +779,14 @@ describe('generateHighLevelTrace (disk write)', () => {
 
     // Verify version 1
     let raw = readFileSync(join(testRoot, '.claude', 'traces', 'high-level.json'), 'utf-8');
-    assert.equal(JSON.parse(raw).version, 1);
+    expect(JSON.parse(raw).version).toBe(1);
 
     // Regenerate
     generateHighLevelTrace({ projectRoot: testRoot });
 
     // Verify version 2
     raw = readFileSync(join(testRoot, '.claude', 'traces', 'high-level.json'), 'utf-8');
-    assert.equal(JSON.parse(raw).version, 2);
+    expect(JSON.parse(raw).version).toBe(2);
   });
 });
 
@@ -874,7 +809,7 @@ describe('readExistingHighLevelTrace', () => {
 
   it('should return null when file does not exist', () => {
     const result = readExistingHighLevelTrace(testRoot);
-    assert.equal(result, null);
+    expect(result).toBe(null);
   });
 
   it('should return parsed object when file exists', () => {
@@ -885,8 +820,8 @@ describe('readExistingHighLevelTrace', () => {
     );
 
     const result = readExistingHighLevelTrace(testRoot);
-    assert.ok(result);
-    assert.equal(result.version, 1);
+    expect(result).toBeTruthy();
+    expect(result.version).toBe(1);
   });
 
   it('should return null for malformed JSON', () => {
@@ -896,7 +831,7 @@ describe('readExistingHighLevelTrace', () => {
     );
 
     const result = readExistingHighLevelTrace(testRoot);
-    assert.equal(result, null);
+    expect(result).toBe(null);
   });
 });
 
@@ -915,7 +850,7 @@ describe('VALID_RELATIONSHIP_TYPES', () => {
       'writes-to',
       'configures',
     ];
-    assert.deepEqual(VALID_RELATIONSHIP_TYPES, expected);
+    expect(VALID_RELATIONSHIP_TYPES).toEqual(expected);
   });
 });
 
@@ -941,7 +876,7 @@ describe('edge cases', () => {
       projectRoot: '/fake/path',
       existingTrace: null,
     });
-    assert.equal(trace.projectRoot, '.', 'Should default to "." when config has no projectRoot');
+    expect(trace.projectRoot).toBe('.');
   });
 
   it('should handle modules with multiple fileGlobs', () => {
@@ -962,7 +897,7 @@ describe('edge cases', () => {
       projectRoot: '/fake/path',
       existingTrace: null,
     });
-    assert.deepEqual(trace.modules[0].fileGlobs, ['src/a/**', 'src/b/**', 'src/c/**']);
+    expect(trace.modules[0].fileGlobs).toEqual(['src/a/**', 'src/b/**', 'src/c/**']);
   });
 
   it('markdown should render multiple fileGlobs inline', () => {
@@ -983,6 +918,6 @@ describe('edge cases', () => {
       ],
     };
     const md = generateHighLevelTraceMarkdown(trace);
-    assert.ok(md.includes('`src/a/**`, `src/b/**`'), 'Multiple globs should be comma-separated in backticks');
+    expect(md.includes('`src/a/**`, `src/b/**`')).toBeTruthy();
   });
 });

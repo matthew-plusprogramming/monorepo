@@ -10,11 +10,10 @@
  * - Import/export static analysis correctness
  * - Version incrementing per module
  *
- * Run with: node --test .claude/scripts/__tests__/trace-generate.test.mjs
+ * Run with: npx vitest run --config .claude/scripts/vitest.config.mjs .claude/scripts/__tests__/trace-generate.test.mjs
  */
 
-import { describe, it, beforeEach, afterEach } from 'node:test';
-import assert from 'node:assert/strict';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdirSync, writeFileSync, readFileSync, rmSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -137,63 +136,63 @@ module.exports = { loadFile };
 describe('parseImports', () => {
   it('should parse named imports', () => {
     const imports = parseImports(`import { readFileSync, writeFileSync } from 'node:fs';`);
-    assert.equal(imports.length, 1);
-    assert.equal(imports[0].source, 'node:fs');
-    assert.deepEqual(imports[0].symbols, ['readFileSync', 'writeFileSync']);
+    expect(imports.length).toBe(1);
+    expect(imports[0].source).toBe('node:fs');
+    expect(imports[0].symbols).toEqual(['readFileSync', 'writeFileSync']);
   });
 
   it('should parse default imports', () => {
     const imports = parseImports(`import Redis from 'ioredis';`);
-    assert.equal(imports.length, 1);
-    assert.equal(imports[0].source, 'ioredis');
-    assert.deepEqual(imports[0].symbols, ['Redis']);
+    expect(imports.length).toBe(1);
+    expect(imports[0].source).toBe('ioredis');
+    expect(imports[0].symbols).toEqual(['Redis']);
   });
 
   it('should parse namespace imports', () => {
     const imports = parseImports(`import * as utils from './utils.js';`);
-    assert.equal(imports.length, 1);
-    assert.equal(imports[0].source, './utils.js');
-    assert.deepEqual(imports[0].symbols, ['* as utils']);
+    expect(imports.length).toBe(1);
+    expect(imports[0].source).toBe('./utils.js');
+    expect(imports[0].symbols).toEqual(['* as utils']);
   });
 
   it('should parse type imports', () => {
     const imports = parseImports(`import type { Config } from '../types.js';`);
-    assert.equal(imports.length, 1);
-    assert.equal(imports[0].source, '../types.js');
-    assert.deepEqual(imports[0].symbols, ['Config']);
+    expect(imports.length).toBe(1);
+    expect(imports[0].source).toBe('../types.js');
+    expect(imports[0].symbols).toEqual(['Config']);
   });
 
   it('should parse side-effect imports', () => {
     const imports = parseImports(`import './side-effect.js';`);
-    assert.equal(imports.length, 1);
-    assert.equal(imports[0].source, './side-effect.js');
-    assert.deepEqual(imports[0].symbols, []);
+    expect(imports.length).toBe(1);
+    expect(imports[0].source).toBe('./side-effect.js');
+    expect(imports[0].symbols).toEqual([]);
   });
 
   it('should parse require statements', () => {
     const imports = parseImports(`const { readFileSync } = require('node:fs');`);
-    assert.equal(imports.length, 1);
-    assert.equal(imports[0].source, 'node:fs');
-    assert.deepEqual(imports[0].symbols, ['readFileSync']);
+    expect(imports.length).toBe(1);
+    expect(imports[0].source).toBe('node:fs');
+    expect(imports[0].symbols).toEqual(['readFileSync']);
   });
 
   it('should parse default require statements', () => {
     const imports = parseImports(`const path = require('node:path');`);
-    assert.equal(imports.length, 1);
-    assert.equal(imports[0].source, 'node:path');
-    assert.deepEqual(imports[0].symbols, ['path']);
+    expect(imports.length).toBe(1);
+    expect(imports[0].source).toBe('node:path');
+    expect(imports[0].symbols).toEqual(['path']);
   });
 
   it('should parse all imports from sample source', () => {
     const imports = parseImports(SAMPLE_TS_SOURCE);
-    assert.ok(imports.length >= 5, `Expected at least 5 imports, got ${imports.length}`);
+    expect(imports.length >= 5).toBeTruthy();
 
     const sources = imports.map(i => i.source);
-    assert.ok(sources.includes('node:fs'), 'Should include node:fs');
-    assert.ok(sources.includes('node:path'), 'Should include node:path');
-    assert.ok(sources.includes('ioredis'), 'Should include ioredis');
-    assert.ok(sources.includes('./utils.js'), 'Should include ./utils.js');
-    assert.ok(sources.includes('./side-effect.js'), 'Should include ./side-effect.js');
+    expect(sources.includes('node:fs')).toBeTruthy();
+    expect(sources.includes('node:path')).toBeTruthy();
+    expect(sources.includes('ioredis')).toBeTruthy();
+    expect(sources.includes('./utils.js')).toBeTruthy();
+    expect(sources.includes('./side-effect.js')).toBeTruthy();
   });
 
   it('should handle multiline imports', () => {
@@ -203,35 +202,35 @@ describe('parseImports', () => {
   mkdirSync,
 } from 'node:fs';`;
     const imports = parseImports(source);
-    assert.equal(imports.length, 1);
-    assert.equal(imports[0].source, 'node:fs');
-    assert.ok(imports[0].symbols.includes('readFileSync'));
-    assert.ok(imports[0].symbols.includes('writeFileSync'));
-    assert.ok(imports[0].symbols.includes('mkdirSync'));
+    expect(imports.length).toBe(1);
+    expect(imports[0].source).toBe('node:fs');
+    expect(imports[0].symbols.includes('readFileSync')).toBeTruthy();
+    expect(imports[0].symbols.includes('writeFileSync')).toBeTruthy();
+    expect(imports[0].symbols.includes('mkdirSync')).toBeTruthy();
   });
 
   it('should handle aliased imports', () => {
     const imports = parseImports(`import { foo as bar } from './module.js';`);
-    assert.equal(imports.length, 1);
-    assert.deepEqual(imports[0].symbols, ['bar']);
+    expect(imports.length).toBe(1);
+    expect(imports[0].symbols).toEqual(['bar']);
   });
 
   it('should skip comments', () => {
     const source = `// import { fake } from 'fake';
 import { real } from 'real';`;
     const imports = parseImports(source);
-    assert.equal(imports.length, 1);
-    assert.equal(imports[0].source, 'real');
+    expect(imports.length).toBe(1);
+    expect(imports[0].source).toBe('real');
   });
 
   it('should handle empty source', () => {
     const imports = parseImports('');
-    assert.equal(imports.length, 0);
+    expect(imports.length).toBe(0);
   });
 
   it('should handle source with no imports', () => {
     const imports = parseImports('const x = 1;\nfunction foo() { return x; }');
-    assert.equal(imports.length, 0);
+    expect(imports.length).toBe(0);
   });
 });
 
@@ -242,100 +241,100 @@ import { real } from 'real';`;
 describe('parseExports', () => {
   it('should parse exported functions', () => {
     const exports = parseExports(`export function createService() {}`);
-    assert.equal(exports.length, 1);
-    assert.equal(exports[0].symbol, 'createService');
-    assert.equal(exports[0].type, 'function');
+    expect(exports.length).toBe(1);
+    expect(exports[0].symbol).toBe('createService');
+    expect(exports[0].type).toBe('function');
   });
 
   it('should parse exported async functions', () => {
     const exports = parseExports(`export async function fetchData() {}`);
-    assert.equal(exports.length, 1);
-    assert.equal(exports[0].symbol, 'fetchData');
-    assert.equal(exports[0].type, 'function');
+    expect(exports.length).toBe(1);
+    expect(exports[0].symbol).toBe('fetchData');
+    expect(exports[0].type).toBe('function');
   });
 
   it('should parse exported classes', () => {
     const exports = parseExports(`export class AlertService {}`);
-    assert.equal(exports.length, 1);
-    assert.equal(exports[0].symbol, 'AlertService');
-    assert.equal(exports[0].type, 'class');
+    expect(exports.length).toBe(1);
+    expect(exports[0].symbol).toBe('AlertService');
+    expect(exports[0].type).toBe('class');
   });
 
   it('should parse exported interfaces', () => {
     const exports = parseExports(`export interface AlertPayload { id: string; }`);
-    assert.equal(exports.length, 1);
-    assert.equal(exports[0].symbol, 'AlertPayload');
-    assert.equal(exports[0].type, 'interface');
+    expect(exports.length).toBe(1);
+    expect(exports[0].symbol).toBe('AlertPayload');
+    expect(exports[0].type).toBe('interface');
   });
 
   it('should parse exported types', () => {
     const exports = parseExports(`export type AlertSeverity = 'warning' | 'critical';`);
-    assert.equal(exports.length, 1);
-    assert.equal(exports[0].symbol, 'AlertSeverity');
-    assert.equal(exports[0].type, 'type');
+    expect(exports.length).toBe(1);
+    expect(exports[0].symbol).toBe('AlertSeverity');
+    expect(exports[0].type).toBe('type');
   });
 
   it('should parse exported consts', () => {
     const exports = parseExports(`export const DEFAULT_TIMEOUT = 30000;`);
-    assert.equal(exports.length, 1);
-    assert.equal(exports[0].symbol, 'DEFAULT_TIMEOUT');
-    assert.equal(exports[0].type, 'const');
+    expect(exports.length).toBe(1);
+    expect(exports[0].symbol).toBe('DEFAULT_TIMEOUT');
+    expect(exports[0].type).toBe('const');
   });
 
   it('should parse export default', () => {
     const exports = parseExports(`export default AlertService;`);
-    assert.equal(exports.length, 1);
-    assert.equal(exports[0].type, 'default');
+    expect(exports.length).toBe(1);
+    expect(exports[0].type).toBe('default');
   });
 
   it('should parse re-exports from other modules', () => {
     const exports = parseExports(`export { AlertService, createAlertService } from './alert-service.js';`);
-    assert.ok(exports.length >= 2);
+    expect(exports.length >= 2).toBeTruthy();
     const symbols = exports.map(e => e.symbol);
-    assert.ok(symbols.includes('AlertService'));
-    assert.ok(symbols.includes('createAlertService'));
+    expect(symbols.includes('AlertService')).toBeTruthy();
+    expect(symbols.includes('createAlertService')).toBeTruthy();
   });
 
   it('should parse type re-exports', () => {
     const exports = parseExports(`export type { AlertSeverity, AlertPayload } from './alert-service.js';`);
-    assert.ok(exports.length >= 2);
+    expect(exports.length >= 2).toBeTruthy();
     const symbols = exports.map(e => e.symbol);
-    assert.ok(symbols.includes('AlertSeverity'));
-    assert.ok(symbols.includes('AlertPayload'));
+    expect(symbols.includes('AlertSeverity')).toBeTruthy();
+    expect(symbols.includes('AlertPayload')).toBeTruthy();
     // Type re-exports should have type 'type'
-    assert.equal(exports.find(e => e.symbol === 'AlertSeverity').type, 'type');
+    expect(exports.find(e => e.symbol === 'AlertSeverity').type).toBe('type');
   });
 
   it('should parse all exports from sample source', () => {
     const exports = parseExports(SAMPLE_TS_SOURCE);
     const symbols = exports.map(e => e.symbol);
 
-    assert.ok(symbols.includes('AlertSeverity'), 'Should export AlertSeverity type');
-    assert.ok(symbols.includes('AlertPayload'), 'Should export AlertPayload interface');
-    assert.ok(symbols.includes('AlertService'), 'Should export AlertService class');
-    assert.ok(symbols.includes('createAlertService'), 'Should export createAlertService function');
-    assert.ok(symbols.includes('DEFAULT_TIMEOUT'), 'Should export DEFAULT_TIMEOUT const');
+    expect(symbols.includes('AlertSeverity')).toBeTruthy();
+    expect(symbols.includes('AlertPayload')).toBeTruthy();
+    expect(symbols.includes('AlertService')).toBeTruthy();
+    expect(symbols.includes('createAlertService')).toBeTruthy();
+    expect(symbols.includes('DEFAULT_TIMEOUT')).toBeTruthy();
   });
 
   it('should parse index.ts re-exports', () => {
     const exports = parseExports(SAMPLE_INDEX_SOURCE);
     const symbols = exports.map(e => e.symbol);
 
-    assert.ok(symbols.includes('AlertSeverity'), 'Should re-export AlertSeverity');
-    assert.ok(symbols.includes('AlertPayload'), 'Should re-export AlertPayload');
-    assert.ok(symbols.includes('AlertService'), 'Should re-export AlertService');
-    assert.ok(symbols.includes('createAlertService'), 'Should re-export createAlertService');
-    assert.ok(symbols.includes('NotificationService'), 'Should re-export NotificationService');
+    expect(symbols.includes('AlertSeverity')).toBeTruthy();
+    expect(symbols.includes('AlertPayload')).toBeTruthy();
+    expect(symbols.includes('AlertService')).toBeTruthy();
+    expect(symbols.includes('createAlertService')).toBeTruthy();
+    expect(symbols.includes('NotificationService')).toBeTruthy();
   });
 
   it('should handle empty source', () => {
     const exports = parseExports('');
-    assert.equal(exports.length, 0);
+    expect(exports.length).toBe(0);
   });
 
   it('should handle source with no exports', () => {
     const exports = parseExports('const x = 1;\nfunction foo() { return x; }');
-    assert.equal(exports.length, 0);
+    expect(exports.length).toBe(0);
   });
 
   it('should not duplicate exports', () => {
@@ -343,22 +342,22 @@ describe('parseExports', () => {
 export { Foo };`;
     const exports = parseExports(source);
     const fooExports = exports.filter(e => e.symbol === 'Foo');
-    assert.equal(fooExports.length, 1, 'Should not duplicate Foo');
+    expect(fooExports.length).toBe(1);
   });
 
   it('should parse exported enums', () => {
     const exports = parseExports(`export enum Status { Active, Inactive }`);
-    assert.equal(exports.length, 1);
-    assert.equal(exports[0].symbol, 'Status');
-    assert.equal(exports[0].type, 'enum');
+    expect(exports.length).toBe(1);
+    expect(exports[0].symbol).toBe('Status');
+    expect(exports[0].type).toBe('enum');
   });
 
   it('should parse exported const with z.enum pattern', () => {
     const source = `export const GateExecutionType = z.enum(['deterministic', 'agentic']);`;
     const exports = parseExports(source);
-    assert.equal(exports.length, 1);
-    assert.equal(exports[0].symbol, 'GateExecutionType');
-    assert.equal(exports[0].type, 'const');
+    expect(exports.length).toBe(1);
+    expect(exports[0].symbol).toBe('GateExecutionType');
+    expect(exports[0].type).toBe('const');
   });
 });
 
@@ -389,13 +388,13 @@ describe('analyzeFile', () => {
     writeFileSync(join(testRoot, filePath), SAMPLE_TS_SOURCE);
 
     const result = analyzeFile(filePath, testRoot);
-    assert.equal(result.filePath, filePath);
-    assert.ok(result.exports.length > 0, 'Should have exports');
-    assert.ok(result.imports.length > 0, 'Should have imports');
-    assert.ok(Array.isArray(result.calls), 'calls should be an array');
-    assert.ok(Array.isArray(result.events), 'events should be an array');
-    assert.equal(result.calls.length, 0, 'v1: calls should be empty');
-    assert.equal(result.events.length, 0, 'v1: events should be empty');
+    expect(result.filePath).toBe(filePath);
+    expect(result.exports.length > 0).toBeTruthy();
+    expect(result.imports.length > 0).toBeTruthy();
+    expect(Array.isArray(result.calls)).toBeTruthy();
+    expect(Array.isArray(result.events)).toBeTruthy();
+    expect(result.calls.length).toBe(0);
+    expect(result.events.length).toBe(0);
   });
 
   it('should return empty arrays for non-TS/JS files', () => {
@@ -403,18 +402,18 @@ describe('analyzeFile', () => {
     writeFileSync(join(testRoot, filePath), '# Hello');
 
     const result = analyzeFile(filePath, testRoot);
-    assert.equal(result.filePath, filePath);
-    assert.equal(result.exports.length, 0);
-    assert.equal(result.imports.length, 0);
-    assert.equal(result.calls.length, 0);
-    assert.equal(result.events.length, 0);
+    expect(result.filePath).toBe(filePath);
+    expect(result.exports.length).toBe(0);
+    expect(result.imports.length).toBe(0);
+    expect(result.calls.length).toBe(0);
+    expect(result.events.length).toBe(0);
   });
 
   it('should return empty arrays for missing files', () => {
     const result = analyzeFile('src/test-module/nonexistent.ts', testRoot);
-    assert.equal(result.filePath, 'src/test-module/nonexistent.ts');
-    assert.equal(result.exports.length, 0);
-    assert.equal(result.imports.length, 0);
+    expect(result.filePath).toBe('src/test-module/nonexistent.ts');
+    expect(result.exports.length).toBe(0);
+    expect(result.imports.length).toBe(0);
   });
 
   it('should handle .mjs files', () => {
@@ -422,8 +421,8 @@ describe('analyzeFile', () => {
     writeFileSync(join(testRoot, filePath), SAMPLE_MJS_SOURCE);
 
     const result = analyzeFile(filePath, testRoot);
-    assert.ok(result.exports.length > 0, 'Should have exports');
-    assert.ok(result.imports.length > 0, 'Should have imports');
+    expect(result.exports.length > 0).toBeTruthy();
+    expect(result.imports.length > 0).toBeTruthy();
   });
 });
 
@@ -450,8 +449,8 @@ describe('validateLowLevelTrace (AC-3.1)', () => {
     };
 
     const result = validateLowLevelTrace(trace);
-    assert.equal(result.valid, true, `Expected valid, got errors: ${result.errors.join(', ')}`);
-    assert.equal(result.errors.length, 0);
+    expect(result.valid).toBe(true);
+    expect(result.errors.length).toBe(0);
   });
 
   it('should reject trace with missing moduleId', () => {
@@ -463,8 +462,8 @@ describe('validateLowLevelTrace (AC-3.1)', () => {
     };
 
     const result = validateLowLevelTrace(trace);
-    assert.equal(result.valid, false);
-    assert.ok(result.errors.some(e => e.includes('moduleId')));
+    expect(result.valid).toBe(false);
+    expect(result.errors.some(e => e.includes('moduleId'))).toBeTruthy();
   });
 
   it('should reject trace with missing version', () => {
@@ -476,8 +475,8 @@ describe('validateLowLevelTrace (AC-3.1)', () => {
     };
 
     const result = validateLowLevelTrace(trace);
-    assert.equal(result.valid, false);
-    assert.ok(result.errors.some(e => e.includes('version')));
+    expect(result.valid).toBe(false);
+    expect(result.errors.some(e => e.includes('version'))).toBeTruthy();
   });
 
   it('should reject trace with invalid lastGenerated', () => {
@@ -490,8 +489,8 @@ describe('validateLowLevelTrace (AC-3.1)', () => {
     };
 
     const result = validateLowLevelTrace(trace);
-    assert.equal(result.valid, false);
-    assert.ok(result.errors.some(e => e.includes('lastGenerated')));
+    expect(result.valid).toBe(false);
+    expect(result.errors.some(e => e.includes('lastGenerated'))).toBeTruthy();
   });
 
   it('should reject trace with missing files array', () => {
@@ -503,8 +502,8 @@ describe('validateLowLevelTrace (AC-3.1)', () => {
     };
 
     const result = validateLowLevelTrace(trace);
-    assert.equal(result.valid, false);
-    assert.ok(result.errors.some(e => e.includes('files')));
+    expect(result.valid).toBe(false);
+    expect(result.errors.some(e => e.includes('files'))).toBeTruthy();
   });
 
   it('should reject file entry with missing filePath', () => {
@@ -524,8 +523,8 @@ describe('validateLowLevelTrace (AC-3.1)', () => {
     };
 
     const result = validateLowLevelTrace(trace);
-    assert.equal(result.valid, false);
-    assert.ok(result.errors.some(e => e.includes('filePath')));
+    expect(result.valid).toBe(false);
+    expect(result.errors.some(e => e.includes('filePath'))).toBeTruthy();
   });
 
   it('should reject invalid export type', () => {
@@ -546,8 +545,8 @@ describe('validateLowLevelTrace (AC-3.1)', () => {
     };
 
     const result = validateLowLevelTrace(trace);
-    assert.equal(result.valid, false);
-    assert.ok(result.errors.some(e => e.includes('type must be one of')));
+    expect(result.valid).toBe(false);
+    expect(result.errors.some(e => e.includes('type must be one of'))).toBeTruthy();
   });
 
   it('should validate trace with empty files array', () => {
@@ -560,7 +559,7 @@ describe('validateLowLevelTrace (AC-3.1)', () => {
     };
 
     const result = validateLowLevelTrace(trace);
-    assert.equal(result.valid, true);
+    expect(result.valid).toBe(true);
   });
 });
 
@@ -602,11 +601,7 @@ describe('generateLowLevelTrace', () => {
 
     const trace = generateLowLevelTrace(config.modules[0], config, testRoot);
     const validation = validateLowLevelTrace(trace);
-    assert.equal(
-      validation.valid,
-      true,
-      `Schema validation failed: ${validation.errors.join(', ')}`,
-    );
+    expect(validation.valid).toBe(true);
   });
 
   it('AC-3.1: trace has all required top-level fields', () => {
@@ -617,13 +612,13 @@ describe('generateLowLevelTrace', () => {
 
     const trace = generateLowLevelTrace(config.modules[0], config, testRoot);
 
-    assert.equal(trace.moduleId, 'test-module');
-    assert.equal(typeof trace.version, 'number');
-    assert.ok(Number.isInteger(trace.version));
-    assert.equal(typeof trace.lastGenerated, 'string');
-    assert.ok(!Number.isNaN(new Date(trace.lastGenerated).getTime()), 'lastGenerated should be valid date');
-    assert.equal(trace.generatedBy, 'trace-generate');
-    assert.ok(Array.isArray(trace.files));
+    expect(trace.moduleId).toBe('test-module');
+    expect(typeof trace.version).toBe('number');
+    expect(Number.isInteger(trace.version)).toBeTruthy();
+    expect(typeof trace.lastGenerated).toBe('string');
+    expect(!Number.isNaN(new Date(trace.lastGenerated).getTime())).toBeTruthy();
+    expect(trace.generatedBy).toBe('trace-generate');
+    expect(Array.isArray(trace.files)).toBeTruthy();
   });
 
   it('AC-3.3: each file matching module glob has an entry', () => {
@@ -637,10 +632,10 @@ describe('generateLowLevelTrace', () => {
     const trace = generateLowLevelTrace(config.modules[0], config, testRoot);
     const filePaths = trace.files.map(f => f.filePath);
 
-    assert.ok(filePaths.includes('src/test-module/service.ts'), 'Should include service.ts');
-    assert.ok(filePaths.includes('src/test-module/index.ts'), 'Should include index.ts');
-    assert.ok(filePaths.includes('src/test-module/utils.mjs'), 'Should include utils.mjs');
-    assert.equal(trace.files.length, 3, 'Should have exactly 3 file entries');
+    expect(filePaths.includes('src/test-module/service.ts')).toBeTruthy();
+    expect(filePaths.includes('src/test-module/index.ts')).toBeTruthy();
+    expect(filePaths.includes('src/test-module/utils.mjs')).toBeTruthy();
+    expect(trace.files.length).toBe(3);
   });
 
   it('AC-3.3: files in other modules are not included', () => {
@@ -653,8 +648,8 @@ describe('generateLowLevelTrace', () => {
     const trace = generateLowLevelTrace(config.modules[0], config, testRoot);
     const filePaths = trace.files.map(f => f.filePath);
 
-    assert.ok(filePaths.includes('src/test-module/service.ts'));
-    assert.ok(!filePaths.includes('src/other/other.ts'), 'Should NOT include files from other module');
+    expect(filePaths.includes('src/test-module/service.ts')).toBeTruthy();
+    expect(!filePaths.includes('src/other/other.ts')).toBeTruthy();
   });
 
   it('should increment version on subsequent generations', () => {
@@ -665,7 +660,7 @@ describe('generateLowLevelTrace', () => {
 
     // First generation
     const trace1 = generateLowLevelTrace(config.modules[0], config, testRoot);
-    assert.equal(trace1.version, 1);
+    expect(trace1.version).toBe(1);
 
     // Write first trace so version can be read
     const tracePath = join(testRoot, '.claude', 'traces', 'low-level', 'test-module.json');
@@ -673,7 +668,7 @@ describe('generateLowLevelTrace', () => {
 
     // Second generation
     const trace2 = generateLowLevelTrace(config.modules[0], config, testRoot);
-    assert.equal(trace2.version, 2, 'Version should increment');
+    expect(trace2.version).toBe(2);
   });
 
   it('should handle module with no matching files', () => {
@@ -682,9 +677,9 @@ describe('generateLowLevelTrace', () => {
     execSync('git init', { cwd: testRoot });
 
     const trace = generateLowLevelTrace(config.modules[0], config, testRoot);
-    assert.equal(trace.files.length, 0, 'Should have no file entries');
-    assert.equal(trace.moduleId, 'test-module');
-    assert.equal(trace.version, 1);
+    expect(trace.files.length).toBe(0);
+    expect(trace.moduleId).toBe('test-module');
+    expect(trace.version).toBe(1);
   });
 
   it('file entries include correct import analysis', () => {
@@ -695,12 +690,12 @@ describe('generateLowLevelTrace', () => {
 
     const trace = generateLowLevelTrace(config.modules[0], config, testRoot);
     const serviceEntry = trace.files.find(f => f.filePath === 'src/test-module/service.ts');
-    assert.ok(serviceEntry, 'Should have entry for service.ts');
+    expect(serviceEntry).toBeTruthy();
 
     // Verify imports
     const importSources = serviceEntry.imports.map(i => i.source);
-    assert.ok(importSources.includes('node:fs'), 'Should import from node:fs');
-    assert.ok(importSources.includes('ioredis'), 'Should import from ioredis');
+    expect(importSources.includes('node:fs')).toBeTruthy();
+    expect(importSources.includes('ioredis')).toBeTruthy();
   });
 
   it('file entries include correct export analysis', () => {
@@ -711,11 +706,11 @@ describe('generateLowLevelTrace', () => {
 
     const trace = generateLowLevelTrace(config.modules[0], config, testRoot);
     const serviceEntry = trace.files.find(f => f.filePath === 'src/test-module/service.ts');
-    assert.ok(serviceEntry, 'Should have entry for service.ts');
+    expect(serviceEntry).toBeTruthy();
 
     const exportSymbols = serviceEntry.exports.map(e => e.symbol);
-    assert.ok(exportSymbols.includes('AlertService'), 'Should export AlertService');
-    assert.ok(exportSymbols.includes('createAlertService'), 'Should export createAlertService');
+    expect(exportSymbols.includes('AlertService')).toBeTruthy();
+    expect(exportSymbols.includes('createAlertService')).toBeTruthy();
   });
 });
 
@@ -735,10 +730,10 @@ describe('generateLowLevelMarkdown (AC-3.2)', () => {
 
     const md = generateLowLevelMarkdown(trace, { id: 'test-module', name: 'Test Module' });
 
-    assert.ok(md.includes('<!-- trace-id: test-module -->'), 'Should have trace-id metadata');
-    assert.ok(md.includes('<!-- trace-version: 3 -->'), 'Should have trace-version metadata');
-    assert.ok(md.includes('<!-- last-generated: 2026-02-22T10:30:00.000Z -->'), 'Should have last-generated metadata');
-    assert.ok(md.includes('<!-- generated-by: trace-generate -->'), 'Should have generated-by metadata');
+    expect(md.includes('<!-- trace-id: test-module -->')).toBeTruthy();
+    expect(md.includes('<!-- trace-version: 3 -->')).toBeTruthy();
+    expect(md.includes('<!-- last-generated: 2026-02-22T10:30:00.000Z -->')).toBeTruthy();
+    expect(md.includes('<!-- generated-by: trace-generate -->')).toBeTruthy();
   });
 
   it('should include module heading', () => {
@@ -751,7 +746,7 @@ describe('generateLowLevelMarkdown (AC-3.2)', () => {
     };
 
     const md = generateLowLevelMarkdown(trace, { id: 'test-module', name: 'Test Module' });
-    assert.ok(md.includes('# Low-Level Trace: Test Module'), 'Should have module heading');
+    expect(md.includes('# Low-Level Trace: Test Module')).toBeTruthy();
   });
 
   it('should include file sections with pipe-delimited exports', () => {
@@ -779,24 +774,24 @@ describe('generateLowLevelMarkdown (AC-3.2)', () => {
     const md = generateLowLevelMarkdown(trace, { id: 'test-module', name: 'Test Module' });
 
     // File heading
-    assert.ok(md.includes('## File: src/test-module/service.ts'), 'Should have file heading');
+    expect(md.includes('## File: src/test-module/service.ts')).toBeTruthy();
 
     // Exports section with pipe-delimited format
-    assert.ok(md.includes('### Exports'), 'Should have Exports section');
-    assert.ok(md.includes('symbol | type'), 'Should have exports header');
-    assert.ok(md.includes('AlertService | class'), 'Should have AlertService export');
-    assert.ok(md.includes('createAlertService | function'), 'Should have createAlertService export');
+    expect(md.includes('### Exports')).toBeTruthy();
+    expect(md.includes('symbol | type')).toBeTruthy();
+    expect(md.includes('AlertService | class')).toBeTruthy();
+    expect(md.includes('createAlertService | function')).toBeTruthy();
 
     // Imports section with pipe-delimited format
-    assert.ok(md.includes('### Imports'), 'Should have Imports section');
-    assert.ok(md.includes('source | symbols'), 'Should have imports header');
-    assert.ok(md.includes('node:fs | readFileSync'), 'Should have node:fs import');
+    expect(md.includes('### Imports')).toBeTruthy();
+    expect(md.includes('source | symbols')).toBeTruthy();
+    expect(md.includes('node:fs | readFileSync')).toBeTruthy();
 
     // Function Calls section
-    assert.ok(md.includes('### Function Calls'), 'Should have Function Calls section');
+    expect(md.includes('### Function Calls')).toBeTruthy();
 
     // Events section
-    assert.ok(md.includes('### Events'), 'Should have Events section');
+    expect(md.includes('### Events')).toBeTruthy();
   });
 
   it('should show empty section markers for files with no exports', () => {
@@ -817,8 +812,8 @@ describe('generateLowLevelMarkdown (AC-3.2)', () => {
     };
 
     const md = generateLowLevelMarkdown(trace, { id: 'test-module', name: 'Test Module' });
-    assert.ok(md.includes('_No exports_'), 'Should show no-exports marker');
-    assert.ok(md.includes('_No imports_'), 'Should show no-imports marker');
+    expect(md.includes('_No exports_')).toBeTruthy();
+    expect(md.includes('_No imports_')).toBeTruthy();
   });
 
   it('should include Notes (not synced) section', () => {
@@ -831,7 +826,7 @@ describe('generateLowLevelMarkdown (AC-3.2)', () => {
     };
 
     const md = generateLowLevelMarkdown(trace, { id: 'test-module', name: 'Test Module' });
-    assert.ok(md.includes('## Notes (not synced)'), 'Should have Notes section');
+    expect(md.includes('## Notes (not synced)')).toBeTruthy();
   });
 
   it('should show side-effect imports correctly', () => {
@@ -852,7 +847,7 @@ describe('generateLowLevelMarkdown (AC-3.2)', () => {
     };
 
     const md = generateLowLevelMarkdown(trace, { id: 'test-module', name: 'Test Module' });
-    assert.ok(md.includes('./polyfill.js | (side-effect)'), 'Should show side-effect import');
+    expect(md.includes('./polyfill.js | (side-effect)')).toBeTruthy();
   });
 
   it('should include events when present', () => {
@@ -876,9 +871,9 @@ describe('generateLowLevelMarkdown (AC-3.2)', () => {
     };
 
     const md = generateLowLevelMarkdown(trace, { id: 'test-module', name: 'Test Module' });
-    assert.ok(md.includes('type | event-name | channel'), 'Should have events header');
-    assert.ok(md.includes('publish | work.completed | dev-team-output'), 'Should have publish event');
-    assert.ok(md.includes('subscribe | work.assigned | triage-output'), 'Should have subscribe event');
+    expect(md.includes('type | event-name | channel')).toBeTruthy();
+    expect(md.includes('publish | work.completed | dev-team-output')).toBeTruthy();
+    expect(md.includes('subscribe | work.assigned | triage-output')).toBeTruthy();
   });
 
   it('should include function calls when present', () => {
@@ -901,8 +896,8 @@ describe('generateLowLevelMarkdown (AC-3.2)', () => {
     };
 
     const md = generateLowLevelMarkdown(trace, { id: 'test-module', name: 'Test Module' });
-    assert.ok(md.includes('target | function | context'), 'Should have calls header');
-    assert.ok(md.includes('knowledge-team/service.py | query_knowledge | processItem'), 'Should have call entry');
+    expect(md.includes('target | function | context')).toBeTruthy();
+    expect(md.includes('knowledge-team/service.py | query_knowledge | processItem')).toBeTruthy();
   });
 });
 
@@ -943,20 +938,20 @@ describe('writeLowLevelTrace', () => {
 
     // Check JSON file exists and is valid
     const jsonPath = join(testRoot, '.claude', 'traces', 'low-level', 'test-module.json');
-    assert.ok(existsSync(jsonPath), 'JSON file should exist');
+    expect(existsSync(jsonPath)).toBeTruthy();
     const jsonContent = JSON.parse(readFileSync(jsonPath, 'utf-8'));
-    assert.equal(jsonContent.moduleId, 'test-module');
+    expect(jsonContent.moduleId).toBe('test-module');
 
     // Check markdown file exists
     const mdPath = join(testRoot, '.claude', 'traces', 'low-level', 'test-module.md');
-    assert.ok(existsSync(mdPath), 'Markdown file should exist');
+    expect(existsSync(mdPath)).toBeTruthy();
     const mdContent = readFileSync(mdPath, 'utf-8');
-    assert.ok(mdContent.includes('# Low-Level Trace: Test Module'));
+    expect(mdContent.includes('# Low-Level Trace: Test Module')).toBeTruthy();
 
     // Check result
-    assert.equal(result.moduleId, 'test-module');
-    assert.equal(result.fileCount, 1);
-    assert.equal(result.version, 1);
+    expect(result.moduleId).toBe('test-module');
+    expect(result.fileCount).toBe(1);
+    expect(result.version).toBe(1);
   });
 
   it('should create low-level directory if it does not exist', () => {
@@ -971,7 +966,7 @@ describe('writeLowLevelTrace', () => {
     writeLowLevelTrace(config.modules[0], config, testRoot);
 
     const jsonPath = join(testRoot, '.claude', 'traces', 'low-level', 'test-module.json');
-    assert.ok(existsSync(jsonPath), 'Should create directory and write file');
+    expect(existsSync(jsonPath)).toBeTruthy();
   });
 
   it('written JSON should validate against schema', () => {
@@ -986,11 +981,7 @@ describe('writeLowLevelTrace', () => {
     const jsonPath = join(testRoot, '.claude', 'traces', 'low-level', 'test-module.json');
     const trace = JSON.parse(readFileSync(jsonPath, 'utf-8'));
     const validation = validateLowLevelTrace(trace);
-    assert.equal(
-      validation.valid,
-      true,
-      `Written JSON failed schema validation: ${validation.errors.join(', ')}`,
-    );
+    expect(validation.valid).toBe(true);
   });
 });
 
@@ -1037,16 +1028,16 @@ describe('generateAllLowLevelTraces', () => {
 
     const result = generateAllLowLevelTraces(undefined, testRoot);
 
-    assert.equal(result.modulesProcessed, 2, 'Should process both modules');
-    assert.equal(result.results.length, 2);
-    assert.ok(result.results.some(r => r.moduleId === 'test-module'));
-    assert.ok(result.results.some(r => r.moduleId === 'other-module'));
+    expect(result.modulesProcessed).toBe(2);
+    expect(result.results.length).toBe(2);
+    expect(result.results.some(r => r.moduleId === 'test-module')).toBeTruthy();
+    expect(result.results.some(r => r.moduleId === 'other-module')).toBeTruthy();
 
     // Verify files were written
-    assert.ok(existsSync(join(testRoot, '.claude', 'traces', 'low-level', 'test-module.json')));
-    assert.ok(existsSync(join(testRoot, '.claude', 'traces', 'low-level', 'test-module.md')));
-    assert.ok(existsSync(join(testRoot, '.claude', 'traces', 'low-level', 'other-module.json')));
-    assert.ok(existsSync(join(testRoot, '.claude', 'traces', 'low-level', 'other-module.md')));
+    expect(existsSync(join(testRoot, '.claude', 'traces', 'low-level', 'test-module.json'))).toBeTruthy();
+    expect(existsSync(join(testRoot, '.claude', 'traces', 'low-level', 'test-module.md'))).toBeTruthy();
+    expect(existsSync(join(testRoot, '.claude', 'traces', 'low-level', 'other-module.json'))).toBeTruthy();
+    expect(existsSync(join(testRoot, '.claude', 'traces', 'low-level', 'other-module.md'))).toBeTruthy();
   });
 
   it('should generate trace for a single targeted module', () => {
@@ -1057,20 +1048,17 @@ describe('generateAllLowLevelTraces', () => {
 
     const result = generateAllLowLevelTraces('test-module', testRoot);
 
-    assert.equal(result.modulesProcessed, 1, 'Should process only targeted module');
-    assert.equal(result.results.length, 1);
-    assert.equal(result.results[0].moduleId, 'test-module');
+    expect(result.modulesProcessed).toBe(1);
+    expect(result.results.length).toBe(1);
+    expect(result.results[0].moduleId).toBe('test-module');
 
     // Only targeted module should have files written
-    assert.ok(existsSync(join(testRoot, '.claude', 'traces', 'low-level', 'test-module.json')));
-    assert.ok(!existsSync(join(testRoot, '.claude', 'traces', 'low-level', 'other-module.json')));
+    expect(existsSync(join(testRoot, '.claude', 'traces', 'low-level', 'test-module.json'))).toBeTruthy();
+    expect(!existsSync(join(testRoot, '.claude', 'traces', 'low-level', 'other-module.json'))).toBeTruthy();
   });
 
   it('should throw for unknown target module', () => {
-    assert.throws(
-      () => generateAllLowLevelTraces('nonexistent-module', testRoot),
-      /Module "nonexistent-module" not found/,
-    );
+    expect(() => generateAllLowLevelTraces('nonexistent-module', testRoot)).toThrow(/Module "nonexistent-module" not found/);
   });
 });
 
@@ -1119,56 +1107,52 @@ describe('full round-trip: generate, validate, verify markdown', () => {
 
     // Generate
     const genResult = generateAllLowLevelTraces('test-module', testRoot);
-    assert.equal(genResult.modulesProcessed, 1);
+    expect(genResult.modulesProcessed).toBe(1);
 
     // Read and validate JSON
     const jsonPath = join(testRoot, '.claude', 'traces', 'low-level', 'test-module.json');
     const trace = JSON.parse(readFileSync(jsonPath, 'utf-8'));
     const validation = validateLowLevelTrace(trace);
-    assert.equal(
-      validation.valid,
-      true,
-      `JSON validation failed: ${validation.errors.join(', ')}`,
-    );
+    expect(validation.valid).toBe(true);
 
     // Verify all 4 files are present (AC-3.3)
-    assert.equal(trace.files.length, 4, 'All 4 files should be in trace');
+    expect(trace.files.length).toBe(4);
     const filePaths = trace.files.map(f => f.filePath).sort();
-    assert.ok(filePaths.includes('src/test-module/README.md'));
-    assert.ok(filePaths.includes('src/test-module/index.ts'));
-    assert.ok(filePaths.includes('src/test-module/nested/helper.mjs'));
-    assert.ok(filePaths.includes('src/test-module/service.ts'));
+    expect(filePaths.includes('src/test-module/README.md')).toBeTruthy();
+    expect(filePaths.includes('src/test-module/index.ts')).toBeTruthy();
+    expect(filePaths.includes('src/test-module/nested/helper.mjs')).toBeTruthy();
+    expect(filePaths.includes('src/test-module/service.ts')).toBeTruthy();
 
     // Read and validate markdown structure
     const mdPath = join(testRoot, '.claude', 'traces', 'low-level', 'test-module.md');
     const md = readFileSync(mdPath, 'utf-8');
 
     // AC-3.2: HTML comment metadata
-    assert.ok(md.includes('<!-- trace-id: test-module -->'));
-    assert.ok(md.includes('<!-- trace-version: 1 -->'));
-    assert.ok(md.includes('<!-- generated-by: trace-generate -->'));
+    expect(md.includes('<!-- trace-id: test-module -->')).toBeTruthy();
+    expect(md.includes('<!-- trace-version: 1 -->')).toBeTruthy();
+    expect(md.includes('<!-- generated-by: trace-generate -->')).toBeTruthy();
 
     // AC-3.2: File sections exist
-    assert.ok(md.includes('## File: src/test-module/service.ts'));
-    assert.ok(md.includes('## File: src/test-module/index.ts'));
-    assert.ok(md.includes('## File: src/test-module/nested/helper.mjs'));
-    assert.ok(md.includes('## File: src/test-module/README.md'));
+    expect(md.includes('## File: src/test-module/service.ts')).toBeTruthy();
+    expect(md.includes('## File: src/test-module/index.ts')).toBeTruthy();
+    expect(md.includes('## File: src/test-module/nested/helper.mjs')).toBeTruthy();
+    expect(md.includes('## File: src/test-module/README.md')).toBeTruthy();
 
     // AC-3.2: Structured sections with pipe-delimited format
-    assert.ok(md.includes('### Exports'));
-    assert.ok(md.includes('### Imports'));
-    assert.ok(md.includes('### Function Calls'));
-    assert.ok(md.includes('### Events'));
-    assert.ok(md.includes('symbol | type'));
-    assert.ok(md.includes('source | symbols'));
+    expect(md.includes('### Exports')).toBeTruthy();
+    expect(md.includes('### Imports')).toBeTruthy();
+    expect(md.includes('### Function Calls')).toBeTruthy();
+    expect(md.includes('### Events')).toBeTruthy();
+    expect(md.includes('symbol | type')).toBeTruthy();
+    expect(md.includes('source | symbols')).toBeTruthy();
 
     // Verify service.ts has real content
-    assert.ok(md.includes('AlertService | class'));
-    assert.ok(md.includes('createAlertService | function'));
-    assert.ok(md.includes('node:fs | readFileSync, writeFileSync'));
+    expect(md.includes('AlertService | class')).toBeTruthy();
+    expect(md.includes('createAlertService | function')).toBeTruthy();
+    expect(md.includes('node:fs | readFileSync, writeFileSync')).toBeTruthy();
 
     // Verify README.md has empty sections
     // (it will have _No exports_ etc since it's not TS/JS)
-    assert.ok(md.includes('_No exports_'));
+    expect(md.includes('_No exports_')).toBeTruthy();
   });
 });

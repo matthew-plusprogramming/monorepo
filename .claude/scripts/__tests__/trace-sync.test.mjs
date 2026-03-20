@@ -4,11 +4,10 @@
  * Tests: as-011-trace-sync-core (AC-10.1, AC-10.2, AC-10.4)
  *         as-012-trace-sync-conflicts (AC-10.3, AC-10.5)
  *
- * Run with: node --test .claude/scripts/__tests__/trace-sync.test.mjs
+ * Run with: npx vitest run --config .claude/scripts/vitest.config.mjs trace-sync.test.mjs
  */
 
-import { describe, it, beforeEach, afterEach } from 'node:test';
-import assert from 'node:assert/strict';
+import { describe, it, beforeEach, afterEach, expect } from 'vitest';
 import { mkdirSync, writeFileSync, readFileSync, rmSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -215,45 +214,45 @@ describe('parseHtmlCommentMetadata', () => {
 <!-- generated-by: trace generate -->`;
 
     const result = parseHtmlCommentMetadata(md);
-    assert.equal(result.traceId, 'high-level');
-    assert.equal(result.traceVersion, 3);
-    assert.equal(result.lastGenerated, '2026-02-22T10:30:00.000Z');
-    assert.equal(result.generatedBy, 'trace generate');
+    expect(result.traceId).toBe('high-level');
+    expect(result.traceVersion).toBe(3);
+    expect(result.lastGenerated).toBe('2026-02-22T10:30:00.000Z');
+    expect(result.generatedBy).toBe('trace generate');
   });
 
   it('should return null for missing fields', () => {
     const md = '<!-- trace-id: test -->';
     const result = parseHtmlCommentMetadata(md);
-    assert.equal(result.traceId, 'test');
-    assert.equal(result.traceVersion, null);
-    assert.equal(result.lastGenerated, null);
-    assert.equal(result.generatedBy, null);
+    expect(result.traceId).toBe('test');
+    expect(result.traceVersion).toBe(null);
+    expect(result.lastGenerated).toBe(null);
+    expect(result.generatedBy).toBe(null);
   });
 
   it('should parse trace-version as integer', () => {
     const md = '<!-- trace-version: 42 -->';
     const result = parseHtmlCommentMetadata(md);
-    assert.equal(result.traceVersion, 42);
+    expect(result.traceVersion).toBe(42);
   });
 
   it('should return null for non-numeric trace-version', () => {
     const md = '<!-- trace-version: abc -->';
     const result = parseHtmlCommentMetadata(md);
-    assert.equal(result.traceVersion, null);
+    expect(result.traceVersion).toBe(null);
   });
 
   it('should handle whitespace in values', () => {
     const md = '<!-- trace-id:   my-module   -->';
     const result = parseHtmlCommentMetadata(md);
-    assert.equal(result.traceId, 'my-module');
+    expect(result.traceId).toBe('my-module');
   });
 
   it('should return all nulls for empty string', () => {
     const result = parseHtmlCommentMetadata('');
-    assert.equal(result.traceId, null);
-    assert.equal(result.traceVersion, null);
-    assert.equal(result.lastGenerated, null);
-    assert.equal(result.generatedBy, null);
+    expect(result.traceId).toBe(null);
+    expect(result.traceVersion).toBe(null);
+    expect(result.lastGenerated).toBe(null);
+    expect(result.generatedBy).toBe(null);
   });
 });
 
@@ -264,56 +263,56 @@ describe('parseHtmlCommentMetadata', () => {
 describe('parsePipeDelimitedLine', () => {
   it('should parse a valid 3-column line', () => {
     const result = parsePipeDelimitedLine('qa-team | publishes-to | Sends work items', 3, 'test');
-    assert.deepEqual(result.fields, ['qa-team', 'publishes-to', 'Sends work items']);
-    assert.equal(result.error, null);
+    expect(result.fields).toEqual(['qa-team', 'publishes-to', 'Sends work items']);
+    expect(result.error).toBe(null);
   });
 
   it('should parse a valid 2-column line', () => {
     const result = parsePipeDelimitedLine('process_work_item | function', 2, 'test');
-    assert.deepEqual(result.fields, ['process_work_item', 'function']);
-    assert.equal(result.error, null);
+    expect(result.fields).toEqual(['process_work_item', 'function']);
+    expect(result.error).toBe(null);
   });
 
   it('should trim whitespace from fields', () => {
     const result = parsePipeDelimitedLine('  target  |  rel-type  |  desc  ', 3, 'test');
-    assert.deepEqual(result.fields, ['target', 'rel-type', 'desc']);
+    expect(result.fields).toEqual(['target', 'rel-type', 'desc']);
   });
 
   it('should report error for wrong column count', () => {
     const result = parsePipeDelimitedLine('only-two | columns', 3, 'test:context');
-    assert.equal(result.fields, null);
-    assert.ok(result.error.includes('expected 3 columns, got 2'));
-    assert.ok(result.error.includes('test:context'));
+    expect(result.fields).toBe(null);
+    expect(result.error.includes('expected 3 columns, got 2')).toBeTruthy();
+    expect(result.error.includes('test:context')).toBeTruthy();
   });
 
   it('should report error for too many columns', () => {
     const result = parsePipeDelimitedLine('a | b | c | d', 3, 'test');
-    assert.equal(result.fields, null);
-    assert.ok(result.error.includes('expected 3 columns, got 4'));
+    expect(result.fields).toBe(null);
+    expect(result.error.includes('expected 3 columns, got 4')).toBeTruthy();
   });
 
   it('should report error for empty fields', () => {
     const result = parsePipeDelimitedLine('target |  | description', 3, 'test');
-    assert.equal(result.fields, null);
-    assert.ok(result.error.includes('empty field'));
+    expect(result.fields).toBe(null);
+    expect(result.error.includes('empty field')).toBeTruthy();
   });
 
   it('should skip empty lines', () => {
     const result = parsePipeDelimitedLine('', 3, 'test');
-    assert.equal(result.fields, null);
-    assert.equal(result.error, null);
+    expect(result.fields).toBe(null);
+    expect(result.error).toBe(null);
   });
 
   it('should skip (none) placeholder', () => {
     const result = parsePipeDelimitedLine('(none)', 3, 'test');
-    assert.equal(result.fields, null);
-    assert.equal(result.error, null);
+    expect(result.fields).toBe(null);
+    expect(result.error).toBe(null);
   });
 
   it('should skip markdown emphasis lines (starting with _)', () => {
     const result = parsePipeDelimitedLine('_No exports_', 2, 'test');
-    assert.equal(result.fields, null);
-    assert.equal(result.error, null);
+    expect(result.fields).toBe(null);
+    expect(result.error).toBe(null);
   });
 });
 
@@ -329,10 +328,10 @@ describe('parsePipeDelimitedSection', () => {
       'knowledge | reads-from | Reads data',
     ];
     const result = parsePipeDelimitedSection(lines, 3, 'test');
-    assert.equal(result.entries.length, 2);
-    assert.deepEqual(result.entries[0], ['qa-team', 'publishes-to', 'Sends work']);
-    assert.deepEqual(result.entries[1], ['knowledge', 'reads-from', 'Reads data']);
-    assert.equal(result.errors.length, 0);
+    expect(result.entries.length).toBe(2);
+    expect(result.entries[0]).toEqual(['qa-team', 'publishes-to', 'Sends work']);
+    expect(result.entries[1]).toEqual(['knowledge', 'reads-from', 'Reads data']);
+    expect(result.errors.length).toBe(0);
   });
 
   it('should skip empty lines and heading lines', () => {
@@ -344,14 +343,14 @@ describe('parsePipeDelimitedSection', () => {
       'qa-team | publishes-to | Sends work',
     ];
     const result = parsePipeDelimitedSection(lines, 3, 'test');
-    assert.equal(result.entries.length, 1);
+    expect(result.entries.length).toBe(1);
   });
 
   it('should skip (none) lines', () => {
     const lines = ['(none)'];
     const result = parsePipeDelimitedSection(lines, 3, 'test');
-    assert.equal(result.entries.length, 0);
-    assert.equal(result.errors.length, 0);
+    expect(result.entries.length).toBe(0);
+    expect(result.errors.length).toBe(0);
   });
 
   it('should collect errors for malformed lines', () => {
@@ -362,15 +361,15 @@ describe('parsePipeDelimitedSection', () => {
       'also | bad',
     ];
     const result = parsePipeDelimitedSection(lines, 3, 'test');
-    assert.equal(result.entries.length, 1); // only the valid line
-    assert.equal(result.errors.length, 1); // "also | bad" has wrong count
+    expect(result.entries.length).toBe(1); // only the valid line
+    expect(result.errors.length).toBe(1); // "also | bad" has wrong count
   });
 
   it('should handle section with only header (no data)', () => {
     const lines = ['target | relationship-type | description'];
     const result = parsePipeDelimitedSection(lines, 3, 'test');
-    assert.equal(result.entries.length, 0);
-    assert.equal(result.errors.length, 0);
+    expect(result.entries.length).toBe(0);
+    expect(result.errors.length).toBe(0);
   });
 });
 
@@ -380,23 +379,23 @@ describe('parsePipeDelimitedSection', () => {
 
 describe('isNotSyncedSection', () => {
   it('should return true for "Notes (not synced)"', () => {
-    assert.ok(isNotSyncedSection('Notes (not synced)'));
+    expect(isNotSyncedSection('Notes (not synced)')).toBeTruthy();
   });
 
   it('should be case-insensitive', () => {
-    assert.ok(isNotSyncedSection('Notes (NOT SYNCED)'));
-    assert.ok(isNotSyncedSection('notes (Not Synced)'));
+    expect(isNotSyncedSection('Notes (NOT SYNCED)')).toBeTruthy();
+    expect(isNotSyncedSection('notes (Not Synced)')).toBeTruthy();
   });
 
   it('should return false for regular headings', () => {
-    assert.ok(!isNotSyncedSection('Dependencies'));
-    assert.ok(!isNotSyncedSection('Dependents'));
-    assert.ok(!isNotSyncedSection('Module: Dev Team'));
+    expect(isNotSyncedSection('Dependencies')).toBeFalsy();
+    expect(isNotSyncedSection('Dependents')).toBeFalsy();
+    expect(isNotSyncedSection('Module: Dev Team')).toBeFalsy();
   });
 
   it('should return true for any heading containing "(not synced)"', () => {
-    assert.ok(isNotSyncedSection('Custom Section (not synced)'));
-    assert.ok(isNotSyncedSection('My notes (not synced) extra'));
+    expect(isNotSyncedSection('Custom Section (not synced)')).toBeTruthy();
+    expect(isNotSyncedSection('My notes (not synced) extra')).toBeTruthy();
   });
 });
 
@@ -415,9 +414,9 @@ Some content
 Other content
 `;
     const sections = splitIntoSections(md, 2);
-    assert.equal(sections.length, 2);
-    assert.equal(sections[0].heading, 'Module: Dev Team');
-    assert.equal(sections[1].heading, 'Module: QA Team');
+    expect(sections.length).toBe(2);
+    expect(sections[0].heading).toBe('Module: Dev Team');
+    expect(sections[1].heading).toBe('Module: QA Team');
   });
 
   it('should split by level 3 headings', () => {
@@ -430,9 +429,9 @@ target | rel | desc
 target | rel | desc
 `;
     const sections = splitIntoSections(md, 3);
-    assert.equal(sections.length, 2);
-    assert.equal(sections[0].heading, 'Dependencies');
-    assert.equal(sections[1].heading, 'Dependents');
+    expect(sections.length).toBe(2);
+    expect(sections[0].heading).toBe('Dependencies');
+    expect(sections[1].heading).toBe('Dependents');
   });
 
   it('should not include content before first heading', () => {
@@ -443,8 +442,8 @@ target | rel | desc
 Content
 `;
     const sections = splitIntoSections(md, 2);
-    assert.equal(sections.length, 1);
-    assert.equal(sections[0].heading, 'Module: Dev Team');
+    expect(sections.length).toBe(1);
+    expect(sections[0].heading).toBe('Module: Dev Team');
   });
 
   it('should capture lines between headings', () => {
@@ -458,8 +457,8 @@ Line 2
 Line 3
 `;
     const sections = splitIntoSections(md, 2);
-    assert.ok(sections[0].lines.some(l => l.includes('Line 1')));
-    assert.ok(sections[0].lines.some(l => l.includes('Line 2')));
+    expect(sections[0].lines.some(l => l.includes('Line 1'))).toBeTruthy();
+    expect(sections[0].lines.some(l => l.includes('Line 2'))).toBeTruthy();
   });
 
   it('should stop level 3 sections at level 2 boundaries', () => {
@@ -472,9 +471,9 @@ dep content
 different content
 `;
     const sections = splitIntoSections(md, 3);
-    assert.equal(sections.length, 1);
-    assert.equal(sections[0].heading, 'Dependencies');
-    assert.ok(!sections[0].lines.some(l => l.includes('different content')));
+    expect(sections.length).toBe(1);
+    expect(sections[0].heading).toBe('Dependencies');
+    expect(sections[0].lines.some(l => l.includes('different content'))).toBeFalsy();
   });
 });
 
@@ -487,10 +486,10 @@ describe('parseHighLevelMarkdown', () => {
     const md = createHighLevelMarkdown();
     const result = parseHighLevelMarkdown(md);
 
-    assert.equal(result.metadata.traceId, 'high-level');
-    assert.equal(result.metadata.traceVersion, 1);
-    assert.equal(result.metadata.lastGenerated, '2026-02-22T10:30:00.000Z');
-    assert.equal(result.metadata.generatedBy, 'trace generate');
+    expect(result.metadata.traceId).toBe('high-level');
+    expect(result.metadata.traceVersion).toBe(1);
+    expect(result.metadata.lastGenerated).toBe('2026-02-22T10:30:00.000Z');
+    expect(result.metadata.generatedBy).toBe('trace generate');
   });
 
   it('should parse module dependencies', () => {
@@ -498,9 +497,9 @@ describe('parseHighLevelMarkdown', () => {
     const result = parseHighLevelMarkdown(md);
 
     const devTeam = result.modules.find(m => m.id === 'dev-team');
-    assert.ok(devTeam, 'Should find dev-team module');
-    assert.equal(devTeam.dependencies.length, 1);
-    assert.deepEqual(devTeam.dependencies[0], {
+    expect(devTeam).toBeTruthy();
+    expect(devTeam.dependencies.length).toBe(1);
+    expect(devTeam.dependencies[0]).toEqual({
       targetId: 'qa-team',
       relationshipType: 'publishes-to',
       description: 'Sends completed work items for QA review',
@@ -512,8 +511,8 @@ describe('parseHighLevelMarkdown', () => {
     const result = parseHighLevelMarkdown(md);
 
     const devTeam = result.modules.find(m => m.id === 'dev-team');
-    assert.equal(devTeam.dependents.length, 1);
-    assert.deepEqual(devTeam.dependents[0], {
+    expect(devTeam.dependents.length).toBe(1);
+    expect(devTeam.dependents[0]).toEqual({
       targetId: 'triage-team',
       relationshipType: 'calls',
       description: 'Receives triaged work items',
@@ -525,9 +524,9 @@ describe('parseHighLevelMarkdown', () => {
     const result = parseHighLevelMarkdown(md);
 
     const qaTeam = result.modules.find(m => m.id === 'qa-team');
-    assert.ok(qaTeam, 'Should find qa-team module');
-    assert.equal(qaTeam.dependencies.length, 0);
-    assert.equal(qaTeam.dependents.length, 0);
+    expect(qaTeam).toBeTruthy();
+    expect(qaTeam.dependencies.length).toBe(0);
+    expect(qaTeam.dependents.length).toBe(0);
   });
 
   it('AC-10.2: should ignore Notes (not synced) section', () => {
@@ -537,8 +536,8 @@ describe('parseHighLevelMarkdown', () => {
     const result = parseHighLevelMarkdown(md);
 
     // Should still parse dev-team and qa-team
-    assert.equal(result.modules.length, 2);
-    assert.equal(result.errors.length, 0);
+    expect(result.modules.length).toBe(2);
+    expect(result.errors.length).toBe(0);
   });
 
   it('should detect changes when dependency line is modified', () => {
@@ -548,9 +547,9 @@ describe('parseHighLevelMarkdown', () => {
     const result = parseHighLevelMarkdown(md);
 
     const devTeam = result.modules.find(m => m.id === 'dev-team');
-    assert.equal(devTeam.dependencies.length, 1);
-    assert.equal(devTeam.dependencies[0].targetId, 'knowledge-team');
-    assert.equal(devTeam.dependencies[0].relationshipType, 'reads-from');
+    expect(devTeam.dependencies.length).toBe(1);
+    expect(devTeam.dependencies[0].targetId).toBe('knowledge-team');
+    expect(devTeam.dependencies[0].relationshipType).toBe('reads-from');
   });
 
   it('should handle multiple dependencies', () => {
@@ -561,9 +560,9 @@ knowledge-team | reads-from | Reads KB`,
     const result = parseHighLevelMarkdown(md);
 
     const devTeam = result.modules.find(m => m.id === 'dev-team');
-    assert.equal(devTeam.dependencies.length, 2);
-    assert.equal(devTeam.dependencies[0].targetId, 'qa-team');
-    assert.equal(devTeam.dependencies[1].targetId, 'knowledge-team');
+    expect(devTeam.dependencies.length).toBe(2);
+    expect(devTeam.dependencies[0].targetId).toBe('qa-team');
+    expect(devTeam.dependencies[1].targetId).toBe('knowledge-team');
   });
 
   it('AC-10.4: should report errors for malformed dependency lines', () => {
@@ -572,8 +571,8 @@ knowledge-team | reads-from | Reads KB`,
     });
     const result = parseHighLevelMarkdown(md);
 
-    assert.ok(result.errors.length > 0, 'Should have parsing errors');
-    assert.ok(result.errors[0].includes('expected 3 columns'));
+    expect(result.errors.length > 0).toBeTruthy();
+    expect(result.errors[0].includes('expected 3 columns')).toBeTruthy();
   });
 });
 
@@ -586,20 +585,20 @@ describe('parseLowLevelMarkdown', () => {
     const md = createLowLevelMarkdown();
     const result = parseLowLevelMarkdown(md);
 
-    assert.equal(result.metadata.traceId, 'dev-team');
-    assert.equal(result.metadata.traceVersion, 1);
+    expect(result.metadata.traceId).toBe('dev-team');
+    expect(result.metadata.traceVersion).toBe(1);
   });
 
   it('should parse file exports', () => {
     const md = createLowLevelMarkdown();
     const result = parseLowLevelMarkdown(md);
 
-    assert.equal(result.files.length, 1);
+    expect(result.files.length).toBe(1);
     const file = result.files[0];
-    assert.equal(file.filePath, 'apps/agent-orchestrator/src/dev-team/service.py');
-    assert.equal(file.exports.length, 2);
-    assert.deepEqual(file.exports[0], { symbol: 'process_work_item', type: 'function' });
-    assert.deepEqual(file.exports[1], { symbol: 'DevTeamService', type: 'class' });
+    expect(file.filePath).toBe('apps/agent-orchestrator/src/dev-team/service.py');
+    expect(file.exports.length).toBe(2);
+    expect(file.exports[0]).toEqual({ symbol: 'process_work_item', type: 'function' });
+    expect(file.exports[1]).toEqual({ symbol: 'DevTeamService', type: 'class' });
   });
 
   it('should parse file imports with comma-separated symbols', () => {
@@ -607,12 +606,12 @@ describe('parseLowLevelMarkdown', () => {
     const result = parseLowLevelMarkdown(md);
 
     const file = result.files[0];
-    assert.equal(file.imports.length, 2);
-    assert.deepEqual(file.imports[0], {
+    expect(file.imports.length).toBe(2);
+    expect(file.imports[0]).toEqual({
       source: '../knowledge-team/service',
       symbols: ['KnowledgeService'],
     });
-    assert.deepEqual(file.imports[1], {
+    expect(file.imports[1]).toEqual({
       source: '../common/models',
       symbols: ['WorkItem', 'Status'],
     });
@@ -623,8 +622,8 @@ describe('parseLowLevelMarkdown', () => {
     const result = parseLowLevelMarkdown(md);
 
     const file = result.files[0];
-    assert.equal(file.calls.length, 1);
-    assert.deepEqual(file.calls[0], {
+    expect(file.calls.length).toBe(1);
+    expect(file.calls[0]).toEqual({
       target: 'knowledge-team/service.py',
       function: 'query_knowledge',
       context: 'process_work_item',
@@ -636,8 +635,8 @@ describe('parseLowLevelMarkdown', () => {
     const result = parseLowLevelMarkdown(md);
 
     const file = result.files[0];
-    assert.equal(file.events.length, 1);
-    assert.deepEqual(file.events[0], {
+    expect(file.events.length).toBe(1);
+    expect(file.events[0]).toEqual({
       type: 'publish',
       eventName: 'work.completed',
       channel: 'dev-team-output',
@@ -651,8 +650,8 @@ describe('parseLowLevelMarkdown', () => {
     const result = parseLowLevelMarkdown(md);
 
     // Should still parse the file entry correctly
-    assert.equal(result.files.length, 1);
-    assert.equal(result.errors.length, 0);
+    expect(result.files.length).toBe(1);
+    expect(result.errors.length).toBe(0);
   });
 
   it('should detect modified export', () => {
@@ -662,8 +661,8 @@ describe('parseLowLevelMarkdown', () => {
     const result = parseLowLevelMarkdown(md);
 
     const file = result.files[0];
-    assert.equal(file.exports.length, 1);
-    assert.equal(file.exports[0].symbol, 'handle_request');
+    expect(file.exports.length).toBe(1);
+    expect(file.exports[0].symbol).toBe('handle_request');
   });
 
   it('AC-10.4: should report errors for malformed export lines', () => {
@@ -674,7 +673,7 @@ describe('parseLowLevelMarkdown', () => {
 
     // "only_symbol_no_pipe" doesn't contain a pipe so it won't match the pipe logic
     // It should be silently skipped (no pipe = not a data line)
-    assert.equal(result.files[0].exports.length, 0);
+    expect(result.files[0].exports.length).toBe(0);
   });
 
   it('AC-10.4: should report error for wrong column count in exports', () => {
@@ -683,8 +682,8 @@ describe('parseLowLevelMarkdown', () => {
     });
     const result = parseLowLevelMarkdown(md);
 
-    assert.ok(result.errors.length > 0);
-    assert.ok(result.errors[0].includes('expected 2 columns'));
+    expect(result.errors.length > 0).toBeTruthy();
+    expect(result.errors[0].includes('expected 2 columns')).toBeTruthy();
   });
 
   it('should handle (side-effect) imports', () => {
@@ -694,9 +693,9 @@ describe('parseLowLevelMarkdown', () => {
     const result = parseLowLevelMarkdown(md);
 
     const file = result.files[0];
-    assert.equal(file.imports.length, 1);
-    assert.equal(file.imports[0].source, './polyfills');
-    assert.deepEqual(file.imports[0].symbols, []);
+    expect(file.imports.length).toBe(1);
+    expect(file.imports[0].source).toBe('./polyfills');
+    expect(file.imports[0].symbols).toEqual([]);
   });
 });
 
@@ -708,28 +707,28 @@ describe('arraysDeepEqual', () => {
   it('should return true for identical arrays', () => {
     const a = [{ x: 1 }, { y: 2 }];
     const b = [{ x: 1 }, { y: 2 }];
-    assert.ok(arraysDeepEqual(a, b));
+    expect(arraysDeepEqual(a, b)).toBeTruthy();
   });
 
   it('should return false for different arrays', () => {
     const a = [{ x: 1 }];
     const b = [{ x: 2 }];
-    assert.ok(!arraysDeepEqual(a, b));
+    expect(arraysDeepEqual(a, b)).toBeFalsy();
   });
 
   it('should return false for different lengths', () => {
     const a = [{ x: 1 }];
     const b = [{ x: 1 }, { y: 2 }];
-    assert.ok(!arraysDeepEqual(a, b));
+    expect(arraysDeepEqual(a, b)).toBeFalsy();
   });
 
   it('should return false for non-array inputs', () => {
-    assert.ok(!arraysDeepEqual('not-array', []));
-    assert.ok(!arraysDeepEqual([], null));
+    expect(arraysDeepEqual('not-array', [])).toBeFalsy();
+    expect(arraysDeepEqual([], null)).toBeFalsy();
   });
 
   it('should return true for empty arrays', () => {
-    assert.ok(arraysDeepEqual([], []));
+    expect(arraysDeepEqual([], [])).toBeTruthy();
   });
 });
 
@@ -756,10 +755,10 @@ describe('applyHighLevelSync', () => {
     const { updatedJson, changes } = applyHighLevelSync(json, parsedMd);
 
     const devTeam = updatedJson.modules.find(m => m.id === 'dev-team');
-    assert.equal(devTeam.dependencies.length, 1);
-    assert.equal(devTeam.dependencies[0].targetId, 'knowledge-team');
-    assert.ok(changes.length > 0);
-    assert.ok(changes.some(c => c.includes('Updated') && c.includes('dependencies') && c.includes('dev-team')));
+    expect(devTeam.dependencies.length).toBe(1);
+    expect(devTeam.dependencies[0].targetId).toBe('knowledge-team');
+    expect(changes.length > 0).toBeTruthy();
+    expect(changes.some(c => c.includes('Updated') && c.includes('dependencies') && c.includes('dev-team'))).toBeTruthy();
   });
 
   it('AC-10.1: should update dependents when markdown differs', () => {
@@ -781,8 +780,8 @@ describe('applyHighLevelSync', () => {
     const { updatedJson, changes } = applyHighLevelSync(json, parsedMd);
 
     const devTeam = updatedJson.modules.find(m => m.id === 'dev-team');
-    assert.equal(devTeam.dependents.length, 2);
-    assert.ok(changes.some(c => c.includes('Updated') && c.includes('dependents')));
+    expect(devTeam.dependents.length).toBe(2);
+    expect(changes.some(c => c.includes('Updated') && c.includes('dependents'))).toBeTruthy();
   });
 
   it('should report no changes when markdown matches JSON', () => {
@@ -804,7 +803,7 @@ describe('applyHighLevelSync', () => {
     };
 
     const { changes } = applyHighLevelSync(json, parsedMd);
-    assert.equal(changes.length, 0);
+    expect(changes.length).toBe(0);
   });
 
   it('should skip modules not found in JSON', () => {
@@ -821,7 +820,7 @@ describe('applyHighLevelSync', () => {
     };
 
     const { changes } = applyHighLevelSync(json, parsedMd);
-    assert.ok(changes.some(c => c.includes('Skipped') && c.includes('nonexistent-module')));
+    expect(changes.some(c => c.includes('Skipped') && c.includes('nonexistent-module'))).toBeTruthy();
   });
 
   it('should not mutate original JSON', () => {
@@ -839,7 +838,7 @@ describe('applyHighLevelSync', () => {
     };
 
     applyHighLevelSync(json, parsedMd);
-    assert.equal(json.modules[0].dependencies.length, originalDepCount, 'Original should not be modified');
+    expect(json.modules[0].dependencies.length).toBe(originalDepCount);
   });
 });
 
@@ -866,9 +865,9 @@ describe('applyLowLevelSync', () => {
     const { updatedJson, changes } = applyLowLevelSync(json, parsedMd);
 
     const file = updatedJson.files[0];
-    assert.equal(file.exports.length, 1);
-    assert.equal(file.exports[0].symbol, 'new_function');
-    assert.ok(changes.some(c => c.includes('exports')));
+    expect(file.exports.length).toBe(1);
+    expect(file.exports[0].symbol).toBe('new_function');
+    expect(changes.some(c => c.includes('exports'))).toBeTruthy();
   });
 
   it('should update imports when markdown differs', () => {
@@ -887,8 +886,8 @@ describe('applyLowLevelSync', () => {
     };
 
     const { updatedJson, changes } = applyLowLevelSync(json, parsedMd);
-    assert.equal(updatedJson.files[0].imports[0].source, 'new-source');
-    assert.ok(changes.some(c => c.includes('imports')));
+    expect(updatedJson.files[0].imports[0].source).toBe('new-source');
+    expect(changes.some(c => c.includes('imports'))).toBeTruthy();
   });
 
   it('should update function calls when markdown differs', () => {
@@ -907,8 +906,8 @@ describe('applyLowLevelSync', () => {
     };
 
     const { updatedJson, changes } = applyLowLevelSync(json, parsedMd);
-    assert.equal(updatedJson.files[0].calls.length, 0);
-    assert.ok(changes.some(c => c.includes('function calls')));
+    expect(updatedJson.files[0].calls.length).toBe(0);
+    expect(changes.some(c => c.includes('function calls'))).toBeTruthy();
   });
 
   it('should update events when markdown differs', () => {
@@ -929,8 +928,8 @@ describe('applyLowLevelSync', () => {
     };
 
     const { updatedJson, changes } = applyLowLevelSync(json, parsedMd);
-    assert.equal(updatedJson.files[0].events[0].eventName, 'new.event');
-    assert.ok(changes.some(c => c.includes('events')));
+    expect(updatedJson.files[0].events[0].eventName).toBe('new.event');
+    expect(changes.some(c => c.includes('events'))).toBeTruthy();
   });
 
   it('should skip files not found in JSON', () => {
@@ -949,7 +948,7 @@ describe('applyLowLevelSync', () => {
     };
 
     const { changes } = applyLowLevelSync(json, parsedMd);
-    assert.ok(changes.some(c => c.includes('Skipped') && c.includes('nonexistent/file.py')));
+    expect(changes.some(c => c.includes('Skipped') && c.includes('nonexistent/file.py'))).toBeTruthy();
   });
 });
 
@@ -992,9 +991,9 @@ describe('syncAll integration', () => {
       readFileSync(join(testRoot, '.claude', 'traces', 'high-level.json'), 'utf-8'),
     );
     const devTeam = updatedJson.modules.find(m => m.id === 'dev-team');
-    assert.equal(devTeam.dependencies[0].targetId, 'knowledge-team');
-    assert.equal(devTeam.dependencies[0].relationshipType, 'reads-from');
-    assert.ok(result.filesUpdated > 0);
+    expect(devTeam.dependencies[0].targetId).toBe('knowledge-team');
+    expect(devTeam.dependencies[0].relationshipType).toBe('reads-from');
+    expect(result.filesUpdated > 0).toBeTruthy();
   });
 
   it('AC-10.2: adding content to Notes (not synced) does not affect JSON', () => {
@@ -1019,8 +1018,8 @@ describe('syncAll integration', () => {
       join(testRoot, '.claude', 'traces', 'high-level.json'),
       'utf-8',
     );
-    assert.equal(afterJson, originalJsonStr, 'JSON should not change when only notes are added');
-    assert.equal(result.filesUpdated, 0);
+    expect(afterJson).toBe(originalJsonStr);
+    expect(result.filesUpdated).toBe(0);
   });
 
   it('AC-10.4: malformed markdown lines produce errors and skip bad entries', () => {
@@ -1040,8 +1039,8 @@ describe('syncAll integration', () => {
     const result = syncAll({ projectRoot: testRoot });
 
     // Should report errors
-    assert.ok(result.allErrors.length > 0, 'Should have parsing errors');
-    assert.ok(result.allErrors.some(e => e.includes('expected 3 columns')));
+    expect(result.allErrors.length > 0).toBeTruthy();
+    expect(result.allErrors.some(e => e.includes('expected 3 columns'))).toBeTruthy();
   });
 
   it('should sync low-level markdown to low-level JSON', () => {
@@ -1070,10 +1069,10 @@ describe('syncAll integration', () => {
         'utf-8',
       ),
     );
-    assert.equal(updatedJson.files[0].exports.length, 1);
-    assert.equal(updatedJson.files[0].exports[0].symbol, 'handle_request');
-    assert.ok(result.filesUpdated > 0);
-    assert.ok(result.allChanges.some(c => c.includes('dev-team')));
+    expect(updatedJson.files[0].exports.length).toBe(1);
+    expect(updatedJson.files[0].exports[0].symbol).toBe('handle_request');
+    expect(result.filesUpdated > 0).toBeTruthy();
+    expect(result.allChanges.some(c => c.includes('dev-team'))).toBeTruthy();
   });
 
   it('should handle missing JSON file gracefully', () => {
@@ -1086,14 +1085,14 @@ describe('syncAll integration', () => {
 
     const result = syncAll({ projectRoot: testRoot });
 
-    assert.ok(result.allErrors.some(e => e.includes('No JSON file found') && e.includes('orphan-module')));
+    expect(result.allErrors.some(e => e.includes('No JSON file found') && e.includes('orphan-module'))).toBeTruthy();
   });
 
   it('should handle empty traces directory', () => {
     // No files in traces directory
     const result = syncAll({ projectRoot: testRoot });
-    assert.equal(result.filesUpdated, 0);
-    assert.equal(result.allChanges.length, 0);
+    expect(result.filesUpdated).toBe(0);
+    expect(result.allChanges.length).toBe(0);
   });
 
   it('round-trip: generate markdown -> edit -> sync -> verify JSON updated', () => {
@@ -1110,7 +1109,7 @@ describe('syncAll integration', () => {
 
     // Step 3: Verify sync with no edits produces no changes
     const noChangeResult = syncAll({ projectRoot: testRoot });
-    assert.equal(noChangeResult.filesUpdated, 0, 'No changes expected on initial sync');
+    expect(noChangeResult.filesUpdated).toBe(0);
 
     // Step 4: Edit the markdown (add a new dependency)
     const editedMd = createHighLevelMarkdown({
@@ -1127,10 +1126,10 @@ knowledge-team | reads-from | Reads KB for development context`,
       readFileSync(join(testRoot, '.claude', 'traces', 'high-level.json'), 'utf-8'),
     );
     const devTeam = updatedJson.modules.find(m => m.id === 'dev-team');
-    assert.equal(devTeam.dependencies.length, 2, 'Should now have 2 dependencies');
-    assert.equal(devTeam.dependencies[1].targetId, 'knowledge-team');
-    assert.ok(syncResult.filesUpdated > 0);
-    assert.ok(syncResult.allChanges.some(c => c.includes('Updated 2 dependencies in dev-team')));
+    expect(devTeam.dependencies.length).toBe(2);
+    expect(devTeam.dependencies[1].targetId).toBe('knowledge-team');
+    expect(syncResult.filesUpdated > 0).toBeTruthy();
+    expect(syncResult.allChanges.some(c => c.includes('Updated 2 dependencies in dev-team'))).toBeTruthy();
   });
 
   it('round-trip: low-level generate -> edit -> sync -> verify', () => {
@@ -1150,7 +1149,7 @@ knowledge-team | reads-from | Reads KB for development context`,
 
     // Step 3: Verify no changes initially
     const noChangeResult = syncAll({ projectRoot: testRoot });
-    assert.equal(noChangeResult.filesUpdated, 0);
+    expect(noChangeResult.filesUpdated).toBe(0);
 
     // Step 4: Edit markdown - add a new event
     const editedMd = createLowLevelMarkdown({
@@ -1172,9 +1171,9 @@ subscribe | work.assigned | triage-output`,
         'utf-8',
       ),
     );
-    assert.equal(updatedJson.files[0].events.length, 2);
-    assert.equal(updatedJson.files[0].events[1].eventName, 'work.assigned');
-    assert.ok(syncResult.filesUpdated > 0);
+    expect(updatedJson.files[0].events.length).toBe(2);
+    expect(updatedJson.files[0].events[1].eventName).toBe('work.assigned');
+    expect(syncResult.filesUpdated > 0).toBeTruthy();
   });
 });
 
@@ -1198,11 +1197,11 @@ describe('detectHighLevelConflicts', () => {
     };
 
     const conflicts = detectHighLevelConflicts(json, parsedMd);
-    assert.equal(conflicts.length, 1);
-    assert.equal(conflicts[0].module, 'dev-team');
-    assert.equal(conflicts[0].field, 'dependencies');
-    assert.equal(conflicts[0].jsonValue[0].targetId, 'qa-team');
-    assert.equal(conflicts[0].markdownValue[0].targetId, 'knowledge-team');
+    expect(conflicts.length).toBe(1);
+    expect(conflicts[0].module).toBe('dev-team');
+    expect(conflicts[0].field).toBe('dependencies');
+    expect(conflicts[0].jsonValue[0].targetId).toBe('qa-team');
+    expect(conflicts[0].markdownValue[0].targetId).toBe('knowledge-team');
   });
 
   it('should detect dependents conflict', () => {
@@ -1218,10 +1217,10 @@ describe('detectHighLevelConflicts', () => {
     };
 
     const conflicts = detectHighLevelConflicts(json, parsedMd);
-    assert.equal(conflicts.length, 1);
-    assert.equal(conflicts[0].field, 'dependents');
-    assert.equal(conflicts[0].jsonValue.length, 1);
-    assert.equal(conflicts[0].markdownValue.length, 0);
+    expect(conflicts.length).toBe(1);
+    expect(conflicts[0].field).toBe('dependents');
+    expect(conflicts[0].jsonValue.length).toBe(1);
+    expect(conflicts[0].markdownValue.length).toBe(0);
   });
 
   it('should return empty array when no conflicts', () => {
@@ -1237,7 +1236,7 @@ describe('detectHighLevelConflicts', () => {
     };
 
     const conflicts = detectHighLevelConflicts(json, parsedMd);
-    assert.equal(conflicts.length, 0);
+    expect(conflicts.length).toBe(0);
   });
 
   it('should skip modules not in JSON', () => {
@@ -1253,7 +1252,7 @@ describe('detectHighLevelConflicts', () => {
     };
 
     const conflicts = detectHighLevelConflicts(json, parsedMd);
-    assert.equal(conflicts.length, 0);
+    expect(conflicts.length).toBe(0);
   });
 });
 
@@ -1273,9 +1272,9 @@ describe('detectLowLevelConflicts', () => {
     };
 
     const conflicts = detectLowLevelConflicts(json, parsedMd);
-    assert.equal(conflicts.length, 1);
-    assert.equal(conflicts[0].field, 'exports');
-    assert.equal(conflicts[0].module, 'apps/agent-orchestrator/src/dev-team/service.py');
+    expect(conflicts.length).toBe(1);
+    expect(conflicts[0].field).toBe('exports');
+    expect(conflicts[0].module).toBe('apps/agent-orchestrator/src/dev-team/service.py');
   });
 
   it('should detect multiple field conflicts for same file', () => {
@@ -1293,9 +1292,9 @@ describe('detectLowLevelConflicts', () => {
     };
 
     const conflicts = detectLowLevelConflicts(json, parsedMd);
-    assert.equal(conflicts.length, 2);
-    assert.ok(conflicts.some(c => c.field === 'exports'));
-    assert.ok(conflicts.some(c => c.field === 'imports'));
+    expect(conflicts.length).toBe(2);
+    expect(conflicts.some(c => c.field === 'exports')).toBeTruthy();
+    expect(conflicts.some(c => c.field === 'imports')).toBeTruthy();
   });
 
   it('should return empty when no conflicts', () => {
@@ -1313,7 +1312,7 @@ describe('detectLowLevelConflicts', () => {
     };
 
     const conflicts = detectLowLevelConflicts(json, parsedMd);
-    assert.equal(conflicts.length, 0);
+    expect(conflicts.length).toBe(0);
   });
 });
 
@@ -1323,29 +1322,23 @@ describe('detectLowLevelConflicts', () => {
 
 describe('jsonDivergedFromMarkdown', () => {
   it('should return false when timestamps match', () => {
-    assert.equal(
-      jsonDivergedFromMarkdown('2026-02-22T10:30:00.000Z', '2026-02-22T10:30:00.000Z'),
-      false,
-    );
+    expect(jsonDivergedFromMarkdown('2026-02-22T10:30:00.000Z', '2026-02-22T10:30:00.000Z')).toBe(false);
   });
 
   it('should return true when timestamps differ', () => {
-    assert.equal(
-      jsonDivergedFromMarkdown('2026-02-23T10:30:00.000Z', '2026-02-22T10:30:00.000Z'),
-      true,
-    );
+    expect(jsonDivergedFromMarkdown('2026-02-23T10:30:00.000Z', '2026-02-22T10:30:00.000Z')).toBe(true);
   });
 
   it('should return false when JSON lastGenerated is null', () => {
-    assert.equal(jsonDivergedFromMarkdown(null, '2026-02-22T10:30:00.000Z'), false);
+    expect(jsonDivergedFromMarkdown(null, '2026-02-22T10:30:00.000Z')).toBe(false);
   });
 
   it('should return false when markdown lastGenerated is null', () => {
-    assert.equal(jsonDivergedFromMarkdown('2026-02-22T10:30:00.000Z', null), false);
+    expect(jsonDivergedFromMarkdown('2026-02-22T10:30:00.000Z', null)).toBe(false);
   });
 
   it('should return false when both are null', () => {
-    assert.equal(jsonDivergedFromMarkdown(null, null), false);
+    expect(jsonDivergedFromMarkdown(null, null)).toBe(false);
   });
 });
 
@@ -1365,9 +1358,9 @@ describe('formatConflictReport', () => {
     ];
 
     const lines = formatConflictReport(conflicts);
-    assert.ok(lines.some(l => l.includes('CONFLICT: dev-team -> dependencies')));
-    assert.ok(lines.some(l => l.includes('JSON value:') && l.includes('qa-team')));
-    assert.ok(lines.some(l => l.includes('Markdown value:') && l.includes('knowledge-team')));
+    expect(lines.some(l => l.includes('CONFLICT: dev-team -> dependencies'))).toBeTruthy();
+    expect(lines.some(l => l.includes('JSON value:') && l.includes('qa-team'))).toBeTruthy();
+    expect(lines.some(l => l.includes('Markdown value:') && l.includes('knowledge-team'))).toBeTruthy();
   });
 
   it('should format multiple conflicts', () => {
@@ -1377,13 +1370,13 @@ describe('formatConflictReport', () => {
     ];
 
     const lines = formatConflictReport(conflicts);
-    assert.ok(lines.some(l => l.includes('mod-a -> deps')));
-    assert.ok(lines.some(l => l.includes('mod-b -> exports')));
+    expect(lines.some(l => l.includes('mod-a -> deps'))).toBeTruthy();
+    expect(lines.some(l => l.includes('mod-b -> exports'))).toBeTruthy();
   });
 
   it('should return empty array for no conflicts', () => {
     const lines = formatConflictReport([]);
-    assert.equal(lines.length, 0);
+    expect(lines.length).toBe(0);
   });
 });
 
@@ -1404,13 +1397,13 @@ describe('buildSyncSummary', () => {
       dryRun: false,
     });
 
-    assert.ok(summary.text.includes('Modules updated:'));
-    assert.ok(summary.text.includes('Fields changed:'));
-    assert.ok(summary.text.includes('Conflicts detected:'));
-    assert.ok(summary.text.includes('Parsing errors:'));
-    assert.equal(summary.fieldsChanged, 2);
-    assert.equal(summary.conflictsDetected, 1);
-    assert.equal(summary.errorsEncountered, 1);
+    expect(summary.text.includes('Modules updated:')).toBeTruthy();
+    expect(summary.text.includes('Fields changed:')).toBeTruthy();
+    expect(summary.text.includes('Conflicts detected:')).toBeTruthy();
+    expect(summary.text.includes('Parsing errors:')).toBeTruthy();
+    expect(summary.fieldsChanged).toBe(2);
+    expect(summary.conflictsDetected).toBe(1);
+    expect(summary.errorsEncountered).toBe(1);
   });
 
   it('should show per-module field counts', () => {
@@ -1425,8 +1418,8 @@ describe('buildSyncSummary', () => {
       dryRun: false,
     });
 
-    assert.ok(summary.text.includes('dev-team:'));
-    assert.ok(summary.text.includes('2 field(s)'));
+    expect(summary.text.includes('dev-team:')).toBeTruthy();
+    expect(summary.text.includes('2 field(s)')).toBeTruthy();
   });
 
   it('should prefix with [DRY RUN] when dryRun is true', () => {
@@ -1438,7 +1431,7 @@ describe('buildSyncSummary', () => {
       dryRun: true,
     });
 
-    assert.ok(summary.text.startsWith('[DRY RUN]'));
+    expect(summary.text.startsWith('[DRY RUN]')).toBeTruthy();
   });
 
   it('should handle zero changes gracefully', () => {
@@ -1450,10 +1443,10 @@ describe('buildSyncSummary', () => {
       dryRun: false,
     });
 
-    assert.equal(summary.modulesUpdated, 0);
-    assert.equal(summary.fieldsChanged, 0);
-    assert.equal(summary.conflictsDetected, 0);
-    assert.equal(summary.errorsEncountered, 0);
+    expect(summary.modulesUpdated).toBe(0);
+    expect(summary.fieldsChanged).toBe(0);
+    expect(summary.conflictsDetected).toBe(0);
+    expect(summary.errorsEncountered).toBe(0);
   });
 
   it('should not count Skipped entries as fields changed', () => {
@@ -1468,7 +1461,7 @@ describe('buildSyncSummary', () => {
       dryRun: false,
     });
 
-    assert.equal(summary.fieldsChanged, 1);
+    expect(summary.fieldsChanged).toBe(1);
   });
 });
 
@@ -1479,26 +1472,26 @@ describe('buildSyncSummary', () => {
 describe('parseCliArgs', () => {
   it('should parse --force flag', () => {
     const result = parseCliArgs(['node', 'trace-sync.mjs', '--force']);
-    assert.equal(result.force, true);
-    assert.equal(result.dryRun, false);
+    expect(result.force).toBe(true);
+    expect(result.dryRun).toBe(false);
   });
 
   it('should parse --dry-run flag', () => {
     const result = parseCliArgs(['node', 'trace-sync.mjs', '--dry-run']);
-    assert.equal(result.force, false);
-    assert.equal(result.dryRun, true);
+    expect(result.force).toBe(false);
+    expect(result.dryRun).toBe(true);
   });
 
   it('should parse both flags', () => {
     const result = parseCliArgs(['node', 'trace-sync.mjs', '--force', '--dry-run']);
-    assert.equal(result.force, true);
-    assert.equal(result.dryRun, true);
+    expect(result.force).toBe(true);
+    expect(result.dryRun).toBe(true);
   });
 
   it('should default to false when no flags', () => {
     const result = parseCliArgs(['node', 'trace-sync.mjs']);
-    assert.equal(result.force, false);
-    assert.equal(result.dryRun, false);
+    expect(result.force).toBe(false);
+    expect(result.dryRun).toBe(false);
   });
 });
 
@@ -1539,16 +1532,15 @@ describe('syncAll conflict detection integration', () => {
     const result = syncAll({ projectRoot: testRoot });
 
     // Should detect conflict
-    assert.ok(result.allConflicts.length > 0, 'Should detect conflicts');
-    assert.ok(result.allConflicts.some(c => c.module === 'dev-team'));
-    assert.ok(result.allConflicts.some(c => c.field === 'dependencies'));
+    expect(result.allConflicts.length > 0).toBeTruthy();
+    expect(result.allConflicts.some(c => c.module === 'dev-team')).toBeTruthy();
+    expect(result.allConflicts.some(c => c.field === 'dependencies')).toBeTruthy();
 
     // JSON should NOT be modified (conflict prevents overwrite)
     const afterJson = JSON.parse(
       readFileSync(join(testRoot, '.claude', 'traces', 'high-level.json'), 'utf-8'),
     );
-    assert.equal(afterJson.modules[0].dependencies[0].targetId, 'qa-team',
-      'JSON should retain original value when conflict detected');
+    expect(afterJson.modules[0].dependencies[0].targetId).toBe('qa-team');
   });
 
   it('AC-10.5: conflict report includes both JSON and markdown values', () => {
@@ -1568,9 +1560,9 @@ describe('syncAll conflict detection integration', () => {
 
     // Verify conflict contains both values
     const depConflict = result.allConflicts.find(c => c.field === 'dependencies');
-    assert.ok(depConflict, 'Should have dependency conflict');
-    assert.equal(depConflict.jsonValue[0].targetId, 'qa-team');
-    assert.equal(depConflict.markdownValue[0].targetId, 'knowledge-team');
+    expect(depConflict).toBeTruthy();
+    expect(depConflict.jsonValue[0].targetId).toBe('qa-team');
+    expect(depConflict.markdownValue[0].targetId).toBe('knowledge-team');
   });
 
   it('--force overrides conflicts (markdown wins)', () => {
@@ -1592,15 +1584,14 @@ describe('syncAll conflict detection integration', () => {
     const result = syncAll({ projectRoot: testRoot, force: true });
 
     // Should have no conflicts reported (force bypasses detection)
-    assert.equal(result.allConflicts.length, 0);
+    expect(result.allConflicts.length).toBe(0);
 
     // JSON should be updated (markdown wins)
     const afterJson = JSON.parse(
       readFileSync(join(testRoot, '.claude', 'traces', 'high-level.json'), 'utf-8'),
     );
-    assert.equal(afterJson.modules[0].dependencies[0].targetId, 'knowledge-team',
-      'With --force, markdown value should win');
-    assert.ok(result.filesUpdated > 0);
+    expect(afterJson.modules[0].dependencies[0].targetId).toBe('knowledge-team');
+    expect(result.filesUpdated > 0).toBeTruthy();
   });
 
   it('--dry-run shows changes without writing', () => {
@@ -1624,14 +1615,14 @@ describe('syncAll conflict detection integration', () => {
     const result = syncAll({ projectRoot: testRoot, dryRun: true });
 
     // Should report changes
-    assert.ok(result.allChanges.length > 0, 'Should report changes');
-    assert.ok(result.filesUpdated > 0, 'Should count files as updated');
+    expect(result.allChanges.length > 0).toBeTruthy();
+    expect(result.filesUpdated > 0).toBeTruthy();
 
     // JSON should NOT be written
     const afterJsonStr = readFileSync(
       join(testRoot, '.claude', 'traces', 'high-level.json'), 'utf-8',
     );
-    assert.equal(afterJsonStr, originalJsonStr, 'JSON should not be modified in dry-run mode');
+    expect(afterJsonStr).toBe(originalJsonStr);
   });
 
   it('--dry-run shows summary with DRY RUN prefix', () => {
@@ -1647,7 +1638,7 @@ describe('syncAll conflict detection integration', () => {
     writeFileSync(join(testRoot, '.claude', 'traces', 'high-level.md'), md);
 
     const result = syncAll({ projectRoot: testRoot, dryRun: true });
-    assert.ok(result.summary.text.startsWith('[DRY RUN]'));
+    expect(result.summary.text.startsWith('[DRY RUN]')).toBeTruthy();
   });
 
   it('no conflict when lastGenerated timestamps match (normal edit scenario)', () => {
@@ -1667,13 +1658,13 @@ describe('syncAll conflict detection integration', () => {
     const result = syncAll({ projectRoot: testRoot });
 
     // Should have NO conflicts (same lastGenerated = markdown was just edited)
-    assert.equal(result.allConflicts.length, 0, 'No conflicts when timestamps match');
+    expect(result.allConflicts.length).toBe(0);
 
     // JSON should be updated normally
     const afterJson = JSON.parse(
       readFileSync(join(testRoot, '.claude', 'traces', 'high-level.json'), 'utf-8'),
     );
-    assert.equal(afterJson.modules[0].dependencies[0].targetId, 'knowledge-team');
+    expect(afterJson.modules[0].dependencies[0].targetId).toBe('knowledge-team');
   });
 
   it('low-level conflict detection works for diverged timestamps', () => {
@@ -1697,14 +1688,13 @@ describe('syncAll conflict detection integration', () => {
     const result = syncAll({ projectRoot: testRoot });
 
     // Should detect conflict
-    assert.ok(result.allConflicts.length > 0, 'Should detect low-level conflicts');
+    expect(result.allConflicts.length > 0).toBeTruthy();
 
     // JSON should NOT be modified
     const afterJson = JSON.parse(
       readFileSync(join(testRoot, '.claude', 'traces', 'low-level', 'dev-team.json'), 'utf-8'),
     );
-    assert.equal(afterJson.files[0].exports.length, 2,
-      'JSON exports should not be overwritten when conflict detected');
+    expect(afterJson.files[0].exports.length).toBe(2);
   });
 
   it('AC-10.3: sync produces summary with correct counts', () => {
@@ -1722,13 +1712,13 @@ knowledge-team | reads-from | Reads KB for context`,
 
     const result = syncAll({ projectRoot: testRoot });
 
-    assert.ok(result.summary, 'Should include summary');
-    assert.ok(result.summary.text.includes('Modules updated:'));
-    assert.ok(result.summary.text.includes('Fields changed:'));
-    assert.ok(result.summary.text.includes('Conflicts detected:'));
-    assert.ok(result.summary.text.includes('Parsing errors:'));
-    assert.equal(result.summary.conflictsDetected, 0);
-    assert.ok(result.summary.fieldsChanged > 0);
+    expect(result.summary).toBeTruthy();
+    expect(result.summary.text.includes('Modules updated:')).toBeTruthy();
+    expect(result.summary.text.includes('Fields changed:')).toBeTruthy();
+    expect(result.summary.text.includes('Conflicts detected:')).toBeTruthy();
+    expect(result.summary.text.includes('Parsing errors:')).toBeTruthy();
+    expect(result.summary.conflictsDetected).toBe(0);
+    expect(result.summary.fieldsChanged > 0).toBeTruthy();
   });
 
   it('AC-10.3: summary includes parsing error count', () => {
@@ -1746,7 +1736,7 @@ knowledge-team | reads-from | Reads KB for context`,
 
     const result = syncAll({ projectRoot: testRoot });
 
-    assert.ok(result.summary.errorsEncountered > 0, 'Should report parsing errors in summary');
+    expect(result.summary.errorsEncountered > 0).toBeTruthy();
   });
 
   it('force + dry-run: shows changes without writing despite conflicts', () => {
@@ -1769,13 +1759,13 @@ knowledge-team | reads-from | Reads KB for context`,
     const result = syncAll({ projectRoot: testRoot, force: true, dryRun: true });
 
     // Force bypasses conflict, dry-run prevents writing
-    assert.equal(result.allConflicts.length, 0);
-    assert.ok(result.allChanges.length > 0);
+    expect(result.allConflicts.length).toBe(0);
+    expect(result.allChanges.length > 0).toBeTruthy();
 
     // JSON should NOT be written
     const afterJsonStr = readFileSync(
       join(testRoot, '.claude', 'traces', 'high-level.json'), 'utf-8',
     );
-    assert.equal(afterJsonStr, originalJsonStr);
+    expect(afterJsonStr).toBe(originalJsonStr);
   });
 });

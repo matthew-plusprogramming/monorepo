@@ -10,11 +10,10 @@
  * - Untraced files only (exit 0) -- AC-8.4
  * - Missing trace system (exit 0) -- AC-8.5
  *
- * Run with: node --test .claude/scripts/__tests__/trace-commit-staleness.test.mjs
+ * Run with: npx vitest run --config .claude/scripts/vitest.config.mjs trace-commit-staleness.test.mjs
  */
 
-import { describe, it, beforeEach, afterEach } from 'node:test';
-import assert from 'node:assert/strict';
+import { describe, it, beforeEach, afterEach, expect } from 'vitest';
 import { mkdirSync, writeFileSync, rmSync, utimesSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -188,7 +187,7 @@ describe('AC-8.3: Non-git-commit Bash commands', () => {
       { tool_input: { command: 'git status' } },
       testRoot,
     );
-    assert.equal(result.exitCode, 0);
+    expect(result.exitCode).toBe(0);
   });
 
   it('should exit 0 for ls command', async () => {
@@ -196,7 +195,7 @@ describe('AC-8.3: Non-git-commit Bash commands', () => {
       { tool_input: { command: 'ls -la' } },
       testRoot,
     );
-    assert.equal(result.exitCode, 0);
+    expect(result.exitCode).toBe(0);
   });
 
   it('should exit 0 for npm test command', async () => {
@@ -204,7 +203,7 @@ describe('AC-8.3: Non-git-commit Bash commands', () => {
       { tool_input: { command: 'npm test' } },
       testRoot,
     );
-    assert.equal(result.exitCode, 0);
+    expect(result.exitCode).toBe(0);
   });
 
   it('should exit 0 for git diff command', async () => {
@@ -212,7 +211,7 @@ describe('AC-8.3: Non-git-commit Bash commands', () => {
       { tool_input: { command: 'git diff HEAD~1' } },
       testRoot,
     );
-    assert.equal(result.exitCode, 0);
+    expect(result.exitCode).toBe(0);
   });
 
   it('should exit 0 for git log command', async () => {
@@ -220,12 +219,12 @@ describe('AC-8.3: Non-git-commit Bash commands', () => {
       { tool_input: { command: 'git log --oneline -5' } },
       testRoot,
     );
-    assert.equal(result.exitCode, 0);
+    expect(result.exitCode).toBe(0);
   });
 
   it('should exit 0 for empty input', async () => {
     const result = await runHook({}, testRoot);
-    assert.equal(result.exitCode, 0);
+    expect(result.exitCode).toBe(0);
   });
 
   it('should exit 0 for malformed JSON stdin', async () => {
@@ -241,12 +240,12 @@ describe('AC-8.3: Non-git-commit Bash commands', () => {
       child.stdin.end();
     });
 
-    assert.equal(exitCode, 0);
+    expect(exitCode).toBe(0);
   });
 
   it('should exit 0 for missing tool_input', async () => {
     const result = await runHook({ something_else: true }, testRoot);
-    assert.equal(result.exitCode, 0);
+    expect(result.exitCode).toBe(0);
   });
 });
 
@@ -277,7 +276,7 @@ describe('AC-8.5: Missing trace system', () => {
       { tool_input: { command: 'git commit -m "test"' } },
       testRoot,
     );
-    assert.equal(result.exitCode, 0);
+    expect(result.exitCode).toBe(0);
   });
 
   it('should exit 0 when .claude/traces/ directory does not exist', async () => {
@@ -293,7 +292,7 @@ describe('AC-8.5: Missing trace system', () => {
       { tool_input: { command: 'git commit -m "test"' } },
       testRoot,
     );
-    assert.equal(result.exitCode, 0);
+    expect(result.exitCode).toBe(0);
   });
 });
 
@@ -337,7 +336,7 @@ describe('AC-8.1: Commit with fresh traces', () => {
       { tool_input: { command: 'git commit -m "add service"' } },
       testRoot,
     );
-    assert.equal(result.exitCode, 0, `Expected exit 0 but got ${result.exitCode}. stderr: ${result.stderr}`);
+    expect(result.exitCode).toBe(0);
   });
 
   it('should exit 0 when multiple modules all have fresh traces', async () => {
@@ -364,7 +363,7 @@ describe('AC-8.1: Commit with fresh traces', () => {
       { tool_input: { command: 'git commit -m "add files"' } },
       testRoot,
     );
-    assert.equal(result.exitCode, 0, `Expected exit 0 but got ${result.exitCode}. stderr: ${result.stderr}`);
+    expect(result.exitCode).toBe(0);
   });
 });
 
@@ -406,13 +405,10 @@ describe('AC-8.2: Commit with stale traces', () => {
       { tool_input: { command: 'git commit -m "add service"' } },
       testRoot,
     );
-    assert.equal(result.exitCode, 2);
-    assert.ok(result.stderr.includes('app-core'), 'Should mention stale module name');
-    assert.ok(result.stderr.includes('BLOCKED'), 'Should include BLOCKED header');
-    assert.ok(
-      result.stderr.includes('trace-generate.mjs'),
-      'Should suggest regeneration command',
-    );
+    expect(result.exitCode).toBe(2);
+    expect(result.stderr.includes('app-core')).toBeTruthy();
+    expect(result.stderr.includes('BLOCKED')).toBeTruthy();
+    expect(result.stderr.includes('trace-generate.mjs')).toBeTruthy();
   });
 
   it('should list all stale modules in the error message', async () => {
@@ -432,9 +428,9 @@ describe('AC-8.2: Commit with stale traces', () => {
       { tool_input: { command: 'git commit -m "add both"' } },
       testRoot,
     );
-    assert.equal(result.exitCode, 2);
-    assert.ok(result.stderr.includes('app-core'), 'Should list app-core module');
-    assert.ok(result.stderr.includes('app-ui'), 'Should list app-ui module');
+    expect(result.exitCode).toBe(2);
+    expect(result.stderr.includes('app-core')).toBeTruthy();
+    expect(result.stderr.includes('app-ui')).toBeTruthy();
   });
 
   it('should exit 2 when trace file is missing entirely', async () => {
@@ -450,8 +446,8 @@ describe('AC-8.2: Commit with stale traces', () => {
       { tool_input: { command: 'git commit -m "add index"' } },
       testRoot,
     );
-    assert.equal(result.exitCode, 2);
-    assert.ok(result.stderr.includes('app-core'));
+    expect(result.exitCode).toBe(2);
+    expect(result.stderr.includes('app-core')).toBeTruthy();
   });
 
   it('should include regeneration instructions per stale module', async () => {
@@ -466,11 +462,8 @@ describe('AC-8.2: Commit with stale traces', () => {
       { tool_input: { command: 'git commit -m "add x"' } },
       testRoot,
     );
-    assert.equal(result.exitCode, 2);
-    assert.ok(
-      result.stderr.includes('trace-generate.mjs app-core'),
-      'Should suggest module-specific regeneration',
-    );
+    expect(result.exitCode).toBe(2);
+    expect(result.stderr.includes('trace-generate.mjs app-core')).toBeTruthy();
   });
 });
 
@@ -505,7 +498,7 @@ describe('AC-8.4: Untraced files in commit', () => {
       { tool_input: { command: 'git commit -m "add docs"' } },
       testRoot,
     );
-    assert.equal(result.exitCode, 0, 'Untraced-only commits should pass');
+    expect(result.exitCode).toBe(0);
   });
 
   it('should only report stale traced modules, not untraced files', async () => {
@@ -524,9 +517,9 @@ describe('AC-8.4: Untraced files in commit', () => {
       { tool_input: { command: 'git commit -m "mixed commit"' } },
       testRoot,
     );
-    assert.equal(result.exitCode, 2, 'Should block because of stale traced module');
-    assert.ok(result.stderr.includes('app-core'), 'Should mention stale module');
-    assert.ok(!result.stderr.includes('docs'), 'Should not mention untraced files');
+    expect(result.exitCode).toBe(2);
+    expect(result.stderr.includes('app-core')).toBeTruthy();
+    expect(result.stderr.includes('docs')).toBeFalsy();
   });
 
   it('should exit 0 when untraced files committed alongside fresh traced modules', async () => {
@@ -550,7 +543,7 @@ describe('AC-8.4: Untraced files in commit', () => {
       { tool_input: { command: 'git commit -m "mixed fresh"' } },
       testRoot,
     );
-    assert.equal(result.exitCode, 0, `Expected exit 0 but got ${result.exitCode}. stderr: ${result.stderr}`);
+    expect(result.exitCode).toBe(0);
   });
 });
 
@@ -587,7 +580,7 @@ describe('Git commit command detection', () => {
       testRoot,
     );
     // Should exit 2 because no trace file exists for app-core
-    assert.equal(result.exitCode, 2, 'Should detect git commit -m');
+    expect(result.exitCode).toBe(2);
   });
 
   it('should detect "git commit --amend" as a commit command', async () => {
@@ -599,7 +592,7 @@ describe('Git commit command detection', () => {
       { tool_input: { command: 'git commit --amend --no-edit' } },
       testRoot,
     );
-    assert.equal(result.exitCode, 2, 'Should detect git commit --amend');
+    expect(result.exitCode).toBe(2);
   });
 
   it('should detect chained command with git commit', async () => {
@@ -611,7 +604,7 @@ describe('Git commit command detection', () => {
       { tool_input: { command: 'git add . && git commit -m "chain commit"' } },
       testRoot,
     );
-    assert.equal(result.exitCode, 2, 'Should detect git commit in chained command');
+    expect(result.exitCode).toBe(2);
   });
 
   it('should NOT detect "git committed" as a commit', async () => {
@@ -619,7 +612,7 @@ describe('Git commit command detection', () => {
       { tool_input: { command: 'echo git committed something' } },
       testRoot,
     );
-    assert.equal(result.exitCode, 0, 'Should not trigger on "git committed"');
+    expect(result.exitCode).toBe(0);
   });
 });
 
@@ -668,9 +661,8 @@ describe('Mixed scenarios', () => {
       { tool_input: { command: 'git commit -m "mixed"' } },
       testRoot,
     );
-    assert.equal(result.exitCode, 2);
-    assert.ok(result.stderr.includes('app-ui'), 'Should list stale app-ui');
-    assert.ok(!result.stderr.includes('app-core') || result.stderr.includes('App Core') === false,
-      'Should not list fresh app-core as stale');
+    expect(result.exitCode).toBe(2);
+    expect(result.stderr.includes('app-ui')).toBeTruthy();
+    expect(!result.stderr.includes('app-core') || result.stderr.includes('App Core') === false).toBeTruthy();
   });
 });

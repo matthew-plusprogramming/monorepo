@@ -147,6 +147,29 @@ export const STOP_MANDATORY_DISPATCHES = [
 ];
 
 /**
+ * Phase-aware dispatch requirements for the Stop hook.
+ *
+ * Maps session phases to the set of mandatory Stop-hook dispatches required
+ * when the session is ending at that phase. Phases not listed require zero
+ * dispatches (pre-implementation and implementation phases).
+ *
+ * Implements: REQ-002 through REQ-006 of sg-phase-aware-stop-hook
+ * @type {Record<string, string[]>}
+ */
+export const STOP_PHASE_REQUIREMENTS = {
+  // Pre-implementation phases: no dispatches required (implicit default)
+  // Implementation phases: no dispatches required (implicit default)
+
+  // Review phases
+  reviewing: ['code-reviewer', 'security-reviewer'],
+  completion_verifying: ['code-reviewer', 'security-reviewer', 'completion-verifier'],
+
+  // Terminal phases
+  documenting: ['code-reviewer', 'security-reviewer', 'completion-verifier', 'documenter'],
+  complete: ['code-reviewer', 'security-reviewer', 'completion-verifier', 'documenter'],
+};
+
+/**
  * Override gate name mapping.
  * Maps prerequisite conditions to canonical gate names for gate-override.json.
  */

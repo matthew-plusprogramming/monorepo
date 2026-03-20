@@ -225,6 +225,42 @@ export function fileToModule(filePath, config) {
 }
 
 /**
+ * Map a file path to ALL matching modules (all-match semantics).
+ *
+ * Unlike fileToModule() which returns the first match, this returns all
+ * modules whose fileGlobs match the given path. Used for dependency
+ * resolution to detect ambiguous file glob configurations (REQ-002).
+ *
+ * @param {string} filePath - File path to resolve (relative to project root)
+ * @param {{ modules: Array<{ id: string, name: string, fileGlobs: string[] }> }} config - Trace config
+ * @returns {Array<{ id: string, name: string, fileGlobs: string[] }>} All matching modules (may be empty)
+ */
+export function fileToModules(filePath, config) {
+  if (!filePath || typeof filePath !== 'string') {
+    return [];
+  }
+
+  if (!config || !Array.isArray(config.modules)) {
+    return [];
+  }
+
+  // Normalize the file path: remove leading ./ or / for consistent matching
+  const normalizedPath = filePath.replace(/^\.\//, '').replace(/^\//, '');
+
+  const matches = [];
+  for (const mod of config.modules) {
+    for (const glob of mod.fileGlobs) {
+      if (matchesGlob(normalizedPath, glob)) {
+        matches.push(mod);
+        break; // This module matched, no need to check more globs for it
+      }
+    }
+  }
+
+  return matches;
+}
+
+/**
  * Get the path to a module's low-level trace JSON file.
  *
  * @param {string} moduleId - Module identifier (e.g., "node-server")
@@ -359,6 +395,39 @@ export function findFilesMatchingGlobs(globs, root) {
  */
 export function formatTimestamp(date) {
   return (date || new Date()).toISOString();
+}
+
+/**
+ * CommonMark special characters that must be backslash-escaped in .md output.
+ *
+ * Escaping order: backslashes first, then all remaining specials.
+ * This prevents double-escaping.
+ *
+ * Implements REQ-025 (NFR-10): Signature sanitization for markdown output.
+ */
+const COMMONMARK_SPECIAL_CHARS = ['\\', '`', '*', '_', '{', '}', '[', ']', '(', ')', '#', '+', '-', '.', '!', '|'];
+
+/**
+ * Backslash-escape CommonMark special characters in text for .md output.
+ *
+ * Applies to symbol names, signature, and signatureRaw values when rendering
+ * to .md trace files. JSON files store raw unescaped values.
+ *
+ * Escaping order: backslashes (`\`) first, then remaining specials.
+ * This prevents double-escaping.
+ *
+ * @param {string} text - Raw text to sanitize
+ * @returns {string} Text with CommonMark specials backslash-escaped
+ */
+export function sanitizeMarkdown(text) {
+  if (!text) return text;
+
+  let result = text;
+  for (const ch of COMMONMARK_SPECIAL_CHARS) {
+    // Escape each special character by replacing it with backslash + character
+    result = result.split(ch).join('\\' + ch);
+  }
+  return result;
 }
 
 // Export constants for use by other trace scripts

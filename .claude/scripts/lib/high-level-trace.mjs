@@ -19,42 +19,20 @@ import {
   HIGH_LEVEL_TRACE_PATH,
 } from './trace-utils.mjs';
 
-/** Allowed relationship types per the HighLevelTrace schema */
-const VALID_RELATIONSHIP_TYPES = [
-  'imports',
-  'calls',
-  'publishes-to',
-  'subscribes-from',
-  'reads-from',
-  'writes-to',
-  'configures',
-];
-
 /**
- * Validate a dependency object against the HighLevelTrace schema.
+ * Validate a dependency entry against the HighLevelTrace schema.
  *
- * @param {object} dep - Dependency object to validate
- * @param {string} context - Context string for error messages (e.g., "module 'dev-team' dependency[0]")
+ * Dependencies are string moduleIds (e.g., "sdlc-events", "node-server-core").
+ *
+ * @param {*} dep - Dependency entry to validate
+ * @param {string} context - Context string for error messages
  * @returns {{ valid: boolean, errors: string[] }}
  */
 function validateDependency(dep, context) {
   const errors = [];
 
-  if (!dep || typeof dep !== 'object') {
-    return { valid: false, errors: [`${context}: must be an object`] };
-  }
-  if (typeof dep.targetId !== 'string' || dep.targetId.length === 0) {
-    errors.push(`${context}: targetId must be a non-empty string`);
-  }
-  if (typeof dep.relationshipType !== 'string') {
-    errors.push(`${context}: relationshipType must be a string`);
-  } else if (!VALID_RELATIONSHIP_TYPES.includes(dep.relationshipType)) {
-    errors.push(
-      `${context}: relationshipType "${dep.relationshipType}" is not valid. Must be one of: ${VALID_RELATIONSHIP_TYPES.join(', ')}`,
-    );
-  }
-  if (typeof dep.description !== 'string') {
-    errors.push(`${context}: description must be a string`);
+  if (typeof dep !== 'string' || dep.length === 0) {
+    errors.push(`${context}: must be a non-empty string moduleId`);
   }
 
   return { valid: errors.length === 0, errors };
@@ -171,7 +149,8 @@ export function readExistingHighLevelTrace(projectRoot) {
  * @param {string} [options.projectRoot] - Project root override
  * @param {string} [options.generatedBy] - Generator identifier (default: "trace generate")
  * @param {object} [options.existingTrace] - Existing trace data to merge from (for version increment)
- * @param {object} [options.dependencyData] - Manual dependency data keyed by module ID
+ * @param {object} [options.dependencyData] - Dependency data keyed by module ID (string moduleId arrays)
+ * @param {Array<{ path: string, matchedModules: string[] }>} [options.skippedFiles] - Files skipped during dependency aggregation due to ambiguous glob matches
  * @param {object} [options.config] - Pre-loaded trace config (avoids re-reading from disk)
  * @returns {object} HighLevelTrace-compliant JSON object
  */
@@ -234,6 +213,11 @@ export function generateHighLevelTraceJSON(options = {}) {
     modules,
   };
 
+  // Add skippedFiles if provided (from dependency aggregation)
+  if (options.skippedFiles && Array.isArray(options.skippedFiles)) {
+    trace.skippedFiles = options.skippedFiles;
+  }
+
   return trace;
 }
 
@@ -266,29 +250,39 @@ export function generateHighLevelTraceMarkdown(trace) {
     lines.push(`**File Globs**: ${mod.fileGlobs.map(g => '`' + g + '`').join(', ')}`);
     lines.push('');
 
-    // Dependencies section (pipe-delimited per spec)
+    // Dependencies section (string moduleId list)
     lines.push('### Dependencies');
     lines.push('');
     if (mod.dependencies.length > 0) {
-      lines.push('target | relationship-type | description');
       for (const dep of mod.dependencies) {
-        lines.push(`${dep.targetId} | ${dep.relationshipType} | ${dep.description}`);
+        lines.push(`- ${dep}`);
       }
     } else {
       lines.push('(none)');
     }
     lines.push('');
 
-    // Dependents section (pipe-delimited per spec)
+    // Dependents section (string moduleId list)
     lines.push('### Dependents');
     lines.push('');
     if (mod.dependents.length > 0) {
-      lines.push('target | relationship-type | description');
       for (const dep of mod.dependents) {
-        lines.push(`${dep.targetId} | ${dep.relationshipType} | ${dep.description}`);
+        lines.push(`- ${dep}`);
       }
     } else {
       lines.push('(none)');
+    }
+    lines.push('');
+  }
+
+  // Skipped files section (from dependency aggregation ambiguous glob matches)
+  if (trace.skippedFiles && trace.skippedFiles.length > 0) {
+    lines.push('## Skipped Files');
+    lines.push('');
+    lines.push('Files skipped during dependency aggregation due to ambiguous glob matches:');
+    lines.push('');
+    for (const entry of trace.skippedFiles) {
+      lines.push(`- \`${entry.path}\` (matched: ${entry.matchedModules.join(', ')})`);
     }
     lines.push('');
   }
@@ -348,6 +342,24 @@ export function generateHighLevelTrace(options = {}) {
     version: trace.version,
   };
 }
+
+/**
+ * Allowed relationship types (retained for backward compatibility).
+ *
+ * These were used in the v1 object-format dependency entries
+ * ({targetId, relationshipType, description}). In v2, dependency
+ * entries are plain string moduleIds, but this constant is kept
+ * for reference and potential future use.
+ */
+const VALID_RELATIONSHIP_TYPES = [
+  'imports',
+  'calls',
+  'publishes-to',
+  'subscribes-from',
+  'reads-from',
+  'writes-to',
+  'configures',
+];
 
 // Export constants for external use
 export { VALID_RELATIONSHIP_TYPES };
