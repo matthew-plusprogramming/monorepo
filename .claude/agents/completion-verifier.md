@@ -110,6 +110,59 @@ In all other cases — including 2+ modified files, any new files created, any p
 
 **Fix action**: Fix failing tests or implementation bugs causing test failures.
 
+### Gate 5: e2e-test-verification (blocking)
+
+**Purpose**: Verify that E2E tests exist and pass for specs with cross-boundary contracts.
+
+**Applicability**: The gate applies only when the spec has cross-boundary contracts (HTTP, SSE, WebSocket, database, external service boundaries). If the spec has only internal contracts (module-to-module within same process), mark **N/A**.
+
+**Evaluation**:
+
+1. Check if the spec has cross-boundary contracts (from spec contracts section or manifest metadata)
+2. If no cross-boundary contracts: **N/A** with explanation: "Spec has no cross-boundary contracts -- E2E tests not required."
+3. If cross-boundary contracts present:
+   - Check for E2E test files in `tests/e2e/<spec-group-id>/`
+   - Verify E2E tests cover each cross-boundary acceptance criterion
+   - If tests exist and all pass: **PASSED**
+   - If any E2E test is missing or failing: **FAILED** -- report as Critical severity finding
+
+**All-or-nothing**: This gate reports PASS, FAIL, or N/A only. There is no PARTIAL status. Any single E2E test failure blocks completion.
+
+**Input**: spec_group_id, has_cross_boundary_contracts, e2e_test_results
+
+**Fix action**: Generate missing E2E tests via `/e2e-test` or fix failing E2E tests. If E2E test failure reveals a spec defect, escalate to human for spec amendment.
+
+### Gate 6: diagram-freshness-verification (blocking) [AC-6.6, AC-6.7]
+
+**Purpose**: Verify that generated `.mmd` diagram files are fresh relative to their YAML sources. Ensures documentation diagrams accurately reflect the current state of structured YAML docs.
+
+**Applicability**: Applicable when `.claude/docs/structured/generated/` directory exists and contains `.mmd` files. Marked N/A when no generated diagrams exist.
+
+**Evaluation**:
+
+1. List all `.mmd` files in `.claude/docs/structured/generated/`
+2. If no `.mmd` files exist: **N/A** with explanation: "No generated diagrams found"
+3. For each `.mmd` file:
+   a. Extract the source hash from the first line using the `%% source-hash: <hash>` pattern
+   b. Determine the corresponding YAML source file:
+   - `architecture.mmd` -> `architecture.yaml`
+   - `component-c4.mmd` -> `architecture.yaml`
+   - `erd.mmd` -> `data-models.yaml`
+   - `state-*.mmd` -> `states/index.yaml`
+   - `security.mmd` -> `security.yaml`
+   - `deployment.mmd` -> `deployment.yaml`
+   - `flow-*.mmd` -> corresponding flow file via `flows/index.yaml`
+     c. Read the YAML source and compute its current hash (first 8 chars of SHA-256 over LF-normalized content)
+     d. Compare the embedded hash against the current source hash
+4. If all hashes match: **PASSED**
+5. If any hash mismatch detected (AC-6.7): **FAILED** -- report each stale diagram as a High severity finding with:
+   - The `.mmd` file path
+   - The corresponding YAML source path
+   - The embedded hash vs current hash
+   - Fix action: "Run `node .claude/scripts/docs-generate.mjs` to regenerate stale diagrams"
+
+**Fix action**: Trigger regeneration via `node .claude/scripts/docs-generate.mjs`. After regeneration, re-verify that all hashes now match.
+
 ## Project-Specific Gates
 
 Project-specific gates are loaded from `.claude/completion-gates.md` at the project root's `.claude/` directory. [traces: REQ-011]
@@ -362,6 +415,8 @@ interface Finding {
    - todo-assumption-scan [traces: REQ-003]
    - memory-bank-update (advisory) [traces: REQ-004]
    - test-verification [traces: REQ-005]
+   - e2e-test-verification
+   - diagram-freshness-verification [AC-6.6, AC-6.7]
 6. **Run applicable project-specific gates**: Check each gate's applicability globs against modified_files [traces: REQ-014]
 7. **Compile results**: Aggregate gate results into the structured output format [traces: REQ-007]
 8. **Return to orchestrator**: Clean if all blocking gates pass; findings if any blocking gate fails

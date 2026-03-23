@@ -20,7 +20,7 @@
  * Spec: sg-structured-docs, Task 10
  */
 
-import { existsSync, readdirSync, mkdirSync, writeFileSync, statSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, mkdirSync, writeFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import YAML from 'yaml'; // Used for YAML.stringify() only — all parsing MUST go through yaml-utils.mjs
 
@@ -30,6 +30,11 @@ import {
   resolveProjectRoot,
   CURRENT_SCHEMA_VERSION,
 } from './lib/yaml-utils.mjs';
+
+import {
+  HIGH_LEVEL_TRACE_PATH,
+  LOW_LEVEL_TRACE_DIR,
+} from './lib/trace-utils.mjs';
 
 // =============================================================================
 // Constants
@@ -204,6 +209,140 @@ function hasSourceFiles(dirPath) {
 }
 
 // =============================================================================
+// Trace-Powered Scaffold Population (M3: REQ-018)
+// =============================================================================
+
+/**
+ * Load trace data for scaffold population.
+ *
+ * Task 3.5 (REQ-018): Reads high-level and low-level trace data to
+ * pre-populate TODO placeholders. Returns null if trace data is not available
+ * (scaffold behaves as before -- EC-6).
+ *
+ * @param {string} projectRoot - Absolute project root path
+ * @returns {object|null} Trace data map keyed by module id, or null
+ */
+function loadTraceDataForScaffold(projectRoot) {
+  try {
+    const highLevelPath = join(projectRoot, HIGH_LEVEL_TRACE_PATH);
+    if (!existsSync(highLevelPath)) {
+      return null;
+    }
+
+    const raw = readFileSync(highLevelPath, 'utf-8');
+    const highLevel = JSON.parse(raw);
+
+    if (!highLevel || !Array.isArray(highLevel.modules)) {
+      return null;
+    }
+
+    // Build a map of module data from high-level trace
+    const traceModules = {};
+    for (const mod of highLevel.modules) {
+      traceModules[mod.id] = {
+        name: mod.name,
+        description: mod.description || '',
+        dependencies: mod.dependencies || [],
+        dependents: mod.dependents || [],
+        exports: [],
+      };
+
+      // Try to load low-level trace for export names
+      try {
+        const llPath = join(projectRoot, LOW_LEVEL_TRACE_DIR, `${mod.id}.json`);
+        if (existsSync(llPath)) {
+          const llRaw = readFileSync(llPath, 'utf-8');
+          const llData = JSON.parse(llRaw);
+
+          if (llData && Array.isArray(llData.files)) {
+            for (const file of llData.files) {
+              if (Array.isArray(file.exports)) {
+                for (const exp of file.exports) {
+                  if (exp.symbol) {
+                    traceModules[mod.id].exports.push(exp.symbol);
+                  }
+                }
+              }
+            }
+          }
+        }
+      } catch {
+        // Low-level trace not available for this module -- skip
+      }
+    }
+
+    return traceModules;
+  } catch {
+    // Trace data not available -- return null (behaves as before)
+    return null;
+  }
+}
+
+/**
+ * Enrich scaffold candidates with trace data.
+ *
+ * Task 3.5 (REQ-018): Pre-populates TODO placeholders with export names,
+ * dependency lists, and module descriptions from traces. Only populates
+ * fields that are still at TODO/placeholder values (don't overwrite
+ * human-authored content).
+ *
+ * @param {Array<{name: string, description: string, path: string, responsibilities: string[]}>} candidates
+ * @param {object} traceModules - Trace data map keyed by module id
+ * @returns {Array} Enriched candidates
+ */
+function enrichCandidatesWithTraceData(candidates, traceModules) {
+  if (!traceModules) return candidates;
+
+  // Build lookup maps for matching candidates to trace modules
+  // Match by name (exact or close match)
+  const traceByName = {};
+  for (const [id, data] of Object.entries(traceModules)) {
+    traceByName[id] = data;
+    // Also index by lowercase name for fuzzy matching
+    traceByName[data.name.toLowerCase()] = data;
+  }
+
+  for (const candidate of candidates) {
+    // Try to find matching trace module
+    const traceMod = traceByName[candidate.name] ||
+      traceByName[candidate.name.toLowerCase()] ||
+      null;
+
+    if (!traceMod) continue;
+
+    // Only populate description if it's still a TODO placeholder
+    if (candidate.description && candidate.description.startsWith('TODO:') && traceMod.description) {
+      candidate.description = `TODO: ${traceMod.description}`;
+    }
+
+    // Add depends_on from trace data if not already set
+    if (!candidate.depends_on && traceMod.dependencies.length > 0) {
+      candidate.depends_on = traceMod.dependencies.map(dep => `TODO: verify dependency on ${dep}`);
+    }
+
+    // Enrich responsibilities with export names if still placeholder
+    if (candidate.responsibilities &&
+        candidate.responsibilities.length === 1 &&
+        candidate.responsibilities[0] === 'TODO: List key responsibilities') {
+      if (traceMod.exports.length > 0) {
+        // List up to 5 key exports as responsibility hints
+        const topExports = traceMod.exports.slice(0, 5);
+        candidate.responsibilities = topExports.map(
+          exp => `TODO: Describe responsibility for ${exp}`,
+        );
+        if (traceMod.exports.length > 5) {
+          candidate.responsibilities.push(
+            `TODO: ... and ${traceMod.exports.length - 5} more exports`,
+          );
+        }
+      }
+    }
+  }
+
+  return candidates;
+}
+
+// =============================================================================
 // Scaffold Pipeline
 // =============================================================================
 
@@ -238,6 +377,10 @@ export function scaffold(projectRoot) {
 
   // AC-7.1: Analyze project and generate draft
   const candidates = analyzeProjectStructure(projectRoot);
+
+  // REQ-018: Enrich candidates with trace data when available (EC-6: no-op without traces)
+  const traceModules = loadTraceDataForScaffold(projectRoot);
+  enrichCandidatesWithTraceData(candidates, traceModules);
 
   const archDoc = {
     schema_version: CURRENT_SCHEMA_VERSION,

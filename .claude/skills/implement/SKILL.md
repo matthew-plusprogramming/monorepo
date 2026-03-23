@@ -362,15 +362,34 @@ node .claude/scripts/session-checkpoint.mjs transition-phase verifying
 2. Run `/unify <spec-group-id>` to validate convergence
 ```
 
-## Parallel Execution with Test Writer
+## Parallel Execution with Test Writer (and E2E Test Writer)
 
-For larger tasks, implementation and test writing can run in parallel.
+For larger tasks, implementation, test writing, and E2E test writing can run in parallel.
 
 ### When to Parallelize
 
 - Multiple independent tasks in task list
 - Clear acceptance criteria for each task
 - Low coupling between tasks
+
+### 2-Way vs 3-Way Parallel Dispatch
+
+```
+Spec Approved + Challenges Pass
+        |
+   [Has cross-boundary contracts?]
+        |                    |
+       YES                  NO
+        |                    |
+  3-way parallel      2-way parallel
+  - implementer       - implementer
+  - test-writer       - test-writer
+  - e2e-test-writer
+```
+
+**Cross-boundary contracts** cross a process, network, or deployment boundary (HTTP, SSE, WebSocket, database, external service). Module-to-module imports within the same process are NOT cross-boundary.
+
+When cross-boundary contracts are present, dispatch the `e2e-test-writer` in parallel. It receives only the spec and contracts -- never implementation file paths (Practice 2.4).
 
 ### How to Parallelize
 
@@ -403,13 +422,24 @@ Task({
   Tests will initially fail until implementation complete.`,
   subagent_type: 'test-writer',
 });
+
+// Dispatch e2e-test-writer in parallel (only for cross-boundary specs)
+Task({
+  description: 'Generate E2E tests for logout functionality',
+  prompt: `Generate E2E tests for cross-boundary ACs from spec at .claude/specs/groups/sg-logout-button/spec.md
+
+  Use only spec contracts and acceptance criteria as input.
+  Do NOT read implementation files.
+  Write tests to tests/e2e/sg-logout-button/.`,
+  subagent_type: 'e2e-test-writer',
+});
 ```
 
 Main agent retains integration responsibility:
 
-- Collect outputs from both subagents
+- Collect outputs from all subagents (2 or 3)
 - Ensure tests pass with implementation
-- Run unifier to validate alignment
+- Run unifier to validate alignment (including E2E coverage at Step 9)
 
 ## Spec Conformance Rules
 

@@ -1,0 +1,474 @@
+# Structured Documentation Schema Reference
+# Version: 1
+#
+# This file defines the validation rules for all structured documentation types.
+# It serves as a human-readable schema reference. The programmatic validator
+# (docs-validate.mjs) enforces these rules.
+#
+# Document Types:
+#   1. architecture.yaml   - Module map with dependencies
+#   2. flows/index.yaml    - Flow index referencing per-flow files
+#   3. flows/*.yaml        - Individual flow definitions
+#   4. glossary.yaml       - Term definitions
+#   5. decisions.yaml      - Architecture decision records (extension)
+#   6. runbooks.yaml       - Operational procedures (extension)
+#   7. data-models.yaml    - Entity-relationship diagram source
+#   8. states/index.yaml   - State machine diagram source
+#   9. security.yaml       - Security boundary diagram source
+#  10. deployment.yaml     - Deployment topology diagram source
+
+schema_version: 1
+
+document_types:
+  architecture:
+    file: architecture.yaml
+    description: Module dependency map for the project
+    required_fields:
+      schema_version:
+        type: integer
+        description: Schema version number
+      modules:
+        type: list
+        description: List of module definitions
+        item_fields:
+          name:
+            type: string
+            required: true
+            unique: true
+            description: Unique module identifier
+          description:
+            type: string
+            required: true
+            description: What this module does
+          path:
+            type: string
+            required: true
+            description: Glob pattern for module source files
+          responsibilities:
+            type: list
+            required: true
+            description: List of responsibility strings
+        optional_item_fields:
+          depends_on:
+            type: list
+            description: List of module names this module depends on
+            alias: dependencies  # "dependencies" is accepted as an alias for "depends_on" by the validator
+          tags:
+            type: list
+            description: Arbitrary classification tags
+
+  flows_index:
+    file: flows/index.yaml
+    description: Index of all flow definitions
+    required_fields:
+      schema_version:
+        type: integer
+        description: Schema version number
+      flows:
+        type: list
+        description: List of flow references
+        item_fields:
+          name:
+            type: string
+            required: true
+            unique: true
+            description: Unique flow name
+          file:
+            type: string
+            required: true
+            description: Relative path to flow YAML file within flows/ directory
+          description:
+            type: string
+            required: true
+            description: What this flow represents
+
+  flow:
+    file: "flows/*.yaml (excluding index.yaml)"
+    description: Individual flow definition with ordered steps
+    required_fields:
+      schema_version:
+        type: integer
+        description: Schema version number
+      name:
+        type: string
+        description: Flow name (should match index entry)
+      description:
+        type: string
+        description: What this flow represents
+      steps:
+        type: list
+        description: Ordered list of flow steps
+        item_fields:
+          order:
+            type: integer
+            required: true
+            description: Step sequence number
+          module:
+            type: string
+            required: true
+            description: Module name (must exist in architecture.yaml)
+          action:
+            type: string
+            required: true
+            description: What happens at this step
+        optional_item_fields:
+          note:
+            type: string
+            description: Additional context for this step
+
+  glossary:
+    file: glossary.yaml
+    description: Project terminology definitions
+    required_fields:
+      schema_version:
+        type: integer
+        description: Schema version number
+      terms:
+        type: list
+        description: List of term definitions
+        item_fields:
+          term:
+            type: string
+            required: true
+            unique: true
+            description: The term being defined
+          definition:
+            type: string
+            required: true
+            description: Clear definition of the term
+        optional_item_fields:
+          see_also:
+            type: list
+            description: List of related term names (must exist in glossary)
+          aliases:
+            type: list
+            description: Alternative names for this term
+
+  decisions:
+    file: decisions.yaml
+    description: Architecture decision records (extension type, optional)
+    required_fields:
+      schema_version:
+        type: integer
+        description: Schema version number
+      decisions:
+        type: list
+        description: List of architecture decision records
+        item_fields:
+          id:
+            type: string
+            required: true
+            unique: true
+            description: "Unique decision identifier (e.g., ADR-001)"
+          title:
+            type: string
+            required: true
+            description: Short title describing the decision
+          status:
+            type: string
+            required: true
+            enum:
+              - proposed
+              - accepted
+              - deprecated
+              - superseded
+            description: Current status of the decision
+          date:
+            type: string
+            required: true
+            description: "Date the decision was made (YYYY-MM-DD)"
+          context:
+            type: string
+            required: true
+            description: Why this decision was needed
+          options:
+            type: list
+            required: true
+            description: List of options considered (strings)
+          chosen:
+            type: string
+            required: true
+            description: Which option was selected
+          consequences:
+            type: list
+            required: true
+            description: List of consequences of this decision (strings)
+        optional_item_fields:
+          superseded_by:
+            type: string
+            description: ID of the decision that supersedes this one
+
+  runbooks:
+    file: runbooks.yaml
+    description: Operational procedures (extension type, optional)
+    required_fields:
+      schema_version:
+        type: integer
+        description: Schema version number
+      runbooks:
+        type: list
+        description: List of operational runbooks
+        item_fields:
+          name:
+            type: string
+            required: true
+            unique: true
+            description: Unique runbook name
+          description:
+            type: string
+            required: true
+            description: When to use this runbook
+          steps:
+            type: list
+            required: true
+            description: Ordered list of steps
+            item_fields:
+              order:
+                type: integer
+                required: true
+                description: Step sequence number
+              action:
+                type: string
+                required: true
+                description: What to do at this step
+            optional_item_fields:
+              note:
+                type: string
+                description: Additional guidance
+        optional_item_fields:
+          severity:
+            type: string
+            enum:
+              - critical
+              - high
+              - medium
+              - low
+            description: Severity level of the situation this runbook addresses
+          tags:
+            type: list
+            description: Arbitrary classification tags
+
+  data_models:
+    file: data-models.yaml
+    description: Entity-relationship diagram source for data model visualization
+    required_fields:
+      schema_version:
+        type: integer
+        description: Schema version number
+      entities:
+        type: list
+        description: List of entity definitions
+        item_fields:
+          name:
+            type: string
+            required: true
+            unique: true
+            description: Unique entity name
+        optional_item_fields:
+          attributes:
+            type: list
+            description: List of entity attributes
+            item_fields:
+              name:
+                type: string
+                required: true
+                description: Attribute name
+              type:
+                type: string
+                required: true
+                description: Attribute data type
+            optional_item_fields:
+              primary:
+                type: boolean
+                description: Whether this attribute is a primary key
+              nullable:
+                type: boolean
+                description: Whether this attribute can be null
+          relationships:
+            type: list
+            description: List of relationships to other entities
+            item_fields:
+              target:
+                type: string
+                required: true
+                description: Target entity name
+              type:
+                type: string
+                required: true
+                description: "Relationship type (one-to-one, one-to-many, many-to-one, many-to-many)"
+            optional_item_fields:
+              label:
+                type: string
+                description: Human-readable relationship label
+          module:
+            type: string
+            description: Module grouping for large diagram collapse
+
+  states:
+    file: states/index.yaml
+    description: State machine diagram source for workflow visualization
+    required_fields:
+      schema_version:
+        type: integer
+        description: Schema version number
+      state_machines:
+        type: list
+        description: List of state machine definitions
+        item_fields:
+          name:
+            type: string
+            required: true
+            unique: true
+            description: Unique state machine name
+          states:
+            type: list
+            required: true
+            description: List of state definitions
+            item_fields:
+              name:
+                type: string
+                required: true
+                description: State name
+            optional_item_fields:
+              description:
+                type: string
+                description: State description
+          transitions:
+            type: list
+            required: true
+            description: List of state transitions
+            item_fields:
+              from:
+                type: string
+                required: true
+                description: Source state name
+              to:
+                type: string
+                required: true
+                description: Target state name
+            optional_item_fields:
+              trigger:
+                type: string
+                description: Event or condition that triggers the transition
+        optional_item_fields:
+          initial:
+            type: string
+            description: Initial state name
+          file:
+            type: string
+            description: Optional per-machine YAML file reference
+
+  security:
+    file: security.yaml
+    description: Security boundary diagram source for threat modeling visualization
+    required_fields:
+      schema_version:
+        type: integer
+        description: Schema version number
+      zones:
+        type: list
+        description: List of security zone definitions
+        item_fields:
+          name:
+            type: string
+            required: true
+            unique: true
+            description: Unique security zone name
+          trust_level:
+            type: string
+            required: true
+            description: "Trust level (untrusted, semi-trusted, trusted, highly-trusted)"
+        optional_item_fields:
+          components:
+            type: list
+            description: List of component names within this zone
+      data_flows:
+        type: list
+        description: List of data flow definitions between zones
+        item_fields:
+          from:
+            type: string
+            required: true
+            description: Source zone name
+          to:
+            type: string
+            required: true
+            description: Target zone name
+        optional_item_fields:
+          protocol:
+            type: string
+            description: Communication protocol
+          data:
+            type: string
+            description: Description of data being transferred
+
+  deployment:
+    file: deployment.yaml
+    description: Deployment topology diagram source for infrastructure visualization
+    required_fields:
+      schema_version:
+        type: integer
+        description: Schema version number
+      nodes:
+        type: list
+        description: List of infrastructure node definitions
+        item_fields:
+          name:
+            type: string
+            required: true
+            unique: true
+            description: Unique node name
+          type:
+            type: string
+            required: true
+            description: "Node type (server, container, database, cdn, load-balancer, cache, queue)"
+        optional_item_fields:
+          services:
+            type: list
+            description: List of services running on this node
+      connections:
+        type: list
+        description: List of connections between nodes
+        item_fields:
+          from:
+            type: string
+            required: true
+            description: Source node name
+          to:
+            type: string
+            required: true
+            description: Target node name
+        optional_item_fields:
+          protocol:
+            type: string
+            description: Communication protocol or port
+          label:
+            type: string
+            description: Connection description
+
+# Validation Rules (enforced by docs-validate.mjs):
+#
+# 1. Schema Version:
+#    - schema_version: 1 (current) -> no warnings
+#    - schema_version: < 1 (older) -> warning
+#    - schema_version: > 1 or non-integer -> error
+#
+# 2. Additional Properties:
+#    - All document types allow additional properties beyond those defined here
+#    - Additional properties are silently accepted (NFR-6)
+#
+# 3. Cross-References:
+#    - Flow step module names must exist in architecture.yaml modules
+#    - Glossary see_also entries must reference existing terms
+#    - Flow index file references must point to existing files in flows/
+#    - Flow file references are confined to flows/ directory (no ../)
+#
+# 4. Circular Dependencies:
+#    - Circular module dependencies are valid
+#    - Validator emits informational note listing cycles
+#    - Mermaid generator renders as bidirectional edges
+#
+# 5. Input Size Limits:
+#    - File size: max 1MB (1,048,576 bytes)
+#    - Modules: max 500
+#    - Flows: max 100

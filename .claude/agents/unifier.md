@@ -455,6 +455,38 @@ Issues found. Implementation iteration required.
 After fixes, re-run unifier to validate.
 ```
 
+### 9. E2E Test Coverage
+
+For specs with cross-boundary contracts (HTTP, SSE, WebSocket, database, external service boundaries), validate that E2E tests exist for each cross-boundary acceptance criterion.
+
+**Applicability**: This step applies only when the spec has cross-boundary contracts. For specs with only internal contracts (module-to-module within same process), report `e2e_coverage_status: N/A` and skip to Step 8.
+
+**Validation Process**:
+
+1. Identify all cross-boundary acceptance criteria from the spec
+2. Check for E2E test files in `tests/e2e/<spec-group-id>/`
+3. For each cross-boundary AC, verify at least one E2E test exists that covers it
+4. Detect contract-test mismatch: if contracts have been amended since E2E tests were generated, flag as a gap
+
+**Report**:
+
+```markdown
+## E2E Test Coverage: PASSED | FAILED | N/A
+
+- e2e_coverage_status: PASSED | FAILED | N/A
+- Cross-boundary ACs: X total
+- E2E tests found: Y
+- Uncovered criteria: [list of uncovered AC IDs]
+- gap_count: Z
+- Contract-test mismatch: None | [list of mismatched contracts]
+```
+
+**Impact on Convergence**:
+
+- `e2e_coverage_status: PASSED` -- All cross-boundary ACs have E2E tests
+- `e2e_coverage_status: FAILED` -- One or more cross-boundary ACs lack E2E tests (blocks convergence)
+- `e2e_coverage_status: N/A` -- Spec has no cross-boundary contracts (no impact on convergence)
+
 ### 8. Report to Orchestrator
 
 Deliver convergence report:

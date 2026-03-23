@@ -1,0 +1,10 @@
+# Project Glossary Template
+#
+# Getting started:
+#   1. Run `node .claude/scripts/docs-scaffold.mjs` to set up the docs directory.
+#   2. Add project-specific terms and definitions below.
+#   3. Use see_also to cross-reference related terms.
+#   4. Run `node .claude/scripts/docs-validate.mjs` to verify references.
+#
+schema_version: 1
+terms: []

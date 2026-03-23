@@ -24,9 +24,9 @@ export const ORCHESTRATOR_PREDECESSORS = {
   'atomizing': ['spec_authoring'],
   'enforcing': ['atomizing'],
   'investigating': ['enforcing'],
-  'awaiting_approval': ['investigating'],
-  'challenging:pre-orchestration': ['awaiting_approval'],
-  'implementing': ['challenging:pre-orchestration'],
+  'challenging:pre-orchestration': ['investigating'],
+  'auto_approval': ['challenging:pre-orchestration'],
+  'implementing': ['auto_approval'],
   'challenging:pre-test': ['implementing'],
   'testing': ['challenging:pre-test'],
   'verifying': ['testing'],
@@ -42,9 +42,9 @@ export const ORCHESTRATOR_PREDECESSORS = {
 export const ONEOFF_SPEC_PREDECESSORS = {
   'spec_authoring': ['prd_gathering'],
   'investigating': ['spec_authoring'],
-  'awaiting_approval': ['investigating'],
-  'challenging:pre-implementation': ['awaiting_approval'],
-  'implementing': ['challenging:pre-implementation'],
+  'challenging:pre-implementation': ['investigating'],
+  'auto_approval': ['challenging:pre-implementation'],
+  'implementing': ['auto_approval'],
   'challenging:pre-test': ['implementing'],
   'testing': ['challenging:pre-test'],
   'verifying': ['testing'],
@@ -62,7 +62,7 @@ export const ONEOFF_SPEC_PREDECESSORS = {
 export const EXEMPT_WORKFLOWS = ['oneoff-vibe', 'refactor', 'journal-only'];
 
 /**
- * Valid subagent types (20 entries).
+ * Valid subagent types (21 entries).
  * @type {string[]}
  */
 export const VALID_SUBAGENT_TYPES = [
@@ -73,6 +73,7 @@ export const VALID_SUBAGENT_TYPES = [
   'interface-investigator',
   'implementer',
   'test-writer',
+  'e2e-test-writer',
   'unifier',
   'code-reviewer',
   'security-reviewer',
@@ -127,6 +128,7 @@ export const REQUIRED_CHALLENGER_STAGES = {
 export const ENFORCED_SUBAGENT_TYPES = [
   'implementer',
   'test-writer',
+  'e2e-test-writer',
   'code-reviewer',
   'security-reviewer',
   'documenter',
@@ -175,6 +177,8 @@ export const STOP_PHASE_REQUIREMENTS = {
  */
 export const OVERRIDE_GATE_NAMES = {
   investigation: 'investigation',
+  investigation_convergence: 'investigation_convergence',
+  challenger_convergence: 'challenger_convergence',
   challenge_pre_impl: 'challenge_pre_impl',
   challenge_pre_orchestration: 'challenge_pre_orchestration',
   implementer_dispatch: 'implementer_dispatch',
@@ -184,6 +188,7 @@ export const OVERRIDE_GATE_NAMES = {
   security_review_convergence: 'security_review_convergence',
   documenter_dispatch: 'documenter_dispatch',
   stop_mandatory_dispatches: 'stop_mandatory_dispatches',
+  status_obligations: 'status_obligations',
 };
 
 /**
@@ -197,7 +202,115 @@ export const REQUIRED_CLEAN_PASSES = 2;
  * Valid convergence gate names for the update-convergence command.
  * @type {string[]}
  */
-export const VALID_CONVERGENCE_GATES = ['code_review', 'security_review'];
+export const VALID_CONVERGENCE_GATES = ['code_review', 'security_review', 'investigation', 'challenger'];
+
+// =============================================================================
+// Phase Obligations (Status Obligation Enforcement)
+// =============================================================================
+
+/**
+ * Static phase-to-obligation mapping.
+ * Each entry defines the manifest fields that must have specific values
+ * when leaving (exiting) the specified phase.
+ *
+ * Field paths use dot notation for nested fields:
+ * - "review_state" -> manifest.review_state
+ * - "convergence.spec_complete" -> manifest.convergence.spec_complete
+ *
+ * 13 obligation entries across 8 phases. Entry-semantics obligations
+ * (e.g., work_state = IMPLEMENTING) are checked at exit time alongside
+ * exit-semantics obligations (TECH-101 resolution).
+ *
+ * Implements: REQ-001, REQ-002, REQ-020 of sg-status-obligation-enforcement
+ */
+export const PHASE_OBLIGATIONS = Object.freeze({
+  spec_authoring: Object.freeze([
+    Object.freeze({ field: 'review_state', expected: 'DRAFT' }),
+    Object.freeze({ field: 'convergence.spec_complete', expected: true }),
+  ]),
+  investigating: Object.freeze([
+    Object.freeze({ field: 'convergence.investigation_converged', expected: true }),
+  ]),
+  challenging: Object.freeze([
+    Object.freeze({ field: 'convergence.challenger_converged', expected: true }),
+  ]),
+  implementing: Object.freeze([
+    Object.freeze({ field: 'work_state', expected: 'IMPLEMENTING' }),
+    Object.freeze({ field: 'convergence.all_acs_implemented', expected: true }),
+  ]),
+  testing: Object.freeze([
+    Object.freeze({ field: 'convergence.all_tests_passing', expected: true }),
+  ]),
+  verifying: Object.freeze([
+    Object.freeze({ field: 'convergence.unifier_passed', expected: true }),
+    Object.freeze({ field: 'work_state', expected: 'VERIFYING' }),
+  ]),
+  reviewing: Object.freeze([
+    Object.freeze({ field: 'convergence.code_review_passed', expected: true }),
+    Object.freeze({ field: 'convergence.security_review_passed', expected: true }),
+  ]),
+  completion_verifying: Object.freeze([
+    Object.freeze({ field: 'convergence.completion_verification_passed', expected: true }),
+  ]),
+  documenting: Object.freeze([
+    Object.freeze({ field: 'convergence.docs_generated', expected: true }),
+    Object.freeze({ field: 'work_state', expected: 'READY_TO_MERGE' }),
+  ]),
+});
+
+/**
+ * Resolve a dot-notation field path against an object.
+ * Returns undefined if any segment is missing.
+ *
+ * @param {string} path - Dot-notation field path (e.g., "convergence.spec_complete")
+ * @param {object} obj - Object to resolve against
+ * @returns {*} The resolved value, or undefined if any segment is missing
+ */
+function resolveFieldPath(path, obj) {
+  const segments = path.split('.');
+  let current = obj;
+  for (const segment of segments) {
+    if (current == null || typeof current !== 'object') {
+      return undefined;
+    }
+    // SEC-002: Guard against prototype pollution via crafted field paths
+    if (segment === '__proto__' || segment === 'constructor' || segment === 'prototype') {
+      return undefined;
+    }
+    current = current[segment];
+  }
+  return current;
+}
+
+/**
+ * Validate manifest fields against obligations for a given phase.
+ *
+ * Uses strict equality (===) for all comparisons -- no truthy coercion (REQ-012).
+ * Missing fields (undefined) are returned as null in the violation report (REQ-011).
+ * Returns { passed: true, violations: [] } for phases with no obligations (AC-1.3).
+ *
+ * Implements: REQ-001, REQ-011, REQ-012 of sg-status-obligation-enforcement
+ *
+ * @param {string} phase - Phase being left (outgoing phase)
+ * @param {object} manifest - Parsed manifest.json object
+ * @returns {{ passed: boolean, violations: Array<{field: string, expected: any, actual: any}> }}
+ */
+export function validateObligations(phase, manifest) {
+  const obligations = PHASE_OBLIGATIONS[phase];
+  if (!obligations || obligations.length === 0) {
+    return { passed: true, violations: [] };
+  }
+
+  const violations = [];
+  for (const { field, expected } of obligations) {
+    const actual = resolveFieldPath(field, manifest);
+    if (actual !== expected) { // strict equality (===)
+      violations.push({ field, expected, actual: actual === undefined ? null : actual });
+    }
+  }
+
+  return { passed: violations.length === 0, violations };
+}
 
 // =============================================================================
 // Query Functions
@@ -319,38 +432,31 @@ export function getPrerequisites(workflow, subagentType) {
 
   switch (subagentType) {
     case 'implementer': {
-      // interface-investigator dispatched
+      // AC-1.7, AC-1.8: Convergence-type prerequisites for investigation and challenger
       prerequisites.push({
-        type: 'dispatch',
-        subagent_type: 'interface-investigator',
-        gate_name: OVERRIDE_GATE_NAMES.investigation,
+        type: 'convergence',
+        gate: 'investigation',
+        required_count: REQUIRED_CLEAN_PASSES,
+        gate_name: OVERRIDE_GATE_NAMES.investigation_convergence,
       });
-      // challenger with appropriate stage
-      if (workflow === 'oneoff-spec') {
-        prerequisites.push({
-          type: 'dispatch',
-          subagent_type: 'challenger',
-          stage: 'pre-implementation',
-          gate_name: OVERRIDE_GATE_NAMES.challenge_pre_impl,
-        });
-      } else {
-        // orchestrator (default)
-        prerequisites.push({
-          type: 'dispatch',
-          subagent_type: 'challenger',
-          stage: 'pre-orchestration',
-          gate_name: OVERRIDE_GATE_NAMES.challenge_pre_orchestration,
-        });
-      }
+      prerequisites.push({
+        type: 'convergence',
+        gate: 'challenger',
+        required_count: REQUIRED_CLEAN_PASSES,
+        gate_name: OVERRIDE_GATE_NAMES.challenger_convergence,
+      });
       break;
     }
 
     case 'test-writer': {
-      prerequisites.push({
-        type: 'dispatch',
-        subagent_type: 'implementer',
-        gate_name: OVERRIDE_GATE_NAMES.implementer_dispatch,
-      });
+      // No coercive prerequisites — test-writer works from spec only (Practice 2.4)
+      // Implementer dispatch ordering is a workflow convention, not a gate requirement
+      break;
+    }
+
+    case 'e2e-test-writer': {
+      // No coercive prerequisites — e2e-test-writer works from spec/contracts only (Practice 2.4)
+      // Same dispatch pattern as test-writer: parallel with implementer, no ordering dependency
       break;
     }
 
@@ -370,16 +476,29 @@ export function getPrerequisites(workflow, subagentType) {
     }
 
     case 'security-reviewer': {
+      // Same prerequisites as code-reviewer — both run in parallel after review prerequisites
+      prerequisites.push({
+        type: 'dispatch',
+        subagent_type: 'challenger',
+        stage: 'pre-review',
+        gate_name: OVERRIDE_GATE_NAMES.challenge_pre_review,
+      });
+      prerequisites.push({
+        type: 'dispatch',
+        subagent_type: 'unifier',
+        gate_name: OVERRIDE_GATE_NAMES.unifier_dispatch,
+      });
+      break;
+    }
+
+    case 'documenter': {
+      // Requires BOTH review convergence gates — both run in parallel, both must converge
       prerequisites.push({
         type: 'convergence',
         gate: 'code_review',
         required_count: REQUIRED_CLEAN_PASSES,
         gate_name: OVERRIDE_GATE_NAMES.code_review_convergence,
       });
-      break;
-    }
-
-    case 'documenter': {
       prerequisites.push({
         type: 'convergence',
         gate: 'security_review',

@@ -1,0 +1,125 @@
+# REST API Contract Template
+# ==========================
+# Defines the wire protocol contract for a REST API endpoint.
+# Use this template in spec `yaml:contract` blocks with `_template: rest-api`.
+#
+# Format: "base plus" -- structured core fields + freeform context namespace.
+# Core fields are machine-parseable via standard YAML parse (no regex/NLP).
+# Freeform fields under `context:` are LLM-readable but not structurally validated.
+#
+# Core fields are always authoritative over freeform context fields.
+
+_schema:
+  required:
+    - method
+    - path
+    - content_type
+    - request_shape
+    - response_shape
+    - error_codes
+    - auth_method
+    - auth_scope
+    - required_headers
+    - rate_limit_tier
+    - error_sanitization
+  optional:
+    - boundary_visibility
+    - query_params
+    - path_params
+
+# --- Core Fields ---
+
+# HTTP method (GET, POST, PUT, PATCH, DELETE)
+method: POST
+
+# Endpoint path (use path-based versioning: /api/v{n}/...)
+path: /api/v1/sessions
+
+# Response content type (default: application/json)
+content_type: application/json
+
+# Request body shape (inline or reference to shared type)
+request_shape:
+  username: string
+  password: string
+
+# Response body shape (inline or reference to shared type)
+response_shape:
+  session_id: string
+  expires_at: string  # ISO 8601
+
+# Error response codes and their meanings
+error_codes:
+  400: Invalid request body
+  401: Invalid credentials
+  429: Rate limit exceeded
+  500: Internal server error
+
+# Authentication method (none, api-key, bearer-token, cookie-session, oauth2)
+auth_method: none
+
+# Required authorization scope (or "public" for unauthenticated endpoints)
+auth_scope: public
+
+# Required HTTP headers beyond standard ones
+required_headers:
+  - Content-Type
+
+# Rate limiting tier (none, standard, strict)
+rate_limit_tier: standard
+
+# Error sanitization strategy (full, safe-message-only, opaque)
+# full: return detailed errors (internal/dev only)
+# safe-message-only: return user-safe message, hide internals
+# opaque: return generic error code only
+error_sanitization: safe-message-only
+
+# --- Optional Fields ---
+
+# Boundary visibility (internal, external). Defaults to "external" when omitted.
+# external: all security fields required
+# internal: only auth_method required; other security fields optional
+# boundary_visibility: external
+
+# Query parameters
+# query_params:
+#   page: integer
+#   limit: integer
+
+# Path parameters
+# path_params:
+#   id: string (UUID)
+
+# --- Freeform Context (LLM-readable, not structurally validated) ---
+
+context:
+  description: "Create a new authenticated session"
+  notes: "Rate limiting applies per IP address. Credentials are validated against the user store."
+  related_endpoints:
+    - DELETE /api/v1/sessions/:id
+    - GET /api/v1/sessions/current
+
+_example:
+  _template: rest-api
+  method: POST
+  path: /api/v1/sessions
+  content_type: application/json
+  request_shape:
+    username: string
+    password: string
+  response_shape:
+    session_id: string
+    expires_at: string
+  error_codes:
+    400: Invalid request body
+    401: Invalid credentials
+    429: Rate limit exceeded
+  auth_method: none
+  auth_scope: public
+  required_headers:
+    - Content-Type
+  rate_limit_tier: standard
+  error_sanitization: safe-message-only
+  boundary_visibility: external
+  context:
+    description: "Create a new authenticated session"

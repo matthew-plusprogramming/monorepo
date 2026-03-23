@@ -30,6 +30,11 @@ import {
   formatConflictReport,
   buildSyncSummary,
   parseCliArgs,
+  classifyDivergence,
+  getKeyFn,
+  classifyConflictsForAutoMerge,
+  applyAutoMerge,
+  formatAutoMergeLog,
 } from '../trace-sync.mjs';
 
 // =============================================================================
@@ -140,18 +145,18 @@ function createLowLevelJson() {
       {
         filePath: 'apps/agent-orchestrator/src/dev-team/service.py',
         exports: [
-          { symbol: 'process_work_item', type: 'function' },
-          { symbol: 'DevTeamService', type: 'class' },
+          { symbol: 'process_work_item', type: 'function', lineNumber: 10, signature: '(items)' },
+          { symbol: 'DevTeamService', type: 'class', lineNumber: 25 },
         ],
         imports: [
           { source: '../knowledge-team/service', symbols: ['KnowledgeService'] },
           { source: '../common/models', symbols: ['WorkItem', 'Status'] },
         ],
         calls: [
-          { target: 'knowledge-team/service.py', function: 'query_knowledge', context: 'process_work_item' },
+          { callerFile: 'apps/agent-orchestrator/src/dev-team/service.py', callerLine: 42, calleeName: 'query_knowledge', calleeFile: 'knowledge-team/service.py', calleeLine: 10 },
         ],
         events: [
-          { type: 'publish', eventName: 'work.completed', channel: 'dev-team-output' },
+          { file: 'apps/agent-orchestrator/src/dev-team/service.py', line: 50, eventName: 'work.completed', type: 'emit' },
         ],
       },
     ],
@@ -159,12 +164,13 @@ function createLowLevelJson() {
 }
 
 function createLowLevelMarkdown(options = {}) {
-  const exports = options.exports || `process_work_item | function
-DevTeamService | class`;
+  // M1: Updated column formats to match contract-calls-events-schema
+  const exports = options.exports || `process_work_item | function | 10 | (items)
+DevTeamService | class | 25 | `;
   const imports = options.imports || `../knowledge-team/service | KnowledgeService
 ../common/models | WorkItem, Status`;
-  const calls = options.calls || `knowledge-team/service.py | query_knowledge | process_work_item`;
-  const events = options.events || `publish | work.completed | dev-team-output`;
+  const calls = options.calls || `apps/agent-orchestrator/src/dev-team/service.py | 42 | query_knowledge | knowledge-team/service.py | 10`;
+  const events = options.events || `apps/agent-orchestrator/src/dev-team/service.py | 50 | work.completed | emit`;
   const notes = options.notes || '';
 
   return `<!-- trace-id: dev-team -->
@@ -178,7 +184,7 @@ DevTeamService | class`;
 
 ### Exports
 
-symbol | type
+symbol | type | line | signature
 ${exports}
 
 ### Imports
@@ -188,12 +194,12 @@ ${imports}
 
 ### Function Calls
 
-target | function | context
+callerFile | callerLine | calleeName | calleeFile | calleeLine
 ${calls}
 
 ### Events
 
-type | event-name | channel
+file | line | eventName | type
 ${events}
 
 ## Notes (not synced)
@@ -291,10 +297,12 @@ describe('parsePipeDelimitedLine', () => {
     expect(result.error.includes('expected 3 columns, got 4')).toBeTruthy();
   });
 
-  it('should report error for empty fields', () => {
+  it('should allow empty fields (e.g., optional signature/calleeLine columns)', () => {
+    // Empty fields are allowed since M1: optional columns like signature and calleeLine
+    // can legitimately be empty. Section-specific parsers handle null semantics.
     const result = parsePipeDelimitedLine('target |  | description', 3, 'test');
-    expect(result.fields).toBe(null);
-    expect(result.error.includes('empty field')).toBeTruthy();
+    expect(result.fields).toEqual(['target', '', 'description']);
+    expect(result.error).toBe(null);
   });
 
   it('should skip empty lines', () => {
@@ -597,8 +605,9 @@ describe('parseLowLevelMarkdown', () => {
     const file = result.files[0];
     expect(file.filePath).toBe('apps/agent-orchestrator/src/dev-team/service.py');
     expect(file.exports.length).toBe(2);
-    expect(file.exports[0]).toEqual({ symbol: 'process_work_item', type: 'function' });
-    expect(file.exports[1]).toEqual({ symbol: 'DevTeamService', type: 'class' });
+    // M1: Exports now have 4 columns (symbol | type | line | signature)
+    expect(file.exports[0]).toEqual({ symbol: 'process_work_item', type: 'function', lineNumber: 10, signature: '(items)' });
+    expect(file.exports[1]).toEqual({ symbol: 'DevTeamService', type: 'class', lineNumber: 25 });
   });
 
   it('should parse file imports with comma-separated symbols', () => {
@@ -623,10 +632,13 @@ describe('parseLowLevelMarkdown', () => {
 
     const file = result.files[0];
     expect(file.calls.length).toBe(1);
+    // M1: Calls now have 5 columns per contract-calls-events-schema
     expect(file.calls[0]).toEqual({
-      target: 'knowledge-team/service.py',
-      function: 'query_knowledge',
-      context: 'process_work_item',
+      callerFile: 'apps/agent-orchestrator/src/dev-team/service.py',
+      callerLine: 42,
+      calleeName: 'query_knowledge',
+      calleeFile: 'knowledge-team/service.py',
+      calleeLine: 10,
     });
   });
 
@@ -636,10 +648,12 @@ describe('parseLowLevelMarkdown', () => {
 
     const file = result.files[0];
     expect(file.events.length).toBe(1);
+    // M1: Events now have 4 columns per contract-calls-events-schema
     expect(file.events[0]).toEqual({
-      type: 'publish',
+      file: 'apps/agent-orchestrator/src/dev-team/service.py',
+      line: 50,
       eventName: 'work.completed',
-      channel: 'dev-team-output',
+      type: 'emit',
     });
   });
 
@@ -656,7 +670,7 @@ describe('parseLowLevelMarkdown', () => {
 
   it('should detect modified export', () => {
     const md = createLowLevelMarkdown({
-      exports: 'handle_request | function',
+      exports: 'handle_request | function | 5 | (req)',
     });
     const result = parseLowLevelMarkdown(md);
 
@@ -678,12 +692,12 @@ describe('parseLowLevelMarkdown', () => {
 
   it('AC-10.4: should report error for wrong column count in exports', () => {
     const md = createLowLevelMarkdown({
-      exports: 'sym | type | extra_column',
+      exports: 'sym | type | extra_column | sig | extra',
     });
     const result = parseLowLevelMarkdown(md);
 
     expect(result.errors.length > 0).toBeTruthy();
-    expect(result.errors[0].includes('expected 2 columns')).toBeTruthy();
+    expect(result.errors[0].includes('expected 4 columns')).toBeTruthy();
   });
 
   it('should handle (side-effect) imports', () => {
@@ -1051,9 +1065,9 @@ describe('syncAll integration', () => {
       JSON.stringify(json, null, 2) + '\n',
     );
 
-    // Markdown with modified export
+    // Markdown with modified export (4-column format)
     const md = createLowLevelMarkdown({
-      exports: 'handle_request | function',
+      exports: 'handle_request | function | 5 | (req)',
     });
     writeFileSync(
       join(testRoot, '.claude', 'traces', 'low-level', 'dev-team.md'),
@@ -1151,10 +1165,10 @@ knowledge-team | reads-from | Reads KB for development context`,
     const noChangeResult = syncAll({ projectRoot: testRoot });
     expect(noChangeResult.filesUpdated).toBe(0);
 
-    // Step 4: Edit markdown - add a new event
+    // Step 4: Edit markdown - add a new event (M1: 4-column format)
     const editedMd = createLowLevelMarkdown({
-      events: `publish | work.completed | dev-team-output
-subscribe | work.assigned | triage-output`,
+      events: `apps/agent-orchestrator/src/dev-team/service.py | 50 | work.completed | emit
+apps/agent-orchestrator/src/dev-team/service.py | 60 | work.assigned | subscribe`,
     });
     writeFileSync(
       join(testRoot, '.claude', 'traces', 'low-level', 'dev-team.md'),
@@ -1767,5 +1781,387 @@ knowledge-team | reads-from | Reads KB for context`,
       join(testRoot, '.claude', 'traces', 'high-level.json'), 'utf-8',
     );
     expect(afterJsonStr).toBe(originalJsonStr);
+  });
+});
+
+// =============================================================================
+// REQ-024: Auto-Merge Classification Unit Tests
+// =============================================================================
+
+describe('classifyDivergence', () => {
+  const exportKeyFn = getKeyFn('exports');
+
+  it('should classify additions (entries in markdown not in JSON)', () => {
+    const jsonArr = [{ symbol: 'foo', type: 'function' }];
+    const mdArr = [
+      { symbol: 'foo', type: 'function' },
+      { symbol: 'bar', type: 'const' },
+    ];
+
+    const result = classifyDivergence(jsonArr, mdArr, exportKeyFn);
+    expect(result.additions).toHaveLength(1);
+    expect(result.additions[0].symbol).toBe('bar');
+    expect(result.deletions).toHaveLength(0);
+    expect(result.modifications).toHaveLength(0);
+  });
+
+  it('should classify deletions (entries in JSON not in markdown)', () => {
+    const jsonArr = [
+      { symbol: 'foo', type: 'function' },
+      { symbol: 'bar', type: 'const' },
+    ];
+    const mdArr = [{ symbol: 'foo', type: 'function' }];
+
+    const result = classifyDivergence(jsonArr, mdArr, exportKeyFn);
+    expect(result.additions).toHaveLength(0);
+    expect(result.deletions).toHaveLength(1);
+    expect(result.deletions[0].symbol).toBe('bar');
+    expect(result.modifications).toHaveLength(0);
+  });
+
+  it('should classify modifications (same key, different content)', () => {
+    const jsonArr = [{ symbol: 'foo', type: 'function' }];
+    const mdArr = [{ symbol: 'foo', type: 'const' }]; // Changed type
+
+    const result = classifyDivergence(jsonArr, mdArr, exportKeyFn);
+    expect(result.additions).toHaveLength(0);
+    expect(result.deletions).toHaveLength(0);
+    expect(result.modifications).toHaveLength(1);
+    expect(result.modifications[0].json.type).toBe('function');
+    expect(result.modifications[0].markdown.type).toBe('const');
+  });
+
+  it('should handle mixed additions, deletions, and modifications', () => {
+    const jsonArr = [
+      { symbol: 'keep', type: 'function' },
+      { symbol: 'remove', type: 'function' },
+      { symbol: 'modify', type: 'function' },
+    ];
+    const mdArr = [
+      { symbol: 'keep', type: 'function' },
+      { symbol: 'add', type: 'const' },
+      { symbol: 'modify', type: 'const' },
+    ];
+
+    const result = classifyDivergence(jsonArr, mdArr, exportKeyFn);
+    expect(result.additions).toHaveLength(1);
+    expect(result.additions[0].symbol).toBe('add');
+    expect(result.deletions).toHaveLength(1);
+    expect(result.deletions[0].symbol).toBe('remove');
+    expect(result.modifications).toHaveLength(1);
+    expect(result.modifications[0].json.symbol).toBe('modify');
+  });
+
+  it('should classify call graph entries correctly', () => {
+    const callKeyFn = getKeyFn('calls');
+    const jsonArr = [
+      { callerFile: 'a.mjs', callerLine: 10, calleeName: 'foo' },
+    ];
+    const mdArr = [
+      { callerFile: 'a.mjs', callerLine: 10, calleeName: 'foo' },
+      { callerFile: 'a.mjs', callerLine: 20, calleeName: 'bar' },
+    ];
+
+    const result = classifyDivergence(jsonArr, mdArr, callKeyFn);
+    expect(result.additions).toHaveLength(1);
+    expect(result.additions[0].calleeName).toBe('bar');
+  });
+});
+
+describe('classifyConflictsForAutoMerge', () => {
+  it('should classify additions-only conflicts as auto-mergeable (AC-auto-merge-additions)', () => {
+    const conflicts = [
+      {
+        module: 'file.mjs',
+        field: 'exports',
+        jsonValue: [{ symbol: 'foo', type: 'function' }],
+        markdownValue: [
+          { symbol: 'foo', type: 'function' },
+          { symbol: 'bar', type: 'const' },
+        ],
+      },
+    ];
+
+    const result = classifyConflictsForAutoMerge(conflicts);
+    expect(result.autoMergeable).toHaveLength(1);
+    expect(result.autoMergeable[0].additions).toHaveLength(1);
+    expect(result.autoMergeable[0].additions[0].symbol).toBe('bar');
+    expect(result.manual).toHaveLength(0);
+  });
+
+  it('should classify conflicts with deletions as manual (AC-auto-merge-fallback)', () => {
+    const conflicts = [
+      {
+        module: 'file.mjs',
+        field: 'exports',
+        jsonValue: [
+          { symbol: 'foo', type: 'function' },
+          { symbol: 'bar', type: 'const' },
+        ],
+        markdownValue: [{ symbol: 'foo', type: 'function' }],
+      },
+    ];
+
+    const result = classifyConflictsForAutoMerge(conflicts);
+    expect(result.autoMergeable).toHaveLength(0);
+    expect(result.manual).toHaveLength(1);
+    expect(result.manual[0].deletions).toHaveLength(1);
+  });
+
+  it('should classify conflicts with modifications as manual', () => {
+    const conflicts = [
+      {
+        module: 'file.mjs',
+        field: 'exports',
+        jsonValue: [{ symbol: 'foo', type: 'function' }],
+        markdownValue: [{ symbol: 'foo', type: 'const' }],
+      },
+    ];
+
+    const result = classifyConflictsForAutoMerge(conflicts);
+    expect(result.autoMergeable).toHaveLength(0);
+    expect(result.manual).toHaveLength(1);
+    expect(result.manual[0].modifications).toHaveLength(1);
+  });
+
+  it('should handle mixed auto-merge and manual conflicts', () => {
+    const conflicts = [
+      {
+        module: 'file.mjs',
+        field: 'exports',
+        jsonValue: [{ symbol: 'foo', type: 'function' }],
+        markdownValue: [
+          { symbol: 'foo', type: 'function' },
+          { symbol: 'bar', type: 'const' }, // Addition
+        ],
+      },
+      {
+        module: 'file.mjs',
+        field: 'imports',
+        jsonValue: [
+          { source: 'a', symbols: ['X'] },
+          { source: 'b', symbols: ['Y'] }, // Will be deleted
+        ],
+        markdownValue: [{ source: 'a', symbols: ['X'] }],
+      },
+    ];
+
+    const result = classifyConflictsForAutoMerge(conflicts);
+    expect(result.autoMergeable).toHaveLength(1);
+    expect(result.autoMergeable[0].conflict.field).toBe('exports');
+    expect(result.manual).toHaveLength(1);
+    expect(result.manual[0].conflict.field).toBe('imports');
+  });
+});
+
+describe('applyAutoMerge', () => {
+  it('should append additions to JSON array', () => {
+    const jsonArr = [{ symbol: 'foo', type: 'function' }];
+    const additions = [{ symbol: 'bar', type: 'const' }];
+
+    const result = applyAutoMerge(jsonArr, additions);
+    expect(result).toHaveLength(2);
+    expect(result[0].symbol).toBe('foo');
+    expect(result[1].symbol).toBe('bar');
+  });
+
+  it('should not mutate original array', () => {
+    const jsonArr = [{ symbol: 'foo', type: 'function' }];
+    const additions = [{ symbol: 'bar', type: 'const' }];
+
+    applyAutoMerge(jsonArr, additions);
+    expect(jsonArr).toHaveLength(1); // Original unchanged
+  });
+});
+
+describe('formatAutoMergeLog', () => {
+  it('should format auto-merged items with addition count', () => {
+    const mergedItems = [
+      {
+        conflict: { module: 'file.mjs', field: 'exports' },
+        additions: [{ symbol: 'bar', type: 'const' }],
+      },
+    ];
+
+    const lines = formatAutoMergeLog(mergedItems, []);
+    expect(lines.some(l => l.includes('Auto-merged'))).toBe(true);
+    expect(lines.some(l => l.includes('file.mjs'))).toBe(true);
+    expect(lines.some(l => l.includes('+1 addition'))).toBe(true);
+  });
+
+  it('should format manual items with deletion/modification counts', () => {
+    const manualItems = [
+      {
+        conflict: { module: 'file.mjs', field: 'exports' },
+        deletions: [{ symbol: 'old' }],
+        modifications: [{ json: {}, markdown: {} }],
+      },
+    ];
+
+    const lines = formatAutoMergeLog([], manualItems);
+    expect(lines.some(l => l.includes('Requires manual resolution'))).toBe(true);
+    expect(lines.some(l => l.includes('1 deletion'))).toBe(true);
+    expect(lines.some(l => l.includes('1 modification'))).toBe(true);
+  });
+});
+
+describe('parseCliArgs (auto-merge)', () => {
+  it('should parse --auto-merge flag', () => {
+    const result = parseCliArgs(['node', 'trace-sync.mjs', '--auto-merge']);
+    expect(result.autoMerge).toBe(true);
+    expect(result.force).toBe(false);
+    expect(result.dryRun).toBe(false);
+  });
+
+  it('should default autoMerge to false', () => {
+    const result = parseCliArgs(['node', 'trace-sync.mjs']);
+    expect(result.autoMerge).toBe(false);
+  });
+
+  it('should allow combining --auto-merge with --dry-run', () => {
+    const result = parseCliArgs(['node', 'trace-sync.mjs', '--auto-merge', '--dry-run']);
+    expect(result.autoMerge).toBe(true);
+    expect(result.dryRun).toBe(true);
+  });
+});
+
+// =============================================================================
+// REQ-024: Auto-Merge Integration Tests
+// =============================================================================
+
+describe('syncAll with --auto-merge', () => {
+  let testRoot;
+
+  beforeEach(() => {
+    testRoot = setupTestRoot();
+  });
+
+  afterEach(() => {
+    try {
+      rmSync(testRoot, { recursive: true, force: true });
+    } catch { /* ignore */ }
+  });
+
+  it('AC-auto-merge-additions: auto-merges additions-only divergence with dry-run log', () => {
+    // Setup: JSON with one dependency, newer lastGenerated
+    const json = createHighLevelJson();
+    json.lastGenerated = '2026-02-23T12:00:00.000Z';
+    writeFileSync(
+      join(testRoot, '.claude', 'traces', 'high-level.json'),
+      JSON.stringify(json, null, 2) + '\n',
+    );
+
+    // Markdown with original dep + new dep (addition only), older lastGenerated
+    const md = createHighLevelMarkdown({
+      devTeamDeps: `qa-team | publishes-to | Sends completed work items for QA review
+knowledge-team | reads-from | Reads KB for context`,
+    });
+    writeFileSync(join(testRoot, '.claude', 'traces', 'high-level.md'), md);
+
+    // Run sync with --auto-merge
+    const result = syncAll({ projectRoot: testRoot, autoMerge: true });
+
+    // Should auto-merge the addition
+    expect(result.allConflicts).toHaveLength(0);
+    expect(result.allChanges.some(c => c.includes('Auto-merged'))).toBe(true);
+    expect(result.autoMergeLog.length).toBeGreaterThan(0);
+
+    // Verify JSON has both dependencies
+    const afterJson = JSON.parse(
+      readFileSync(join(testRoot, '.claude', 'traces', 'high-level.json'), 'utf-8'),
+    );
+    const devTeam = afterJson.modules.find(m => m.id === 'dev-team');
+    expect(devTeam.dependencies).toHaveLength(2);
+    expect(devTeam.dependencies.some(d => d.targetId === 'qa-team')).toBe(true);
+    expect(devTeam.dependencies.some(d => d.targetId === 'knowledge-team')).toBe(true);
+  });
+
+  it('AC-auto-merge-fallback: falls back to manual for deletions', () => {
+    // Setup: JSON with two dependencies, newer lastGenerated
+    const json = createHighLevelJson();
+    json.modules[0].dependencies.push(
+      { targetId: 'knowledge-team', relationshipType: 'reads-from', description: 'Reads KB' },
+    );
+    json.lastGenerated = '2026-02-23T12:00:00.000Z';
+    writeFileSync(
+      join(testRoot, '.claude', 'traces', 'high-level.json'),
+      JSON.stringify(json, null, 2) + '\n',
+    );
+
+    // Markdown has one dep removed (deletion)
+    const md = createHighLevelMarkdown({
+      devTeamDeps: 'qa-team | publishes-to | Sends completed work items for QA review',
+    });
+    writeFileSync(join(testRoot, '.claude', 'traces', 'high-level.md'), md);
+
+    // Run sync with --auto-merge
+    const result = syncAll({ projectRoot: testRoot, autoMerge: true });
+
+    // Should report manual conflict for the deletion
+    expect(result.allConflicts.length).toBeGreaterThan(0);
+    expect(result.autoMergeLog.some(l => l.includes('manual resolution'))).toBe(true);
+
+    // JSON should NOT be modified for the conflicting field
+    const afterJson = JSON.parse(
+      readFileSync(join(testRoot, '.claude', 'traces', 'high-level.json'), 'utf-8'),
+    );
+    expect(afterJson.modules[0].dependencies).toHaveLength(2); // Unchanged
+  });
+
+  it('auto-merge for low-level additions-only exports', () => {
+    // Setup: low-level JSON with one export, newer lastGenerated
+    const json = createLowLevelJson();
+    json.lastGenerated = '2026-02-23T12:00:00.000Z';
+    writeFileSync(
+      join(testRoot, '.claude', 'traces', 'low-level', 'dev-team.json'),
+      JSON.stringify(json, null, 2) + '\n',
+    );
+
+    // Markdown with original exports + new export (addition only)
+    const md = createLowLevelMarkdown({
+      exports: `process_work_item | function | 10 | (items)
+DevTeamService | class | 25 |
+new_helper | function | 50 | (data)`,
+    });
+    writeFileSync(
+      join(testRoot, '.claude', 'traces', 'low-level', 'dev-team.md'),
+      md,
+    );
+
+    const result = syncAll({ projectRoot: testRoot, autoMerge: true });
+
+    // Should auto-merge the new export
+    expect(result.allConflicts).toHaveLength(0);
+    expect(result.allChanges.some(c => c.includes('Auto-merged'))).toBe(true);
+
+    // Verify JSON has all three exports
+    const afterJson = JSON.parse(
+      readFileSync(join(testRoot, '.claude', 'traces', 'low-level', 'dev-team.json'), 'utf-8'),
+    );
+    expect(afterJson.files[0].exports).toHaveLength(3);
+    expect(afterJson.files[0].exports.some(e => e.symbol === 'new_helper')).toBe(true);
+  });
+
+  it('without --auto-merge flag, conflicts are reported normally', () => {
+    // Same setup as additions-only test but without autoMerge flag
+    const json = createHighLevelJson();
+    json.lastGenerated = '2026-02-23T12:00:00.000Z';
+    writeFileSync(
+      join(testRoot, '.claude', 'traces', 'high-level.json'),
+      JSON.stringify(json, null, 2) + '\n',
+    );
+
+    const md = createHighLevelMarkdown({
+      devTeamDeps: `qa-team | publishes-to | Sends completed work items for QA review
+knowledge-team | reads-from | Reads KB for context`,
+    });
+    writeFileSync(join(testRoot, '.claude', 'traces', 'high-level.md'), md);
+
+    // Run sync WITHOUT --auto-merge
+    const result = syncAll({ projectRoot: testRoot });
+
+    // Should report as conflict (normal behavior)
+    expect(result.allConflicts.length).toBeGreaterThan(0);
+    expect(result.autoMergeLog).toHaveLength(0);
   });
 });

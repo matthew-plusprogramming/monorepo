@@ -80,6 +80,16 @@ const TEMPLATE_REQUIREMENTS = {
     frontmatterFields: ['id:', 'title:', 'owner:', 'status:'],
   },
 
+  'prd-report.template.md': {
+    placeholders: [],
+    sections: [
+      '## Phase 1: Preliminary Report',
+      '## Phase 2: Enriched Report',
+      '## Generation Log',
+    ],
+    frontmatterFields: ['prd_id:', 'phase:'],
+  },
+
   'prd-phase1.template.md': {
     placeholders: [],
     sections: [

@@ -223,8 +223,11 @@ function checkHeartbeat(filePath, fileContent) {
     return {
       status: 'block',
       message: `HEARTBEAT BLOCK: ${minutesSinceUpdate} minutes since last progress update.\n` +
-        `${MAX_WARNINGS_BEFORE_BLOCK} warnings ignored. Please update the spec's Implementation Evidence or Decision Log.\n` +
-        `To unblock: Add progress to the atomic spec or update manifest.last_progress_update.`
+        `${MAX_WARNINGS_BEFORE_BLOCK} warnings ignored.\n` +
+        `To unblock, do ONE of:\n` +
+        `  1. Update the Implementation Evidence or Decision Log section in the active spec file under .claude/specs/\n` +
+        `  2. Update the manifest.json last_progress_update field to the current timestamp: "${new Date().toISOString()}"\n` +
+        `Any edit to spec files in .claude/specs/ will reset the heartbeat.`
     };
   }
 
@@ -273,7 +276,7 @@ function main() {
     if (result.status === 'block') {
       console.error(result.message);
       // AC3.4: Block after 3 consecutive ignored warnings
-      process.exit(1);
+      process.exit(2);
     } else {
       console.error(result.message);
     }

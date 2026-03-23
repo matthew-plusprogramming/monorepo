@@ -43,7 +43,12 @@ import {
   getWorkflowType,
   getPredecessorGraph,
   wasPredecessorVisited,
+  validateObligations,
 } from './lib/workflow-dag.mjs';
+import {
+  loadOverrides,
+  findMatchingOverride,
+} from './lib/hook-utils.mjs';
 
 // Schema version for session.json
 const SESSION_VERSION = '1.0.0';
@@ -55,7 +60,8 @@ const VALID_PHASES = [
   'atomizing',
   'enforcing',
   'investigating',
-  'awaiting_approval',
+  'awaiting_approval',  // Kept for backwards compatibility (AC-1.12)
+  'auto_approval',      // AC-1.9: New transitional phase replacing awaiting_approval
   'implementing',
   'testing',
   'verifying',
@@ -530,6 +536,132 @@ function opTransitionPhase(newPhase) {
     }
   }
   // --- End DAG validation ---
+
+  // --- Obligation validation (status-obligation-enforcement) ---
+  // Check outgoing phase obligations BEFORE executing the transition.
+  // Runs after DAG validation so predecessor violations are caught first.
+  // Implements: REQ-003, REQ-004, REQ-005, REQ-008, REQ-009, REQ-010, REQ-013, REQ-014, REQ-015
+  const killSwitchPath = join(CLAUDE_DIR, 'coordination', 'gate-enforcement-disabled');
+  const killSwitchActive = existsSync(killSwitchPath);
+  if (!EXEMPT_WORKFLOWS.includes(workflow) && effectiveEnforcementLevel !== 'off' && !killSwitchActive) {
+    const specGroupId = session.active_work?.spec_group_id;
+    if (specGroupId) {
+      const manifestPath = join(CLAUDE_DIR, 'specs', 'groups', specGroupId, 'manifest.json');
+
+      try {
+        if (existsSync(manifestPath)) {
+          const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
+
+          // Check for phase-scoped override (REQ-014)
+          // CR-M1: Use shared loadOverrides/findMatchingOverride from hook-utils.mjs
+          // session-checkpoint.mjs is a CLI utility, not a hook, so no stdin data.
+          // Use active_work.spec_group_id as session identifier for override matching (AC-8.5).
+          const overrideGateName = `status_obligations:${oldPhase}`;
+          let overrideActive = false;
+
+          const overridePath = join(CLAUDE_DIR, 'coordination', 'gate-override.json');
+          const overrideList = loadOverrides(overridePath);
+          if (overrideList) {
+            const matchingOverride = findMatchingOverride(overrideList, overrideGateName, specGroupId);
+            if (matchingOverride) {
+              overrideActive = true;
+            }
+          }
+
+          if (overrideActive) {
+            // AC-9.4: Record overridden event for each obligation
+            const result = validateObligations(oldPhase, manifest);
+            for (const v of result.violations) {
+              addHistoryEntry(session, 'obligation_violation', {
+                phase: oldPhase,
+                field: v.field,
+                expected_value: v.expected,
+                actual_value: v.actual,
+                resolution: 'overridden',
+              });
+            }
+          } else {
+            // AC-9.3: Check if this is a successful re-attempt after a previous block
+            const hadPriorBlock = (session.history || []).some(
+              h => h.event_type === 'obligation_violation' &&
+                   h.details?.phase === oldPhase &&
+                   h.details?.resolution === 'blocked'
+            );
+
+            const result = validateObligations(oldPhase, manifest);
+
+            if (!result.passed) {
+              // Record violation events (REQ-015: written by enforcement script, not agent)
+              for (const v of result.violations) {
+                addHistoryEntry(session, 'obligation_violation', {
+                  phase: oldPhase,
+                  field: v.field,
+                  expected_value: v.expected,
+                  actual_value: v.actual,
+                  resolution: effectiveEnforcementLevel === 'graduated' ? 'blocked' : 'warned',
+                });
+              }
+
+              if (effectiveEnforcementLevel === 'graduated') {
+                // AC-4.4: Block immediately on first occurrence (no grace period)
+                saveSession(session);
+                const violationLines = result.violations.map(
+                  v => `  - ${v.field}: expected ${JSON.stringify(v.expected)}, actual ${v.actual === null ? 'null (not set)' : JSON.stringify(v.actual)}`
+                ).join('\n');
+                console.error(
+                  `Error: Manifest status obligations not satisfied for phase '${oldPhase}'.\n` +
+                  `Manifest status inconsistency:\n${violationLines}\n` +
+                  `Update the manifest fields listed above before transitioning from '${oldPhase}'.`
+                );
+                process.exit(1);
+              } else {
+                // warn-only: emit warning, allow transition (AC-4.2)
+                const violationLines = result.violations.map(
+                  v => `  - ${v.field}: expected ${JSON.stringify(v.expected)}, actual ${v.actual === null ? 'null (not set)' : JSON.stringify(v.actual)}`
+                ).join('\n');
+                console.error(
+                  `Warning: Manifest status obligations not satisfied for phase '${oldPhase}'.\n` +
+                  `Manifest status inconsistency:\n${violationLines}\n` +
+                  `Transition allowed (warn-only mode).`
+                );
+              }
+            } else if (hadPriorBlock) {
+              // AC-9.3: Successful re-attempt after prior block -- record "updated" events
+              // The obligations for this phase now all pass after agent corrected the manifest
+              const priorViolations = (session.history || []).filter(
+                h => h.event_type === 'obligation_violation' &&
+                     h.details?.phase === oldPhase &&
+                     h.details?.resolution === 'blocked'
+              );
+              // Record one "updated" event per field that was previously blocked
+              const seenFields = new Set();
+              for (const h of priorViolations) {
+                const fieldName = h.details?.field;
+                if (fieldName && !seenFields.has(fieldName)) {
+                  seenFields.add(fieldName);
+                  addHistoryEntry(session, 'obligation_violation', {
+                    phase: oldPhase,
+                    field: fieldName,
+                    expected_value: h.details?.expected_value,
+                    actual_value: h.details?.expected_value, // now matches expected
+                    resolution: 'updated',
+                  });
+                }
+              }
+            }
+          }
+        } else {
+          // AC-7.1: Missing manifest file -- fail-open with warning
+          console.error(`Warning: Obligation validation skipped -- manifest not found at ${manifestPath}`);
+        }
+      } catch (err) {
+        // AC-7.2: Fail-open on structural errors (malformed JSON, read failure) (REQ-010)
+        console.error(`Warning: Obligation validation skipped (structural error): ${err.message}`);
+      }
+    }
+    // No spec_group_id: skip silently (REQ-009, AC-6.5)
+  }
+  // --- End obligation validation ---
 
   session.active_work.current_phase = newPhase;
   session.phase_checkpoint.phase = newPhase;
@@ -1193,7 +1325,7 @@ function opGetStatus() {
  * update-convergence - Write convergence state to session.json (AC-5.1 through AC-5.6).
  *
  * Usage: update-convergence <gate_name> <clean_pass_count>
- * Valid gate_name: code_review, security_review
+ * Valid gate_name: code_review, security_review, investigation, challenger
  * clean_pass_count: non-negative integer
  *
  * Implements: REQ-016, REQ-017, REQ-018, REQ-019

@@ -545,7 +545,7 @@ All validation scripts are located in `.claude/scripts/`.
 
 ### workflow-stop-enforcement.mjs
 
-**Purpose**: Block session completion when mandatory dispatches have not occurred for spec-based workflows.
+**Purpose**: Block session completion when mandatory dispatches have not occurred or manifest status obligations are unsatisfied for spec-based workflows.
 
 **Hook Type**: Stop (runs on session completion)
 
@@ -557,11 +557,15 @@ All validation scripts are located in `.claude/scripts/`.
 2. Reads `session.json` for workflow type and dispatch history
 3. Checks `stop-hook-active` sentinel -- exits 0 if present (re-entry prevention)
 4. If exempt workflow: exits 0
-5. Checks all 4 mandatory dispatch records in `subagent_tasks`
-6. If all present: exits 0
-7. If missing: checks `gate-override.json` for stop-gate override
-8. If override found: exits 0
-9. Creates `stop-hook-active` sentinel, then outputs `{"decision": "block", "reason": "..."}` via stdout
+5. Checks phase-aware mandatory dispatch records in `subagent_tasks`
+6. Checks manifest status obligations for the current phase (see [Status Obligation Enforcement](#status-obligation-enforcement) below)
+7. If all dispatch and obligation checks pass: exits 0
+8. If dispatch violations: checks `gate-override.json` for stop-gate override
+9. If obligation violations: checks for phase-scoped override (`status_obligations:<phase>`)
+10. Builds combined block message distinguishing "Missing mandatory dispatches" from "Manifest status inconsistency"
+11. Creates `stop-hook-active` sentinel, then outputs `{"decision": "block", "reason": "..."}` via stdout
+
+**Obligation Enforcement Level**: The stop hook reads `enforcement_level` from `session.phase_checkpoint`. At `warn-only`, obligation violations are logged to stderr but do not block. At `graduated`, obligation violations contribute to the block decision. At `off`, obligation validation is skipped.
 
 **Blocking Mechanism**: stdout JSON `{"decision": "block", "reason": "..."}` -- NOT stderr + exit 2.
 
@@ -647,6 +651,115 @@ All validation scripts are located in `.claude/scripts/`.
 
 - `0`: Allow the commit (all traces current, or no traced modules affected)
 - `2`: Block the commit (stale traces detected, provides `trace-generate` instructions)
+
+---
+
+## Status Obligation Enforcement
+
+Status obligation enforcement validates that manifest status fields have the expected values when leaving a workflow phase. It catches manifest drift -- where the manifest stops reflecting actual work completion -- at two enforcement points: phase transitions (`session-checkpoint.mjs`) and session completion (`workflow-stop-enforcement.mjs`).
+
+### How It Works
+
+A static `PHASE_OBLIGATIONS` mapping (exported from `workflow-dag.mjs`) defines which manifest fields must have which values when exiting each phase. The `validateObligations(phase, manifest)` function checks these fields using strict equality (`===`) and returns any violations.
+
+Both `session-checkpoint.mjs` and `workflow-stop-enforcement.mjs` import and call `validateObligations` at their respective enforcement points.
+
+### Phase-to-Obligation Mapping
+
+| Phase (on exit)        | Manifest Field                               | Expected Value     |
+| ---------------------- | -------------------------------------------- | ------------------ |
+| `spec_authoring`       | `review_state`                               | `"DRAFT"`          |
+| `spec_authoring`       | `convergence.spec_complete`                  | `true`             |
+| `investigating`        | `convergence.investigation_converged`        | `true`             |
+| `challenging`          | `convergence.challenger_converged`           | `true`             |
+| `implementing`         | `work_state`                                 | `"IMPLEMENTING"`   |
+| `implementing`         | `convergence.all_acs_implemented`            | `true`             |
+| `testing`              | `convergence.all_tests_passing`              | `true`             |
+| `verifying`            | `convergence.unifier_passed`                 | `true`             |
+| `verifying`            | `work_state`                                 | `"VERIFYING"`      |
+| `reviewing`            | `convergence.code_review_passed`             | `true`             |
+| `reviewing`            | `convergence.security_review_passed`         | `true`             |
+| `completion_verifying` | `convergence.completion_verification_passed` | `true`             |
+| `documenting`          | `convergence.docs_generated`                 | `true`             |
+| `documenting`          | `work_state`                                 | `"READY_TO_MERGE"` |
+
+13 obligations across 8 phases. Phases not listed (e.g., `challenging`, `prd_gathering`) have no obligations and always pass validation.
+
+### Enforcement Points
+
+**Phase transitions** (`session-checkpoint.mjs transition-phase`): Checks obligations for the outgoing phase (the phase being left) after DAG predecessor validation and before the phase is updated. At `graduated` enforcement, violations block immediately with no grace period. At `warn-only`, violations emit warnings but allow the transition.
+
+**Session completion** (`workflow-stop-enforcement.mjs`): Checks obligations for the current phase at session end. Obligations for phases previously skipped via `override-skip` are excluded. The block message clearly separates "Missing mandatory dispatches" from "Manifest status inconsistency" with specific field names and expected values.
+
+### Enforcement Levels
+
+Obligation enforcement follows the same enforcement level as other workflow enforcement:
+
+- **off**: No obligation validation occurs
+- **warn-only**: Violations emit warnings but do not block; `obligation_violation` events recorded with `resolution: "warned"`
+- **graduated**: Violations block the transition or session completion; events recorded with `resolution: "blocked"`
+
+### Override Mechanism
+
+Phase-scoped overrides use the gate name pattern `status_obligations:<phase>` in `gate-override.json`:
+
+```json
+{
+  "gate": "status_obligations:implementing",
+  "session_id": "<spec_group_id>",
+  "timestamp": "2026-03-20T12:00:00Z",
+  "rationale": "all_acs_implemented not applicable: infrastructure-only spec"
+}
+```
+
+A blanket `status_obligations` gate name (without phase suffix) is not supported. Each phase must be overridden individually.
+
+### Kill Switch
+
+The existing kill switch (`.claude/coordination/gate-enforcement-disabled`) disables obligation enforcement alongside all other enforcement.
+
+### Fail-Open Behavior
+
+- **Missing manifest file**: Obligation check skipped with warning
+- **Malformed manifest JSON**: Obligation check skipped with warning
+- **Missing spec_group_id**: Obligation check skipped silently
+- **Missing manifest fields**: Treated as `null` (semantic violation, not structural error)
+
+### Audit Trail
+
+Obligation violations are recorded in `session.json` history as `obligation_violation` events:
+
+```json
+{
+  "event_type": "obligation_violation",
+  "timestamp": "<ISO 8601>",
+  "details": {
+    "phase": "implementing",
+    "field": "convergence.all_acs_implemented",
+    "expected_value": true,
+    "actual_value": false,
+    "resolution": "blocked"
+  }
+}
+```
+
+Resolution values: `blocked` (graduated enforcement blocked), `warned` (warn-only allowed with warning), `overridden` (phase-scoped override applied), `updated` (agent corrected the manifest and re-attempted successfully).
+
+These events are written exclusively by the enforcement scripts, not by agents.
+
+### Baseline Audit
+
+The `obligation-baseline-audit.mjs` script audits recent spec group manifests against the obligation mapping to measure the baseline drift rate:
+
+```bash
+node .claude/scripts/obligation-baseline-audit.mjs [--limit N]
+```
+
+Outputs a field-level drift report to stderr and a machine-readable JSON summary to stdout.
+
+### Workflow Scoping
+
+Obligation enforcement applies only to spec-based workflows (`oneoff-spec`, `orchestrator`). Exempt workflows (`oneoff-vibe`, `refactor`, `journal-only`) skip obligation validation entirely.
 
 ---
 

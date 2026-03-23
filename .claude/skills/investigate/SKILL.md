@@ -59,7 +59,28 @@ Determine what's being investigated:
 | `/investigate --all`             | All active specs in `.claude/specs/groups/`   |
 | `/investigate sg-a sg-b sg-c`    | Exactly those three spec groups               |
 
-### 2. Dispatch Interface Investigator
+### 2. Investigation Convergence Loop
+
+The investigation runs as a convergence loop with auto-decision engine integration.
+
+**Loop state** (owned by this skill, not the investigator agent):
+
+```json
+{
+  "gate": "investigation",
+  "iteration_count": 0,
+  "clean_pass_count": 0,
+  "max_iterations": 5,
+  "required_clean_passes": 2,
+  "findings_history": [],
+  "cross_stage_resolution_count": 0,
+  "cross_stage_resolution_cap": 3
+}
+```
+
+**Loop mechanics:**
+
+1. **Dispatch investigator** for one pass:
 
 ```
 Task: interface-investigator
@@ -68,6 +89,7 @@ Prompt: |
 
   Spec groups: <list>
   Mode: <single-spec | cross | master>
+  Pass: <iteration_count + 1>
 
   Focus on:
   1. Environment variable naming consistency
@@ -75,42 +97,69 @@ Prompt: |
   3. Data shape consistency (field names, types, required/optional)
   4. Deployment assumption consistency (infra, secrets management)
   5. Cross-spec dependencies and their assumptions
+
+  Include structured confidence enum (high/medium/low) and deterministic finding IDs
+  in format inv-{category}-{hash} for each finding.
 ```
 
-### 3. Generate Investigation Report
+2. **Evaluate findings**: If no Medium+ findings, increment `clean_pass_count`. Otherwise reset to 0.
 
-Agent produces a structured report with:
+3. **Auto-decision engine**: For Medium+ findings, invoke auto-decision engine:
+   - Findings with valid recommendations (action verb + field reference + high/medium confidence) are auto-accepted
+   - Security-tagged, low-confidence, and ambiguous findings escalate to human
+   - Oscillation detection: if a finding ID recurs after its fix was applied, escalate immediately
+   - All-or-nothing batch processing: if engine crashes, present all findings to human (graceful degradation)
 
-- Connection map (inputs/outputs/assumptions per spec)
-- Inconsistencies by severity (Critical/High/Medium/Low)
-- Decisions required (with options and recommendations)
-- Proposed canonical contracts
+4. **Apply fixes**: Dispatch spec-author with accepted and resolved findings to amend the spec.
 
-### 4. Report to User
+5. **Check convergence**:
+   - If `clean_pass_count >= 2`: **Converged**. Record convergence (see Step 3 below).
+   - If `iteration_count >= 5`: **Escalate** to human with iteration history.
+   - Otherwise: Back to step 1.
 
-Surface findings for human decision-making:
+6. **Cross-stage resolution**: If a finding resolution introduces a blocker at the challenger stage, increment `cross_stage_resolution_count`. If count reaches 3, escalate to human.
+
+### 3. Record Convergence
+
+After 2 consecutive clean passes:
+
+```bash
+# Set manifest flat boolean for PHASE_OBLIGATIONS
+# (implementer reads manifest.convergence.investigation_converged)
+node -e "
+const fs = require('fs');
+const path = '<spec-group-dir>/manifest.json';
+const m = JSON.parse(fs.readFileSync(path));
+m.convergence = m.convergence || {};
+m.convergence.investigation_converged = true;
+fs.writeFileSync(path, JSON.stringify(m, null, 2) + '\\n');
+"
+
+# Set session.json for coercive enforcement
+node .claude/scripts/session-checkpoint.mjs update-convergence investigation 2
+```
+
+### 4. Report Results
+
+Surface findings for human decision-making (escalated findings only):
 
 ```
 Interface Investigation: sg-auth-system + sg-user-management
 
-Inconsistencies Found:
-  Critical: 1  (must resolve before implementation)
-  High: 2     (will cause runtime errors)
-  Medium: 1   (technical debt)
-  Low: 0
+Convergence: Achieved in <N> iterations (2 consecutive clean passes)
+Auto-accepted findings: <count>
+Escalated findings: <count>
 
-Decisions Required: 3
-  DEC-001: SSH key variable naming
-  DEC-002: Container image format
-  DEC-003: Required env vars set
+Escalated Decisions Required: <count>
+  DEC-001: SSH key variable naming [escalated: no recommendation]
+  DEC-002: Container image format [escalated: security-tagged]
 
 Full report: .claude/specs/groups/sg-auth-system/investigation-report.md
+Audit trail: .claude/specs/groups/sg-auth-system/auto-decision-audit.json
 
 Next steps:
-  1. Review decisions in report
-  2. Make canonical decisions
-  3. Update affected specs
-  4. (Optional) Create contracts in .claude/contracts/
+  1. Resolve escalated decisions
+  2. Proceed to challenger convergence loop
 ```
 
 ## Output
@@ -190,7 +239,7 @@ Next steps:
 ### In oneoff-spec Workflow
 
 ```
-/route → PM → Spec → /investigate (MANDATORY, mode: single-spec) → Approve → Implement
+/route → PM → Spec → /investigate (MANDATORY, convergence loop) → /challenge (convergence loop) → Auto-Approval → Implement
 ```
 
 ### In orchestrator Workflow
@@ -198,9 +247,11 @@ Next steps:
 ```
 /route → PM → MasterSpec → [Parallel: WorkstreamSpecs]
                                     ↓
-                              /investigate ms-<id>  ← MANDATORY
+                              /investigate ms-<id>  ← MANDATORY (convergence loop)
                                     ↓
-                           Resolve decisions
+                              /challenge (convergence loop, pre-orchestration)
+                                    ↓
+                              Auto-Approval
                                     ↓
                         [Parallel: Implement per workstream]
 ```
@@ -213,9 +264,10 @@ For complex tasks with multiple workstreams or dependencies, `/route` will recom
 /route analysis: orchestrator workflow recommended
 
 Before implementation:
-  1. Run /investigate ms-<id> to surface cross-workstream conflicts
-  2. Resolve any blocking decisions
-  3. Then proceed to parallel implementation
+  1. Run /investigate ms-<id> (convergence loop, auto-decision)
+  2. Run /challenge (convergence loop, auto-decision)
+  3. Auto-approval after both converge
+  4. Proceed to parallel implementation
 ```
 
 ## State Transitions

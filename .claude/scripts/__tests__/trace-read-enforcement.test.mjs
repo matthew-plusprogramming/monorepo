@@ -159,8 +159,8 @@ function makeStdinJson(sessionId, filePath, toolName = 'Edit') {
   };
 }
 
-/** TTL matches the constant in trace-read-enforcement.mjs (5 minutes) */
-const TRACE_READ_TTL_MS = 5 * 60 * 1000;
+/** TTL matches the constant in trace-read-enforcement.mjs (10 minutes) */
+const TRACE_READ_TTL_MS = 10 * 60 * 1000;
 
 /**
  * Helper: generate a recent ISO timestamp (within TTL window).
@@ -254,7 +254,7 @@ describe('AC-7.1: Block edit when trace not read', () => {
     expect(result.exitCode).toBe(2);
   });
 
-  it('should suggest reading the high-level trace as alternative', async () => {
+  it('should NOT suggest high-level trace (only low-level unlocks modules)', async () => {
     writeTestTraceReads(testRoot, {
       session_id: 'test-session',
       reads: {},
@@ -266,7 +266,8 @@ describe('AC-7.1: Block edit when trace not read', () => {
     );
 
     expect(result.exitCode).toBe(2);
-    expect(result.stderr.includes('high-level.md')).toBeTruthy();
+    expect(result.stderr.includes('high-level.md')).toBeFalsy();
+    expect(result.stderr.includes('low-level/')).toBeTruthy();
   });
 
   it('should include the instruction format specified in the spec', async () => {
@@ -672,10 +673,10 @@ describe('Input validation and edge cases', () => {
 });
 
 // ============================================================
-// TTL enforcement: reads expire after 5 minutes
+// TTL enforcement: reads expire after 10 minutes
 // ============================================================
 
-describe('TTL enforcement: trace reads expire after 5 minutes', () => {
+describe('TTL enforcement: trace reads expire after 10 minutes', () => {
   let testRoot;
 
   beforeEach(() => {
@@ -727,8 +728,8 @@ describe('TTL enforcement: trace reads expire after 5 minutes', () => {
     expect(result.exitCode).toBe(0);
   });
 
-  it('should exit 2 when trace was read more than 5 minutes ago (expired)', async () => {
-    // 6 minutes ago -- 1 minute past expiry
+  it('should exit 2 when trace was read more than 10 minutes ago (expired)', async () => {
+    // TTL + 1 minute past expiry
     writeTestTraceReads(testRoot, {
       session_id: 'test-session',
       reads: {
@@ -777,7 +778,7 @@ describe('TTL enforcement: trace reads expire after 5 minutes', () => {
 
     expect(result.exitCode).toBe(2);
     expect(result.stderr.includes('Trace Read Expired')).toBeTruthy();
-    expect(result.stderr.includes('expire after 5 minutes')).toBeTruthy();
+    expect(result.stderr.includes('expire after 10 minutes')).toBeTruthy();
   });
 
   it('should show "Trace Not Read" message when module was never read', async () => {

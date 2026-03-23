@@ -1,0 +1,104 @@
+# Data Model Contract Template
+# ============================
+# Defines the contract for a shared data model or entity.
+# Use this template in spec `yaml:contract` blocks with `_template: data-model`.
+#
+# Format: "base plus" -- structured core fields + freeform context namespace.
+# Core fields are machine-parseable via standard YAML parse (no regex/NLP).
+# Freeform fields under `context:` are LLM-readable but not structurally validated.
+#
+# Core fields are always authoritative over freeform context fields.
+
+_schema:
+  required:
+    - entity_name
+    - fields
+    - relationships
+    - indexes
+    - data_classification
+    - pii_fields
+  optional:
+    - constraints
+    - migration_notes
+
+# --- Core Fields ---
+
+# Entity name (PascalCase for types, snake_case for tables)
+entity_name: UserSession
+
+# Field definitions with types
+fields:
+  id: string  # UUID primary key
+  user_id: string  # FK to User
+  token_hash: string
+  created_at: string  # ISO 8601
+  expires_at: string  # ISO 8601
+  ip_address: string
+  user_agent: string
+
+# Relationships to other entities
+relationships:
+  - entity: User
+    type: many-to-one
+    foreign_key: user_id
+
+# Database indexes
+indexes:
+  - fields: [user_id]
+    unique: false
+  - fields: [token_hash]
+    unique: true
+  - fields: [expires_at]
+    unique: false
+
+# Data classification level (public, internal, confidential, restricted)
+# public: no access controls needed
+# internal: accessible within the organization
+# confidential: restricted to authorized personnel
+# restricted: highest sensitivity, audit-logged access
+data_classification: confidential
+
+# Fields containing personally identifiable information
+# List field names that contain PII for compliance tracking
+pii_fields:
+  - ip_address
+  - user_agent
+
+# --- Optional Fields ---
+
+# Additional constraints (unique, check, etc.)
+# constraints:
+#   - type: check
+#     expression: "expires_at > created_at"
+
+# Migration notes for schema changes
+# migration_notes: "Added ip_address field in v2; backfill from access logs"
+
+# --- Freeform Context (LLM-readable, not structurally validated) ---
+
+context:
+  description: "Tracks active user sessions for authentication"
+  notes: "Sessions are soft-deleted (expires_at set to past) rather than hard-deleted for audit purposes."
+  retention_policy: "90 days after expiration"
+
+_example:
+  _template: data-model
+  entity_name: UserSession
+  fields:
+    id: string
+    user_id: string
+    token_hash: string
+    created_at: string
+    expires_at: string
+  relationships:
+    - entity: User
+      type: many-to-one
+      foreign_key: user_id
+  indexes:
+    - fields: [user_id]
+      unique: false
+  data_classification: confidential
+  pii_fields:
+    - ip_address
+  context:
+    description: "Tracks active user sessions"

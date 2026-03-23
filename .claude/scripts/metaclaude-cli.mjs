@@ -465,10 +465,20 @@ async function cmdSync(projectArg, options) {
         continue;
       }
 
-      // Check category-level sync policy (e.g., memory-bank never-overwrite)
+      // Check sync policies (category-level and per-artifact)
       const [category] = artifactPath.split('/');
       const categoryMeta = registry.artifacts[category];
-      if (categoryMeta?._sync_policy === 'never-overwrite' && existsSync(targetFile)) {
+      const effectivePolicy = artifact._sync_policy || categoryMeta?._sync_policy;
+
+      // DEC-002: never-sync means never propagate to consumer projects at all
+      if (effectivePolicy === 'never-sync') {
+        log(`  Skip ${artifactPath}: never-sync policy (excluded from sync)`, 'dim');
+        skipped++;
+        continue;
+      }
+
+      // never-overwrite means propagate once, then do not overwrite if target exists
+      if (effectivePolicy === 'never-overwrite' && existsSync(targetFile)) {
         log(`  Skip ${artifactPath}: never-overwrite policy (file exists)`, 'dim');
         skipped++;
         continue;

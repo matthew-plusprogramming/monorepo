@@ -73,8 +73,8 @@ Fill ALL required sections:
 - [ ] Core Flows
 - [ ] Sequence Diagram(s) - At least one Mermaid diagram
 - [ ] Edge Cases
-- [ ] Interfaces & Data Model
-- [ ] Security
+- [ ] Interfaces & Contracts
+- [ ] Security Considerations
 - [ ] Additional Considerations
 - [ ] Task List with dependencies
 - [ ] Testing strategy
@@ -85,22 +85,60 @@ Fill ALL required sections:
 
 ### 3. Define Interfaces & Contracts
 
-If this workstream creates interfaces used by others:
+**For any spec that crosses a service, runtime, or process boundary**, you MUST define complete wire protocol contracts -- not just lightweight metadata. Use the `## Interfaces & Contracts` section with fenced `yaml:contract` blocks.
 
-```yaml
-contracts:
-  - id: contract-<name>
-    type: API | Interface | Data Model
-    path: src/<path>
-    version: 1.0
-```
+**Two contract formats coexist** (they are complementary, not competing):
 
-Document:
+1. **Lightweight YAML frontmatter** (`id`, `type`, `path`, `version` in the spec's `contracts:` array): Used for spec-level metadata -- declaring which contracts a spec owns or depends on.
+2. **Inline `yaml:contract` blocks** (new structured format): Used for detailed wire protocol definitions embedded inline. These provide the data shapes, endpoints, error codes, and security fields that parallel agents need.
 
-- Function signatures
-- Request/response formats
-- Data schemas
+**Contract templates** are at `.claude/contracts/templates/`:
+
+- `rest-api.template.yaml` -- REST API endpoints
+- `event.template.yaml` -- SSE, WebSocket, pub/sub events
+- `data-model.template.yaml` -- Shared data models/entities
+- `behavioral.template.yaml` -- Retry, timeout, ordering guarantees
+
+**Naming conventions** are at `.claude/contracts/naming-conventions.md`. Follow these for endpoint paths, event names, field names, and error codes.
+
+**Complete wire protocol contracts** include:
+
+- Data shapes (request/response or payload)
+- Endpoints or channels
 - Error codes
+- Security fields (auth_method, auth_scope, etc.)
+- Behavioral guarantees (retry, timeout, ordering)
+
+If the spec has no boundary crossings, write "N/A -- no boundary crossings" in the section.
+
+**Append-only modification rule**: Once a contract is defined, existing fields cannot be removed or have their types changed. Type widening (e.g., `string` to `string|null`) is a breaking change. Breaking changes require a new contract version with `-v2` suffix.
+
+Example inline contract:
+
+<!-- prettier-ignore -->
+```yaml:contract
+_template: rest-api
+method: POST
+path: /api/v1/sessions
+content_type: application/json
+request_shape:
+  username: string
+  password: string
+response_shape:
+  session_id: string
+  expires_at: string
+error_codes:
+  400: Invalid request body
+  401: Invalid credentials
+auth_method: none
+auth_scope: public
+required_headers:
+  - Content-Type
+rate_limit_tier: standard
+error_sanitization: safe-message-only
+context:
+  description: "Create a new authenticated session"
+```
 
 ### 4. Create Sequence Diagrams
 
@@ -158,7 +196,25 @@ Document any ambiguities:
   - Status: awaiting decision
 ```
 
-### 7. Validate Completeness
+### 7. Generate Diagrams from Spec Artifacts (AC-6.1, AC-6.2)
+
+When data model contracts or workflow definitions exist in the spec group, generate corresponding diagrams.
+
+**ERD Generation (AC-6.1)**: When the spec group contains data model contracts (entities with attributes and relationships defined in acceptance criteria or contract sections):
+
+1. Create or update `.claude/docs/structured/data-models.yaml` with entities extracted from the spec's data model contracts
+2. Run `node .claude/scripts/docs-generate.mjs` to generate `generated/erd.mmd`
+3. Reference the generated ERD in the spec's relevant section
+
+**State Diagram Generation (AC-6.2)**: When the spec group contains workflow definitions (state machines with states and transitions):
+
+1. Create or update `.claude/docs/structured/states/index.yaml` with state machines extracted from the spec's workflow definitions
+2. Run `node .claude/scripts/docs-generate.mjs` to generate `generated/state-<name>.mmd`
+3. Reference the generated state diagram in the spec's relevant section
+
+**Important**: The spec-author generates diagrams from spec artifacts but does NOT own the PRD Report. The PRD Report is assembled by the documenter agent during Phase 2 enrichment.
+
+### 8. Validate Completeness
 
 Before delivering, verify:
 
@@ -169,7 +225,7 @@ Before delivering, verify:
 - Contracts registered (if applicable)
 - No TBD or TODO left unresolved
 
-### 8. Output Validation (Required)
+### 9. Output Validation (Required)
 
 Before reporting completion, validate the created spec file.
 
@@ -191,8 +247,8 @@ node .claude/scripts/spec-schema-validate.mjs <spec-file-path>
   4. `## Core Flows`
   5. `## Sequence Diagram(s)` (with at least one Mermaid diagram)
   6. `## Edge Cases`
-  7. `## Interfaces & Data Model`
-  8. `## Security`
+  7. `## Interfaces & Contracts`
+  8. `## Security Considerations`
   9. `## Additional Considerations`
   10. `## Task List`
   11. `## Testing`
@@ -205,7 +261,7 @@ node .claude/scripts/spec-schema-validate.mjs <spec-file-path>
 
 If validation fails, fix issues before delivering. Do not hand off specs with validation errors.
 
-### 9. Deliver Spec
+### 10. Deliver Spec
 
 Save spec to:
 
@@ -383,7 +439,7 @@ sequenceDiagram
 6. **Define Contract**:
 
 ````markdown
-## Interfaces & Data Model
+## Interfaces & Contracts
 
 ### Contract: contract-websocket-api
 

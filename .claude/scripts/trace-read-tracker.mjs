@@ -58,8 +58,8 @@ async function readStdin() {
 /**
  * Determine which module IDs a trace file covers.
  *
- * - high-level.md or high-level.json: covers ALL modules in trace.config.json
- * - low-level/<module-id>.md or .json: covers only that specific module
+ * - high-level.md or high-level.json: orientation only, does NOT unlock modules for editing
+ * - low-level/<module-id>.md or .json: unlocks that specific module for editing
  *
  * @param {string} filePath - The trace file path (relative to project root)
  * @param {object} config - Parsed trace.config.json
@@ -69,9 +69,11 @@ export function traceFileToModuleIds(filePath, config) {
   const name = basename(filePath);
   const parentDir = basename(dirname(filePath));
 
-  // AC-6.1: High-level trace covers all modules
+  // High-level trace is for dispatch planning orientation only.
+  // It does NOT unlock modules for editing — agents must read the
+  // specific low-level trace for each module they intend to edit.
   if (name.startsWith('high-level')) {
-    return config.modules.map(m => m.id);
+    return [];
   }
 
   // AC-6.2: Low-level trace covers only the specific module

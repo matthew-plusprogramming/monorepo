@@ -200,7 +200,33 @@ For inline documentation:
 - README.md in package roots
 - CHANGELOG.md for version history
 
-### Step 5: Validate
+### Step 5: Generate Diagrams
+
+Run the diagram generator to ensure all Mermaid diagrams are fresh:
+
+```bash
+node .claude/scripts/docs-generate.mjs
+```
+
+This produces `.mmd` files in `.claude/docs/structured/generated/` for all available YAML sources (architecture, flows, ERD, state, security, deployment, C4 component). Missing sources are skipped silently.
+
+### Step 5.5: Phase 2 PRD Report Enrichment (AC-6.5)
+
+When spec authoring is complete for a linked PRD, trigger Phase 2 enrichment of the PRD Report:
+
+1. **Check for linked PRD**: Look for `prd` reference in `manifest.json`
+2. **If PRD exists and Phase 1 report was generated**:
+   - Dispatch documenter agent for Phase 2 assembly
+   - Documenter reads Phase 1 report, generates fresh diagrams, and enriches with:
+     - ERD diagrams from `data-models.yaml`
+     - Detailed sequence diagrams from spec flow definitions
+     - Contract overview table from wire protocol contracts
+   - Phase 2 retains all Phase 1 content
+   - Partial enrichment is acceptable: skip diagrams whose spec artifacts are unavailable, log reasons
+3. **If no PRD linked**: Skip Phase 2 (no action)
+4. **Output**: Enriched PRD Report at `.claude/prds/<prd-id>/report.md` using template at `.claude/templates/prd-report.template.md`
+
+### Step 6: Validate
 
 ```bash
 # Check code examples compile (if applicable)
@@ -210,7 +236,7 @@ npx tsc --noEmit docs/examples/*.ts
 npx prettier --check docs/**/*.md
 ```
 
-### Step 6: Update Manifest
+### Step 7: Update Manifest
 
 Update `manifest.json` with documentation status:
 

@@ -264,7 +264,44 @@ For inline documentation:
 - README.md in package roots
 - CHANGELOG.md for version history
 
-### 6. Validate Documentation
+### 6. Generate Diagrams (AC-6.3)
+
+As part of the documentation workflow, invoke `docs-generate.mjs` to ensure all diagrams are fresh from available YAML sources:
+
+```bash
+node .claude/scripts/docs-generate.mjs
+```
+
+This generates Mermaid `.mmd` files for all available diagram types:
+
+- **architecture.mmd**: Module dependency flowchart (from `architecture.yaml`)
+- **component-c4.mmd**: C4-style component diagram (from `architecture.yaml`)
+- **flow-\*.mmd**: Sequence diagrams (from `flows/*.yaml`)
+- **erd.mmd**: Entity-relationship diagram (from `data-models.yaml`)
+- **state-\*.mmd**: State machine diagrams (from `states/index.yaml`)
+- **security.mmd**: Security boundary diagram (from `security.yaml`)
+- **deployment.mmd**: Deployment topology diagram (from `deployment.yaml`)
+
+Diagram types whose YAML sources do not exist are skipped silently.
+
+### 7. Assemble Phase 2 PRD Report (AC-6.4)
+
+When triggered by the `/docs` skill for Phase 2 enrichment, assemble the enriched PRD Report:
+
+1. **Read the Phase 1 report** (if it exists) from the PRD's output directory
+2. **Generate fresh diagrams** via `docs-generate.mjs`
+3. **Enrich with spec artifacts**:
+   - ERD diagrams from `data-models.yaml` (populated during spec authoring)
+   - Detailed sequence diagrams from spec flow definitions
+   - Contract overview table from spec wire protocol contracts
+4. **Retain all Phase 1 content** -- Phase 2 adds to but never removes Phase 1 sections
+5. **Log skipped diagrams** -- if a spec artifact is not available, log the reason (e.g., "ERD skipped: no data-model contracts in spec") and continue
+6. **Use the PRD Report template** at `.claude/templates/prd-report.template.md`
+7. **Update enrichment metadata** (spec group reference, enrichment timestamp, phase: 2)
+
+**Partial enrichment (AC-5.5)**: When Phase 2 runs with partial spec completion, generate only diagrams whose spec artifacts are available. Do not block on missing artifacts.
+
+### 8. Validate Documentation
 
 Before completing:
 
@@ -279,7 +316,7 @@ npx tsc --noEmit docs/examples/*.ts
 npx prettier --check docs/**/*.md
 ```
 
-### 7. Update Spec Status
+### 9. Update Spec Status
 
 ```yaml
 ---

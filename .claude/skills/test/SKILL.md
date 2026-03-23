@@ -494,12 +494,12 @@ describe('error handling (as-004)', () => {
 
 ## Parallel Execution with Implementation
 
-Tests can be written in parallel with implementation.
+Tests can be written in parallel with implementation. When a spec has cross-boundary contracts, the `e2e-test-writer` also runs in parallel as a third stream (3-way parallel dispatch: implementer + test-writer + e2e-test-writer). The test-writer produces unit/integration tests; the e2e-test-writer produces E2E tests from contracts only. Neither sees the implementation.
 
 ### Approach: TDD-Style
 
 1. Write tests first (they will fail)
-2. Run implementer in parallel
+2. Run implementer in parallel (and e2e-test-writer for cross-boundary specs)
 3. Tests pass as implementation completes
 
 ```javascript

@@ -4,8 +4,11 @@
  * PreToolUse Gate Enforcement Hook (Agent matcher)
  *
  * Blocks dispatch of enforced subagent types when their workflow prerequisites
- * have not been satisfied. Reads session.json dispatch history as the source
- * of truth -- no cooperative participation required.
+ * have not been satisfied. Reads session.json dispatch history and convergence
+ * state as the source of truth -- no cooperative participation required.
+ *
+ * Implementer prerequisites are convergence-type: investigation and challenger
+ * gates must have clean_pass_count >= 2 in session.json (AC-1.7, AC-1.8).
  *
  * Invocation: Receives stdin JSON from Claude Code PreToolUse hook system.
  * Input format: { session_id: string, tool_name: string, tool_input: { subagent_type: string, ... } }
@@ -73,32 +76,35 @@ function blockDispatch(subagentType, missing, sessionId) {
   for (const m of missing) {
     const prereq = m.prerequisite;
     if (prereq.type === 'dispatch') {
-      const desc = prereq.stage
-        ? `${prereq.subagent_type} (stage: ${prereq.stage})`
-        : prereq.subagent_type;
-      process.stderr.write(`  - Dispatch '${desc}' first\n`);
+      if (prereq.subagent_type === 'challenger') {
+        const stage = prereq.stage || 'unknown';
+        process.stderr.write(`  - Run /challenge (stage: ${stage}) to dispatch the required 'challenger' first\n`);
+      } else if (prereq.subagent_type === 'unifier') {
+        process.stderr.write(`  - Run /unify on the spec group to dispatch the required 'unifier' first\n`);
+      } else if (prereq.subagent_type === 'documenter') {
+        process.stderr.write(`  - Run /docs on the spec group to dispatch the required 'documenter' first\n`);
+      } else {
+        process.stderr.write(`  - Dispatch '${prereq.subagent_type}' first (use the corresponding skill command)\n`);
+      }
     } else if (prereq.type === 'convergence') {
+      const skillMap = {
+        investigation: '/investigate',
+        challenger: '/challenge',
+        code_review: '/code-review',
+        security_review: '/security',
+      };
+      const skill = skillMap[prereq.gate] || prereq.gate;
       process.stderr.write(
-        `  - Convergence gate '${prereq.gate}' requires clean_pass_count >= ${prereq.required_count}\n`
+        `  - Run the convergence loop for '${prereq.gate}' until ${prereq.required_count} consecutive clean passes are recorded.\n` +
+        `    Use: ${skill} (repeat until clean), then record with: node .claude/scripts/session-checkpoint.mjs update-convergence ${prereq.gate} ${prereq.required_count}\n`
       );
     }
   }
 
   process.stderr.write('\n');
-  process.stderr.write('To override, create .claude/coordination/gate-override.json:\n');
-  process.stderr.write('{\n');
-  process.stderr.write('  "overrides": [\n');
-
-  // Show override template for each missing prerequisite
-  for (let i = 0; i < missing.length; i++) {
-    const comma = i < missing.length - 1 ? ',' : '';
-    process.stderr.write(`    { "gate": "${missing[i].gate_name}", "session_id": "${sessionId}", "timestamp": "${new Date().toISOString()}", "rationale": "..." }${comma}\n`);
-  }
-
-  process.stderr.write('  ]\n');
-  process.stderr.write('}\n');
-  process.stderr.write('\n');
-  process.stderr.write(`Session ID: ${sessionId}\n`);
+  process.stderr.write('How to unblock:\n');
+  process.stderr.write('  1. Complete the missing prerequisite dispatches or convergence loops listed above\n');
+  process.stderr.write('  2. Then retry this dispatch\n');
   process.stderr.write('\n');
   process.stderr.write('========================================\n');
   process.stderr.write('\n');

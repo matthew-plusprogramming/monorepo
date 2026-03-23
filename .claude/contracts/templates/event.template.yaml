@@ -1,0 +1,84 @@
+# Event Contract Template
+# ======================
+# Defines the wire protocol contract for an event (SSE, WebSocket, pub/sub).
+# Use this template in spec `yaml:contract` blocks with `_template: event`.
+#
+# Format: "base plus" -- structured core fields + freeform context namespace.
+# Core fields are machine-parseable via standard YAML parse (no regex/NLP).
+# Freeform fields under `context:` are LLM-readable but not structurally validated.
+#
+# Core fields are always authoritative over freeform context fields.
+
+_schema:
+  required:
+    - event_name
+    - channel
+    - payload_shape
+    - auth_method
+    - channel_access_control
+  optional:
+    - boundary_visibility
+    - ordering_guarantee
+    - retry_policy
+    - delivery_semantics
+
+# --- Core Fields ---
+
+# Event name (use dot-separated: resource.action)
+event_name: session.created
+
+# Channel or topic (SSE endpoint, WebSocket path, pub/sub topic)
+channel: /events/sessions
+
+# Payload shape (inline or reference to shared type)
+payload_shape:
+  session_id: string
+  user_id: string
+  created_at: string  # ISO 8601
+
+# Authentication method for channel subscription (none, api-key, bearer-token, cookie-session)
+auth_method: bearer-token
+
+# Channel access control (public, authenticated, role-based, owner-only)
+channel_access_control: authenticated
+
+# --- Optional Fields ---
+
+# Boundary visibility (internal, external). Defaults to "external" when omitted.
+# external: all security fields required
+# internal: only auth_method required; other security fields optional
+# boundary_visibility: external
+
+# Ordering guarantee (none, per-channel, per-key, global)
+# ordering_guarantee: per-channel
+
+# Retry policy for failed deliveries
+# retry_policy:
+#   max_retries: 3
+#   backoff: exponential
+
+# Delivery semantics (at-most-once, at-least-once, exactly-once)
+# delivery_semantics: at-least-once
+
+# --- Freeform Context (LLM-readable, not structurally validated) ---
+
+context:
+  description: "Emitted when a new session is created"
+  notes: "Subscribers receive events only for sessions they have access to."
+  related_events:
+    - session.expired
+    - session.revoked
+
+_example:
+  _template: event
+  event_name: session.created
+  channel: /events/sessions
+  payload_shape:
+    session_id: string
+    user_id: string
+    created_at: string
+  auth_method: bearer-token
+  channel_access_control: authenticated
+  delivery_semantics: at-least-once
+  context:
+    description: "Emitted when a new session is created"

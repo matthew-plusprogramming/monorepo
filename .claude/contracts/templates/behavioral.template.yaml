@@ -1,0 +1,108 @@
+# Behavioral Contract Template
+# ============================
+# Defines the behavioral contract for a system operation or interaction pattern.
+# Use this template in spec `yaml:contract` blocks with `_template: behavioral`.
+#
+# Format: "base plus" -- structured core fields + freeform context namespace.
+# Core fields are machine-parseable via standard YAML parse (no regex/NLP).
+# Freeform fields under `context:` are LLM-readable but not structurally validated.
+#
+# Core fields are always authoritative over freeform context fields.
+
+_schema:
+  required:
+    - behavior_name
+    - retry_policy
+    - timeout
+    - ordering_guarantee
+    - concurrency
+    - idempotency
+    - rate_limit_tier
+  optional:
+    - circuit_breaker
+    - fallback_behavior
+    - error_escalation
+
+# --- Core Fields ---
+
+# Behavior name (descriptive, kebab-case)
+behavior_name: session-creation
+
+# Retry policy for failed operations
+retry_policy:
+  max_retries: 3
+  backoff: exponential
+  base_delay_ms: 1000
+  max_delay_ms: 30000
+  retry_on:
+    - network_error
+    - timeout
+    - 503
+
+# Operation timeout
+timeout:
+  request_ms: 5000
+  total_ms: 30000
+
+# Ordering guarantee (none, per-key, per-user, global)
+ordering_guarantee: per-user
+
+# Concurrency model (serial, bounded, unbounded)
+concurrency:
+  model: bounded
+  max_concurrent: 10
+
+# Idempotency guarantee (none, client-token, natural-key)
+idempotency: client-token
+
+# Rate limiting tier (none, standard, strict)
+# none: no rate limiting
+# standard: reasonable limits for normal usage
+# strict: aggressive limits for sensitive operations
+rate_limit_tier: standard
+
+# --- Optional Fields ---
+
+# Circuit breaker configuration
+# circuit_breaker:
+#   failure_threshold: 5
+#   reset_timeout_ms: 60000
+#   half_open_requests: 1
+
+# Fallback behavior when primary path fails
+# fallback_behavior: "Return cached response with stale indicator"
+
+# Error escalation policy
+# error_escalation:
+#   alert_threshold: 10  # errors per minute
+#   alert_channel: ops-alerts
+#   escalation_chain:
+#     - on-call-engineer
+#     - team-lead
+
+# --- Freeform Context (LLM-readable, not structurally validated) ---
+
+context:
+  description: "Defines the behavioral contract for session creation operations"
+  notes: "Retry policy applies to downstream service calls, not to the client-facing endpoint. Client receives immediate 503 on circuit break."
+  dependencies:
+    - user-service
+    - token-service
+
+_example:
+  _template: behavioral
+  behavior_name: session-creation
+  retry_policy:
+    max_retries: 3
+    backoff: exponential
+  timeout:
+    request_ms: 5000
+    total_ms: 30000
+  ordering_guarantee: per-user
+  concurrency:
+    model: bounded
+    max_concurrent: 10
+  idempotency: client-token
+  rate_limit_tier: standard
+  context:
+    description: "Behavioral contract for session creation"

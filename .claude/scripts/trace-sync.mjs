@@ -11,10 +11,10 @@
  *   - HTML comment metadata (trace-id, trace-version, last-generated, generated-by)
  *   - Dependencies (pipe-delimited: target | relationship-type | description)
  *   - Dependents (pipe-delimited: target | relationship-type | description)
- *   - Exports (pipe-delimited: symbol | type)
+ *   - Exports (pipe-delimited: symbol | type | line | signature)
  *   - Imports (pipe-delimited: source | symbols)
- *   - Function Calls (pipe-delimited: target | function | context)
- *   - Events (pipe-delimited: type | event-name | channel)
+ *   - Function Calls (pipe-delimited: callerFile | callerLine | calleeName | calleeFile | calleeLine)
+ *   - Events (pipe-delimited: file | line | eventName | type)
  *
  * Conflict detection (as-012):
  *   When both markdown and JSON have been modified since the last generation,
@@ -22,9 +22,10 @@
  *   Use --force to override (markdown wins). Use --dry-run to preview changes.
  *
  * Usage:
- *   node .claude/scripts/trace-sync.mjs             # Sync all (with conflict detection)
- *   node .claude/scripts/trace-sync.mjs --force     # Force sync (markdown wins, skip conflict checks)
- *   node .claude/scripts/trace-sync.mjs --dry-run   # Preview changes without writing
+ *   node .claude/scripts/trace-sync.mjs                  # Sync all (with conflict detection)
+ *   node .claude/scripts/trace-sync.mjs --force          # Force sync (markdown wins, skip conflict checks)
+ *   node .claude/scripts/trace-sync.mjs --dry-run        # Preview changes without writing
+ *   node .claude/scripts/trace-sync.mjs --auto-merge     # Auto-merge additions; flag deletions/modifications
  *
  * Implements: REQ-AT-013, REQ-AT-014, REQ-AT-015, REQ-AT-016
  * Spec: as-011-trace-sync-core, as-012-trace-sync-conflicts
@@ -123,13 +124,8 @@ export function parsePipeDelimitedLine(line, expectedColumns, context) {
     };
   }
 
-  // Check for empty required fields
-  if (fields.some(f => f.length === 0)) {
-    return {
-      fields: null,
-      error: `${context}: empty field in line: "${trimmed}"`,
-    };
-  }
+  // Note: Empty trailing fields are allowed (e.g., signature column for non-function exports,
+  // calleeFile/calleeLine for unresolved calls). Section-specific parsers handle null/empty semantics.
 
   return { fields, error: null };
 }
@@ -154,6 +150,11 @@ export function parsePipeDelimitedSection(lines, expectedColumns, context) {
 
     // Skip empty lines and non-data lines
     if (!line || line.startsWith('#') || line === '(none)' || line.startsWith('_')) {
+      continue;
+    }
+
+    // Skip markdown table separator lines (e.g., "--- | --- | ---")
+    if (line.includes('|') && /^[-|\s]+$/.test(line)) {
       continue;
     }
 
@@ -373,9 +374,14 @@ export function parseLowLevelMarkdown(markdown) {
       }
 
       if (sub.heading === 'Exports') {
-        const result = parsePipeDelimitedSection(sub.lines, 2, `${filePath}:Exports`);
-        for (const [symbol, type] of result.entries) {
-          fileEntry.exports.push({ symbol, type });
+        // INC-012: Generator renders 4 columns (symbol | type | line | signature);
+        // parse all 4 to stay in sync with trace-generate.mjs
+        const result = parsePipeDelimitedSection(sub.lines, 4, `${filePath}:Exports`);
+        for (const [symbol, type, lineNum, signature] of result.entries) {
+          const entry = { symbol, type };
+          if (lineNum) entry.lineNumber = parseInt(lineNum, 10);
+          if (signature) entry.signature = signature;
+          fileEntry.exports.push(entry);
         }
         errors.push(...result.errors);
       }
@@ -392,21 +398,33 @@ export function parseLowLevelMarkdown(markdown) {
       }
 
       if (sub.heading === 'Function Calls') {
-        const result = parsePipeDelimitedSection(sub.lines, 3, `${filePath}:Function Calls`);
-        for (const [target, func, context] of result.entries) {
-          const call = { target, function: func };
-          if (context) {
-            call.context = context;
-          }
-          fileEntry.calls.push(call);
+        // M1: Updated to 5-column format per contract-calls-events-schema
+        // Columns: callerFile | callerLine | calleeName | calleeFile | calleeLine
+        const result = parsePipeDelimitedSection(sub.lines, 5, `${filePath}:Function Calls`);
+        for (const [callerFile, callerLineStr, calleeName, calleeFile, calleeLineStr] of result.entries) {
+          fileEntry.calls.push({
+            callerFile,
+            callerLine: parseInt(callerLineStr, 10),
+            calleeName,
+            // Handle '(none)' placeholder as null (used for unresolved callees)
+            calleeFile: calleeFile === '(none)' ? null : calleeFile,
+            calleeLine: calleeLineStr === '(none)' ? null : parseInt(calleeLineStr, 10),
+          });
         }
         errors.push(...result.errors);
       }
 
       if (sub.heading === 'Events') {
-        const result = parsePipeDelimitedSection(sub.lines, 3, `${filePath}:Events`);
-        for (const [type, eventName, channel] of result.entries) {
-          fileEntry.events.push({ type, eventName, channel });
+        // M1: Updated to 4-column format per contract-calls-events-schema
+        // Columns: file | line | eventName | type
+        const result = parsePipeDelimitedSection(sub.lines, 4, `${filePath}:Events`);
+        for (const [evtFile, lineStr, eventName, type] of result.entries) {
+          fileEntry.events.push({
+            file: evtFile,
+            line: parseInt(lineStr, 10),
+            eventName,
+            type,
+          });
         }
         errors.push(...result.errors);
       }
@@ -504,6 +522,178 @@ export function detectLowLevelConflicts(existingJson, parsedMd) {
   }
 
   return conflicts;
+}
+
+// =============================================================================
+// Auto-Merge Classification (REQ-024)
+// =============================================================================
+
+/**
+ * Classify a conflict as addition, deletion, or modification.
+ *
+ * REQ-024: Additions-only divergence is auto-mergeable. Deletions and
+ * modifications require manual confirmation.
+ *
+ * Classification rules:
+ * - Addition: entry exists in markdown but not in JSON
+ * - Deletion: entry exists in JSON but not in markdown
+ * - Modification: entry exists in both but with different values
+ *
+ * @param {Array} jsonArray - Array from JSON side
+ * @param {Array} mdArray - Array from markdown side
+ * @param {function} keyFn - Function to extract a unique key from an entry
+ * @returns {{ additions: Array, deletions: Array, modifications: Array }}
+ */
+export function classifyDivergence(jsonArray, mdArray, keyFn) {
+  const jsonByKey = new Map();
+  const mdByKey = new Map();
+
+  for (const entry of jsonArray) {
+    jsonByKey.set(keyFn(entry), entry);
+  }
+  for (const entry of mdArray) {
+    mdByKey.set(keyFn(entry), entry);
+  }
+
+  const additions = [];
+  const deletions = [];
+  const modifications = [];
+
+  // Entries in markdown but not in JSON => additions
+  for (const [key, entry] of mdByKey) {
+    if (!jsonByKey.has(key)) {
+      additions.push(entry);
+    } else {
+      // Both have it -- check if values differ
+      const jsonEntry = jsonByKey.get(key);
+      if (JSON.stringify(jsonEntry) !== JSON.stringify(entry)) {
+        modifications.push({ json: jsonEntry, markdown: entry });
+      }
+    }
+  }
+
+  // Entries in JSON but not in markdown => deletions
+  for (const [key] of jsonByKey) {
+    if (!mdByKey.has(key)) {
+      deletions.push(jsonByKey.get(key));
+    }
+  }
+
+  return { additions, deletions, modifications };
+}
+
+/**
+ * Generate a key function for a given field type.
+ *
+ * Returns a function that extracts a unique identifier from an entry,
+ * used for comparing JSON and markdown entries during auto-merge classification.
+ *
+ * @param {string} field - Field name ('exports', 'imports', 'calls', 'events', 'dependencies', 'dependents')
+ * @returns {function} Key extraction function
+ */
+export function getKeyFn(field) {
+  switch (field) {
+    case 'exports':
+      return (e) => e.symbol || '';
+    case 'imports':
+      return (e) => e.source || '';
+    case 'calls':
+      return (e) => `${e.callerFile || ''}:${e.callerLine || 0}->${e.calleeName || ''}`;
+    case 'events':
+      return (e) => `${e.file || ''}:${e.line || 0}:${e.eventName || ''}:${e.type || ''}`;
+    case 'dependencies':
+    case 'dependents':
+      return (e) => e.targetId || '';
+    default:
+      return (e) => JSON.stringify(e);
+  }
+}
+
+/**
+ * Classify all conflicts for auto-merge eligibility.
+ *
+ * For each conflict, determines if it consists of additions-only (auto-mergeable)
+ * or contains deletions/modifications (requires manual resolution).
+ *
+ * @param {Array<{ module: string, field: string, jsonValue: Array, markdownValue: Array }>} conflicts
+ * @returns {{ autoMergeable: Array<{ conflict: object, additions: Array }>, manual: Array<{ conflict: object, deletions: Array, modifications: Array }> }}
+ */
+export function classifyConflictsForAutoMerge(conflicts) {
+  const autoMergeable = [];
+  const manual = [];
+
+  for (const conflict of conflicts) {
+    const keyFn = getKeyFn(conflict.field);
+    const { additions, deletions, modifications } = classifyDivergence(
+      conflict.jsonValue || [],
+      conflict.markdownValue || [],
+      keyFn,
+    );
+
+    if (deletions.length === 0 && modifications.length === 0 && additions.length > 0) {
+      // Additions-only: safe to auto-merge
+      autoMergeable.push({ conflict, additions });
+    } else if (deletions.length > 0 || modifications.length > 0) {
+      // Has deletions or modifications: requires manual resolution
+      manual.push({ conflict, additions, deletions, modifications });
+    }
+    // If no changes at all (shouldn't happen since it's a conflict), skip
+  }
+
+  return { autoMergeable, manual };
+}
+
+/**
+ * Apply auto-merge for additions-only conflicts.
+ *
+ * Merges additions from markdown into the JSON data (JSON + markdown additions).
+ * Returns the merged array and a log entry describing what was merged.
+ *
+ * @param {Array} jsonArray - Current JSON array
+ * @param {Array} additions - Entries to add from markdown
+ * @returns {Array} Merged array (JSON entries + additions)
+ */
+export function applyAutoMerge(jsonArray, additions) {
+  // Return JSON entries plus new additions from markdown
+  return [...jsonArray, ...additions];
+}
+
+/**
+ * Format an auto-merge dry-run log.
+ *
+ * REQ-024: After auto-merge, produce a dry-run log showing what was merged.
+ *
+ * @param {Array<{ conflict: object, additions: Array }>} mergedItems - Items that were auto-merged
+ * @param {Array<{ conflict: object, deletions: Array, modifications: Array }>} manualItems - Items requiring manual resolution
+ * @returns {string[]} Array of log lines
+ */
+export function formatAutoMergeLog(mergedItems, manualItems) {
+  const lines = [];
+
+  if (mergedItems.length > 0) {
+    lines.push('Auto-merged (additions-only):');
+    for (const item of mergedItems) {
+      const { conflict, additions } = item;
+      lines.push(`  ${conflict.module} -> ${conflict.field}: +${additions.length} addition(s)`);
+      for (const addition of additions) {
+        lines.push(`    + ${JSON.stringify(addition)}`);
+      }
+    }
+  }
+
+  if (manualItems.length > 0) {
+    lines.push('');
+    lines.push('Requires manual resolution (deletions/modifications detected):');
+    for (const item of manualItems) {
+      const { conflict, deletions, modifications } = item;
+      const parts = [];
+      if (deletions.length > 0) parts.push(`${deletions.length} deletion(s)`);
+      if (modifications.length > 0) parts.push(`${modifications.length} modification(s)`);
+      lines.push(`  ${conflict.module} -> ${conflict.field}: ${parts.join(', ')}`);
+    }
+  }
+
+  return lines;
 }
 
 /**
@@ -774,15 +964,18 @@ export function buildSyncSummary({ changes, errors, conflicts, filesUpdated, dry
  * @param {string} [options.projectRoot] - Project root override
  * @param {boolean} [options.force] - Force sync, markdown wins (skip conflict checks)
  * @param {boolean} [options.dryRun] - Preview changes without writing
- * @returns {{ allChanges: string[], allErrors: string[], allConflicts: Array<{ module: string, field: string, jsonValue: object[], markdownValue: object[] }>, filesUpdated: number, summary: object }}
+ * @param {boolean} [options.autoMerge] - Auto-merge additions-only; flag deletions/modifications for manual
+ * @returns {{ allChanges: string[], allErrors: string[], allConflicts: Array<{ module: string, field: string, jsonValue: object[], markdownValue: object[] }>, filesUpdated: number, summary: object, autoMergeLog: string[] }}
  */
 export function syncAll(options = {}) {
   const projectRoot = options.projectRoot || resolveProjectRoot();
   const force = options.force || false;
   const dryRun = options.dryRun || false;
+  const autoMerge = options.autoMerge || false;
   const allChanges = [];
   const allErrors = [];
   const allConflicts = [];
+  const autoMergeLog = [];
   let filesUpdated = 0;
 
   // 1. Sync high-level.md -> high-level.json
@@ -809,9 +1002,43 @@ export function syncAll(options = {}) {
       if (hasDiverged && !force) {
         const conflicts = detectHighLevelConflicts(jsonContent, parsed);
         if (conflicts.length > 0) {
-          // Report conflicts without auto-resolving
-          allConflicts.push(...conflicts);
-          // Do not apply changes -- user must resolve or use --force
+          if (autoMerge) {
+            // REQ-024: Classify conflicts and auto-merge additions-only
+            const { autoMergeable, manual } = classifyConflictsForAutoMerge(conflicts);
+
+            // Auto-merge additions-only conflicts
+            if (autoMergeable.length > 0) {
+              const updatedJson = JSON.parse(JSON.stringify(jsonContent));
+              for (const item of autoMergeable) {
+                const jsonModule = updatedJson.modules.find(m => m.id === item.conflict.module);
+                if (jsonModule) {
+                  jsonModule[item.conflict.field] = applyAutoMerge(
+                    jsonModule[item.conflict.field] || [],
+                    item.additions,
+                  );
+                  allChanges.push(
+                    `Auto-merged ${item.additions.length} addition(s) to ${item.conflict.field} in ${item.conflict.module}`,
+                  );
+                }
+              }
+              if (!dryRun) {
+                writeFileSync(highLevelJsonPath, JSON.stringify(updatedJson, null, 2) + '\n');
+              }
+              filesUpdated++;
+            }
+
+            // Report remaining manual conflicts
+            if (manual.length > 0) {
+              allConflicts.push(...manual.map(m => m.conflict));
+            }
+
+            // Build auto-merge log
+            autoMergeLog.push(...formatAutoMergeLog(autoMergeable, manual));
+          } else {
+            // Report conflicts without auto-resolving
+            allConflicts.push(...conflicts);
+            // Do not apply changes -- user must resolve or use --force
+          }
         } else {
           // JSON was modified but no field differences -- safe to proceed
           const { updatedJson, changes } = applyHighLevelSync(jsonContent, parsed);
@@ -875,12 +1102,57 @@ export function syncAll(options = {}) {
         if (hasDiverged && !force) {
           const conflicts = detectLowLevelConflicts(jsonContent, parsed);
           if (conflicts.length > 0) {
-            // Report conflicts without auto-resolving
-            allConflicts.push(...conflicts.map(c => ({
-              ...c,
-              module: `[${moduleId}] ${c.module}`,
-            })));
-            // Do not apply changes for this module
+            if (autoMerge) {
+              // REQ-024: Classify conflicts and auto-merge additions-only
+              const { autoMergeable, manual } = classifyConflictsForAutoMerge(conflicts);
+
+              // Auto-merge additions-only conflicts
+              if (autoMergeable.length > 0) {
+                const updatedJson = JSON.parse(JSON.stringify(jsonContent));
+                for (const item of autoMergeable) {
+                  const jsonFile = updatedJson.files.find(f => f.filePath === item.conflict.module);
+                  if (jsonFile) {
+                    jsonFile[item.conflict.field] = applyAutoMerge(
+                      jsonFile[item.conflict.field] || [],
+                      item.additions,
+                    );
+                    allChanges.push(
+                      `[${moduleId}] Auto-merged ${item.additions.length} addition(s) to ${item.conflict.field} in ${item.conflict.module}`,
+                    );
+                  }
+                }
+                if (!dryRun) {
+                  writeFileSync(jsonPath, JSON.stringify(updatedJson, null, 2) + '\n');
+                }
+                filesUpdated++;
+              }
+
+              // Report remaining manual conflicts
+              if (manual.length > 0) {
+                allConflicts.push(...manual.map(m => ({
+                  ...m.conflict,
+                  module: `[${moduleId}] ${m.conflict.module}`,
+                })));
+              }
+
+              // Build auto-merge log
+              const scopedAutoMergeable = autoMergeable.map(a => ({
+                ...a,
+                conflict: { ...a.conflict, module: `[${moduleId}] ${a.conflict.module}` },
+              }));
+              const scopedManual = manual.map(m => ({
+                ...m,
+                conflict: { ...m.conflict, module: `[${moduleId}] ${m.conflict.module}` },
+              }));
+              autoMergeLog.push(...formatAutoMergeLog(scopedAutoMergeable, scopedManual));
+            } else {
+              // Report conflicts without auto-resolving
+              allConflicts.push(...conflicts.map(c => ({
+                ...c,
+                module: `[${moduleId}] ${c.module}`,
+              })));
+              // Do not apply changes for this module
+            }
           } else {
             // JSON was modified but no field differences -- safe to proceed
             const { updatedJson, changes } = applyLowLevelSync(jsonContent, parsed);
@@ -918,7 +1190,7 @@ export function syncAll(options = {}) {
     dryRun,
   });
 
-  return { allChanges, allErrors, allConflicts, filesUpdated, summary };
+  return { allChanges, allErrors, allConflicts, filesUpdated, summary, autoMergeLog };
 }
 
 // =============================================================================
@@ -926,27 +1198,36 @@ export function syncAll(options = {}) {
 // =============================================================================
 
 /**
- * Parse CLI arguments for --force and --dry-run flags.
+ * Parse CLI arguments for --force, --dry-run, and --auto-merge flags.
  *
  * @param {string[]} argv - Process arguments (process.argv)
- * @returns {{ force: boolean, dryRun: boolean }}
+ * @returns {{ force: boolean, dryRun: boolean, autoMerge: boolean }}
  */
 export function parseCliArgs(argv) {
   const args = argv.slice(2);
   return {
     force: args.includes('--force'),
     dryRun: args.includes('--dry-run'),
+    autoMerge: args.includes('--auto-merge'),
   };
 }
 
 async function main() {
   try {
-    const { force, dryRun } = parseCliArgs(process.argv);
-    const result = syncAll({ force, dryRun });
+    const { force, dryRun, autoMerge } = parseCliArgs(process.argv);
+    const result = syncAll({ force, dryRun, autoMerge });
 
     // Report errors to stderr (AC-10.4)
     for (const error of result.allErrors) {
       process.stderr.write(`ERROR: ${error}\n`);
+    }
+
+    // REQ-024: Display auto-merge log
+    if (result.autoMergeLog.length > 0) {
+      console.log('');
+      for (const line of result.autoMergeLog) {
+        console.log(line);
+      }
     }
 
     // AC-10.5: Report conflicts to stderr
@@ -957,6 +1238,9 @@ async function main() {
         process.stderr.write(`${line}\n`);
       }
       process.stderr.write(`\nUse --force to override conflicts (markdown wins).\n`);
+      if (!autoMerge) {
+        process.stderr.write(`Use --auto-merge to auto-merge additions and flag deletions/modifications.\n`);
+      }
     }
 
     // AC-10.3: Output sync completion summary to stdout

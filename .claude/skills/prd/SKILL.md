@@ -137,6 +137,97 @@ Prompt: |
 
 4d. **Proceed to Phase 2** (Critique Loop) -- critics now evaluate the PRD with integration context already populated.
 
+#### Phase 1.55: Optional Technical Architecture Design (TAD)
+
+> **Applicability**: Optional for all workflows. Human chooses whether to provide TAD input.
+> **Purpose**: Allow humans to front-load architectural decisions before spec authoring, reducing investigation findings downstream.
+
+After the Integration Surface exploration (Phase 1.5) and before the Critique Loop (Phase 2):
+
+4a-tad. **Present TAD option to human**:
+
+```
+Would you like to provide technical architecture input before critique begins?
+
+This optional TAD (Technical Architecture Design) phase lets you specify:
+  - Key architectural decisions (e.g., database choice, API style, auth strategy)
+  - System design constraints (e.g., latency requirements, scaling targets)
+  - Technology choices (e.g., framework, language, infrastructure)
+  - Integration patterns (e.g., sync vs async, event-driven vs request-response)
+
+This input will be available to the spec-author agent as context, potentially
+reducing downstream investigation findings.
+
+[Provide TAD input / Skip TAD]
+```
+
+4b-tad. **If human provides TAD input**:
+
+- Record the TAD input in the PRD under a `## Technical Architecture Design` section
+- Dispatch PRD Writer (amendment mode) to integrate the TAD into the PRD:
+
+```
+Task: prd-writer
+Prompt: |
+  <context>
+  Mode: amendment
+  PRD path: .claude/prds/<prd-id>/prd.md
+  Pass number: 0 (TAD integration)
+  TAD Input:
+    <human's technical architecture input>
+  </context>
+
+  Add the TAD input to the "Technical Architecture Design" section of the PRD.
+  Integrate architectural decisions with existing Integration Surface findings.
+  Do NOT modify any other section of the PRD.
+  Save the complete amended PRD to disk.
+```
+
+- The TAD input will be passed through to spec-author context when `/spec` is invoked
+
+4c-tad. **If human skips TAD**: Continue to Phase 1.6 without error. No TAD section added.
+
+**Note**: The TAD phase does NOT count as a separate human intervention in metrics. The PRD gather-criticize loop remains fully human-in-the-loop -- no auto-decision logic applies to PRD findings.
+
+#### Phase 1.6: Diagram Generation (AC-4.4, AC-4.5)
+
+> **Trigger**: Runs after the gather-criticize loop exits (after Phase 1.5, before Phase 2).
+> **Purpose**: Generate preliminary visual artifacts from PRD content.
+
+4e. **Generate preliminary diagrams** from available YAML sources:
+
+```bash
+# Generate all diagrams from structured YAML docs
+node .claude/scripts/docs-generate.mjs
+```
+
+This produces three types of preliminary diagrams:
+
+1. **Architecture overview** (C4 component diagram): Generated from `architecture.yaml` via `generateComponentMmd()`. Shows system components and dependencies.
+2. **User flow sequences**: Generated from `flows/*.yaml` via `generateFlowMmd()`. Shows step-by-step interaction flows.
+3. **Security boundary diagram**: Generated from `security.yaml` via `generateSecurityMmd()`. Shows trust zones and data flow between them.
+
+**Behavior**:
+
+- If a YAML source does not exist, that diagram type is skipped silently
+- Generated `.mmd` files are placed in `.claude/docs/structured/generated/`
+- Each `.mmd` file includes a `%% source-hash:` header for freshness tracking
+- Results are referenced in the PRD's Visual Report section
+
+4f. **Update PRD Visual Report section** with references to generated diagrams:
+
+```markdown
+## Visual Report
+
+### Phase 1 Diagrams (Preliminary)
+
+- Architecture Overview: .claude/docs/structured/generated/component-c4.mmd
+- User Flow Sequences: .claude/docs/structured/generated/flow-\*.mmd
+- Security Boundaries: .claude/docs/structured/generated/security.mmd
+```
+
+4g. **Proceed to Phase 2** (Critique Loop).
+
 #### Phase 2: Critique Loop
 
 5. **Initialize pass counter**: `pass = 1`

@@ -124,6 +124,12 @@
           },
           {
             "_source": "metaclaude",
+            "_id": "contract-validate",
+            "type": "command",
+            "command": "cd \"$CLAUDE_PROJECT_DIR\" && node .claude/scripts/hook-wrapper.mjs '.claude/specs/**/*.md' 'node .claude/scripts/contract-validate.mjs {{file}}'"
+          },
+          {
+            "_source": "metaclaude",
             "_id": "evidence-table-check",
             "type": "command",
             "command": "cd \"$CLAUDE_PROJECT_DIR\" && node .claude/scripts/hook-wrapper.mjs '.claude/specs/**/*.md' 'node .claude/scripts/evidence-table-check.mjs {{file}}'"
@@ -240,6 +246,39 @@
             "_id": "workflow-file-protection",
             "type": "command",
             "command": "cd \"$CLAUDE_PROJECT_DIR\" && node .claude/scripts/workflow-file-protection.mjs"
+          }
+        ]
+      },
+      {
+        "matcher": "Agent",
+        "hooks": [
+          {
+            "_source": "metaclaude",
+            "_id": "e2e-blackbox-enforcement-agent",
+            "type": "command",
+            "command": "cd \"$CLAUDE_PROJECT_DIR\" && node .claude/scripts/e2e-blackbox-enforcement.mjs"
+          }
+        ]
+      },
+      {
+        "matcher": "Read",
+        "hooks": [
+          {
+            "_source": "metaclaude",
+            "_id": "e2e-blackbox-enforcement-read",
+            "type": "command",
+            "command": "cd \"$CLAUDE_PROJECT_DIR\" && node .claude/scripts/e2e-blackbox-enforcement.mjs"
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "_source": "metaclaude",
+            "_id": "e2e-blackbox-enforcement-write",
+            "type": "command",
+            "command": "cd \"$CLAUDE_PROJECT_DIR\" && node .claude/scripts/e2e-blackbox-enforcement.mjs"
           }
         ]
       }

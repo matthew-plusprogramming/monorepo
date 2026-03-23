@@ -16,7 +16,7 @@
  */
 
 import { readFileSync, existsSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import {
   loadTraceConfig,
   fileToModule,
@@ -180,14 +180,17 @@ function formatModuleQuery(queryResult, includeDetail, projectRoot) {
           }).join(', '));
         }
 
-        // Function calls
+        // Function calls (M1: updated to use contract-calls-events-schema field names)
         if (file.calls.length > 0) {
-          lines.push('**Calls**: ' + file.calls.map(c => `\`${c.target}:${c.function}\``).join(', '));
+          lines.push('**Calls**: ' + file.calls.map(c => {
+            const target = c.calleeFile ? `${c.calleeFile}:${c.calleeLine || '?'}` : '(unresolved)';
+            return `\`${c.calleeName}\` -> ${target}`;
+          }).join(', '));
         }
 
-        // Events
+        // Events (M1: updated to use contract-calls-events-schema field names)
         if (file.events.length > 0) {
-          lines.push('**Events**: ' + file.events.map(e => `${e.type} \`${e.eventName}\` on \`${e.channel}\``).join(', '));
+          lines.push('**Events**: ' + file.events.map(e => `${e.type} \`${e.eventName}\``).join(', '));
         }
 
         lines.push('');
@@ -323,13 +326,136 @@ function formatImpactAnalysis(filePath, impactResult) {
       lines.push('**Events**:');
       lines.push('');
       for (const evt of fileDetail.events) {
-        lines.push(`- ${evt.type} \`${evt.eventName}\` on \`${evt.channel}\``);
+        lines.push(`- ${evt.type} \`${evt.eventName}\` at ${evt.file}:${evt.line}`);
       }
       lines.push('');
     }
   }
 
   return lines.join('\n');
+}
+
+// =============================================================================
+// Call Graph Query (REQ-004: --calls mode)
+// =============================================================================
+
+/**
+ * Query callers and callees of a function across all traced modules.
+ *
+ * Searches all low-level trace JSON files for matching entries in calls[] arrays.
+ * Returns a complete cross-module view showing all callers/callees with module context.
+ *
+ * Implements: contract-trace-query-calls-cli
+ *
+ * @param {string} functionName - Function name to search for
+ * @param {string} projectRoot - Absolute path to project root
+ * @returns {{ callers: Array<{ moduleId: string, callerFile: string, callerLine: number, calleeName: string }>, callees: Array<{ moduleId: string, callerFile: string, callerLine: number, calleeName: string, calleeFile: string|null, calleeLine: number|null }> }}
+ */
+function queryCallGraph(functionName, projectRoot) {
+  const config = loadTraceConfig(projectRoot);
+  const callers = [];
+  const callees = [];
+
+  for (const mod of config.modules) {
+    const lowLevel = loadLowLevelTrace(mod.id, projectRoot);
+    if (!lowLevel || !lowLevel.files) continue;
+
+    for (const file of lowLevel.files) {
+      if (!Array.isArray(file.calls)) continue;
+
+      for (const call of file.calls) {
+        // Find callers: entries where calleeName matches the function
+        if (call.calleeName === functionName) {
+          callers.push({
+            moduleId: mod.id,
+            callerFile: call.callerFile,
+            callerLine: call.callerLine,
+            calleeName: call.calleeName,
+          });
+        }
+
+        // Find callees: entries in files that export the function
+        // (i.e., the function is a caller and we want to know what it calls)
+        // Check if this call originates from the function we're querying
+        // We approximate this by checking if the callerFile exports the functionName
+      }
+
+      // Find callees: look for calls made FROM files that export this function
+      const exportsFunction = file.exports && file.exports.some(e => e.symbol === functionName);
+      if (exportsFunction) {
+        for (const call of file.calls) {
+          callees.push({
+            moduleId: mod.id,
+            callerFile: call.callerFile,
+            callerLine: call.callerLine,
+            calleeName: call.calleeName,
+            calleeFile: call.calleeFile,
+            calleeLine: call.calleeLine,
+          });
+        }
+      }
+    }
+  }
+
+  return { callers, callees };
+}
+
+/**
+ * Format call graph query results as CLI output.
+ *
+ * Follows existing CLI conventions established by --module and --impact modes.
+ *
+ * @param {string} functionName - Function that was queried
+ * @param {{ callers: Array, callees: Array }} result - Query results
+ * @returns {string} Formatted output
+ */
+function formatCallGraphQuery(functionName, result) {
+  const lines = [];
+
+  lines.push(`Callers of ${functionName}:`);
+  if (result.callers.length > 0) {
+    for (const caller of result.callers) {
+      lines.push(`  ${caller.moduleId} / ${caller.callerFile}:${caller.callerLine}`);
+    }
+  } else {
+    lines.push('  (none found)');
+  }
+
+  lines.push('');
+  lines.push(`Callees of ${functionName}:`);
+  if (result.callees.length > 0) {
+    for (const callee of result.callees) {
+      const target = callee.calleeFile ? `${callee.calleeFile}:${callee.calleeLine || '?'}` : '(unresolved)';
+      lines.push(`  ${callee.moduleId} / ${callee.callerFile}:${callee.callerLine} - ${callee.calleeName} -> ${target}`);
+    }
+  } else {
+    lines.push('  (none found)');
+  }
+
+  return lines.join('\n');
+}
+
+// =============================================================================
+// Path Traversal Validation (REQ-031)
+// =============================================================================
+
+/**
+ * Validate and sanitize a file path input.
+ *
+ * Resolves the path against projectRoot and validates it stays within
+ * the project boundary. Rejects paths with .. traversal that escape.
+ *
+ * @param {string} inputPath - Raw file path from user input
+ * @param {string} projectRoot - Absolute path to project root
+ * @returns {string} Resolved, validated path within projectRoot
+ * @throws {Error} If path escapes project boundary
+ */
+function validateFilePath(inputPath, projectRoot) {
+  const resolved = resolve(projectRoot, inputPath);
+  if (!resolved.startsWith(projectRoot)) {
+    throw new Error(`Path traversal rejected: ${inputPath} resolves outside project root`);
+  }
+  return resolved;
 }
 
 // =============================================================================
@@ -341,11 +467,13 @@ function printUsage() {
   node .claude/scripts/trace-query.mjs --module <id>           Show module dependencies
   node .claude/scripts/trace-query.mjs --module <id> --detail  Include file-level detail
   node .claude/scripts/trace-query.mjs --impact <file-path>    Show impact of changing a file
+  node .claude/scripts/trace-query.mjs --calls <functionName>  Show callers/callees of a function
 
 Options:
   --module <id>    Module ID to query (from trace.config.json)
   --detail         Include low-level file/function details (with --module)
   --impact <path>  File path to analyze for impact (relative to project root)
+  --calls <name>   Function name to query for callers and callees
   --help           Show this help message`);
 }
 
@@ -355,6 +483,7 @@ function parseArgs(argv) {
     mode: null,
     moduleId: null,
     filePath: null,
+    functionName: null,
     detail: false,
   };
 
@@ -367,6 +496,10 @@ function parseArgs(argv) {
       case '--impact':
         result.mode = 'impact';
         result.filePath = args[++i];
+        break;
+      case '--calls':
+        result.mode = 'calls';
+        result.functionName = args[++i];
         break;
       case '--detail':
         result.detail = true;
@@ -425,8 +558,22 @@ function main() {
         process.exit(EXIT_USAGE_ERROR);
       }
 
+      // Validate path stays within project boundary (rejects .. traversal escapes)
+      validateFilePath(args.filePath, projectRoot);
       const result = analyzeImpact(args.filePath, config, highLevelTrace, projectRoot);
       console.log(formatImpactAnalysis(args.filePath, result));
+      process.exit(EXIT_SUCCESS);
+    }
+
+    if (args.mode === 'calls') {
+      if (!args.functionName) {
+        console.error('Error: --calls requires a function name.');
+        printUsage();
+        process.exit(EXIT_USAGE_ERROR);
+      }
+
+      const result = queryCallGraph(args.functionName, projectRoot);
+      console.log(formatCallGraphQuery(args.functionName, result));
       process.exit(EXIT_SUCCESS);
     }
   } catch (err) {
@@ -444,6 +591,9 @@ export {
   analyzeImpact,
   formatImpactAnalysis,
   parseArgs,
+  queryCallGraph,
+  formatCallGraphQuery,
+  validateFilePath,
 };
 
 // Run main only if executed directly

@@ -14,9 +14,10 @@
  * Spec: as-002-trace-utils
  */
 
-import { readFileSync, statSync } from 'node:fs';
+import { readFileSync, writeFileSync, statSync, renameSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { execSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 
 /** Default path to trace.config.json relative to project root */
 const TRACE_CONFIG_RELATIVE_PATH = '.claude/traces/trace.config.json';
@@ -291,15 +292,48 @@ export function getHighLevelTracePath(projectRoot) {
  * the module's fileGlobs. If any source file has an mtime newer than
  * lastGenerated, the trace is stale (AC-4.3, REQ-AT-007).
  *
+ * M2 extension (REQ-008): When called with optional fourth parameter `options`,
+ * performs file-level granularity staleness checks using staleness.json.
+ * Existing callers using `isTraceStale(moduleId, config, root)` are unaffected.
+ *
  * @param {string} moduleId - Module identifier to check
  * @param {{ modules: Array<{ id: string, fileGlobs: string[] }> }} config - Trace config
  * @param {string} [projectRoot] - Optional project root override
- * @returns {boolean} True if the trace is stale (needs regeneration)
+ * @param {object} [options] - M2 options for file-level staleness
+ * @param {string} [options.filePath] - Check staleness of specific file
+ * @param {boolean} [options.useStalenessStore] - Use staleness.json for checking
+ * @returns {boolean} True if stale (module-level or file-level depending on options)
  */
-export function isTraceStale(moduleId, config, projectRoot) {
+export function isTraceStale(moduleId, config, projectRoot, options) {
   const root = projectRoot || resolveProjectRoot();
 
-  // Find the module in config
+  // M2: File-level staleness via staleness.json
+  if (options && options.useStalenessStore) {
+    const staleness = loadStalenessMetadata(root);
+    if (!staleness) {
+      // No staleness data -- treat as stale (will trigger --full)
+      return true;
+    }
+
+    // If a specific file is requested, check only that file
+    if (options.filePath) {
+      return isFileStale(options.filePath, moduleId, staleness.data, root);
+    }
+
+    // Check all files in the module
+    const mod = config.modules.find(m => m.id === moduleId);
+    if (!mod) return false;
+
+    const matchingFiles = findFilesMatchingGlobs(mod.fileGlobs, root);
+    for (const filePath of matchingFiles) {
+      if (isFileStale(filePath, moduleId, staleness.data, root)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  // Original behavior: module-level staleness via mtime comparison
   const mod = config.modules.find(m => m.id === moduleId);
   if (!mod) {
     // Module not found in config -- cannot determine staleness
@@ -430,7 +464,458 @@ export function sanitizeMarkdown(text) {
   return result;
 }
 
+// =============================================================================
+// Staleness Metadata Store (M2: REQ-006, REQ-011, REQ-012)
+// =============================================================================
+
+/** Default path to staleness.json relative to project root */
+const STALENESS_JSON_RELATIVE_PATH = '.claude/traces/staleness.json';
+
+/** Current schema version for staleness.json */
+const STALENESS_SCHEMA_VERSION = 1;
+
+/** Maximum propagation depth for cross-module staleness (REQ-007) */
+const MAX_PROPAGATION_DEPTH = 3;
+
+/** Trace file size soft warning threshold in bytes (REQ-013) */
+const TRACE_SIZE_SOFT_WARNING_BYTES = 500 * 1024;
+
+/** Trace file size escalation threshold in bytes (REQ-013) */
+const TRACE_SIZE_ESCALATION_BYTES = 1024 * 1024;
+
+/**
+ * Compute SHA-256 hash of file content for change detection.
+ *
+ * Task 2.2: Used by staleness system to detect file modifications.
+ *
+ * @param {string} filePath - Absolute path to the file
+ * @returns {string} Hex-encoded SHA-256 hash of file content
+ */
+export function computeFileHash(filePath) {
+  const content = readFileSync(filePath, 'utf-8');
+  return createHash('sha256').update(content).digest('hex');
+}
+
+/**
+ * Compute export signature hash for a module's exports.
+ *
+ * Task 2.5: Hash covers "export name + kind + parameter names" for
+ * all exports. Excludes JSDoc comments, whitespace, and function bodies.
+ * Used to gate cross-module staleness propagation.
+ *
+ * @param {Array<{ symbol: string, type: string, signature?: string }>} moduleExports - All exports from a module
+ * @returns {string} Hex-encoded SHA-256 hash of export signatures
+ */
+export function computeExportSignatureHash(moduleExports) {
+  // Sort exports by symbol name for determinism
+  const sorted = [...moduleExports].sort((a, b) => a.symbol.localeCompare(b.symbol));
+
+  // Build canonical representation: "name:kind:paramNames" per export
+  const parts = sorted.map(exp => {
+    const paramNames = extractParamNames(exp.signature || '');
+    return `${exp.symbol}:${exp.type}:${paramNames}`;
+  });
+
+  const canonical = parts.join('\n');
+  return createHash('sha256').update(canonical).digest('hex');
+}
+
+/**
+ * Extract parameter names from a function signature string.
+ *
+ * Handles signatures like "(a, b, c)" or "(options = {})" etc.
+ * Returns a comma-separated list of parameter names only.
+ *
+ * @param {string} signature - Function signature string (e.g., "(a, b)")
+ * @returns {string} Comma-separated parameter names
+ */
+function extractParamNames(signature) {
+  if (!signature) return '';
+
+  // Extract content between first ( and matching )
+  const parenStart = signature.indexOf('(');
+  if (parenStart === -1) return '';
+
+  let depth = 0;
+  let parenEnd = -1;
+  for (let i = parenStart; i < signature.length; i++) {
+    if (signature[i] === '(') depth++;
+    if (signature[i] === ')') depth--;
+    if (depth === 0) {
+      parenEnd = i;
+      break;
+    }
+  }
+
+  if (parenEnd === -1) return '';
+
+  const inner = signature.slice(parenStart + 1, parenEnd).trim();
+  if (!inner) return '';
+
+  // Split on commas (not inside nested parens/brackets)
+  const params = [];
+  let current = '';
+  depth = 0;
+  for (const ch of inner) {
+    if (ch === '(' || ch === '[' || ch === '{') depth++;
+    if (ch === ')' || ch === ']' || ch === '}') depth--;
+    if (ch === ',' && depth === 0) {
+      params.push(current.trim());
+      current = '';
+    } else {
+      current += ch;
+    }
+  }
+  if (current.trim()) params.push(current.trim());
+
+  // Extract just the name (before =, :, or ?)
+  return params.map(p => {
+    // Handle destructured params like { a, b } or [a, b]
+    if (p.startsWith('{') || p.startsWith('[')) return p.split('=')[0].trim();
+    // Handle rest params like ...args
+    const name = p.split(/[=:?]/)[0].trim();
+    return name;
+  }).join(',');
+}
+
+/**
+ * Validate staleness.json data against the expected schema.
+ *
+ * Task 2.6 (REQ-011): Validates structure integrity on load.
+ * Returns validation result; callers should fall back to --full on failure.
+ *
+ * @param {*} data - Parsed JSON data to validate
+ * @returns {{ valid: boolean, errors: string[] }}
+ */
+export function validateStalenessMetadata(data) {
+  const errors = [];
+
+  if (!data || typeof data !== 'object') {
+    errors.push('staleness.json must be a non-null object');
+    return { valid: false, errors };
+  }
+
+  if (data.version !== STALENESS_SCHEMA_VERSION) {
+    errors.push(`staleness.json: version must be ${STALENESS_SCHEMA_VERSION}, got ${data.version}`);
+  }
+
+  if (!data.modules || typeof data.modules !== 'object') {
+    errors.push('staleness.json: modules must be an object');
+    return { valid: false, errors };
+  }
+
+  for (const [moduleId, modData] of Object.entries(data.modules)) {
+    const prefix = `modules.${moduleId}`;
+
+    if (!modData || typeof modData !== 'object') {
+      errors.push(`${prefix} must be an object`);
+      continue;
+    }
+
+    if (typeof modData.exportSignatureHash !== 'string') {
+      errors.push(`${prefix}.exportSignatureHash must be a string`);
+    }
+
+    if (!modData.files || typeof modData.files !== 'object') {
+      errors.push(`${prefix}.files must be an object`);
+      continue;
+    }
+
+    for (const [filePath, fileData] of Object.entries(modData.files)) {
+      const filePrefix = `${prefix}.files["${filePath}"]`;
+
+      if (!fileData || typeof fileData !== 'object') {
+        errors.push(`${filePrefix} must be an object`);
+        continue;
+      }
+
+      if (typeof fileData.hash !== 'string') {
+        errors.push(`${filePrefix}.hash must be a string`);
+      }
+      if (typeof fileData.lastTraced !== 'string') {
+        errors.push(`${filePrefix}.lastTraced must be a string`);
+      }
+
+      // externalRefs is optional
+      if (fileData.externalRefs !== undefined) {
+        if (typeof fileData.externalRefs !== 'object' || fileData.externalRefs === null) {
+          errors.push(`${filePrefix}.externalRefs must be an object when present`);
+        } else {
+          for (const [refModId, refSymbols] of Object.entries(fileData.externalRefs)) {
+            if (!Array.isArray(refSymbols)) {
+              errors.push(`${filePrefix}.externalRefs["${refModId}"] must be an array of strings`);
+            }
+          }
+        }
+      }
+    }
+  }
+
+  return { valid: errors.length === 0, errors };
+}
+
+/**
+ * Write data to a file using atomic write-rename pattern.
+ *
+ * Task 2.9 (REQ-012): Writes to a temporary .tmp file first, then
+ * atomically renames to the final path. Prevents partial/corrupted
+ * files from interrupted operations.
+ *
+ * @param {string} filePath - Final destination path
+ * @param {string} content - File content to write
+ */
+export function atomicWriteFile(filePath, content) {
+  const tmpPath = `${filePath}.tmp.${process.pid}.${Date.now()}`;
+  writeFileSync(tmpPath, content);
+  renameSync(tmpPath, filePath);
+}
+
+/**
+ * Load and validate staleness.json metadata.
+ *
+ * Task 2.1 (REQ-006): Reads and parses staleness.json with schema
+ * validation. Returns null if file is missing, corrupt, or invalid.
+ *
+ * @param {string} [projectRoot] - Optional project root override
+ * @returns {{ data: object, path: string } | null} Parsed staleness data and its path, or null
+ */
+export function loadStalenessMetadata(projectRoot) {
+  const root = projectRoot || resolveProjectRoot();
+  const stalenessPath = join(root, STALENESS_JSON_RELATIVE_PATH);
+
+  let raw;
+  try {
+    raw = readFileSync(stalenessPath, 'utf-8');
+  } catch {
+    // File does not exist -- not an error, just no staleness data
+    return null;
+  }
+
+  let data;
+  try {
+    data = JSON.parse(raw);
+  } catch {
+    // REQ-011: Corrupt JSON -- log warning, caller falls back to --full
+    process.stderr.write('[trace] WARNING: staleness.json contains invalid JSON; will fall back to --full regeneration\n');
+    return null;
+  }
+
+  const validation = validateStalenessMetadata(data);
+  if (!validation.valid) {
+    // REQ-011: Schema validation failure -- log warning, caller falls back to --full
+    process.stderr.write(`[trace] WARNING: staleness.json failed schema validation: ${validation.errors.join('; ')}; will fall back to --full regeneration\n`);
+    return null;
+  }
+
+  return { data, path: stalenessPath };
+}
+
+/**
+ * Write staleness.json metadata using atomic write-rename.
+ *
+ * Task 2.1 (REQ-006, REQ-012): Writes staleness metadata with
+ * atomic write-rename pattern.
+ *
+ * @param {object} data - Staleness metadata conforming to schema
+ * @param {string} [projectRoot] - Optional project root override
+ */
+export function writeStalenessMetadata(data, projectRoot) {
+  const root = projectRoot || resolveProjectRoot();
+  const stalenessPath = join(root, STALENESS_JSON_RELATIVE_PATH);
+  atomicWriteFile(stalenessPath, JSON.stringify(data, null, 2) + '\n');
+}
+
+/**
+ * Create a fresh staleness.json data structure.
+ *
+ * @returns {{ version: number, modules: {} }} Empty staleness metadata
+ */
+export function createEmptyStalenessData() {
+  return {
+    version: STALENESS_SCHEMA_VERSION,
+    modules: {},
+  };
+}
+
+/**
+ * Check if a specific file within a module is stale using staleness.json.
+ *
+ * Task 2.3 (REQ-005): Compares current file hash against stored hash.
+ * Returns true if hash differs or file is not in staleness data.
+ *
+ * @param {string} filePath - Relative path to file
+ * @param {string} moduleId - Module the file belongs to
+ * @param {object} stalenessData - Parsed staleness.json data
+ * @param {string} projectRoot - Absolute project root
+ * @returns {boolean} True if file is stale (needs regeneration)
+ */
+export function isFileStale(filePath, moduleId, stalenessData, projectRoot) {
+  // Module not in staleness data -- file is stale
+  if (!stalenessData.modules[moduleId]) {
+    return true;
+  }
+
+  const moduleData = stalenessData.modules[moduleId];
+  const fileData = moduleData.files[filePath];
+
+  // File not in staleness data -- stale
+  if (!fileData) {
+    return true;
+  }
+
+  // Compare current hash to stored hash
+  try {
+    const absPath = resolve(projectRoot, filePath);
+    const currentHash = computeFileHash(absPath);
+    return currentHash !== fileData.hash;
+  } catch {
+    // File read failed (deleted?) -- stale
+    return true;
+  }
+}
+
+/**
+ * Propagate cross-module staleness when a module's export signature changes.
+ *
+ * Task 2.6 (REQ-007): When a module's export signature hash changes,
+ * marks dependent modules' files as stale via externalRefs lookup.
+ * Max propagation depth: 3.
+ *
+ * @param {string} changedModuleId - Module whose exports changed
+ * @param {object} stalenessData - Staleness metadata (mutated in place)
+ * @param {string} newExportSigHash - New export signature hash
+ * @param {number} [depth=1] - Current propagation depth (internal)
+ * @returns {string[]} List of module IDs that were marked as having stale files
+ */
+export function propagateCrossModuleStaleness(changedModuleId, stalenessData, newExportSigHash, depth = 1) {
+  const affectedModules = [];
+
+  if (depth > MAX_PROPAGATION_DEPTH) {
+    process.stderr.write(`[trace] WARNING: Cross-module staleness propagation depth exceeded (max ${MAX_PROPAGATION_DEPTH}) for module ${changedModuleId}\n`);
+    return affectedModules;
+  }
+
+  // Check old vs new export signature hash
+  const moduleData = stalenessData.modules[changedModuleId];
+  if (!moduleData) return affectedModules;
+
+  const oldHash = moduleData.exportSignatureHash;
+  if (oldHash === newExportSigHash) {
+    // Export signature unchanged -- no propagation needed
+    return affectedModules;
+  }
+
+  // Update the export signature hash
+  moduleData.exportSignatureHash = newExportSigHash;
+
+  // Find all files in other modules that have externalRefs to the changed module
+  for (const [otherModuleId, otherModuleData] of Object.entries(stalenessData.modules)) {
+    if (otherModuleId === changedModuleId) continue;
+
+    let moduleAffected = false;
+    for (const [filePath, fileData] of Object.entries(otherModuleData.files)) {
+      if (fileData.externalRefs && fileData.externalRefs[changedModuleId]) {
+        // This file references exports from the changed module -- mark stale by clearing hash
+        fileData.hash = '';
+        moduleAffected = true;
+      }
+    }
+
+    if (moduleAffected) {
+      affectedModules.push(otherModuleId);
+    }
+  }
+
+  return affectedModules;
+}
+
+/**
+ * Check trace file size and emit warnings per REQ-013 thresholds.
+ *
+ * Task 2.10: Soft warning at 500KB, stderr escalation at 1MB.
+ * Generation is never blocked.
+ *
+ * @param {string} filePath - Path to the trace file to check
+ * @param {string} moduleId - Module ID for warning context
+ */
+export function checkTraceFileSize(filePath, moduleId) {
+  try {
+    const stat = statSync(filePath);
+    const sizeBytes = stat.size;
+
+    if (sizeBytes >= TRACE_SIZE_ESCALATION_BYTES) {
+      process.stderr.write(
+        `[trace] WARNING: Module "${moduleId}" trace file exceeds 1MB (${(sizeBytes / 1024 / 1024).toFixed(1)}MB). ` +
+        `Consider splitting this module into smaller modules.\n`
+      );
+    } else if (sizeBytes >= TRACE_SIZE_SOFT_WARNING_BYTES) {
+      process.stderr.write(
+        `[trace] Note: Module "${moduleId}" trace file is ${(sizeBytes / 1024).toFixed(0)}KB (approaching 1MB threshold).\n`
+      );
+    }
+  } catch {
+    // File stat failed -- skip size check
+  }
+}
+
+// =============================================================================
+// Trace Integrity Validation (M3: REQ-015)
+// =============================================================================
+
+/** Maximum age for trace data in milliseconds (1 year) */
+const MAX_TRACE_AGE_MS = 365 * 24 * 60 * 60 * 1000;
+
+/**
+ * Validate trace data integrity before consumption.
+ *
+ * Task 3.1 (REQ-015): Checks that `generatedBy` and `lastGenerated` fields
+ * are present and plausible. On failure, returns `{ valid: false, reason }`.
+ * Used by Route skill and hooks before consuming trace data.
+ *
+ * @param {object} traceData - Parsed trace JSON (high-level or low-level)
+ * @returns {{ valid: boolean, reason?: string }}
+ */
+export function validateTraceIntegrity(traceData) {
+  if (!traceData || typeof traceData !== 'object') {
+    return { valid: false, reason: 'Trace data is null or not an object' };
+  }
+
+  // Check generatedBy field is present and non-empty
+  if (!traceData.generatedBy || typeof traceData.generatedBy !== 'string' || traceData.generatedBy.trim() === '') {
+    return { valid: false, reason: 'Missing or empty "generatedBy" field' };
+  }
+
+  // Check lastGenerated field is present
+  if (!traceData.lastGenerated || typeof traceData.lastGenerated !== 'string') {
+    return { valid: false, reason: 'Missing or invalid "lastGenerated" field' };
+  }
+
+  // Parse and validate the timestamp
+  const timestamp = new Date(traceData.lastGenerated);
+  const timestampMs = timestamp.getTime();
+
+  if (Number.isNaN(timestampMs)) {
+    return { valid: false, reason: `"lastGenerated" is not a valid ISO 8601 timestamp: ${traceData.lastGenerated}` };
+  }
+
+  const now = Date.now();
+
+  // Reject future timestamps (with 60s tolerance for clock skew)
+  const CLOCK_SKEW_TOLERANCE_MS = 60 * 1000;
+  if (timestampMs > now + CLOCK_SKEW_TOLERANCE_MS) {
+    return { valid: false, reason: `"lastGenerated" is in the future: ${traceData.lastGenerated}` };
+  }
+
+  // Reject unreasonably old timestamps (older than MAX_TRACE_AGE_MS)
+  if (now - timestampMs > MAX_TRACE_AGE_MS) {
+    return { valid: false, reason: `"lastGenerated" is unreasonably old (> 1 year): ${traceData.lastGenerated}` };
+  }
+
+  return { valid: true };
+}
+
 // Export constants for use by other trace scripts
 export const TRACE_CONFIG_PATH = TRACE_CONFIG_RELATIVE_PATH;
 export const HIGH_LEVEL_TRACE_PATH = HIGH_LEVEL_TRACE_RELATIVE_PATH;
 export const LOW_LEVEL_TRACE_DIR = LOW_LEVEL_TRACE_DIR_RELATIVE_PATH;
+export const STALENESS_JSON_PATH = STALENESS_JSON_RELATIVE_PATH;

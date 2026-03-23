@@ -28,6 +28,7 @@ import {
   isTraceStale,
   resolveProjectRoot,
   TRACE_CONFIG_PATH,
+  loadStalenessMetadata,
 } from './lib/trace-utils.mjs';
 
 /**
@@ -173,8 +174,13 @@ async function main() {
     }
 
     // Step 5: Map files to modules and check staleness
+    // M2 (REQ-010): Use file-level staleness when staleness.json is available.
+    // Falls back to module-level (mtime-based) staleness if staleness.json is
+    // missing or corrupt (REQ-029: fallback safety).
     const staleModules = new Map(); // moduleId -> moduleName
     const checkedModules = new Set(); // moduleIds already evaluated (stale or fresh)
+    const stalenessResult = loadStalenessMetadata(projectRoot);
+    const useStalenessStore = stalenessResult !== null;
 
     for (const filePath of committedFiles) {
       const mod = fileToModule(filePath, config);
@@ -191,7 +197,11 @@ async function main() {
       checkedModules.add(mod.id);
 
       // Check if this module's trace is stale
-      if (isTraceStale(mod.id, config, projectRoot)) {
+      // M2: Prefer file-level staleness check when available
+      const stale = isTraceStale(mod.id, config, projectRoot,
+        useStalenessStore ? { useStalenessStore: true } : undefined
+      );
+      if (stale) {
         staleModules.set(mod.id, mod.name);
       }
     }

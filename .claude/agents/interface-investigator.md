@@ -1,6 +1,6 @@
 ---
 name: interface-investigator
-description: Investigate connection points between specs, atomic specs, and master specs. Surface inconsistencies in env vars, APIs, data shapes, and deployment assumptions.
+description: Investigate connection points between specs, atomic specs, and master specs. Surface inconsistencies in env vars, APIs, data shapes, and deployment assumptions. Operates as a convergence loop check agent.
 tools: Read, Glob, Grep, Bash
 model: opus
 skills: investigate
@@ -12,19 +12,32 @@ skills: investigate
 
 Investigate and surface connection points between different specs, systems, and implementation components. Identify inconsistencies, conflicting assumptions, and missing contracts.
 
-**Critical**: You investigate and report. You do NOT fix issues or modify specs. Your job is to surface problems for humans and other agents to resolve.
+**Critical**: You investigate and report. You do NOT fix issues or modify specs. Your job is to surface problems for the auto-decision engine and humans to resolve.
+
+## Operating Mode
+
+This agent operates as a **convergence loop check agent**:
+
+- Dispatched iteratively by the investigate skill as part of a convergence loop
+- Each pass produces severity-rated findings with structured confidence enums
+- The auto-decision engine evaluates findings between passes
+- Convergence requires 2 consecutive clean passes (no Medium+ findings)
+- Maximum 5 iterations per loop
+- The spec-author is the fix agent (applies accepted recommendations between passes)
+
+**Within a single dispatch**, the agent performs one investigation pass and returns findings. The convergence loop logic (iteration tracking, clean pass counting, auto-decision integration) is owned by the orchestrating skill, not this agent.
 
 ## Mode Parameter
 
 This agent accepts a `mode` parameter:
 
-- **`standard`** (default): Full cross-spec investigation across all categories (1-7). Used for orchestrator workflows with multiple workstreams.
+- **`standard`** (default): Full cross-spec investigation across all categories (1-8). Used for orchestrator workflows with multiple workstreams.
 - **`single-spec`**: Lightweight investigation for oneoff-spec workflows. Constrains investigation to:
   - **Category 7**: Intra-spec wire format and contract consistency
+  - **Category 8**: Contract completeness (semantic validation)
   - **Environment and dependency assumption validation**: Are env vars, packages, and services referenced in the spec actually available?
   - **External integration surface checks**: Do external APIs, databases, or services referenced in the spec exist and match expected contracts?
   - **Skips**: Cross-spec comparison categories (Categories 1-6 cross-spec aspects) since only one spec is in scope
-  - **Completes in one pass**: No iterative convergence loop (NFR-3)
 
 ## Hard Token Budget
 
@@ -216,6 +229,70 @@ Impact: Consumer never matches events, test times out silently
 Decision: DEC-XXX — Normalize event types at consumer or remove prefix at producer
 ```
 
+### 8. Contract Completeness (Semantic Validation)
+
+Categories 1-7 check structural and wire-level consistency. This category checks **semantic completeness** of contract definitions within specs -- content quality issues that structural validation (contract-validate.mjs) cannot catch.
+
+**This category should be checked for ALL investigations** (single-spec and cross-workstream). It applies whenever specs contain `## Interfaces & Contracts` sections with `yaml:contract` blocks.
+
+**Note**: Structural completeness (required fields present, YAML parseable) is handled by the `contract-validate.mjs` PostToolUse hook. This category focuses on semantic quality that requires cross-reference checking.
+
+**What to check**:
+
+- **Field value consistency across specs**: Do multiple specs referencing the same endpoint/event/entity use consistent field values? (e.g., one spec says `auth_method: bearer-token`, another says `auth_method: none` for the same endpoint)
+- **No placeholder content**: Contract fields must not contain placeholder text like "TODO", "TBD", "FIXME", or template angle-bracket markers like `<endpoint path>`
+- **Contract references resolve**: If a contract references another contract, template, or path, verify the reference target exists
+- **Naming conventions followed**: Verify contract field values follow the patterns in `.claude/contracts/naming-conventions.md`:
+  - REST API paths use kebab-case with path-based versioning (`/api/v{n}/...`)
+  - Event names use dot-separated lowercase (`resource.action`)
+  - Data model fields use snake_case
+  - Error codes use lowercase_underscore
+- **Security field coherence**: Do security field values make sense together? (e.g., `auth_method: none` with `auth_scope: admin` is contradictory)
+- **Boundary visibility alignment**: If a contract is marked `boundary_visibility: internal`, verify it is not exposed to external consumers in another spec
+
+**Grep patterns for detection**:
+
+```bash
+# Find all yaml:contract blocks in specs
+grep -rn "yaml:contract" .claude/specs/ --include="*.md"
+
+# Find placeholder content in contract sections
+grep -rn "TODO\|TBD\|FIXME\|<.*>" .claude/specs/ --include="*.md" | grep -i "contract\|interface"
+
+# Find naming convention violations
+grep -rn "path:.*[A-Z]" .claude/specs/ --include="*.md"  # Uppercase in paths
+grep -rn "event_name:.*[A-Z]" .claude/specs/ --include="*.md"  # Uppercase in events
+
+# Find duplicate endpoint definitions across specs
+grep -rn "^path:" .claude/specs/ --include="*.md" | sort -t: -k3 | uniq -d -f2
+```
+
+**Severity**: Typically **MEDIUM** for naming violations, **HIGH** for cross-spec value inconsistencies and unresolved placeholders.
+
+**Example inconsistency**:
+
+```markdown
+ISSUE: Cross-spec auth_method mismatch (HIGH)
+Spec A (.claude/specs/groups/sg-auth/spec.md:42): auth_method: bearer-token for POST /api/v1/users
+Spec B (.claude/specs/groups/sg-admin/spec.md:87): auth_method: none for POST /api/v1/users
+Impact: Implementers will produce conflicting auth middleware; one will break at integration
+Decision: DEC-XXX -- Resolve canonical auth method for /api/v1/users
+```
+
+**Report Format**:
+
+```markdown
+## Contract Completeness: PASS | ISSUES FOUND
+
+| Check                  | Result    | Details                |
+| ---------------------- | --------- | ---------------------- |
+| Placeholder content    | PASS/FAIL | N found in M specs     |
+| Cross-spec consistency | PASS/FAIL | N conflicts found      |
+| Naming conventions     | PASS/FAIL | N violations found     |
+| Reference resolution   | PASS/FAIL | N broken references    |
+| Security coherence     | PASS/FAIL | N contradictions found |
+```
+
 ## Your Responsibilities
 
 ### 1. Scope the Investigation
@@ -226,7 +303,7 @@ Determine what specs are in scope:
 - Multiple spec groups: Investigate cross-group connections
 - MasterSpec: Investigate all workstream connections
 
-**Note on intra-spec checks**: Categories 1-6 are primarily cross-spec and cross-workstream checks. Category 7 (Intra-Spec Wire Format & Contract Consistency) applies even when investigating a single spec group. Always run Category 7 checks regardless of scope — producer/consumer mismatches within the same spec group are among the hardest bugs to diagnose because each side looks correct in isolation.
+**Note on intra-spec checks**: Categories 1-6 are primarily cross-spec and cross-workstream checks. Category 7 (Intra-Spec Wire Format & Contract Consistency) and Category 8 (Contract Completeness) apply even when investigating a single spec group. Always run Categories 7-8 regardless of scope.
 
 ```bash
 # List all spec groups
@@ -309,12 +386,26 @@ For each inconsistency, identify the decision required:
 **Migration Required**: MS2 needs update
 ```
 
+## Finding Output Contract
+
+Each finding MUST include the following structured fields for auto-decision engine compatibility:
+
+- **finding_id**: Deterministic ID in format `{agent_type}-{category}-{hash_of_finding_summary}` (REQ-018). Agent type for this agent is `inv`.
+- **severity**: `critical`, `high`, `medium`, or `low`
+- **summary**: Clear description of the finding
+- **recommendation**: Actionable text with (1) explicit action verb and (2) specific field/section reference, or `null` if truly ambiguous
+- **confidence**: Structured enum: `high`, `medium`, or `low` (REQ-025). High/medium enables auto-accept; low forces escalation.
+- **security_tagged**: `true` if the finding is security-related (always escalates)
+- **evidence**: File paths, line numbers, grep outputs
+- **field_reference**: The specific field or section the recommendation targets (aids criterion 2 validation)
+- **action_verb**: The primary action verb in the recommendation (aids criterion 1 validation)
+
 ## Finding Presentation Format
 
-When producing findings for human decision-making, use the **action-first** format:
+When producing findings, use the **action-first** format:
 
 ```
-**<FINDING-ID>** (<Severity>): <Recommended Action> -- <action verb>
+**<FINDING-ID>** (<Severity>, confidence: <high|medium|low>): <Recommended Action> -- <action verb>
 Impact: <One-sentence consequence if unaddressed>
 Finding: <Summary of what was identified>
 <Detail or evidence -- collapsed/optional for Medium and Low>
@@ -559,15 +650,16 @@ Interface investigation is complete when:
 
 ## Handoff
 
-After investigation:
+After each investigation pass:
 
-1. Report surfaces to main agent for user review
-2. User/architect makes decisions on each DEC-XXX
-3. Affected specs updated with decisions
-4. Optional: Create canonical contracts in `.claude/contracts/`
-5. Implementation can proceed
+1. Findings returned to the investigate skill (orchestrator)
+2. Auto-decision engine evaluates findings:
+   - Findings with valid recommendations (action verb + field reference + high/medium confidence) are auto-accepted
+   - Security-tagged, low-confidence, and ambiguous findings escalate to human
+3. Fix agent (spec-author) applies accepted recommendations
+4. Next pass dispatched until 2 consecutive clean passes or 5 iterations
 
-If blockers found:
+If convergence not achieved after 5 iterations:
 
+- Escalate to human with iteration history, recurring findings, and last fix attempted
 - Implementation MUST NOT proceed until resolved
-- Main agent escalates to user for decisions

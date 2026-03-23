@@ -30,6 +30,7 @@ A spec group is **converged** when:
 4. **Traceability intact** - REQ → atomic spec → implementation → test chain is complete
 5. **Tests pass** - All tests passing, coverage adequate
 6. **Contracts valid** - (For MasterSpec) Contracts consistent across workstreams
+7. **E2E test coverage** - (For cross-boundary specs) E2E tests exist for each cross-boundary AC (Step 9)
 
 If any criterion fails → Task is **not converged** → Iteration needed.
 
@@ -300,6 +301,39 @@ Verify:
 - No duplicate contract IDs
 - Implementations match contract interfaces
 - No dependency cycles
+
+### Step 8b: E2E Test Coverage (Cross-Boundary Specs)
+
+For specs with cross-boundary contracts (HTTP, SSE, WebSocket, database, external service boundaries), validate E2E test coverage. This corresponds to the unifier agent's Step 9.
+
+**Applicability**: Only for specs with cross-boundary contracts. For internal-only specs, report `e2e_coverage_status: N/A`.
+
+```bash
+# Check for E2E test files
+ls tests/e2e/<spec-group-id>/
+
+# Verify coverage of cross-boundary ACs
+```
+
+Validate:
+
+- E2E test files exist in `tests/e2e/<spec-group-id>/`
+- Each cross-boundary AC has at least one corresponding E2E test
+- No contract-test mismatch (contracts not amended since tests were generated)
+
+**Report**:
+
+```markdown
+## E2E Test Coverage: PASSED | FAILED | N/A
+
+- e2e_coverage_status: PASSED | FAILED | N/A
+- Cross-boundary ACs: X total
+- E2E tests found: Y
+- Uncovered criteria: [list]
+- gap_count: Z
+```
+
+**Impact on convergence**: FAILED blocks convergence. N/A has no impact.
 
 ### Step 9: Generate Convergence Report
 

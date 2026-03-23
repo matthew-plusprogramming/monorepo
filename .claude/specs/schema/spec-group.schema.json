@@ -138,6 +138,8 @@
       "additionalProperties": false,
       "properties": {
         "spec_complete": { "type": "boolean" },
+        "investigation_converged": { "type": "boolean" },
+        "challenger_converged": { "type": "boolean" },
         "all_acs_implemented": { "type": "boolean" },
         "all_tests_passing": { "type": "boolean" },
         "unifier_passed": { "type": "boolean" },

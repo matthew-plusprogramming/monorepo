@@ -67,15 +67,15 @@ function createTestConfig() {
 describe('traceFileToModuleIds', () => {
   const config = createTestConfig();
 
-  // AC-6.1: Reading high-level.md records all modules as read
-  it('AC-6.1: high-level.md should return all module IDs', () => {
+  // High-level trace is orientation-only — does NOT unlock modules for editing
+  it('high-level.md should return empty array (orientation only, no edit unlock)', () => {
     const result = traceFileToModuleIds('.claude/traces/high-level.md', config);
-    expect(result.sort()).toEqual(['claude-scripts', 'node-server-core', 'sdlc-dev-team', 'sdlc-qa-team']);
+    expect(result).toEqual([]);
   });
 
-  it('AC-6.1: high-level.json should also return all module IDs', () => {
+  it('high-level.json should also return empty array', () => {
     const result = traceFileToModuleIds('.claude/traces/high-level.json', config);
-    expect(result.length).toBe(4);
+    expect(result).toEqual([]);
   });
 
   // AC-6.2: Reading low-level/<module-id>.md records only that module
@@ -470,7 +470,7 @@ describe('trace-read-tracker integration (child process)', () => {
     return JSON.parse(readFileSync(filePath, 'utf-8'));
   }
 
-  it('AC-6.1: reading high-level.md records all modules', () => {
+  it('reading high-level.md does NOT record any modules (orientation only)', () => {
     invokeTracker({
       session_id: 'integration-test',
       tool_input: {
@@ -479,12 +479,10 @@ describe('trace-read-tracker integration (child process)', () => {
     });
 
     const result = readTraceReads();
-    expect(result).toBeTruthy();
-    expect(result.session_id).toBe('integration-test');
-    expect('sdlc-dev-team' in result.reads).toBeTruthy();
-    expect('sdlc-qa-team' in result.reads).toBeTruthy();
-    expect('node-server-core' in result.reads).toBeTruthy();
-    expect('claude-scripts' in result.reads).toBeTruthy();
+    // trace-reads.json may or may not be created, but no modules should be recorded
+    if (result) {
+      expect(Object.keys(result.reads).length).toBe(0);
+    }
   });
 
   it('AC-6.2: reading low-level/sdlc-dev-team.md records only sdlc-dev-team', () => {
@@ -643,19 +641,20 @@ describe('trace-read-tracker integration (child process)', () => {
     expect('sdlc-dev-team' in result.reads).toBeTruthy();
     expect(result.session_id).toBe('session-1');
 
-    // New session reads a different module
+    // New session reads a specific low-level module
     invokeTracker({
       session_id: 'session-2',
       tool_input: {
-        file_path: join(testDir, '.claude', 'traces', 'high-level.md'),
+        file_path: join(testDir, '.claude', 'traces', 'low-level', 'sdlc-qa-team.md'),
       },
     });
 
-    // Verify old reads were cleared
+    // Verify old reads were cleared and only new session's read exists
     result = readTraceReads();
     expect(result.session_id).toBe('session-2');
-    // The old sdlc-dev-team read from session-1 timestamp should be gone,
-    // replaced by the high-level read which includes all modules
-    expect('sdlc-dev-team' in result.reads).toBeTruthy();
+    // The old sdlc-dev-team read from session-1 should be gone
+    expect('sdlc-dev-team' in result.reads).toBeFalsy();
+    // Only the new session's read should be present
+    expect('sdlc-qa-team' in result.reads).toBeTruthy();
   });
 });

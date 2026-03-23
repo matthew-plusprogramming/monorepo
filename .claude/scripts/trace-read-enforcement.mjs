@@ -37,8 +37,8 @@ import {
 /** Path to session state file relative to project root */
 const TRACE_READS_RELATIVE_PATH = '.claude/coordination/trace-reads.json';
 
-/** TTL for trace reads in milliseconds (5 minutes). Reads older than this are treated as expired. */
-const TRACE_READ_TTL_MS = 5 * 60 * 1000;
+/** TTL for trace reads in milliseconds (10 minutes). Reads older than this are treated as expired. */
+const TRACE_READ_TTL_MS = 10 * 60 * 1000;
 
 /**
  * Read all stdin as a string.
@@ -204,7 +204,7 @@ async function main() {
     process.stderr.write('\n');
     if (isExpired) {
       process.stderr.write(
-        `Your trace read for module '${mod.id}' (${mod.name}) has expired. Trace reads expire after 5 minutes.\n`,
+        `Your trace read for module '${mod.id}' (${mod.name}) has expired. Trace reads expire after 10 minutes.\n`,
       );
     } else {
       process.stderr.write(
@@ -214,10 +214,7 @@ async function main() {
     process.stderr.write('\n');
     process.stderr.write(`Read \`${traceFile}\` before editing files in module '${mod.id}'\n`);
     process.stderr.write('\n');
-    process.stderr.write('Or read the high-level trace to unlock all modules:\n');
-    process.stderr.write('  Read \`.claude/traces/high-level.md\`\n');
-    process.stderr.write('\n');
-    process.stderr.write('Note: Trace reads expire after 5 minutes. Re-read the trace to continue editing.\n');
+    process.stderr.write('Note: Trace reads expire after 10 minutes. Re-read the trace to continue editing.\n');
     process.stderr.write('\n');
     process.stderr.write('========================================\n');
     process.stderr.write('\n');

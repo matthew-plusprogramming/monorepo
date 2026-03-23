@@ -1,0 +1,14 @@
+# Data Models Template (Entity-Relationship Diagram Source)
+#
+# Getting started:
+#   1. Run `node .claude/scripts/docs-scaffold-diagrams.mjs` to generate a stub
+#      with the schema_version header and minimal valid structure.
+#   2. Or fill in this template manually with your project's data models.
+#   3. Run `node .claude/scripts/docs-validate.mjs` to check for issues.
+#   4. Run `node .claude/scripts/docs-generate.mjs` to create Mermaid ERD diagrams.
+#
+# Each entity defines attributes and relationships to other entities.
+# The generator produces an erDiagram from this source.
+#
+schema_version: 1
+entities: []

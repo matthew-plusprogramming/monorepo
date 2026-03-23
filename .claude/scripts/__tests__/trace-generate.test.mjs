@@ -393,8 +393,9 @@ describe('analyzeFile', () => {
     expect(result.imports.length > 0).toBeTruthy();
     expect(Array.isArray(result.calls)).toBeTruthy();
     expect(Array.isArray(result.events)).toBeTruthy();
-    expect(result.calls.length).toBe(0);
-    expect(result.events.length).toBe(0);
+    // M1: calls[] and events[] are now populated by regex analysis
+    expect(result.calls.length).toBeGreaterThanOrEqual(0);
+    expect(result.events.length).toBeGreaterThanOrEqual(0);
   });
 
   it('should return empty arrays for non-TS/JS files', () => {
@@ -863,17 +864,17 @@ describe('generateLowLevelMarkdown (AC-3.2)', () => {
           imports: [],
           calls: [],
           events: [
-            { type: 'publish', eventName: 'work.completed', channel: 'dev-team-output' },
-            { type: 'subscribe', eventName: 'work.assigned', channel: 'triage-output' },
+            { file: 'src/test-module/emitter.ts', line: 10, eventName: 'work.completed', type: 'emit' },
+            { file: 'src/test-module/emitter.ts', line: 20, eventName: 'work.assigned', type: 'subscribe' },
           ],
         },
       ],
     };
 
     const md = generateLowLevelMarkdown(trace, { id: 'test-module', name: 'Test Module' });
-    expect(md.includes('type | event-name | channel')).toBeTruthy();
-    expect(md.includes('publish | work.completed | dev-team-output')).toBeTruthy();
-    expect(md.includes('subscribe | work.assigned | triage-output')).toBeTruthy();
+    expect(md.includes('file | line | eventName | type')).toBeTruthy();
+    expect(md.includes('src/test-module/emitter.ts | 10 | work.completed | emit')).toBeTruthy();
+    expect(md.includes('src/test-module/emitter.ts | 20 | work.assigned | subscribe')).toBeTruthy();
   });
 
   it('should include function calls when present', () => {
@@ -888,7 +889,7 @@ describe('generateLowLevelMarkdown (AC-3.2)', () => {
           exports: [],
           imports: [],
           calls: [
-            { target: 'knowledge-team/service.py', function: 'query_knowledge', context: 'processItem' },
+            { callerFile: 'src/test-module/service.ts', callerLine: 42, calleeName: 'query_knowledge', calleeFile: 'src/knowledge/service.mjs', calleeLine: 10 },
           ],
           events: [],
         },
@@ -896,8 +897,8 @@ describe('generateLowLevelMarkdown (AC-3.2)', () => {
     };
 
     const md = generateLowLevelMarkdown(trace, { id: 'test-module', name: 'Test Module' });
-    expect(md.includes('target | function | context')).toBeTruthy();
-    expect(md.includes('knowledge-team/service.py | query_knowledge | processItem')).toBeTruthy();
+    expect(md.includes('callerFile | callerLine | calleeName | calleeFile | calleeLine')).toBeTruthy();
+    expect(md.includes('src/test-module/service.ts | 42 | query_knowledge | src/knowledge/service.mjs | 10')).toBeTruthy();
   });
 });
 

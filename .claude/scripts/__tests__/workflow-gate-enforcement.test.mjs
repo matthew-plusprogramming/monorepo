@@ -193,12 +193,12 @@ afterEach(() => {
 
 describe('AC-0.1: Agent tool stdin includes subagent_type', () => {
   it('should parse subagent_type from stdin tool_input', async () => {
-    // Arrange -- session with all prerequisites met for implementer
+    // Arrange -- session with all convergence prerequisites met for implementer (WS-4 change)
     const session = makeSessionJson({
-      subagent_tasks: [
-        { subagent_type: 'interface-investigator', status: 'completed' },
-        { subagent_type: 'challenger', stage: 'pre-implementation', status: 'completed' },
-      ],
+      convergence: {
+        investigation: { clean_pass_count: 2 },
+        challenger: { clean_pass_count: 2 },
+      },
     });
     writeSessionJson(session);
 
@@ -215,25 +215,25 @@ describe('AC-0.1: Agent tool stdin includes subagent_type', () => {
 // ============================================================
 
 describe('AC-2.1: Blocks implementer without prerequisites', () => {
-  it('should block implementer when no interface-investigator dispatch exists (oneoff-spec)', async () => {
-    // Arrange
+  it('should block implementer when no investigation convergence exists (oneoff-spec)', async () => {
+    // Arrange -- no convergence data at all
     const session = makeSessionJson({ subagent_tasks: [] });
     writeSessionJson(session);
 
     // Act
     const result = await runHook(makeAgentStdin('test-session', 'implementer'));
 
-    // Assert
+    // Assert -- convergence-type prerequisites block (WS-4 change)
     expect(result.exitCode).toBe(2);
-    expect(result.stderr).toMatch(/interface-investigator|investigation/i);
+    expect(result.stderr).toMatch(/investigation|convergence/i);
   });
 
-  it('should block implementer when interface-investigator exists but no challenger (oneoff-spec)', async () => {
-    // Arrange
+  it('should block implementer when investigation converged but challenger has not (oneoff-spec)', async () => {
+    // Arrange -- only investigation converged, challenger still at 0
     const session = makeSessionJson({
-      subagent_tasks: [
-        { subagent_type: 'interface-investigator', status: 'completed' },
-      ],
+      convergence: {
+        investigation: { clean_pass_count: 2 },
+      },
     });
     writeSessionJson(session);
 
@@ -242,16 +242,16 @@ describe('AC-2.1: Blocks implementer without prerequisites', () => {
 
     // Assert
     expect(result.exitCode).toBe(2);
-    expect(result.stderr).toMatch(/challenger|pre-implementation/i);
+    expect(result.stderr).toMatch(/challenger|convergence/i);
   });
 
-  it('should allow implementer when both prerequisites are met (oneoff-spec)', async () => {
-    // Arrange
+  it('should allow implementer when both convergence prerequisites are met (oneoff-spec)', async () => {
+    // Arrange -- both investigation and challenger converged (>= 2 clean passes)
     const session = makeSessionJson({
-      subagent_tasks: [
-        { subagent_type: 'interface-investigator', status: 'completed' },
-        { subagent_type: 'challenger', stage: 'pre-implementation', status: 'completed' },
-      ],
+      convergence: {
+        investigation: { clean_pass_count: 2 },
+        challenger: { clean_pass_count: 2 },
+      },
     });
     writeSessionJson(session);
 
@@ -262,33 +262,32 @@ describe('AC-2.1: Blocks implementer without prerequisites', () => {
     expect(result.exitCode).toBe(0);
   });
 
-  it('should check for pre-orchestration challenger in orchestrator workflow', async () => {
-    // Arrange
+  it('should block implementer in orchestrator when convergence not met', async () => {
+    // Arrange -- orchestrator workflow, convergence gates not met
     const session = makeSessionJson({
       active_work: { workflow: 'orchestrator' },
-      subagent_tasks: [
-        { subagent_type: 'interface-investigator', status: 'completed' },
-        // Has pre-implementation, but orchestrator needs pre-orchestration
-        { subagent_type: 'challenger', stage: 'pre-implementation', status: 'completed' },
-      ],
+      convergence: {
+        investigation: { clean_pass_count: 2 },
+        challenger: { clean_pass_count: 1 },
+      },
     });
     writeSessionJson(session);
 
     // Act
     const result = await runHook(makeAgentStdin('test-session', 'implementer'));
 
-    // Assert -- should block because pre-orchestration is needed, not pre-implementation
+    // Assert -- should block because challenger convergence < 2
     expect(result.exitCode).toBe(2);
   });
 
-  it('should allow implementer in orchestrator when pre-orchestration challenger exists', async () => {
-    // Arrange
+  it('should allow implementer in orchestrator when both convergence gates are met', async () => {
+    // Arrange -- orchestrator workflow, both gates converged
     const session = makeSessionJson({
       active_work: { workflow: 'orchestrator' },
-      subagent_tasks: [
-        { subagent_type: 'interface-investigator', status: 'completed' },
-        { subagent_type: 'challenger', stage: 'pre-orchestration', status: 'completed' },
-      ],
+      convergence: {
+        investigation: { clean_pass_count: 2 },
+        challenger: { clean_pass_count: 2 },
+      },
     });
     writeSessionJson(session);
 
@@ -301,11 +300,11 @@ describe('AC-2.1: Blocks implementer without prerequisites', () => {
 });
 
 // ============================================================
-// AC-2.2: Blocks test-writer without implementer
+// AC-2.2: test-writer has no coercive prerequisites (Practice 2.4)
 // ============================================================
 
-describe('AC-2.2: Blocks test-writer without implementer', () => {
-  it('should block test-writer when no implementer dispatch exists', async () => {
+describe('AC-2.2: test-writer has no coercive prerequisites (parallel with implementer)', () => {
+  it('should allow test-writer even without implementer dispatch (works from spec only)', async () => {
     // Arrange
     const session = makeSessionJson({ subagent_tasks: [] });
     writeSessionJson(session);
@@ -313,24 +312,7 @@ describe('AC-2.2: Blocks test-writer without implementer', () => {
     // Act
     const result = await runHook(makeAgentStdin('test-session', 'test-writer'));
 
-    // Assert
-    expect(result.exitCode).toBe(2);
-    expect(result.stderr).toMatch(/implementer/i);
-  });
-
-  it('should allow test-writer when implementer has been dispatched', async () => {
-    // Arrange
-    const session = makeSessionJson({
-      subagent_tasks: [
-        { subagent_type: 'implementer', status: 'running' },
-      ],
-    });
-    writeSessionJson(session);
-
-    // Act
-    const result = await runHook(makeAgentStdin('test-session', 'test-writer'));
-
-    // Assert
+    // Assert — no coercive prerequisites, test-writer is free to dispatch
     expect(result.exitCode).toBe(0);
   });
 });
@@ -393,14 +375,29 @@ describe('AC-2.3: Blocks code-reviewer without prerequisites', () => {
 });
 
 // ============================================================
-// AC-2.4: Blocks security-reviewer when code_review convergence < 2
+// AC-2.4: security-reviewer has same prerequisites as code-reviewer (parallel)
 // ============================================================
 
-describe('AC-2.4: Blocks security-reviewer when code_review convergence < 2', () => {
-  it('should block when code_review clean_pass_count is 0', async () => {
+describe('AC-2.4: security-reviewer requires challenger(pre-review) + unifier (parallel with code-reviewer)', () => {
+  it('should block when no prerequisites are met', async () => {
+    // Arrange
+    const session = makeSessionJson({ subagent_tasks: [] });
+    writeSessionJson(session);
+
+    // Act
+    const result = await runHook(makeAgentStdin('test-session', 'security-reviewer'));
+
+    // Assert
+    expect(result.exitCode).toBe(2);
+    expect(result.stderr).toMatch(/challenger|unifier|pre-review/i);
+  });
+
+  it('should block when only unifier is present (missing challenger pre-review)', async () => {
     // Arrange
     const session = makeSessionJson({
-      convergence: { code_review: { clean_pass_count: 0 } },
+      subagent_tasks: [
+        { subagent_type: 'unifier', status: 'completed' },
+      ],
     });
     writeSessionJson(session);
 
@@ -409,61 +406,57 @@ describe('AC-2.4: Blocks security-reviewer when code_review convergence < 2', ()
 
     // Assert
     expect(result.exitCode).toBe(2);
-    expect(result.stderr).toMatch(/code.?review|convergence/i);
+    expect(result.stderr).toMatch(/challenger|pre-review/i);
   });
 
-  it('should block when code_review clean_pass_count is 1', async () => {
+  it('should allow when both challenger(pre-review) and unifier are present', async () => {
     // Arrange
     const session = makeSessionJson({
-      convergence: { code_review: { clean_pass_count: 1 } },
+      subagent_tasks: [
+        { subagent_type: 'challenger', stage: 'pre-review', status: 'completed' },
+        { subagent_type: 'unifier', status: 'completed' },
+      ],
     });
     writeSessionJson(session);
 
     // Act
     const result = await runHook(makeAgentStdin('test-session', 'security-reviewer'));
 
-    // Assert
-    expect(result.exitCode).toBe(2);
-  });
-
-  it('should allow when code_review clean_pass_count is 2', async () => {
-    // Arrange
-    const session = makeSessionJson({
-      convergence: { code_review: { clean_pass_count: 2 } },
-    });
-    writeSessionJson(session);
-
-    // Act
-    const result = await runHook(makeAgentStdin('test-session', 'security-reviewer'));
-
-    // Assert
-    expect(result.exitCode).toBe(0);
-  });
-
-  it('should allow when code_review clean_pass_count is > 2', async () => {
-    // Arrange
-    const session = makeSessionJson({
-      convergence: { code_review: { clean_pass_count: 5 } },
-    });
-    writeSessionJson(session);
-
-    // Act
-    const result = await runHook(makeAgentStdin('test-session', 'security-reviewer'));
-
-    // Assert
+    // Assert — same prerequisites as code-reviewer, both can dispatch in parallel
     expect(result.exitCode).toBe(0);
   });
 });
 
 // ============================================================
-// AC-2.5: Blocks documenter when security_review convergence < 2
+// AC-2.5: Blocks documenter when either review convergence < 2
 // ============================================================
 
-describe('AC-2.5: Blocks documenter when security_review convergence < 2', () => {
-  it('should block when security_review clean_pass_count is 0', async () => {
+describe('AC-2.5: Blocks documenter until both code_review AND security_review converge', () => {
+  it('should block when neither review has converged', async () => {
     // Arrange
     const session = makeSessionJson({
-      convergence: { security_review: { clean_pass_count: 0 } },
+      convergence: {
+        code_review: { clean_pass_count: 0 },
+        security_review: { clean_pass_count: 0 },
+      },
+    });
+    writeSessionJson(session);
+
+    // Act
+    const result = await runHook(makeAgentStdin('test-session', 'documenter'));
+
+    // Assert
+    expect(result.exitCode).toBe(2);
+    expect(result.stderr).toMatch(/convergence/i);
+  });
+
+  it('should block when only code_review has converged', async () => {
+    // Arrange
+    const session = makeSessionJson({
+      convergence: {
+        code_review: { clean_pass_count: 2 },
+        security_review: { clean_pass_count: 1 },
+      },
     });
     writeSessionJson(session);
 
@@ -475,10 +468,31 @@ describe('AC-2.5: Blocks documenter when security_review convergence < 2', () =>
     expect(result.stderr).toMatch(/security.?review|convergence/i);
   });
 
-  it('should allow when security_review clean_pass_count is >= 2', async () => {
+  it('should block when only security_review has converged', async () => {
     // Arrange
     const session = makeSessionJson({
-      convergence: { security_review: { clean_pass_count: 2 } },
+      convergence: {
+        code_review: { clean_pass_count: 0 },
+        security_review: { clean_pass_count: 2 },
+      },
+    });
+    writeSessionJson(session);
+
+    // Act
+    const result = await runHook(makeAgentStdin('test-session', 'documenter'));
+
+    // Assert
+    expect(result.exitCode).toBe(2);
+    expect(result.stderr).toMatch(/code.?review|convergence/i);
+  });
+
+  it('should allow when both reviews have converged (>= 2 clean passes each)', async () => {
+    // Arrange
+    const session = makeSessionJson({
+      convergence: {
+        code_review: { clean_pass_count: 2 },
+        security_review: { clean_pass_count: 2 },
+      },
     });
     writeSessionJson(session);
 
@@ -668,13 +682,13 @@ describe('AC-2.12: Fail-open on uncaught exception', () => {
 // ============================================================
 
 describe('AC-2.13: Fail-closed when convergence field missing', () => {
-  it('should treat missing convergence.code_review.clean_pass_count as 0 and block security-reviewer', async () => {
-    // Arrange -- session with no convergence field
+  it('should treat missing convergence.code_review.clean_pass_count as 0 and block documenter', async () => {
+    // Arrange -- session with no convergence field at all
     const session = makeSessionJson({ subagent_tasks: [] });
     writeSessionJson(session);
 
-    // Act
-    const result = await runHook(makeAgentStdin('test-session', 'security-reviewer'));
+    // Act — documenter requires both code_review and security_review convergence
+    const result = await runHook(makeAgentStdin('test-session', 'documenter'));
 
     // Assert -- fail-closed: treat as 0, block
     expect(result.exitCode).toBe(2);
@@ -737,23 +751,23 @@ describe('AC-2.14: Kill switch exits 0 immediately', () => {
 
 describe('AC-2.15: Override allows blocked dispatch', () => {
   it('should allow dispatch when valid override matches session_id and gate', async () => {
-    // Arrange -- session that would block implementer
+    // Arrange -- session that would block implementer (convergence-type prerequisites)
     const session = makeSessionJson({ subagent_tasks: [] });
     writeSessionJson(session);
 
     writeOverrideJson({
       overrides: [
         {
-          gate: 'investigation',
+          gate: 'investigation_convergence',
           session_id: 'test-session',
           timestamp: new Date().toISOString(),
-          rationale: 'Investigation completed out-of-band',
+          rationale: 'Investigation convergence completed out-of-band',
         },
         {
-          gate: 'challenge_pre_impl',
+          gate: 'challenger_convergence',
           session_id: 'test-session',
           timestamp: new Date().toISOString(),
-          rationale: 'Challenge completed out-of-band',
+          rationale: 'Challenger convergence completed out-of-band',
         },
       ],
     });
@@ -773,13 +787,13 @@ describe('AC-2.15: Override allows blocked dispatch', () => {
     writeOverrideJson({
       overrides: [
         {
-          gate: 'investigation',
+          gate: 'investigation_convergence',
           session_id: 'wrong-session',
           timestamp: new Date().toISOString(),
           rationale: 'Wrong session',
         },
         {
-          gate: 'challenge_pre_impl',
+          gate: 'challenger_convergence',
           session_id: 'wrong-session',
           timestamp: new Date().toISOString(),
           rationale: 'Wrong session',
@@ -808,22 +822,22 @@ describe('AC-2.16: Most recent override wins for same gate', () => {
     writeOverrideJson({
       overrides: [
         {
-          gate: 'investigation',
+          gate: 'investigation_convergence',
           session_id: 'test-session',
           timestamp: '2026-03-18T10:00:00Z',
           rationale: 'Earlier override',
         },
         {
-          gate: 'investigation',
+          gate: 'investigation_convergence',
           session_id: 'test-session',
           timestamp: '2026-03-18T12:00:00Z',
           rationale: 'Later override -- should win',
         },
         {
-          gate: 'challenge_pre_impl',
+          gate: 'challenger_convergence',
           session_id: 'test-session',
           timestamp: '2026-03-18T12:00:00Z',
-          rationale: 'Override for challenge',
+          rationale: 'Override for challenger convergence',
         },
       ],
     });
@@ -895,15 +909,15 @@ describe('AC-2.18: Block message includes helpful information', () => {
     const session = makeSessionJson({ subagent_tasks: [] });
     writeSessionJson(session);
 
-    // Act
-    const result = await runHook(makeAgentStdin('test-session-123', 'test-writer'));
+    // Act — use code-reviewer which requires challenger(pre-review) + unifier
+    const result = await runHook(makeAgentStdin('test-session-123', 'code-reviewer'));
 
     // Assert
     expect(result.exitCode).toBe(2);
-    expect(result.stderr).toMatch(/implementer/i);
+    expect(result.stderr).toMatch(/challenger|unifier/i);
   });
 
-  it('should include the current session_id in stderr for override guidance', async () => {
+  it('should include actionable unblock guidance in stderr', async () => {
     // Arrange
     const session = makeSessionJson({ subagent_tasks: [] });
     writeSessionJson(session);
@@ -913,7 +927,8 @@ describe('AC-2.18: Block message includes helpful information', () => {
 
     // Assert
     expect(result.exitCode).toBe(2);
-    expect(result.stderr).toContain('my-unique-session-id');
+    expect(result.stderr).toMatch(/How to unblock/i);
+    expect(result.stderr).toMatch(/retry this dispatch/i);
   });
 });
 
@@ -923,20 +938,24 @@ describe('AC-2.18: Block message includes helpful information', () => {
 
 describe('AC-2.19: Skips unrecognized dispatch records', () => {
   it('should skip unknown type records and still evaluate valid ones', async () => {
-    // Arrange
+    // Arrange -- implementer uses convergence-type prerequisites (WS-4 change)
     const session = makeSessionJson({
       subagent_tasks: [
         { subagent_type: 'unknown-type-xyz', status: 'completed' },
         { subagent_type: 'interface-investigator', status: 'completed' },
         { subagent_type: 'challenger', stage: 'pre-implementation', status: 'completed' },
       ],
+      convergence: {
+        investigation: { clean_pass_count: 2 },
+        challenger: { clean_pass_count: 2 },
+      },
     });
     writeSessionJson(session);
 
     // Act
     const result = await runHook(makeAgentStdin('test-session', 'implementer'));
 
-    // Assert -- valid prereqs are met
+    // Assert -- convergence prereqs are met
     expect(result.exitCode).toBe(0);
   });
 
@@ -949,10 +968,10 @@ describe('AC-2.19: Skips unrecognized dispatch records', () => {
     });
     writeSessionJson(session);
 
-    // Act
-    const result = await runHook(makeAgentStdin('test-session', 'test-writer'));
+    // Act — use code-reviewer which requires challenger(pre-review) + unifier
+    const result = await runHook(makeAgentStdin('test-session', 'code-reviewer'));
 
-    // Assert -- unknown type doesn't satisfy implementer prereq
+    // Assert -- unknown type doesn't satisfy challenger/unifier prereqs
     expect(result.exitCode).toBe(2);
   });
 });

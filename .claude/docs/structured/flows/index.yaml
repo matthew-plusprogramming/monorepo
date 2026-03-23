@@ -1,0 +1,10 @@
+# Flow Index Template
+#
+# Getting started:
+#   1. Run `node .claude/scripts/docs-scaffold.mjs` to set up the docs directory.
+#   2. Add flow entries below, then create corresponding YAML files in this directory.
+#   3. Each flow file defines steps with module references from architecture.yaml.
+#   4. Run `node .claude/scripts/docs-validate.mjs` to check cross-references.
+#
+schema_version: 1
+flows: []

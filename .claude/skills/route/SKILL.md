@@ -192,7 +192,8 @@ Would you like to resume this work? [Y/n]
    - `atomizing` → Continue atomization with `/atomize`
    - `enforcing` → Continue enforcement with `/enforce`
    - `investigating` → Continue investigation with `/investigate`
-   - `awaiting_approval` → Remind user spec is awaiting approval, display approval prompt
+   - `awaiting_approval` → Legacy phase (backwards compat); treat as auto_approval
+   - `auto_approval` → Investigation and challenger convergence complete; proceed to implementation
    - `implementing` → Resume implementation with `/implement`, starting from next pending atomic spec
    - `testing` → Resume test writing with `/test`
    - `verifying` → Run unify validation with `/unify`
@@ -271,6 +272,67 @@ If the file exists, use the module landscape, dependency graph, and export summa
 
 If the file does not exist, proceed without trace context -- no error or warning needed.
 
+### Step 1c: Trace-Informed Impact Analysis (REQ-014, REQ-015)
+
+After reading `high-level.md`, perform structured impact analysis using `high-level.json` for precise dependency data.
+
+**1. Read and validate `high-level.json`**:
+
+Use the Read tool to load `.claude/traces/high-level.json` directly (NOT via Bash/CLI -- Route does not have Bash access).
+
+**2. Validate trace integrity before consumption**:
+
+Before using trace data for routing decisions, verify that the `generatedBy` and `lastGenerated` fields are present and plausible:
+
+- `generatedBy` must be a non-empty string
+- `lastGenerated` must be a valid ISO 8601 timestamp, not in the future, and not unreasonably old (> 1 year)
+
+If validation fails, proceed without trace data (conservative fallback). Do NOT block routing.
+
+**3. Parse module dependencies**:
+
+The `high-level.json` `modules` array contains flat string arrays for `dependencies` and `dependents`:
+
+```json
+{
+  "modules": [
+    {
+      "id": "scripts-lib",
+      "name": "Shared Libraries",
+      "dependencies": [],
+      "dependents": ["docs-scripts", "trace-scripts"]
+    }
+  ]
+}
+```
+
+**4. Identify affected modules**:
+
+Map the user's request (file paths, keywords, module names) to modules in `high-level.json`:
+
+- Match file paths against module `fileGlobs` (from `trace.config.json`) or module names
+- For each affected module, note its `dependencies` and `dependents`
+- Count total affected modules (direct + transitive dependents up to depth 2)
+
+**5. Use module count for workflow complexity**:
+
+| Affected Modules                    | Suggested Workflow                  |
+| ----------------------------------- | ----------------------------------- |
+| 1 module, simple change             | oneoff-vibe (if truly trivial)      |
+| 1-2 modules                         | oneoff-spec                         |
+| 3+ modules or deep dependency chain | oneoff-spec (consider orchestrator) |
+| 4+ modules across multiple layers   | orchestrator                        |
+
+**6. (Optional) Deeper analysis via low-level traces**:
+
+For deeper impact analysis, read the affected module's low-level trace JSON at `.claude/traces/low-level/<module-id>.json` to examine:
+
+- Specific exports that might be affected
+- Downstream callers (from `calls[]` arrays)
+- Cross-module function references
+
+This is pure file reading (Read tool) -- no Bash/CLI execution needed.
+
 ### Step 2: Analyze Scope
 
 Use Glob and Grep to understand impact:
@@ -342,8 +404,35 @@ workstreams:
   - <workstream 1> (for orchestrator only)
   - <workstream 2>
 investigation_scope: <spec-group-id | master-spec-id | null>
+trace_context: # (REQ-016) Include when trace data is available
+  affected_modules:
+    - <module-id>: <brief description of impact>
+  recommended_trace_reads:
+    - .claude/traces/low-level/<module-id>.json # for each affected module
+  dependency_depth: <N> # number of transitive dependency levels
 next_action: <Suggested next step>
 ```
+
+**Dispatch prompt enrichment (REQ-016)**:
+
+When dispatching subagents (implementer, test-writer, etc.), include trace context in the dispatch prompt:
+
+- **Module impact summary**: List the modules affected and their dependency relationships
+- **Recommended trace reads**: Specify which low-level traces the subagent should read before editing files (e.g., "Before editing `trace-utils.mjs`, read `.claude/traces/low-level/scripts-lib.json` for the module's export surface and call graph")
+- **Cross-module dependencies**: Note which modules depend on the ones being changed, so the subagent can assess blast radius
+
+**Example dispatch prompt enrichment**:
+
+```
+Trace Context:
+  Affected modules: scripts-lib (direct), trace-scripts (dependent), docs-scripts (dependent)
+  Read these traces before implementation:
+    - .claude/traces/low-level/scripts-lib.json (primary module)
+    - .claude/traces/low-level/trace-scripts.json (downstream dependent)
+  Dependency depth: 2 (scripts-lib -> trace-scripts -> script-tests)
+```
+
+If trace data is unavailable or integrity validation failed, omit the `trace_context` section entirely and proceed without it. Trace enrichment is additive -- never block dispatch on missing traces.
 
 **Decomposition rules**:
 

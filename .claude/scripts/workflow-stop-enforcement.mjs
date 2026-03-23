@@ -15,6 +15,8 @@
  *   3. completion-verifier
  *   4. documenter
  *
+ * Note: awaiting_approval is NOT in any mandatory check list (AC-1.13).
+ *
  * Invocation: Receives stdin JSON from Claude Code Stop hook system.
  *
  * Exit codes:
@@ -25,7 +27,7 @@
  * Spec: sg-coercive-gate-enforcement
  */
 
-import { existsSync, writeFileSync, unlinkSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync, renameSync, unlinkSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   STOP_MANDATORY_DISPATCHES,
@@ -34,6 +36,7 @@ import {
   getWorkflowTypeStrict,
   isExemptWorkflow,
   getAllTasks,
+  validateObligations,
 } from './lib/workflow-dag.mjs';
 import {
   readStdin,
@@ -137,7 +140,6 @@ async function main() {
 
     // Step 7: Phase-aware mandatory dispatch check (REQ-001 through REQ-008)
     // Determine which dispatches are required based on current session phase.
-    // Phases not in STOP_PHASE_REQUIREMENTS require zero dispatches (exit 0).
     const currentPhase = session.active_work.current_phase;
 
     if (!currentPhase || typeof currentPhase !== 'string') {
@@ -146,11 +148,6 @@ async function main() {
     }
 
     const requiredDispatches = STOP_PHASE_REQUIREMENTS[currentPhase] || [];
-
-    if (requiredDispatches.length === 0) {
-      // REQ-002/REQ-003: Pre-implementation or implementation phase -- no dispatches required
-      process.exit(0);
-    }
 
     const allTasks = getAllTasks(session);
     const missingDispatches = [];
@@ -163,26 +160,221 @@ async function main() {
       }
     }
 
-    if (missingDispatches.length === 0) {
-      // AC-4.5: All mandatory dispatches present -- allow completion
+    // Step 7.5: Manifest status obligation check (status-obligation-enforcement)
+    // Implements: REQ-006, REQ-007, REQ-008, REQ-009, REQ-010, REQ-013, REQ-014, REQ-015
+    let obligationViolations = [];
+    let obligationOverridden = false;
+
+    const specGroupId = session.active_work?.spec_group_id;
+    if (specGroupId) {
+      // SEC-001: Validate spec_group_id format before constructing file path
+      if (!/^sg-[a-z0-9-]+$/.test(specGroupId)) {
+        process.stderr.write(`Warning: Invalid spec_group_id format '${specGroupId}' -- obligation check skipped\n`);
+      } else {
+      const manifestPath = join(claudeDir, 'specs', 'groups', specGroupId, 'manifest.json');
+      try {
+        if (existsSync(manifestPath)) {
+          const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
+
+          // AC-5.4: Identify skipped phases from session history (exclude from validation)
+          const skippedPhases = (session.history || [])
+            .filter(h => h.event_type === 'override_skip')
+            .map(h => h.details?.phase)
+            .filter(Boolean);
+
+          // Only check obligations for current phase if it wasn't skipped
+          if (!skippedPhases.includes(currentPhase)) {
+            // Check for phase-scoped override (REQ-014)
+            const overrideGateName = `status_obligations:${currentPhase}`;
+            const overridePath = join(coordinationDir, OVERRIDE_FILENAME);
+            const overrides = loadOverrides(overridePath);
+
+            if (overrides) {
+              // CR-H1: Use spec_group_id for override matching (AC-8.5), consistent with session-checkpoint.mjs
+              const obligationOverride = findMatchingOverride(overrides, overrideGateName, specGroupId);
+              if (obligationOverride) {
+                obligationOverridden = true;
+              }
+            }
+
+            if (!obligationOverridden) {
+              const result = validateObligations(currentPhase, manifest);
+              if (!result.passed) {
+                obligationViolations = result.violations;
+              }
+            }
+          }
+        } else {
+          // AC-7.1: Missing manifest -- fail-open with warning
+          process.stderr.write(`Warning: Obligation check skipped -- manifest not found at ${manifestPath}\n`);
+        }
+      } catch (err) {
+        // Fail-open on structural errors (malformed JSON, read failure)
+        process.stderr.write(`Warning: Obligation check skipped: ${err.message}\n`);
+      }
+      } // end SEC-001 else block
+    }
+    // No spec_group_id: obligation check skipped silently (REQ-009, AC-6.5)
+
+    // Step 7.6: Determine enforcement level for obligation violations
+    // Read enforcement_level directly from session.phase_checkpoint (not a shared function).
+    // Default to 'graduated' when phase_checkpoint is null (e.g., after complete-work).
+    const enforcementLevel = session.phase_checkpoint?.enforcement_level || 'graduated';
+
+    // If no dispatch violations and no obligation violations, allow completion
+    if (missingDispatches.length === 0 && obligationViolations.length === 0) {
       safeDelete(sentinelPath);
       process.exit(0);
     }
 
-    // Step 8: Check for stop-gate override
+    // Step 8: Check for stop-gate dispatch override
     const overridePath = join(coordinationDir, OVERRIDE_FILENAME);
     const overrides = loadOverrides(overridePath);
+    let dispatchOverridden = false;
 
-    if (overrides) {
+    if (overrides && missingDispatches.length > 0) {
       const stopOverride = findMatchingOverride(overrides, OVERRIDE_GATE_NAMES.stop_mandatory_dispatches, sessionId);
       if (stopOverride) {
-        // Override honored -- allow completion
+        dispatchOverridden = true;
+      }
+    }
+
+    // If both dispatch and obligation issues are overridden/resolved, allow
+    if (dispatchOverridden && obligationViolations.length === 0) {
+      safeDelete(sentinelPath);
+      process.exit(0);
+    }
+
+    // Determine what to block/warn about
+    const hasDispatchIssues = missingDispatches.length > 0 && !dispatchOverridden;
+    const hasObligationIssues = obligationViolations.length > 0;
+
+    // Handle obligation violations based on enforcement level (AC-5.5)
+    if (hasObligationIssues && enforcementLevel === 'warn-only') {
+      // Log warnings to stderr but do NOT block for obligations (AC-5.5)
+      const violationLines = obligationViolations.map(
+        v => `  - ${v.field}: expected ${JSON.stringify(v.expected)}, actual ${v.actual === null ? 'null (not set)' : JSON.stringify(v.actual)}`
+      ).join('\n');
+      process.stderr.write(
+        `Warning: Manifest status inconsistency (warn-only mode):\n${violationLines}\n`
+      );
+
+      // Record warned violation events in session.json (REQ-015)
+      try {
+        const sessionPath = join(claudeDir, 'context', 'session.json');
+        const freshSession = loadSession(sessionPath);
+        if (freshSession) {
+          for (const v of obligationViolations) {
+            freshSession.history = freshSession.history || [];
+            freshSession.history.push({
+              timestamp: new Date().toISOString(),
+              event_type: 'obligation_violation',
+              details: {
+                phase: currentPhase,
+                field: v.field,
+                expected_value: v.expected,
+                actual_value: v.actual,
+                resolution: 'warned',
+              },
+            });
+          }
+          freshSession.updated_at = new Date().toISOString();
+          // CR-M2/SEC-003: Atomic write-to-temp-then-rename to prevent partial writes
+          const tmpPath = sessionPath + '.tmp.' + process.pid;
+          writeFileSync(tmpPath, JSON.stringify(freshSession, null, 2) + '\n');
+          renameSync(tmpPath, sessionPath);
+        }
+      } catch {
+        // Fail-open on session write errors
+      }
+
+      // If no dispatch issues remain, allow completion
+      if (!hasDispatchIssues) {
         safeDelete(sentinelPath);
         process.exit(0);
       }
     }
 
+    // Record blocked obligation violation events in session.json (REQ-015)
+    if (hasObligationIssues && enforcementLevel === 'graduated') {
+      try {
+        const sessionPath = join(claudeDir, 'context', 'session.json');
+        const freshSession = loadSession(sessionPath);
+        if (freshSession) {
+          for (const v of obligationViolations) {
+            freshSession.history = freshSession.history || [];
+            freshSession.history.push({
+              timestamp: new Date().toISOString(),
+              event_type: 'obligation_violation',
+              details: {
+                phase: currentPhase,
+                field: v.field,
+                expected_value: v.expected,
+                actual_value: v.actual,
+                resolution: 'blocked',
+              },
+            });
+          }
+          freshSession.updated_at = new Date().toISOString();
+          // CR-M2/SEC-003: Atomic write-to-temp-then-rename to prevent partial writes
+          const tmpPath2 = sessionPath + '.tmp.' + process.pid;
+          writeFileSync(tmpPath2, JSON.stringify(freshSession, null, 2) + '\n');
+          renameSync(tmpPath2, sessionPath);
+        }
+      } catch {
+        // Fail-open on session write errors
+      }
+    }
+
     // Step 9: Block session completion
+    // Build combined block message (AC-5.2: clearly distinguish dispatch vs obligation blocks)
+    const reasonParts = [];
+
+    if (hasDispatchIssues) {
+      reasonParts.push(`Missing mandatory dispatches: ${missingDispatches.join(', ')}.`);
+    }
+
+    if (hasObligationIssues && enforcementLevel === 'graduated') {
+      const violationLines = obligationViolations.map(
+        v => `  - ${v.field}: expected ${JSON.stringify(v.expected)}, actual ${v.actual === null ? 'null (not set)' : JSON.stringify(v.actual)}`
+      ).join('\n');
+      reasonParts.push(`Manifest status inconsistency:\n${violationLines}`);
+    }
+
+    // If nothing to block (e.g., obligations were warn-only and dispatch had issues)
+    if (reasonParts.length === 0) {
+      safeDelete(sentinelPath);
+      process.exit(0);
+    }
+
+    // Build specific remediation guidance
+    const remediationParts = [];
+    if (hasDispatchIssues) {
+      const skillMap = {
+        'code-reviewer': '/code-review',
+        'security-reviewer': '/security',
+        'completion-verifier': 'completion-verifier agent (dispatch directly)',
+        'documenter': '/docs',
+      };
+      const skillInstructions = missingDispatches
+        .map(d => `  - ${d}: Run ${skillMap[d] || d}`)
+        .join('\n');
+      remediationParts.push(`Dispatch the following subagent types:\n${skillInstructions}`);
+    }
+    if (hasObligationIssues && enforcementLevel === 'graduated') {
+      const obligationInstructions = obligationViolations.map(v => {
+        if (v.field.startsWith('convergence.')) {
+          const gate = v.field.replace('convergence.', '').replace('_passed', '').replace('_converged', '');
+          return `  - ${v.field}: Run the convergence loop, then: node .claude/scripts/session-checkpoint.mjs update-convergence ${gate} 2`;
+        }
+        return `  - ${v.field}: Update manifest.json to set ${v.field} = ${JSON.stringify(v.expected)}`;
+      }).join('\n');
+      remediationParts.push(`Update manifest fields:\n${obligationInstructions}`);
+    }
+    reasonParts.push(
+      'How to unblock:\n' + remediationParts.join('\n')
+    );
+
     // Create sentinel BEFORE outputting block decision (AC-4.6)
     try {
       writeFileSync(sentinelPath, new Date().toISOString());
@@ -192,11 +384,7 @@ async function main() {
     }
 
     // AC-4.10: Block via stdout JSON, NOT stderr + exit 2
-    const reason = `Missing mandatory dispatches: ${missingDispatches.join(', ')}. ` +
-      `Dispatch these subagent types before completing the session. ` +
-      `To override: add { "gate": "stop_mandatory_dispatches", "session_id": "${sessionId}", ` +
-      `"timestamp": "${new Date().toISOString()}", "rationale": "..." } to .claude/coordination/gate-override.json`;
-
+    const reason = reasonParts.join('\n\n');
     console.log(JSON.stringify({ decision: 'block', reason }));
     process.exit(0);
   } catch (err) {

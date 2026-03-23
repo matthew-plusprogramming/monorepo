@@ -1,0 +1,11 @@
+# Architecture Module Map Template
+#
+# Getting started:
+#   1. Run `node .claude/scripts/docs-scaffold.mjs` to auto-generate a draft
+#      from your project's directory structure.
+#   2. Or fill in this template manually with your project's modules.
+#   3. Run `node .claude/scripts/docs-validate.mjs` to check for issues.
+#   4. Run `node .claude/scripts/docs-generate.mjs` to create Mermaid diagrams.
+#
+schema_version: 1
+modules: []

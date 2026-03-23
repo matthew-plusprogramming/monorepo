@@ -140,7 +140,7 @@ describe('AC-1.1: Module exports all expected constants and functions', () => {
 
     // Assert
     expect(Array.isArray(VALID_SUBAGENT_TYPES)).toBe(true);
-    expect(VALID_SUBAGENT_TYPES.length).toBe(20);
+    expect(VALID_SUBAGENT_TYPES.length).toBe(21);
   });
 
   it('should export MANDATORY_DISPATCHES covering mandatory dispatch types', async () => {
@@ -344,7 +344,7 @@ describe('AC-1.3: isExemptWorkflow identifies exempt workflows', () => {
 // ============================================================
 
 describe('AC-1.4: getPrerequisites returns correct prerequisites per enforcement table', () => {
-  it('should return prerequisites including interface-investigator for implementer in oneoff-spec', async () => {
+  it('should return convergence prerequisites for investigation and challenger gates for implementer in oneoff-spec', async () => {
     // Arrange
     const mod = await loadModule();
     expect(mod).not.toBeNull();
@@ -352,13 +352,13 @@ describe('AC-1.4: getPrerequisites returns correct prerequisites per enforcement
     // Act
     const prereqs = mod.getPrerequisites('oneoff-spec', 'implementer');
 
-    // Assert -- prereqs may be strings or typed objects
+    // Assert -- convergence-type prerequisites (WS-4 change)
     expect(Array.isArray(prereqs)).toBe(true);
-    expect(prereqs.length).toBeGreaterThanOrEqual(2);
-    expect(hasPrereqForType(prereqs, 'interface-investigator')).toBe(true);
+    expect(prereqs.length).toBe(2);
+    expect(hasPrereqForConvergence(prereqs, 'investigation')).toBe(true);
   });
 
-  it('should return prerequisites including pre-implementation challenger for implementer in oneoff-spec', async () => {
+  it('should return convergence prerequisite for challenger gate for implementer in oneoff-spec', async () => {
     // Arrange
     const mod = await loadModule();
     expect(mod).not.toBeNull();
@@ -367,10 +367,10 @@ describe('AC-1.4: getPrerequisites returns correct prerequisites per enforcement
     const prereqs = mod.getPrerequisites('oneoff-spec', 'implementer');
 
     // Assert
-    expect(hasPrereqForChallengerStage(prereqs, 'pre-implementation')).toBe(true);
+    expect(hasPrereqForConvergence(prereqs, 'challenger')).toBe(true);
   });
 
-  it('should return prerequisites including pre-orchestration challenger for implementer in orchestrator', async () => {
+  it('should return convergence prerequisites for investigation and challenger gates for implementer in orchestrator', async () => {
     // Arrange
     const mod = await loadModule();
     expect(mod).not.toBeNull();
@@ -378,12 +378,12 @@ describe('AC-1.4: getPrerequisites returns correct prerequisites per enforcement
     // Act
     const prereqs = mod.getPrerequisites('orchestrator', 'implementer');
 
-    // Assert
-    expect(hasPrereqForType(prereqs, 'interface-investigator')).toBe(true);
-    expect(hasPrereqForChallengerStage(prereqs, 'pre-orchestration')).toBe(true);
+    // Assert -- same convergence-type prerequisites regardless of workflow
+    expect(hasPrereqForConvergence(prereqs, 'investigation')).toBe(true);
+    expect(hasPrereqForConvergence(prereqs, 'challenger')).toBe(true);
   });
 
-  it('should return prerequisites including implementer for test-writer', async () => {
+  it('should return empty prerequisites for test-writer (works from spec only, Practice 2.4)', async () => {
     // Arrange
     const mod = await loadModule();
     expect(mod).not.toBeNull();
@@ -391,10 +391,9 @@ describe('AC-1.4: getPrerequisites returns correct prerequisites per enforcement
     // Act
     const prereqs = mod.getPrerequisites('oneoff-spec', 'test-writer');
 
-    // Assert
+    // Assert — no coercive prerequisites, test-writer works from spec only
     expect(Array.isArray(prereqs)).toBe(true);
-    expect(prereqs.length).toBeGreaterThanOrEqual(1);
-    expect(hasPrereqForType(prereqs, 'implementer')).toBe(true);
+    expect(prereqs.length).toBe(0);
   });
 
   it('should return prerequisites including unifier and pre-review challenger for code-reviewer', async () => {
@@ -410,7 +409,7 @@ describe('AC-1.4: getPrerequisites returns correct prerequisites per enforcement
     expect(hasPrereqForChallengerStage(prereqs, 'pre-review')).toBe(true);
   });
 
-  it('should return convergence prerequisite for security-reviewer (code_review)', async () => {
+  it('should return dispatch prerequisites for security-reviewer (same as code-reviewer, parallel execution)', async () => {
     // Arrange
     const mod = await loadModule();
     expect(mod).not.toBeNull();
@@ -418,13 +417,14 @@ describe('AC-1.4: getPrerequisites returns correct prerequisites per enforcement
     // Act
     const prereqs = mod.getPrerequisites('oneoff-spec', 'security-reviewer');
 
-    // Assert -- should have a convergence-type prerequisite for code_review
+    // Assert — same prerequisites as code-reviewer: challenger pre-review + unifier
     expect(Array.isArray(prereqs)).toBe(true);
-    expect(prereqs.length).toBeGreaterThanOrEqual(1);
-    expect(hasPrereqForConvergence(prereqs, 'code_review')).toBe(true);
+    expect(prereqs.length).toBe(2);
+    expect(hasPrereqForChallengerStage(prereqs, 'pre-review')).toBe(true);
+    expect(hasPrereqForType(prereqs, 'unifier')).toBe(true);
   });
 
-  it('should return convergence prerequisite for documenter (security_review)', async () => {
+  it('should return both convergence prerequisites for documenter (code_review + security_review)', async () => {
     // Arrange
     const mod = await loadModule();
     expect(mod).not.toBeNull();
@@ -432,9 +432,10 @@ describe('AC-1.4: getPrerequisites returns correct prerequisites per enforcement
     // Act
     const prereqs = mod.getPrerequisites('oneoff-spec', 'documenter');
 
-    // Assert
+    // Assert — requires BOTH review convergences since they run in parallel
     expect(Array.isArray(prereqs)).toBe(true);
-    expect(prereqs.length).toBeGreaterThanOrEqual(1);
+    expect(prereqs.length).toBe(2);
+    expect(hasPrereqForConvergence(prereqs, 'code_review')).toBe(true);
     expect(hasPrereqForConvergence(prereqs, 'security_review')).toBe(true);
   });
 
@@ -469,21 +470,21 @@ describe('AC-1.4: getPrerequisites returns correct prerequisites per enforcement
 // ============================================================
 
 describe('AC-1.5: werePrerequisitesMet checks dispatch history', () => {
-  it('should return met:true when all prerequisites are satisfied by dispatch history', async () => {
-    // Arrange -- use getPrerequisites to get the actual prerequisites format
+  it('should return met:true when all convergence prerequisites are satisfied for implementer', async () => {
+    // Arrange -- implementer now uses convergence-type prerequisites (WS-4 change)
     const mod = await loadModule();
     expect(mod).not.toBeNull();
 
     const session = {
       subagent_tasks: {
         in_flight: [],
-        completed_this_session: [
-          { subagent_type: 'interface-investigator', status: 'completed' },
-          { subagent_type: 'challenger', stage: 'pre-implementation', status: 'completed' },
-        ],
+        completed_this_session: [],
       },
       history: [],
-      convergence: {},
+      convergence: {
+        investigation: { clean_pass_count: 2 },
+        challenger: { clean_pass_count: 2 },
+      },
     };
 
     // Get actual prerequisite format
@@ -533,30 +534,36 @@ describe('AC-1.5: werePrerequisitesMet checks dispatch history', () => {
     expect(result.missing).toEqual([]);
   });
 
-  it('should accept dispatch records with any status (running/failed/pending)', async () => {
-    // Arrange
+  it('should check convergence counts regardless of dispatch records for implementer', async () => {
+    // Arrange -- implementer uses convergence-type prerequisites (WS-4 change)
     const mod = await loadModule();
     expect(mod).not.toBeNull();
 
     const session = {
       subagent_tasks: {
-        in_flight: [{ subagent_type: 'implementer', status: 'running' }],
-        completed_this_session: [],
+        in_flight: [{ subagent_type: 'interface-investigator', status: 'running' }],
+        completed_this_session: [
+          { subagent_type: 'challenger', stage: 'pre-implementation', status: 'completed' },
+        ],
       },
       history: [],
-      convergence: {},
+      convergence: {
+        investigation: { clean_pass_count: 2 },
+        challenger: { clean_pass_count: 2 },
+      },
     };
 
-    const prereqs = mod.getPrerequisites('oneoff-spec', 'test-writer');
+    // implementer requires convergence gates for investigation + challenger
+    const prereqs = mod.getPrerequisites('oneoff-spec', 'implementer');
 
     // Act
     const result = mod.werePrerequisitesMet(session, prereqs);
 
-    // Assert
+    // Assert — convergence counts satisfy convergence prerequisites
     expect(result.met).toBe(true);
   });
 
-  it('should handle convergence prerequisites correctly', async () => {
+  it('should handle convergence prerequisites correctly (documenter requires both reviews converged)', async () => {
     // Arrange
     const mod = await loadModule();
     expect(mod).not.toBeNull();
@@ -564,15 +571,15 @@ describe('AC-1.5: werePrerequisitesMet checks dispatch history', () => {
     const session = {
       subagent_tasks: [],
       history: [],
-      convergence: { code_review: { clean_pass_count: 2 }, security_review: { clean_pass_count: 0 } },
+      convergence: { code_review: { clean_pass_count: 2 }, security_review: { clean_pass_count: 2 } },
     };
 
-    const prereqs = mod.getPrerequisites('oneoff-spec', 'security-reviewer');
+    const prereqs = mod.getPrerequisites('oneoff-spec', 'documenter');
 
     // Act
     const result = mod.werePrerequisitesMet(session, prereqs);
 
-    // Assert -- code_review has converged (>= 2), so should be met
+    // Assert — both reviews converged (>= 2), so should be met
     expect(result.met).toBe(true);
   });
 
@@ -584,15 +591,15 @@ describe('AC-1.5: werePrerequisitesMet checks dispatch history', () => {
     const session = {
       subagent_tasks: [],
       history: [],
-      convergence: { code_review: { clean_pass_count: 1 }, security_review: { clean_pass_count: 0 } },
+      convergence: { code_review: { clean_pass_count: 2 }, security_review: { clean_pass_count: 1 } },
     };
 
-    const prereqs = mod.getPrerequisites('oneoff-spec', 'security-reviewer');
+    const prereqs = mod.getPrerequisites('oneoff-spec', 'documenter');
 
     // Act
     const result = mod.werePrerequisitesMet(session, prereqs);
 
-    // Assert -- code_review has NOT converged (< 2)
+    // Assert — security_review has NOT converged (< 2), blocks documenter
     expect(result.met).toBe(false);
   });
 });

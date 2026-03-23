@@ -33,11 +33,24 @@ import {
   formatTimestamp,
   sanitizeMarkdown,
   LOW_LEVEL_TRACE_DIR,
+  loadStalenessMetadata,
+  writeStalenessMetadata,
+  createEmptyStalenessData,
+  computeFileHash,
+  computeExportSignatureHash,
+  isFileStale,
+  propagateCrossModuleStaleness,
+  atomicWriteFile,
+  checkTraceFileSize,
 } from './lib/trace-utils.mjs';
 
 import {
   generateHighLevelTrace,
 } from './lib/high-level-trace.mjs';
+
+import {
+  analyzeSourceWithCompiler,
+} from './lib/ts-analyzer.mjs';
 
 // =============================================================================
 // Constants
@@ -520,17 +533,218 @@ export function parseExports(source) {
 }
 
 // =============================================================================
-// Low-Level Trace Generation
+// Call Graph Analysis (REQ-002)
 // =============================================================================
 
 /**
- * Analyze a single file for imports and exports.
+ * Parse function call patterns from source code using regex-based detection.
+ *
+ * Identifies `identifier(` patterns in source code and resolves callees against
+ * the importMap (imported symbols) and knownExports (all known exports from
+ * traced modules). Unresolved callees get calleeFile: null, calleeLine: null.
+ *
+ * Implements: REQ-002 (contract-calls-events-schema)
+ *
+ * @param {string} source - File source code
+ * @param {Array<{ source: string, symbols: string[] }>} importMap - Parsed imports from this file
+ * @param {Map<string, { file: string, line: number }>} knownExports - Cross-module export index: symbol name -> { file, line }
+ * @param {string} filePath - Relative path of the file being analyzed (for callerFile)
+ * @returns {Array<{ callerFile: string, callerLine: number, calleeName: string, calleeFile: string|null, calleeLine: number|null }>}
+ */
+export function parseCallGraph(source, importMap, knownExports, filePath) {
+  const calls = [];
+  const seen = new Set(); // Deduplicate: "callerLine:calleeName"
+
+  // Build a map of imported symbol -> source module path for resolution
+  const importedSymbolToSource = new Map();
+  for (const imp of importMap) {
+    for (const sym of imp.symbols) {
+      // Handle "* as X" namespace imports
+      if (sym.startsWith('* as ')) continue;
+      importedSymbolToSource.set(sym, imp.source);
+    }
+  }
+
+  // Remove block comments while preserving line numbers
+  const cleaned = removeBlockCommentsPreserveLines(source);
+  const lines = cleaned.split('\n');
+
+  // Regex to detect function calls: identifier followed by (
+  // Excludes: keywords, string content, import/export/from statements
+  const CALL_PATTERN = /\b([a-zA-Z_$][a-zA-Z0-9_$]*)\s*\(/g;
+  const JS_KEYWORDS = new Set([
+    'if', 'else', 'for', 'while', 'do', 'switch', 'case', 'break', 'continue',
+    'return', 'throw', 'try', 'catch', 'finally', 'new', 'typeof', 'instanceof',
+    'void', 'delete', 'in', 'of', 'class', 'function', 'async', 'await',
+    'import', 'export', 'from', 'const', 'let', 'var', 'super', 'this',
+    'yield', 'with', 'debugger', 'default', 'extends', 'static',
+  ]);
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const trimmedLine = line.trim();
+    const lineNumber = i + 1;
+
+    // Skip single-line comments
+    if (trimmedLine.startsWith('//')) continue;
+
+    // Skip import/export declaration lines (already captured by parseImports/parseExports)
+    if (/^\s*(import|export)\s+/.test(line)) continue;
+
+    // Find all function call patterns on this line
+    let match;
+    CALL_PATTERN.lastIndex = 0;
+    while ((match = CALL_PATTERN.exec(line)) !== null) {
+      const calleeName = match[1];
+
+      // Skip JavaScript keywords
+      if (JS_KEYWORDS.has(calleeName)) continue;
+
+      // Skip common non-function patterns (e.g., method chain receivers)
+      // But keep the actual function call
+      const dedupKey = `${lineNumber}:${calleeName}`;
+      if (seen.has(dedupKey)) continue;
+      seen.add(dedupKey);
+
+      // Resolve callee: check imported symbols, then known exports
+      let calleeFile = null;
+      let calleeLine = null;
+
+      // Check if calleeName is an imported symbol
+      if (importedSymbolToSource.has(calleeName)) {
+        // It's imported -- try to resolve via knownExports
+        const exportInfo = knownExports.get(calleeName);
+        if (exportInfo) {
+          calleeFile = exportInfo.file;
+          calleeLine = exportInfo.line;
+        }
+      } else {
+        // Not imported -- still check knownExports (same-module calls)
+        const exportInfo = knownExports.get(calleeName);
+        if (exportInfo) {
+          calleeFile = exportInfo.file;
+          calleeLine = exportInfo.line;
+        }
+      }
+
+      calls.push({
+        callerFile: filePath,
+        callerLine: lineNumber,
+        calleeName,
+        calleeFile,
+        calleeLine,
+      });
+    }
+  }
+
+  return calls;
+}
+
+// =============================================================================
+// Event Pattern Detection (REQ-003)
+// =============================================================================
+
+/**
+ * Parse event emit/subscribe patterns from source code.
+ *
+ * Detects patterns like:
+ *   - .emit('eventName', ...)
+ *   - .on('eventName', ...)
+ *   - .addEventListener('eventName', ...)
+ *   - .subscribe('eventName', ...)
+ *   - .once('eventName', ...)
+ *   - .addListener('eventName', ...)
+ *   - .removeListener('eventName', ...)
+ *   - .off('eventName', ...)
+ *
+ * Implements: REQ-003 (contract-calls-events-schema)
+ *
+ * @param {string} source - File source code
+ * @param {string} filePath - Relative path of the file being analyzed
+ * @returns {Array<{ file: string, line: number, eventName: string, type: "emit"|"subscribe" }>}
+ */
+export function parseEventPatterns(source, filePath) {
+  const events = [];
+
+  // Remove block comments while preserving line numbers
+  const cleaned = removeBlockCommentsPreserveLines(source);
+  const lines = cleaned.split('\n');
+
+  // Emit patterns: .emit(, .dispatch(, .trigger(
+  const EMIT_METHODS = new Set(['emit', 'dispatch', 'trigger']);
+  // Subscribe patterns: .on(, .addEventListener(, .subscribe(, .once(, .addListener(
+  const SUBSCRIBE_METHODS = new Set(['on', 'addEventListener', 'subscribe', 'once', 'addListener']);
+
+  // Pattern: .methodName('eventName' or .methodName("eventName"
+  const EVENT_PATTERN = /\.(\w+)\(\s*['"`]([^'"`]+)['"`]/g;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const trimmedLine = line.trim();
+    const lineNumber = i + 1;
+
+    // Skip single-line comments
+    if (trimmedLine.startsWith('//')) continue;
+
+    let match;
+    EVENT_PATTERN.lastIndex = 0;
+    while ((match = EVENT_PATTERN.exec(line)) !== null) {
+      const methodName = match[1];
+      const eventName = match[2];
+
+      let type = null;
+      if (EMIT_METHODS.has(methodName)) {
+        type = 'emit';
+      } else if (SUBSCRIBE_METHODS.has(methodName)) {
+        type = 'subscribe';
+      }
+
+      if (type) {
+        events.push({
+          file: filePath,
+          line: lineNumber,
+          eventName,
+          type,
+        });
+      }
+    }
+  }
+
+  return events;
+}
+
+// =============================================================================
+// Low-Level Trace Generation
+// =============================================================================
+
+/** Default file extensions for analysis (REQ-022) */
+const DEFAULT_FILE_EXTENSIONS = ['.mjs', '.js'];
+
+/** All supported file extensions (superset for extension matching) */
+const ALL_ANALYZABLE_EXTENSIONS_PATTERN = /\.(ts|tsx|js|jsx|mjs|cjs)$/;
+
+/**
+ * Analyze a single file for imports, exports, calls, and events.
+ *
+ * M4 (REQ-020, REQ-021, REQ-022): Delegates to TypeScript compiler API-based
+ * analysis by default. The optional third `config` parameter controls behavior:
+ *   - config.parser: 'compiler' (default) | 'regex' (legacy fallback)
+ *   - config.fileExtensions: string[] (default: ['.mjs', '.js'])
+ *
+ * When called as analyzeFile(filePath, projectRoot) or
+ * analyzeFile(filePath, projectRoot, knownExports), behavior is identical
+ * to M1-M3 except using the TS compiler for better accuracy.
+ *
+ * The third parameter is polymorphic for backward compatibility:
+ *   - If it's a Map, it's treated as knownExports (M1-M3 calling convention)
+ *   - If it's a plain object, it's treated as config (M4 calling convention)
  *
  * @param {string} filePath - Relative path from project root
  * @param {string} projectRoot - Absolute project root path
+ * @param {Map<string, { file: string, line: number }> | object} [configOrExports] - Config object or knownExports Map
  * @returns {{ filePath: string, exports: Array, imports: Array, calls: Array, events: Array }}
  */
-export function analyzeFile(filePath, projectRoot) {
+export function analyzeFile(filePath, projectRoot, configOrExports) {
   const absPath = join(projectRoot, filePath);
 
   // Default entry with empty arrays
@@ -538,22 +752,66 @@ export function analyzeFile(filePath, projectRoot) {
     filePath,
     exports: [],
     imports: [],
-    calls: [],    // v1: empty, manual population deferred
-    events: [],   // v1: empty, manual population deferred
+    calls: [],
+    events: [],
   };
 
-  // Only analyze TS/JS files
-  if (!/\.(ts|tsx|js|jsx|mjs|cjs)$/.test(filePath)) {
+  // Resolve the polymorphic third parameter
+  let knownExports = new Map();
+  let config = {};
+
+  if (configOrExports instanceof Map) {
+    // M1-M3 calling convention: analyzeFile(filePath, projectRoot, knownExports)
+    knownExports = configOrExports;
+  } else if (configOrExports && typeof configOrExports === 'object') {
+    // M4 calling convention: analyzeFile(filePath, projectRoot, config)
+    config = configOrExports;
+    if (config.knownExports instanceof Map) {
+      knownExports = config.knownExports;
+    }
+  }
+
+  // REQ-022: Configurable file extensions
+  const fileExtensions = config.fileExtensions || DEFAULT_FILE_EXTENSIONS;
+
+  // Check if this file extension is analyzable
+  if (!ALL_ANALYZABLE_EXTENSIONS_PATTERN.test(filePath)) {
     return entry;
   }
 
+  // REQ-022: Additional check against configured extensions
+  // Only skip if extensions are explicitly configured and this extension is not in the list
+  if (config.fileExtensions) {
+    const fileExt = filePath.match(/\.[^.]+$/)?.[0];
+    if (fileExt && !fileExtensions.includes(fileExt)) {
+      return entry;
+    }
+  }
+
+  // Determine analysis strategy (REQ-020, REQ-021)
+  const useRegex = config.parser === 'regex';
+
   try {
     const source = readFileSync(absPath, 'utf-8');
-    entry.exports = parseExports(source);
-    entry.imports = parseImports(source);
+
+    if (useRegex) {
+      // Legacy regex-based analysis (fallback)
+      entry.exports = parseExports(source);
+      entry.imports = parseImports(source);
+      entry.calls = parseCallGraph(source, entry.imports, knownExports, filePath);
+      entry.events = parseEventPatterns(source, filePath);
+    } else {
+      // M4: TypeScript compiler API-based analysis (default)
+      const result = analyzeSourceWithCompiler(source, filePath, knownExports);
+      entry.exports = result.exports;
+      entry.imports = result.imports;
+      entry.calls = result.calls;
+      entry.events = result.events;
+    }
   } catch (err) {
-    // File read failure: return entry with empty arrays
-    // This can happen for binary files or permission issues
+    // Surface analysis failures without breaking the pipeline
+    // This can happen for binary files, permission issues, or TS compiler crashes
+    process.stderr.write(`Warning: trace analysis failed for ${filePath}: ${err.message}\n`);
   }
 
   return entry;
@@ -573,7 +831,7 @@ export function analyzeFile(filePath, projectRoot) {
  * @param {string} projectRoot - Absolute project root
  * @returns {{ moduleId: string, version: number, lastGenerated: string, generatedBy: string, files: Array }}
  */
-export function generateLowLevelTrace(moduleConfig, traceConfig, projectRoot) {
+export function generateLowLevelTrace(moduleConfig, traceConfig, projectRoot, knownExports) {
   // Find all files matching the module's globs
   const matchingFiles = findFilesMatchingGlobs(moduleConfig.fileGlobs, projectRoot);
 
@@ -593,7 +851,9 @@ export function generateLowLevelTrace(moduleConfig, traceConfig, projectRoot) {
   }
 
   // AC-3.3: Analyze each file in the module's glob scope
-  const files = matchingFiles.map(filePath => analyzeFile(filePath, projectRoot));
+  // Pass knownExports for cross-module call resolution (M1: REQ-002)
+  const exportIndex = knownExports || new Map();
+  const files = matchingFiles.map(filePath => analyzeFile(filePath, projectRoot, exportIndex));
 
   // AC-3.1: Build LowLevelTrace data structure
   return {
@@ -603,6 +863,48 @@ export function generateLowLevelTrace(moduleConfig, traceConfig, projectRoot) {
     generatedBy: GENERATED_BY,
     files,
   };
+}
+
+/**
+ * Build a cross-module export index from all traced modules.
+ *
+ * Collects exports from all modules' files and builds a Map of
+ * symbol name -> { file, line } for cross-module call resolution.
+ *
+ * @param {{ modules: Array<{ id: string, fileGlobs: string[] }> }} config - Trace config
+ * @param {string} projectRoot - Absolute project root
+ * @returns {Map<string, { file: string, line: number }>}
+ */
+export function buildExportIndex(config, projectRoot) {
+  const exportIndex = new Map();
+
+  for (const mod of config.modules) {
+    const matchingFiles = findFilesMatchingGlobs(mod.fileGlobs, projectRoot);
+    for (const filePath of matchingFiles) {
+      // Only analyze TS/JS files
+      if (!/\.(ts|tsx|js|jsx|mjs|cjs)$/.test(filePath)) continue;
+
+      try {
+        const absPath = join(projectRoot, filePath);
+        const source = readFileSync(absPath, 'utf-8');
+        const fileExports = parseExports(source);
+
+        for (const exp of fileExports) {
+          // First export wins (for determinism)
+          if (!exportIndex.has(exp.symbol)) {
+            exportIndex.set(exp.symbol, {
+              file: filePath,
+              line: exp.lineNumber || 0,
+            });
+          }
+        }
+      } catch {
+        // File read failure -- skip
+      }
+    }
+  }
+
+  return exportIndex;
 }
 
 /**
@@ -663,31 +965,34 @@ export function generateLowLevelMarkdown(trace, moduleConfig) {
     }
     lines.push('');
 
-    // Function Calls section (AC-3.2: pipe-delimited format)
+    // Function Calls section (M1: spec-defined column headers per contract-calls-events-schema)
     lines.push('### Function Calls');
     lines.push('');
     if (file.calls.length > 0) {
-      lines.push('target | function | context');
-      lines.push('--- | --- | ---');
+      lines.push('callerFile | callerLine | calleeName | calleeFile | calleeLine');
+      lines.push('--- | --- | --- | --- | ---');
       for (const call of file.calls) {
-        lines.push(`${call.target} | ${call.function} | ${call.context || ''}`);
+        // Use '(none)' placeholder for null values to satisfy parsePipeDelimitedLine's empty field check
+        const calleeFile = call.calleeFile || '(none)';
+        const calleeLine = call.calleeLine != null ? String(call.calleeLine) : '(none)';
+        lines.push(`${call.callerFile} | ${call.callerLine} | ${call.calleeName} | ${calleeFile} | ${calleeLine}`);
       }
     } else {
-      lines.push('_No function calls traced (v1: manual population)_');
+      lines.push('_No function calls traced_');
     }
     lines.push('');
 
-    // Events section (AC-3.2: pipe-delimited format)
+    // Events section (M1: spec-defined column headers per contract-calls-events-schema)
     lines.push('### Events');
     lines.push('');
     if (file.events.length > 0) {
-      lines.push('type | event-name | channel');
-      lines.push('--- | --- | ---');
+      lines.push('file | line | eventName | type');
+      lines.push('--- | --- | --- | ---');
       for (const evt of file.events) {
-        lines.push(`${evt.type} | ${evt.eventName} | ${evt.channel}`);
+        lines.push(`${evt.file} | ${evt.line} | ${evt.eventName} | ${evt.type}`);
       }
     } else {
-      lines.push('_No events traced (v1: manual population)_');
+      lines.push('_No events traced_');
     }
     lines.push('');
   }
@@ -702,26 +1007,32 @@ export function generateLowLevelMarkdown(trace, moduleConfig) {
 /**
  * Write low-level trace files (JSON + markdown) for a single module.
  *
+ * Uses atomic write-rename pattern (REQ-012): writes to .tmp first,
+ * then renames atomically. Checks trace file size (REQ-013) after write.
+ *
  * @param {{ id: string, name: string, description?: string, fileGlobs: string[] }} moduleConfig
  * @param {{ version: number, modules: Array }} traceConfig
  * @param {string} projectRoot
  * @returns {{ moduleId: string, fileCount: number, version: number }}
  */
-export function writeLowLevelTrace(moduleConfig, traceConfig, projectRoot) {
-  const trace = generateLowLevelTrace(moduleConfig, traceConfig, projectRoot);
+export function writeLowLevelTrace(moduleConfig, traceConfig, projectRoot, knownExports) {
+  const trace = generateLowLevelTrace(moduleConfig, traceConfig, projectRoot, knownExports);
 
   // Ensure low-level directory exists (AC-5.3 partial: directory creation)
   const lowLevelDir = join(projectRoot, LOW_LEVEL_TRACE_DIR);
   mkdirSync(lowLevelDir, { recursive: true });
 
-  // Write JSON (canonical)
+  // REQ-012: Write JSON using atomic write-rename (trace file first per write ordering guarantee)
   const jsonPath = join(lowLevelDir, `${moduleConfig.id}.json`);
-  writeFileSync(jsonPath, JSON.stringify(trace, null, 2) + '\n');
+  atomicWriteFile(jsonPath, JSON.stringify(trace, null, 2) + '\n');
 
-  // Write markdown (generated view)
+  // Write markdown using atomic write-rename
   const mdPath = join(lowLevelDir, `${moduleConfig.id}.md`);
   const markdown = generateLowLevelMarkdown(trace, moduleConfig);
-  writeFileSync(mdPath, markdown);
+  atomicWriteFile(mdPath, markdown);
+
+  // REQ-013: Check trace file size and emit warnings
+  checkTraceFileSize(jsonPath, moduleConfig.id);
 
   return {
     moduleId: moduleConfig.id,
@@ -745,6 +1056,9 @@ export function generateAllLowLevelTraces(targetModuleId, projectRoot) {
   const lowLevelDir = join(root, LOW_LEVEL_TRACE_DIR);
   mkdirSync(lowLevelDir, { recursive: true });
 
+  // M1: Build cross-module export index for call graph resolution (REQ-002)
+  const knownExports = buildExportIndex(config, root);
+
   const results = [];
   let modulesProcessed = 0;
 
@@ -754,7 +1068,7 @@ export function generateAllLowLevelTraces(targetModuleId, projectRoot) {
       continue;
     }
 
-    const result = writeLowLevelTrace(mod, config, root);
+    const result = writeLowLevelTrace(mod, config, root, knownExports);
     results.push(result);
     modulesProcessed++;
   }
@@ -853,9 +1167,48 @@ export function validateLowLevelTrace(trace) {
     }
     if (!Array.isArray(file.calls)) {
       errors.push(`${prefix}.calls must be an array`);
+    } else {
+      // M1 (Task 1.5d): Validate each calls[] entry against CallEntry schema
+      for (let j = 0; j < file.calls.length; j++) {
+        const call = file.calls[j];
+        const callPrefix = `${prefix}.calls[${j}]`;
+        if (typeof call.callerFile !== 'string') {
+          errors.push(`${callPrefix}.callerFile must be a string`);
+        }
+        if (typeof call.callerLine !== 'number' || !Number.isInteger(call.callerLine)) {
+          errors.push(`${callPrefix}.callerLine must be an integer`);
+        }
+        if (typeof call.calleeName !== 'string') {
+          errors.push(`${callPrefix}.calleeName must be a string`);
+        }
+        if (call.calleeFile !== null && typeof call.calleeFile !== 'string') {
+          errors.push(`${callPrefix}.calleeFile must be a string or null`);
+        }
+        if (call.calleeLine !== null && (typeof call.calleeLine !== 'number' || !Number.isInteger(call.calleeLine))) {
+          errors.push(`${callPrefix}.calleeLine must be an integer or null`);
+        }
+      }
     }
     if (!Array.isArray(file.events)) {
       errors.push(`${prefix}.events must be an array`);
+    } else {
+      // M1 (Task 1.5d): Validate each events[] entry against EventEntry schema
+      for (let j = 0; j < file.events.length; j++) {
+        const evt = file.events[j];
+        const evtPrefix = `${prefix}.events[${j}]`;
+        if (typeof evt.file !== 'string') {
+          errors.push(`${evtPrefix}.file must be a string`);
+        }
+        if (typeof evt.line !== 'number' || !Number.isInteger(evt.line)) {
+          errors.push(`${evtPrefix}.line must be an integer`);
+        }
+        if (typeof evt.eventName !== 'string') {
+          errors.push(`${evtPrefix}.eventName must be a string`);
+        }
+        if (evt.type !== 'emit' && evt.type !== 'subscribe') {
+          errors.push(`${evtPrefix}.type must be "emit" or "subscribe"`);
+        }
+      }
     }
   }
 
@@ -1024,9 +1377,9 @@ function resolveImportPath(fromDir, importPath) {
       // Current directory, no change
       continue;
     } else if (segment === '..') {
-      // Go up one directory; guard against escaping project root
+      // Go up one directory; reject paths that attempt to escape project root
       if (parts.length === 0) {
-        continue;
+        return null;
       }
       parts.pop();
     } else {
@@ -1054,17 +1407,27 @@ function resolveImportPath(fromDir, importPath) {
  * AC-5.3: Creates .claude/traces/ and low-level/ directories if they do not exist
  * AC-5.4: Returns summary with modules processed, files generated, and duration
  *
+ * M2 (REQ-005, REQ-009): Supports incremental mode via staleness.json.
+ * When `incremental: true` is set and staleness.json exists, only regenerates
+ * stale files. Use `full: true` to force complete regeneration.
+ * Default behavior (no incremental/full flag) is full generation for backward
+ * compatibility. After generation, always updates staleness.json with new hashes.
+ *
  * @param {object} [options]
  * @param {string} [options.targetModuleId] - If provided, generate only this module's low-level trace + update high-level
  * @param {string} [options.projectRoot] - Project root override
  * @param {boolean} [options.lowLevelOnly] - Skip high-level trace generation
- * @returns {{ modulesProcessed: number, filesGenerated: number, durationMs: number, lowLevelResults: Array, highLevelVersion: number | null }}
+ * @param {boolean} [options.full] - Force full regeneration, ignoring staleness state (REQ-009)
+ * @param {boolean} [options.incremental] - Enable incremental mode using staleness.json (REQ-005)
+ * @returns {{ modulesProcessed: number, filesGenerated: number, durationMs: number, lowLevelResults: Array, highLevelVersion: number | null, incremental: boolean }}
  */
 export function generateAllTraces(options = {}) {
   const startTime = Date.now();
   const root = options.projectRoot || resolveProjectRoot();
   const targetModuleId = options.targetModuleId || undefined;
   const lowLevelOnly = options.lowLevelOnly || false;
+  const forceFull = options.full || false;
+  const requestIncremental = options.incremental || false;
 
   // AC-5.3: Ensure directory structure exists
   const tracesDir = join(root, '.claude', 'traces');
@@ -1073,16 +1436,242 @@ export function generateAllTraces(options = {}) {
 
   let filesGenerated = 0;
   let highLevelVersion = null;
+  let incremental = false;
+
+  // M2: Attempt incremental generation if explicitly requested AND staleness.json exists
+  // AND --full not set AND no target module specified
+  const useIncremental = requestIncremental && !forceFull && !targetModuleId;
+  const stalenessResult = useIncremental ? loadStalenessMetadata(root) : null;
+
+  if (stalenessResult) {
+    // Incremental mode: only regenerate stale files
+    incremental = true;
+    const config = loadTraceConfig(root);
+    const knownExports = buildExportIndex(config, root);
+    const stalenessData = stalenessResult.data;
+    const lowLevelResults = [];
+    let modulesProcessed = 0;
+
+    for (const mod of config.modules) {
+      // Find stale files in this module
+      const matchingFiles = findFilesMatchingGlobs(mod.fileGlobs, root);
+      matchingFiles.sort();
+
+      const staleFiles = matchingFiles.filter(f =>
+        isFileStale(f, mod.id, stalenessData, root)
+      );
+
+      if (staleFiles.length === 0) {
+        // No stale files -- skip this module entirely
+        continue;
+      }
+
+      // Collect export signatures BEFORE regeneration for comparison
+      const oldExportSigHash = stalenessData.modules[mod.id]
+        ? stalenessData.modules[mod.id].exportSignatureHash
+        : '';
+
+      // Regenerate the entire module trace (containing both stale and fresh files)
+      // The trace file is per-module, so we regenerate it fully but only because
+      // at least one file changed. The staleness.json tracks per-file hashes.
+      const result = writeLowLevelTrace(mod, config, root, knownExports);
+      lowLevelResults.push(result);
+      modulesProcessed++;
+      filesGenerated += 2; // .json + .md
+
+      // Update staleness.json for this module's files
+      if (!stalenessData.modules[mod.id]) {
+        stalenessData.modules[mod.id] = { files: {}, exportSignatureHash: '' };
+      }
+
+      // Read the just-generated trace to get current exports
+      const tracePath = join(lowLevelDir, `${mod.id}.json`);
+      let traceData;
+      try {
+        traceData = JSON.parse(readFileSync(tracePath, 'utf-8'));
+      } catch {
+        continue;
+      }
+
+      // Collect all exports from the module for signature hash
+      const allModuleExports = [];
+      const now = formatTimestamp();
+
+      for (const file of traceData.files) {
+        allModuleExports.push(...file.exports);
+
+        // Update per-file hash in staleness data
+        try {
+          const absPath = join(root, file.filePath);
+          const fileHash = computeFileHash(absPath);
+          stalenessData.modules[mod.id].files[file.filePath] = {
+            hash: fileHash,
+            lastTraced: now,
+            ...(stalenessData.modules[mod.id].files[file.filePath]?.externalRefs
+              ? { externalRefs: stalenessData.modules[mod.id].files[file.filePath].externalRefs }
+              : {}),
+          };
+        } catch {
+          // File may not exist -- skip
+        }
+      }
+
+      // Build externalRefs from import data
+      for (const file of traceData.files) {
+        const refs = {};
+        for (const imp of file.imports) {
+          if (!imp.source.startsWith('.') && !imp.source.startsWith('/')) continue;
+          // Check which module this import resolves to
+          for (const otherMod of config.modules) {
+            if (otherMod.id === mod.id) continue;
+            // Check if any of the imported symbols come from this module
+            const otherFiles = findFilesMatchingGlobs(otherMod.fileGlobs, root);
+            for (const otherFile of otherFiles) {
+              // Simple heuristic: if import source resolves to a file in another module
+              const importDir = file.filePath.includes('/')
+                ? file.filePath.substring(0, file.filePath.lastIndexOf('/'))
+                : '.';
+              const resolved = resolveImportPath(importDir, imp.source);
+              if (resolved && otherFiles.some(of => of === resolved || of.startsWith(resolved))) {
+                if (!refs[otherMod.id]) refs[otherMod.id] = [];
+                for (const sym of imp.symbols) {
+                  if (!refs[otherMod.id].includes(sym)) {
+                    refs[otherMod.id].push(sym);
+                  }
+                }
+                break;
+              }
+            }
+          }
+        }
+
+        if (Object.keys(refs).length > 0 && stalenessData.modules[mod.id].files[file.filePath]) {
+          stalenessData.modules[mod.id].files[file.filePath].externalRefs = refs;
+        }
+      }
+
+      // Compute new export signature hash and propagate if changed
+      const newExportSigHash = computeExportSignatureHash(allModuleExports);
+      propagateCrossModuleStaleness(mod.id, stalenessData, newExportSigHash);
+    }
+
+    // Write staleness.json AFTER all trace files (REQ-012: write ordering)
+    writeStalenessMetadata(stalenessData, root);
+
+    // Generate high-level trace if needed
+    if (!lowLevelOnly && modulesProcessed > 0) {
+      const lowLevelTraces = [];
+      for (const mod of config.modules) {
+        const tracePath = join(root, LOW_LEVEL_TRACE_DIR, `${mod.id}.json`);
+        try {
+          const traceData = JSON.parse(readFileSync(tracePath, 'utf-8'));
+          lowLevelTraces.push(traceData);
+        } catch {
+          // skip
+        }
+      }
+
+      const { dependencyData, skippedFiles } = aggregateDependencies(lowLevelTraces, config);
+      const highLevelResult = generateHighLevelTrace({
+        projectRoot: root,
+        config,
+        dependencyData,
+        skippedFiles,
+      });
+      highLevelVersion = highLevelResult.version;
+      filesGenerated += 2;
+    }
+
+    const durationMs = Date.now() - startTime;
+    return {
+      modulesProcessed,
+      filesGenerated,
+      durationMs,
+      lowLevelResults,
+      highLevelVersion,
+      incremental: true,
+    };
+  }
+
+  // Full generation mode (original behavior, or --full, or no staleness.json)
 
   // Step 1: Generate low-level traces for all modules (or target module)
   // Must happen before high-level trace so dependency aggregation has import data.
   const { modulesProcessed, results: lowLevelResults } = generateAllLowLevelTraces(targetModuleId, root);
   filesGenerated += lowLevelResults.length * 2; // .json + .md per module
 
-  // Step 2: Generate high-level trace with dependency aggregation (unless --low-level-only)
-  if (!lowLevelOnly) {
-    const config = loadTraceConfig(root);
+  // Step 2: Build/rebuild staleness.json from the generated traces
+  const config = loadTraceConfig(root);
+  const newStalenessData = createEmptyStalenessData();
 
+  for (const mod of config.modules) {
+    const tracePath = join(root, LOW_LEVEL_TRACE_DIR, `${mod.id}.json`);
+    let traceData;
+    try {
+      traceData = JSON.parse(readFileSync(tracePath, 'utf-8'));
+    } catch {
+      continue;
+    }
+
+    const allModuleExports = [];
+    const moduleFiles = {};
+    const now = formatTimestamp();
+
+    for (const file of traceData.files) {
+      allModuleExports.push(...file.exports);
+
+      try {
+        const absPath = join(root, file.filePath);
+        const fileHash = computeFileHash(absPath);
+        const fileEntry = {
+          hash: fileHash,
+          lastTraced: now,
+        };
+
+        // Build externalRefs from import data
+        const refs = {};
+        for (const imp of file.imports) {
+          if (!imp.source.startsWith('.') && !imp.source.startsWith('/')) continue;
+          for (const otherMod of config.modules) {
+            if (otherMod.id === mod.id) continue;
+            const otherFiles = findFilesMatchingGlobs(otherMod.fileGlobs, root);
+            const importDir = file.filePath.includes('/')
+              ? file.filePath.substring(0, file.filePath.lastIndexOf('/'))
+              : '.';
+            const resolved = resolveImportPath(importDir, imp.source);
+            if (resolved && otherFiles.some(of => of === resolved || of.startsWith(resolved))) {
+              if (!refs[otherMod.id]) refs[otherMod.id] = [];
+              for (const sym of imp.symbols) {
+                if (!refs[otherMod.id].includes(sym)) {
+                  refs[otherMod.id].push(sym);
+                }
+              }
+              break;
+            }
+          }
+        }
+
+        if (Object.keys(refs).length > 0) {
+          fileEntry.externalRefs = refs;
+        }
+
+        moduleFiles[file.filePath] = fileEntry;
+      } catch {
+        // File hash computation failed -- skip
+      }
+    }
+
+    newStalenessData.modules[mod.id] = {
+      files: moduleFiles,
+      exportSignatureHash: computeExportSignatureHash(allModuleExports),
+    };
+  }
+
+  // Write staleness.json AFTER all trace files (REQ-012: write ordering)
+  writeStalenessMetadata(newStalenessData, root);
+
+  // Step 3: Generate high-level trace with dependency aggregation (unless --low-level-only)
+  if (!lowLevelOnly) {
     // Read all low-level traces for dependency aggregation
     const lowLevelTraces = [];
     for (const mod of config.modules) {
@@ -1116,8 +1705,19 @@ export function generateAllTraces(options = {}) {
     durationMs,
     lowLevelResults,
     highLevelVersion,
+    incremental: false,
   };
 }
+
+/**
+ * Resolve a relative import path against an importing directory (for staleness tracking).
+ *
+ * Simplified version of resolveImportPath for cross-module reference detection.
+ *
+ * @param {string} fromDir - Directory of the importing file
+ * @param {string} importPath - Import specifier
+ * @returns {string | null} Resolved path or null
+ */
 
 // =============================================================================
 // Bootstrap: Auto-Detection and Initial Config Generation (AC-13.1 through AC-13.4)
@@ -1279,6 +1879,7 @@ async function main() {
   const targetModule = args.find(a => !a.startsWith('--'));
   const lowLevelOnly = args.includes('--low-level-only');
   const bootstrapFlag = args.includes('--bootstrap');
+  const fullFlag = args.includes('--full');
 
   try {
     const root = resolveProjectRoot();
@@ -1311,9 +1912,14 @@ async function main() {
       }
     }
 
+    // M2: CLI defaults to full generation for backward compatibility.
+    // --full is an explicit escape hatch (REQ-009) that forces full regeneration
+    // even when incremental mode is requested by the caller.
+    // Incremental mode is primarily used by the commit-staleness hook (REQ-010).
     const result = generateAllTraces({
       targetModuleId: targetModule,
       lowLevelOnly,
+      full: fullFlag,
     });
 
     // AC-5.4: Output summary reporting modules processed and files generated
@@ -1321,6 +1927,7 @@ async function main() {
       ? `Trace generation complete (module: ${targetModule}).`
       : 'Trace generation complete.';
     console.log(modeLabel);
+    console.log(`  Mode: ${result.incremental ? 'incremental' : 'full'}`);
     console.log(`  Modules processed: ${result.modulesProcessed}`);
     console.log(`  Files generated: ${result.filesGenerated}`);
     console.log(`  Duration: ${result.durationMs}ms`);
