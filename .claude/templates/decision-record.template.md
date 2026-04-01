@@ -1,3 +1,4 @@
+<!-- Store at: .claude/journal/decisions/<id>.md -->
 ---
 id: decision-<NNN>
 title: <Brief description of the decision>

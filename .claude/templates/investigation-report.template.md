@@ -1,3 +1,4 @@
+<!-- Store at: .claude/journal/entries/investigation-<date>-<slug>.md (standalone) or .claude/specs/groups/<sg-id>/investigation-report.md (spec-coupled) -->
 ---
 id: investigation-<NNN>
 title: <Brief description of the investigation>
