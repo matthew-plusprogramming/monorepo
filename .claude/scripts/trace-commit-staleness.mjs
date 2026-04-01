@@ -236,7 +236,7 @@ async function main() {
 
     process.stderr.write('\n');
     process.stderr.write('Or regenerate all traces:\n');
-    process.stderr.write('  node .claude/scripts/trace-generate.mjs\n');
+    process.stderr.write('  node .claude/scripts/trace-generate.mjs --full\n');
     process.stderr.write('\n');
     process.stderr.write('========================================\n');
     process.stderr.write('\n');

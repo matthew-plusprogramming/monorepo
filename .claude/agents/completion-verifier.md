@@ -352,21 +352,31 @@ The orchestrator handles fix agent failures:
 
 ### Findings (if any)
 
-**CVG-001** (High): <Recommended Action> -- <action verb>
+**CVG-001** (High, confidence: <high|medium|low>): <Recommended Action> -- <action verb>
 Impact: <One-sentence consequence if unaddressed>
 Finding: <Summary of what was identified>
 Evidence: <File path, line number, or pattern match>
+Reasoning: <Why this confidence level, under 200 characters>
 
 ### Advisory Warnings (if any)
 
-**CVG-002** (Low): <Suggestion>
+**CVG-002** (Low, confidence: <high|medium|low>): <Suggestion>
 Finding: <Summary of what was identified>
 Evidence: <Supporting evidence>
+Reasoning: <Why this confidence level, under 200 characters>
 ```
 
 ### Finding ID Format
 
 - `CVG-001`, `CVG-002`, ... (Completion Verification Gate findings)
+
+### Confidence Assignment
+
+Every finding MUST include a confidence level:
+
+- **high**: Concrete evidence found (file missing, TODO marker present, no docs generated)
+- **medium**: Partial evidence suggesting a gap (docs exist but may be stale, patterns detected but not confirmed)
+- **low**: Advisory suggestion based on best practices without concrete evidence
 
 ### Return Contract
 

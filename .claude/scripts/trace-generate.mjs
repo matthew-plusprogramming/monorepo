@@ -25,6 +25,10 @@
 import { readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync, statSync } from 'node:fs';
 import { join, dirname, basename } from 'node:path';
 
+import { cpus } from 'node:os';
+import { Worker } from 'node:worker_threads';
+import { fileURLToPath } from 'node:url';
+
 import {
   loadTraceConfig,
   findFilesMatchingGlobs,
@@ -42,6 +46,8 @@ import {
   propagateCrossModuleStaleness,
   atomicWriteFile,
   checkTraceFileSize,
+  resetFileCache,
+  getCachedGitFiles,
 } from './lib/trace-utils.mjs';
 
 import {
@@ -57,6 +63,72 @@ import {
 // =============================================================================
 
 const GENERATED_BY = 'trace-generate';
+
+/** Maximum cache size in bytes before workers fall back to direct file reads (AC-7) */
+const WORKER_CACHE_THRESHOLD_BYTES = 256 * 1024 * 1024;
+
+/** Default worker concurrency cap (AC-7) */
+const DEFAULT_MAX_WORKERS = 4;
+
+// =============================================================================
+// File Content Cache (AC-4)
+// =============================================================================
+
+/**
+ * Module-scoped file content cache.
+ * Populated during buildExportIndex and reused by analyzeFile and computeFileHash.
+ * @type {Map<string, string>}
+ */
+const fileContentCache = new Map();
+
+/**
+ * Get file content, using cache if available.
+ *
+ * AC-4: Eliminates double file reads by caching content on first access.
+ * Both buildExportIndex (regex parsing) and analyzeFile (TS compiler) read
+ * the same files; this cache ensures each file is read from disk at most once.
+ *
+ * @param {string} absPath - Absolute path to the file
+ * @returns {string} File content
+ */
+function getCachedContent(absPath) {
+  let cached = fileContentCache.get(absPath);
+  if (cached !== undefined) {
+    return cached;
+  }
+  cached = readFileSync(absPath, 'utf-8');
+  fileContentCache.set(absPath, cached);
+  return cached;
+}
+
+/**
+ * Get the approximate total size of the file content cache in bytes.
+ *
+ * Used to determine whether to serialize the cache for workers (AC-7).
+ *
+ * @returns {number} Approximate byte size
+ */
+function getContentCacheSize() {
+  let total = 0;
+  for (const value of fileContentCache.values()) {
+    total += value.length * 2; // Approximate: JS strings are UTF-16
+  }
+  return total;
+}
+
+/**
+ * Prime the file content cache with pre-computed entries.
+ *
+ * Used by worker threads to avoid redundant file reads. The main thread
+ * serializes cached file contents and workers reconstruct the cache.
+ *
+ * @param {Array<[string, string]>} entries - Array of [absPath, content] pairs
+ */
+export function primeContentCache(entries) {
+  for (const [key, value] of entries) {
+    fileContentCache.set(key, value);
+  }
+}
 
 // =============================================================================
 // Import/Export Static Analysis
@@ -792,7 +864,8 @@ export function analyzeFile(filePath, projectRoot, configOrExports) {
   const useRegex = config.parser === 'regex';
 
   try {
-    const source = readFileSync(absPath, 'utf-8');
+    // AC-4: Use cached file content to avoid redundant disk reads
+    const source = getCachedContent(absPath);
 
     if (useRegex) {
       // Legacy regex-based analysis (fallback)
@@ -886,7 +959,8 @@ export function buildExportIndex(config, projectRoot) {
 
       try {
         const absPath = join(projectRoot, filePath);
-        const source = readFileSync(absPath, 'utf-8');
+        // AC-4: Use cached content to avoid redundant disk reads
+        const source = getCachedContent(absPath);
         const fileExports = parseExports(source);
 
         for (const exp of fileExports) {
@@ -1044,11 +1118,16 @@ export function writeLowLevelTrace(moduleConfig, traceConfig, projectRoot, known
 /**
  * Generate low-level traces for all modules or a specific module.
  *
+ * AC-7: Supports parallel module analysis via worker_threads when
+ * parallelWorkers > 0. Falls back to sequential when parallelWorkers === 0
+ * or when targeting a specific module.
+ *
  * @param {string} [targetModuleId] - If provided, generate only this module
  * @param {string} [projectRoot] - Optional project root override
- * @returns {{ modulesProcessed: number, results: Array<{ moduleId: string, fileCount: number, version: number }> }}
+ * @param {number} [parallelWorkers=0] - Number of worker threads (0 = sequential)
+ * @returns {Promise<{ modulesProcessed: number, results: Array<{ moduleId: string, fileCount: number, version: number }> }>}
  */
-export function generateAllLowLevelTraces(targetModuleId, projectRoot) {
+export async function generateAllLowLevelTraces(targetModuleId, projectRoot, parallelWorkers = 0) {
   const root = projectRoot || resolveProjectRoot();
   const config = loadTraceConfig(root);
 
@@ -1059,21 +1138,12 @@ export function generateAllLowLevelTraces(targetModuleId, projectRoot) {
   // M1: Build cross-module export index for call graph resolution (REQ-002)
   const knownExports = buildExportIndex(config, root);
 
-  const results = [];
-  let modulesProcessed = 0;
+  // Determine modules to process
+  const modulesToProcess = targetModuleId
+    ? config.modules.filter(m => m.id === targetModuleId)
+    : config.modules;
 
-  for (const mod of config.modules) {
-    // If targeting a specific module, skip others
-    if (targetModuleId && mod.id !== targetModuleId) {
-      continue;
-    }
-
-    const result = writeLowLevelTrace(mod, config, root, knownExports);
-    results.push(result);
-    modulesProcessed++;
-  }
-
-  if (targetModuleId && modulesProcessed === 0) {
+  if (targetModuleId && modulesToProcess.length === 0) {
     const availableIds = config.modules.map(m => m.id);
     const availableList = availableIds.length > 0
       ? `Available modules: ${availableIds.join(', ')}`
@@ -1083,7 +1153,133 @@ export function generateAllLowLevelTraces(targetModuleId, projectRoot) {
     );
   }
 
-  return { modulesProcessed, results };
+  // AC-7: Use parallel workers when available and processing multiple modules
+  if (parallelWorkers > 0 && modulesToProcess.length > 1 && !targetModuleId) {
+    const results = await processModulesInParallel(
+      modulesToProcess, config, root, knownExports, parallelWorkers,
+    );
+    return { modulesProcessed: results.length, results };
+  }
+
+  // Sequential fallback (--parallel 0, single module, or targeting specific module)
+  const results = [];
+  for (const mod of modulesToProcess) {
+    const result = writeLowLevelTrace(mod, config, root, knownExports);
+    results.push(result);
+  }
+
+  return { modulesProcessed: results.length, results };
+}
+
+/**
+ * Process modules in parallel using worker_threads.
+ *
+ * AC-7: Dispatches module analysis to worker threads with configurable concurrency.
+ * Workers receive module config and known exports via workerData (structured clone).
+ * The content cache is serialized only if below the 256MB threshold.
+ *
+ * @param {Array} modules - Modules to process
+ * @param {object} config - Trace config
+ * @param {string} root - Project root
+ * @param {Map} knownExports - Cross-module export index
+ * @param {number} concurrency - Number of concurrent workers
+ * @returns {Promise<Array<{ moduleId: string, fileCount: number, version: number }>>}
+ */
+async function processModulesInParallel(modules, config, root, knownExports, concurrency) {
+  const workerPath = new URL('./lib/trace-worker.mjs', import.meta.url);
+  const exportEntries = [...knownExports.entries()];
+
+  // AC-7: Check cache size against threshold for worker serialization
+  const cacheSize = getContentCacheSize();
+  const sendCache = cacheSize < WORKER_CACHE_THRESHOLD_BYTES;
+  const fileContentEntries = sendCache ? [...fileContentCache.entries()] : null;
+
+  const results = [];
+  const queue = [...modules];
+  const active = new Set();
+
+  return new Promise((resolveAll) => {
+    function startNext() {
+      while (active.size < concurrency && queue.length > 0) {
+        const mod = queue.shift();
+        const worker = new Worker(workerPath, {
+          workerData: {
+            moduleConfig: mod,
+            traceConfig: config,
+            projectRoot: root,
+            knownExports: exportEntries,
+            cachedGitFiles: getCachedGitFiles(),
+            fileContentEntries,
+          },
+        });
+
+        active.add(worker);
+
+        worker.on('message', (msg) => {
+          active.delete(worker);
+          if (msg.success) {
+            results.push(msg.result);
+          } else {
+            process.stderr.write(`Warning: Worker failed for module ${mod.id}: ${msg.error}\n`);
+            // Fall back to sequential for this module
+            try {
+              const result = writeLowLevelTrace(mod, config, root, knownExports);
+              results.push(result);
+            } catch (err) {
+              process.stderr.write(`Warning: Sequential fallback also failed for ${mod.id}: ${err.message}\n`);
+            }
+          }
+          startNext();
+          if (active.size === 0 && queue.length === 0) {
+            resolveAll(results);
+          }
+        });
+
+        worker.on('error', (err) => {
+          active.delete(worker);
+          process.stderr.write(`Warning: Worker error for module ${mod.id}: ${err.message}\n`);
+          // Fall back to sequential for this module
+          try {
+            const result = writeLowLevelTrace(mod, config, root, knownExports);
+            results.push(result);
+          } catch (fallbackErr) {
+            process.stderr.write(`Warning: Sequential fallback also failed for ${mod.id}: ${fallbackErr.message}\n`);
+          }
+          startNext();
+          if (active.size === 0 && queue.length === 0) {
+            resolveAll(results);
+          }
+        });
+
+        worker.on('exit', (code) => {
+          // Guard: only handle if not already handled by 'message' or 'error'
+          if (!active.has(worker)) return;
+          active.delete(worker);
+          if (code !== 0) {
+            process.stderr.write(`Warning: Worker exited with code ${code} for module ${mod.id}\n`);
+            // Fall back to sequential for this module
+            try {
+              const result = writeLowLevelTrace(mod, config, root, knownExports);
+              results.push(result);
+            } catch (fallbackErr) {
+              process.stderr.write(`Warning: Sequential fallback also failed for ${mod.id}: ${fallbackErr.message}\n`);
+            }
+          }
+          startNext();
+          if (active.size === 0 && queue.length === 0) {
+            resolveAll(results);
+          }
+        });
+      }
+    }
+
+    startNext();
+
+    // Handle edge case: empty modules list
+    if (queue.length === 0 && active.size === 0) {
+      resolveAll(results);
+    }
+  });
 }
 
 // =============================================================================
@@ -1397,6 +1593,91 @@ function resolveImportPath(fromDir, importPath) {
 }
 
 // =============================================================================
+// File-to-Module Map (AC-2)
+// =============================================================================
+
+/** Common file extensions to try when resolving extensionless import paths */
+const IMPORT_EXTENSIONS = ['' /* try exact path first (may already have extension) */, '.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs', '/index.ts', '/index.tsx', '/index.js', '/index.mjs'];
+
+/**
+ * Build a map from file path to module ID for O(1) external ref resolution.
+ *
+ * AC-2: Replaces the O(F x I x M) nested loop pattern with a pre-computed map.
+ * Iterates all modules and their matched files once to build the map.
+ *
+ * @param {{ modules: Array<{ id: string, fileGlobs: string[] }> }} config - Trace config
+ * @param {string} root - Project root directory
+ * @returns {Map<string, string>} Map from relative file path to module ID
+ */
+function buildFileToModuleMap(config, root) {
+  const map = new Map();
+  for (const mod of config.modules) {
+    const files = findFilesMatchingGlobs(mod.fileGlobs, root);
+    for (const filePath of files) {
+      // First module wins (consistent with fileToModule semantics)
+      if (!map.has(filePath)) {
+        map.set(filePath, mod.id);
+      }
+    }
+  }
+  return map;
+}
+
+/**
+ * Look up the owning module for an import path using the file-to-module map.
+ *
+ * Tries the resolved path directly, then with common file extensions appended.
+ * Returns the first matching module ID or null.
+ *
+ * @param {string} resolved - Resolved import path (relative to project root)
+ * @param {Map<string, string>} fileToModuleMap - Pre-computed map
+ * @returns {string | null} Module ID or null if no match
+ */
+function lookupModuleForImport(resolved, fileToModuleMap) {
+  for (const ext of IMPORT_EXTENSIONS) {
+    const candidate = resolved + ext;
+    const moduleId = fileToModuleMap.get(candidate);
+    if (moduleId) return moduleId;
+  }
+  return null;
+}
+
+/**
+ * Build external refs map for a single file's imports using pre-computed fileToModuleMap.
+ *
+ * AC-2: O(1) lookups per import via fileToModuleMap. Extracted to avoid duplication
+ * between incremental and full generation paths.
+ *
+ * @param {{ filePath: string, imports: Array<{ source: string, symbols: string[] }> }} file - Analyzed file
+ * @param {{ id: string }} mod - Module config (used to exclude self-references)
+ * @param {Map<string, string>} fileToModuleMap - Pre-computed file-to-module map
+ * @returns {Record<string, string[]>} Map of target module ID to imported symbols (empty if none)
+ */
+function buildExternalRefsForFile(file, mod, fileToModuleMap) {
+  const refs = {};
+  for (const imp of file.imports) {
+    if (!imp.source.startsWith('.') && !imp.source.startsWith('/')) continue;
+    const importDir = file.filePath.includes('/')
+      ? file.filePath.substring(0, file.filePath.lastIndexOf('/'))
+      : '.';
+    const resolved = resolveImportPath(importDir, imp.source);
+    if (!resolved) continue;
+
+    // O(1) lookup: try resolved path directly and with common extensions
+    const targetModuleId = lookupModuleForImport(resolved, fileToModuleMap);
+    if (targetModuleId && targetModuleId !== mod.id) {
+      if (!refs[targetModuleId]) refs[targetModuleId] = [];
+      for (const sym of imp.symbols) {
+        if (!refs[targetModuleId].includes(sym)) {
+          refs[targetModuleId].push(sym);
+        }
+      }
+    }
+  }
+  return refs;
+}
+
+// =============================================================================
 // Full Trace Generation (AC-5.1, AC-5.3, AC-5.4)
 // =============================================================================
 
@@ -1419,15 +1700,17 @@ function resolveImportPath(fromDir, importPath) {
  * @param {boolean} [options.lowLevelOnly] - Skip high-level trace generation
  * @param {boolean} [options.full] - Force full regeneration, ignoring staleness state (REQ-009)
  * @param {boolean} [options.incremental] - Enable incremental mode using staleness.json (REQ-005)
+ * @param {number} [options.parallelWorkers=0] - Number of worker threads for parallel module analysis (AC-7, 0 = sequential)
  * @returns {{ modulesProcessed: number, filesGenerated: number, durationMs: number, lowLevelResults: Array, highLevelVersion: number | null, incremental: boolean }}
  */
-export function generateAllTraces(options = {}) {
+export async function generateAllTraces(options = {}) {
   const startTime = Date.now();
   const root = options.projectRoot || resolveProjectRoot();
   const targetModuleId = options.targetModuleId || undefined;
   const lowLevelOnly = options.lowLevelOnly || false;
   const forceFull = options.full || false;
   const requestIncremental = options.incremental || false;
+  const parallelWorkers = options.parallelWorkers != null ? options.parallelWorkers : 0;
 
   // AC-5.3: Ensure directory structure exists
   const tracesDir = join(root, '.claude', 'traces');
@@ -1448,6 +1731,8 @@ export function generateAllTraces(options = {}) {
     incremental = true;
     const config = loadTraceConfig(root);
     const knownExports = buildExportIndex(config, root);
+    // AC-2: Build file-to-module map for O(1) external ref resolution
+    const fileToModuleMap = buildFileToModuleMap(config, root);
     const stalenessData = stalenessResult.data;
     const lowLevelResults = [];
     let modulesProcessed = 0;
@@ -1503,7 +1788,9 @@ export function generateAllTraces(options = {}) {
         // Update per-file hash in staleness data
         try {
           const absPath = join(root, file.filePath);
-          const fileHash = computeFileHash(absPath);
+          // AC-5: Pass cached content to avoid redundant file reads for hashing
+          const cachedContent = fileContentCache.get(absPath) || null;
+          const fileHash = computeFileHash(absPath, cachedContent);
           stalenessData.modules[mod.id].files[file.filePath] = {
             hash: fileHash,
             lastTraced: now,
@@ -1516,35 +1803,9 @@ export function generateAllTraces(options = {}) {
         }
       }
 
-      // Build externalRefs from import data
+      // AC-2: Build externalRefs using pre-computed fileToModuleMap for O(1) lookups
       for (const file of traceData.files) {
-        const refs = {};
-        for (const imp of file.imports) {
-          if (!imp.source.startsWith('.') && !imp.source.startsWith('/')) continue;
-          // Check which module this import resolves to
-          for (const otherMod of config.modules) {
-            if (otherMod.id === mod.id) continue;
-            // Check if any of the imported symbols come from this module
-            const otherFiles = findFilesMatchingGlobs(otherMod.fileGlobs, root);
-            for (const otherFile of otherFiles) {
-              // Simple heuristic: if import source resolves to a file in another module
-              const importDir = file.filePath.includes('/')
-                ? file.filePath.substring(0, file.filePath.lastIndexOf('/'))
-                : '.';
-              const resolved = resolveImportPath(importDir, imp.source);
-              if (resolved && otherFiles.some(of => of === resolved || of.startsWith(resolved))) {
-                if (!refs[otherMod.id]) refs[otherMod.id] = [];
-                for (const sym of imp.symbols) {
-                  if (!refs[otherMod.id].includes(sym)) {
-                    refs[otherMod.id].push(sym);
-                  }
-                }
-                break;
-              }
-            }
-          }
-        }
-
+        const refs = buildExternalRefsForFile(file, mod, fileToModuleMap);
         if (Object.keys(refs).length > 0 && stalenessData.modules[mod.id].files[file.filePath]) {
           stalenessData.modules[mod.id].files[file.filePath].externalRefs = refs;
         }
@@ -1582,6 +1843,10 @@ export function generateAllTraces(options = {}) {
       filesGenerated += 2;
     }
 
+    // Clear file content cache after generation run to free memory
+    fileContentCache.clear();
+    resetFileCache();
+
     const durationMs = Date.now() - startTime;
     return {
       modulesProcessed,
@@ -1597,11 +1862,13 @@ export function generateAllTraces(options = {}) {
 
   // Step 1: Generate low-level traces for all modules (or target module)
   // Must happen before high-level trace so dependency aggregation has import data.
-  const { modulesProcessed, results: lowLevelResults } = generateAllLowLevelTraces(targetModuleId, root);
+  const { modulesProcessed, results: lowLevelResults } = await generateAllLowLevelTraces(targetModuleId, root, parallelWorkers);
   filesGenerated += lowLevelResults.length * 2; // .json + .md per module
 
   // Step 2: Build/rebuild staleness.json from the generated traces
   const config = loadTraceConfig(root);
+  // AC-2: Build file-to-module map for O(1) external ref resolution
+  const fileToModuleMap = buildFileToModuleMap(config, root);
   const newStalenessData = createEmptyStalenessData();
 
   for (const mod of config.modules) {
@@ -1622,35 +1889,16 @@ export function generateAllTraces(options = {}) {
 
       try {
         const absPath = join(root, file.filePath);
-        const fileHash = computeFileHash(absPath);
+        // AC-5: Pass cached content to avoid redundant file reads for hashing
+        const cachedContent = fileContentCache.get(absPath) || null;
+        const fileHash = computeFileHash(absPath, cachedContent);
         const fileEntry = {
           hash: fileHash,
           lastTraced: now,
         };
 
-        // Build externalRefs from import data
-        const refs = {};
-        for (const imp of file.imports) {
-          if (!imp.source.startsWith('.') && !imp.source.startsWith('/')) continue;
-          for (const otherMod of config.modules) {
-            if (otherMod.id === mod.id) continue;
-            const otherFiles = findFilesMatchingGlobs(otherMod.fileGlobs, root);
-            const importDir = file.filePath.includes('/')
-              ? file.filePath.substring(0, file.filePath.lastIndexOf('/'))
-              : '.';
-            const resolved = resolveImportPath(importDir, imp.source);
-            if (resolved && otherFiles.some(of => of === resolved || of.startsWith(resolved))) {
-              if (!refs[otherMod.id]) refs[otherMod.id] = [];
-              for (const sym of imp.symbols) {
-                if (!refs[otherMod.id].includes(sym)) {
-                  refs[otherMod.id].push(sym);
-                }
-              }
-              break;
-            }
-          }
-        }
-
+        // AC-2: Build externalRefs using pre-computed fileToModuleMap for O(1) lookups
+        const refs = buildExternalRefsForFile(file, mod, fileToModuleMap);
         if (Object.keys(refs).length > 0) {
           fileEntry.externalRefs = refs;
         }
@@ -1696,6 +1944,10 @@ export function generateAllTraces(options = {}) {
     highLevelVersion = highLevelResult.version;
     filesGenerated += 2; // high-level.json + high-level.md
   }
+
+  // Clear file content cache after generation run to free memory
+  fileContentCache.clear();
+  resetFileCache();
 
   const durationMs = Date.now() - startTime;
 
@@ -1876,10 +2128,23 @@ export function bootstrapTraceConfig(projectRoot) {
 
 async function main() {
   const args = process.argv.slice(2);
-  const targetModule = args.find(a => !a.startsWith('--'));
+  // Skip args that are values for --parallel flag
+  const parallelValueIdx = args.indexOf('--parallel') !== -1 ? args.indexOf('--parallel') + 1 : -1;
+  const targetModule = args.find((a, i) => !a.startsWith('--') && i !== parallelValueIdx);
   const lowLevelOnly = args.includes('--low-level-only');
   const bootstrapFlag = args.includes('--bootstrap');
   const fullFlag = args.includes('--full');
+  const incrementalFlag = args.includes('--incremental');
+
+  // AC-7: Parse --parallel flag (default: auto, 0 = sequential)
+  let parallelWorkers = Math.min(cpus().length, DEFAULT_MAX_WORKERS);
+  const parallelIdx = args.indexOf('--parallel');
+  if (parallelIdx !== -1 && args[parallelIdx + 1] !== undefined) {
+    parallelWorkers = parseInt(args[parallelIdx + 1], 10);
+    if (Number.isNaN(parallelWorkers) || parallelWorkers < 0) {
+      parallelWorkers = Math.min(cpus().length, DEFAULT_MAX_WORKERS);
+    }
+  }
 
   try {
     const root = resolveProjectRoot();
@@ -1912,14 +2177,14 @@ async function main() {
       }
     }
 
-    // M2: CLI defaults to full generation for backward compatibility.
-    // --full is an explicit escape hatch (REQ-009) that forces full regeneration
-    // even when incremental mode is requested by the caller.
-    // Incremental mode is primarily used by the commit-staleness hook (REQ-010).
-    const result = generateAllTraces({
+    // AC-3: CLI defaults to incremental mode. Use --full for complete regeneration.
+    // --incremental is a no-op (already the default) but kept for explicitness.
+    const result = await generateAllTraces({
       targetModuleId: targetModule,
       lowLevelOnly,
       full: fullFlag,
+      incremental: !fullFlag,
+      parallelWorkers,
     });
 
     // AC-5.4: Output summary reporting modules processed and files generated

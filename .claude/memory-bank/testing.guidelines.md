@@ -67,3 +67,38 @@ last_reviewed: 2026-02-14
 - Each test focuses on a single concept with minimal mocking and explicitly labeled Arrange/Act/Assert comments.
 - No hidden global state; timers and environment variables restored after each test; data deterministic.
 - Test data flows through builders/helpers rather than large inline literals.
+
+## E2E Testing
+
+E2E tests exercise the real deployed system through its external surfaces. They complement unit and integration tests by catching wiring issues, deployment configuration errors, and cross-service contract misalignments that only manifest in a live environment.
+
+### Philosophy: Black-Box, Never Half Measures
+
+E2E tests are black-box by identity, not by guideline. The system under test is an opaque box. Tests interact with it through published external surfaces only (HTTP endpoints, browser UI, WebSocket connections). They never read implementation source code -- not during test generation, not during failure diagnosis.
+
+### Tooling
+
+- **Frontend**: Playwright for browser-based tests. Launch a real browser, navigate to pages, interact with UI elements, assert on visible outcomes. Run against the real dev server with no mocked backends.
+- **Backend**: fetch or supertest for HTTP API tests. Hit the real running server with complete setup (authentication, seed data) and teardown (cleanup with verification).
+- **Diagnosis**: Server logs, browser console output, network request/response traces, error messages in the UI, observability dashboards. Never implementation source code.
+
+### Test Data Hygiene
+
+- **Dedicated test credentials**: E2E tests use separate credentials from dev. Never share credentials with development.
+- **Namespace isolation**: All test data is prefixed with a unique run ID (e.g., `e2e-run-<uuid>-<entity>`) to prevent collision during concurrent runs.
+- **Mandatory cleanup verification**: After teardown, verify cleanup succeeded (e.g., GET deleted resource returns 404). Do not assume teardown worked without confirmation.
+
+### URL Allowlisting
+
+E2E tests may only target localhost (any port) and known preview domains. Arbitrary external URLs are prohibited to prevent data leakage and unintended side effects.
+
+### Determinism and Isolation
+
+- Tests must be deterministic given consistent server state. Flaky tests are treated as bugs.
+- Each test sets up its own preconditions and cleans up after itself. No test-to-test ordering dependency.
+- Tests must pass with randomized execution order.
+- Target execution time: under 5 minutes per spec suite.
+
+### Applicability
+
+E2E tests apply only to specs with cross-boundary contracts (HTTP, SSE, WebSocket, database, external service boundaries). Module-to-module imports within the same process are NOT cross-boundary. Internal-only specs are exempt from E2E testing.

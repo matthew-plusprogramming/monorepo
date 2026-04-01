@@ -19,6 +19,15 @@ import { join, resolve } from 'node:path';
 import { execSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 
+
+// === Performance Caches (AC-1, AC-6) ===
+
+/** Module-scoped cache for git ls-files result (AC-1). Populated on first call, reused thereafter. */
+let cachedGitFiles = null;
+
+/** Module-scoped cache for compiled regex objects keyed by glob pattern (AC-6). */
+const regexCache = new Map();
+
 /** Default path to trace.config.json relative to project root */
 const TRACE_CONFIG_RELATIVE_PATH = '.claude/traces/trace.config.json';
 
@@ -88,12 +97,17 @@ export function matchesGlob(filePath, pattern) {
   const patterns = pattern.split(',').map(p => p.trim());
 
   for (const p of patterns) {
-    const regexStr = globToRegex(p);
-    // Pattern can match:
-    // 1. The entire path
-    // 2. The end of the path (for patterns like *.json)
-    // 3. A suffix after / (for patterns like .claude/agents/*.md)
-    const regex = new RegExp('(^|/)' + regexStr + '$');
+    // AC-6: Use cached compiled regex to avoid redundant globToRegex() + new RegExp() calls
+    let regex = regexCache.get(p);
+    if (!regex) {
+      const regexStr = globToRegex(p);
+      // Pattern can match:
+      // 1. The entire path
+      // 2. The end of the path (for patterns like *.json)
+      // 3. A suffix after / (for patterns like .claude/agents/*.md)
+      regex = new RegExp('(^|/)' + regexStr + '$');
+      regexCache.set(p, regex);
+    }
     if (regex.test(filePath)) {
       return true;
     }
@@ -396,15 +410,21 @@ export function findFilesMatchingGlobs(globs, root) {
   const matchingFiles = [];
 
   try {
-    // Use git ls-files for the full file list (efficient, respects .gitignore)
-    const allFiles = execSync('git ls-files', {
-      encoding: 'utf-8',
-      cwd: root,
-      timeout: 10000,
-    })
-      .trim()
-      .split('\n')
-      .filter(Boolean);
+    // AC-1: Use cached git ls-files result to avoid repeated subprocess spawns.
+    // The cache is populated on first call and reused for all subsequent calls
+    // within the same generation run.
+    let allFiles = cachedGitFiles;
+    if (!allFiles) {
+      allFiles = execSync('git ls-files', {
+        encoding: 'utf-8',
+        cwd: root,
+        timeout: 10000,
+      })
+        .trim()
+        .split('\n')
+        .filter(Boolean);
+      cachedGitFiles = allFiles;
+    }
 
     for (const file of allFiles) {
       for (const glob of globs) {
@@ -419,6 +439,43 @@ export function findFilesMatchingGlobs(globs, root) {
   }
 
   return matchingFiles;
+}
+
+
+/**
+ * Reset all module-scoped caches.
+ *
+ * Clears the cached git ls-files result (AC-1) and compiled regex cache (AC-6).
+ * Call this when fresh state is needed (e.g., between test runs or when
+ * the working tree has changed).
+ */
+export function resetFileCache() {
+  cachedGitFiles = null;
+  regexCache.clear();
+}
+
+/**
+ * Prime the git files cache with pre-computed results.
+ *
+ * Used by worker threads to avoid redundant git ls-files subprocess calls.
+ * Each worker receives the cached file list from the main thread and primes
+ * its own module-scoped cache.
+ *
+ * @param {string[]} files - Array of relative file paths from git ls-files
+ */
+export function primeGitFilesCache(files) {
+  cachedGitFiles = files;
+}
+
+/**
+ * Get the current cached git files, or null if not yet populated.
+ *
+ * Used by the parallel dispatcher to pass cached files to workers.
+ *
+ * @returns {string[] | null}
+ */
+export function getCachedGitFiles() {
+  return cachedGitFiles;
 }
 
 /**
@@ -491,9 +548,11 @@ const TRACE_SIZE_ESCALATION_BYTES = 1024 * 1024;
  * @param {string} filePath - Absolute path to the file
  * @returns {string} Hex-encoded SHA-256 hash of file content
  */
-export function computeFileHash(filePath) {
-  const content = readFileSync(filePath, 'utf-8');
-  return createHash('sha256').update(content).digest('hex');
+export function computeFileHash(filePath, content) {
+  // AC-5: When content is provided (from file content cache), hash directly
+  // instead of reading from disk. Falls back to readFileSync for backward compat.
+  const fileContent = content != null ? content : readFileSync(filePath, 'utf-8');
+  return createHash('sha256').update(fileContent).digest('hex');
 }
 
 /**

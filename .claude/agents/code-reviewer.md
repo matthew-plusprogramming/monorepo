@@ -201,6 +201,18 @@ Check for:
 | **Medium**   | Should fix but not blocking       | No           |
 | **Low**      | Suggestion for improvement        | No           |
 
+### 3b. Confidence Levels
+
+Every finding MUST include a confidence level:
+
+| Confidence | When to Use                                                                                 |
+| ---------- | ------------------------------------------------------------------------------------------- |
+| **high**   | You can point to the exact line(s) causing the issue and demonstrate the problem concretely |
+| **medium** | The pattern is suspicious but you cannot fully confirm without more context or testing      |
+| **low**    | General concern or style suggestion based on experience rather than concrete evidence       |
+
+Include confidence in each finding as: `**Confidence**: <high | medium | low>` followed by a brief `**Reasoning**` (under 200 characters) explaining why you assigned that confidence level.
+
 ### 4. Review Checklist
 
 For each changed file:

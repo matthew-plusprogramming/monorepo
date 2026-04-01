@@ -76,6 +76,8 @@ function hasEslintConfig(workspaceDir) {
     'eslint.config.js',
     'eslint.config.mjs',
     'eslint.config.cjs',
+    'eslint.config.ts',
+    'eslint.config.mts',
   ];
 
   for (const config of eslintConfigs) {

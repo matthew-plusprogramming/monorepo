@@ -24,9 +24,11 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-// Canonical convergence field names (9 fields including completion verification)
+// Canonical convergence field names (11 fields including convergence gates and completion verification)
 const CANONICAL_FIELDS = new Set([
   'spec_complete',
+  'investigation_converged',
+  'challenger_converged',
   'all_acs_implemented',
   'all_tests_passing',
   'unifier_passed',
@@ -40,6 +42,14 @@ const CANONICAL_FIELDS = new Set([
 // AC2.4: 20+ known non-canonical variants with alias suggestions
 // Merged from ai-eng-dashboard source and spec Non-Canonical Alias Map table
 const ALIASES = {
+  // -> investigation_converged
+  investigation_complete: 'investigation_converged',
+  investigation_passed: 'investigation_converged',
+
+  // -> challenger_converged
+  challenger_complete: 'challenger_converged',
+  challenger_passed: 'challenger_converged',
+
   // -> all_acs_implemented
   implemented: 'all_acs_implemented',
   implementation_complete: 'all_acs_implemented',

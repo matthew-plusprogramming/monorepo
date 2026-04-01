@@ -131,9 +131,11 @@ Return findings as a structured list. Each finding MUST contain:
 ### <finding_id>
 
 - **Severity**: <Critical | High | Medium | Low>
+- **Confidence**: <high | medium | low>
 - **Summary**: <One-line description of what is missing or wrong>
 - **Detail**: <Full explanation: what is missing, why it matters, what could go wrong without it>
 - **PRD Section**: <Which section of the PRD is affected>
+- **Reasoning**: <Why this confidence level was assigned -- under 200 characters>
 - **Suggested Resolution**: <Optional -- what information or change would close this gap>
 ```
 
@@ -144,6 +146,14 @@ Return findings as a structured list. Each finding MUST contain:
 - Security: `SEC-001`, `SEC-002`, ...
 - Edge Case: `EDGE-001`, `EDGE-002`, ...
 
+### Confidence Assignment Guidance
+
+Assign confidence based on your certainty in the finding:
+
+- **high**: You are citing a specific missing section, contradicting a stated requirement, or referencing a concrete gap with evidence from the PRD text. You can point to the exact sentence or section that is wrong or missing.
+- **medium**: You are inferring a gap from omission. The PRD does not mention something that should be there, but you cannot point to a specific contradiction. The concern is reasonable but based on what is absent rather than what is present.
+- **low**: You are raising a general concern without specific evidence from the PRD. The finding is based on experience or best practices rather than a concrete gap in the document.
+
 ## Example Output
 
 ```markdown
@@ -152,17 +162,21 @@ Return findings as a structured list. Each finding MUST contain:
 ### TECH-001
 
 - **Severity**: High
+- **Confidence**: high
 - **Summary**: No error response format specified for API endpoints
 - **Detail**: The PRD describes 5 API endpoints but does not specify the error response shape. Without this, Dev and QA will assume different formats, causing integration failures.
 - **PRD Section**: Non-Functional Requirements
+- **Reasoning**: PRD defines 5 endpoints (Section 3.2) with no error shape -- concrete omission.
 - **Suggested Resolution**: Define a standard error response shape (e.g., `{ error: { code: string, message: string } }`)
 
 ### TECH-002
 
 - **Severity**: Low
+- **Confidence**: low
 - **Summary**: Log level not specified for audit events
 - **Detail**: PRD says "log authentication events" but does not specify log level. A competent implementer would use info-level structured JSON per codebase conventions.
 - **PRD Section**: Non-Functional Requirements
+- **Reasoning**: General best practice concern; PRD correctly identifies what to log.
 - **Suggested Resolution**: None needed -- implementation detail
 ```
 

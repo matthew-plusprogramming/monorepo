@@ -592,6 +592,18 @@ npm audit --audit-level=high
 - No high vulnerabilities
 - Dependencies up to date
 
+### 7b. Confidence Levels
+
+Every finding MUST include a confidence level:
+
+| Confidence | When to Use                                                                                       |
+| ---------- | ------------------------------------------------------------------------------------------------- |
+| **high**   | You can demonstrate the vulnerability with a concrete proof-of-concept or point to the exact flaw |
+| **medium** | The code pattern is suspicious but exploitability depends on context you cannot fully verify      |
+| **low**    | Theoretical concern or defense-in-depth suggestion based on best practices                        |
+
+Include `**Confidence**: <high | medium | low>` and `**Reasoning**` (under 200 characters) in each finding.
+
 ### 8. Generate Security Report
 
 Aggregate findings:

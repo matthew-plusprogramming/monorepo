@@ -113,3 +113,31 @@ _This is a borderline Medium/Low case. The deciding factor: do the tooltips affe
 | 8   | Edge Case   | Low (borderline)    | Missing nice-to-have content, feature works without it  |
 
 **Borderline cases (6 and 8)**: The examples above include explicit reasoning for why the borderline was drawn where it was. Critics should use similar reasoning when encountering findings that could be either Medium or Low.
+
+---
+
+## Confidence Calibration
+
+Confidence is orthogonal to severity. A Critical finding can have low confidence (you suspect an architectural flaw but lack evidence), and a Low finding can have high confidence (you can point to the exact line that is redundant).
+
+### Confidence Definitions
+
+- **high**: Citing a specific section, contradicting a stated requirement, or referencing a concrete, verifiable gap.
+- **medium**: Inferring from omission. The PRD does not mention something it should, but you cannot point to a contradiction.
+- **low**: General concern based on experience or best practices, without specific PRD evidence.
+
+### Confidence Calibration Examples
+
+| #   | Finding Summary                        | Severity | Confidence | Reasoning                                                                |
+| --- | -------------------------------------- | -------- | ---------- | ------------------------------------------------------------------------ |
+| C1  | Missing auth model (Example 1)         | Critical | high       | PRD says "users can access" without defining auth -- concrete omission.  |
+| C2  | Contradictory acceptance criteria (#2) | High     | high       | SC-1 and SC-5 directly conflict -- both are stated in the PRD.           |
+| C3  | Missing error response format (#3)     | High     | high       | 5 endpoints defined with no error shape -- verifiable gap.               |
+| C4  | Missing failure mode for payment (#4)  | Medium   | medium     | Integration is described but failure handling is not mentioned.          |
+| C5  | Ambiguous file upload scope (#5)       | Medium   | medium     | PRD says "upload files" without specifying constraints -- inferred gap.  |
+| C6  | Missing pagination details (#6)        | Medium   | low        | General concern about scale; PRD does not acknowledge list size.         |
+| C7  | Unspecified log level (#7)             | Low      | low        | Best practice concern; competent implementer would handle correctly.     |
+| C8  | "Might need rate limiting"             | Medium   | low        | Speculative concern based on experience, no PRD evidence.                |
+| C9  | "Timeout not specified for API call"   | Medium   | high       | PRD defines API call (Section 4.1) with no timeout -- concrete omission. |
+
+**Key insight**: Confidence reflects _how sure you are about the finding_, not _how bad the finding is_. Example C6 is Medium severity (scale matters) but low confidence (you are guessing about scale). Example C9 is Medium severity but high confidence (you can point to the exact API call missing a timeout).

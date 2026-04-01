@@ -167,6 +167,14 @@ Finding: <Summary of what was identified>
 
 **Field order** (mandatory): (1) Recommended action, (2) Impact indicator, (3) Finding summary, (4) Detail
 
+Each finding must also include a `Reasoning` line (under 200 characters) explaining why the confidence level was assigned.
+
+### Confidence Assignment Guidance
+
+- **high**: You verified the blocker exists (env var missing, file not found, dependency unavailable, API unreachable). Concrete evidence.
+- **medium**: The gap is likely based on spec analysis but you could not fully verify (e.g., dependency version might be incompatible, execution environment might differ).
+- **low**: Theoretical risk based on experience or patterns seen elsewhere, without specific evidence in this project.
+
 ### Batch Decision Rules
 
 When findings are presented to the human for decisions (escalated findings only -- auto-accepted findings are handled automatically):

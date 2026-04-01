@@ -255,6 +255,31 @@ The orchestrating agent (main agent or workstream conductor) owns the loop state
 
 Not every operation benefits from the framework's abstractions. These are sanctioned exceptions:
 
+### Trace-Aware Delegation
+
+Trace files (`.claude/traces/`) are pre-computed architectural summaries that the main agent MAY read directly. This is the only class of files exempt from the delegation-first constraint.
+
+**When to use traces:**
+
+- **Before first dispatch**: Read `traces/high-level.md` for module landscape, dependency graph, and export summaries. This informs routing and dispatch decisions without an Explore subagent.
+- **When dispatching subagents**: Include relevant trace file paths in the dispatch prompt. Traces answer "what exists in module X" without requiring the subagent to perform its own Explore dispatch.
+- **Path resolution**: Match task file paths against module `fileGlobs` in `traces/trace.config.json` to identify which `traces/low-level/<module-id>.json` files are relevant.
+
+**What traces provide:**
+
+- Module boundaries and file ownership (which files belong to which module)
+- Exported symbols with types, signatures, and line numbers
+- Cross-module dependency relationships (which modules import from which)
+- Freshness metadata (when the trace was last generated)
+
+**What traces do NOT replace:**
+
+- Source code reading (still requires Explore subagent)
+- Implementation details beyond structural metadata
+- Runtime behavior or state
+
+**Freshness**: Use `isTraceStale(moduleId, config)` from `.claude/scripts/lib/trace-utils.mjs` to check whether a trace is current. Stale traces are still useful for structural context but should not be trusted for exact line numbers or symbol existence without verification.
+
 ### File-Based Coordination
 
 For trivially simple inter-agent coordination, use sentinel files instead of dispatching subagents:

@@ -30,11 +30,18 @@ Traces are stored as JSON (canonical source of truth) with generated markdown vi
 ### Generate Traces
 
 ```bash
-# Generate all traces (high-level + low-level for all modules)
+# Generate traces incrementally (default: only regenerates stale modules)
 node .claude/scripts/trace-generate.mjs
+
+# Force full regeneration of all traces
+node .claude/scripts/trace-generate.mjs --full
 
 # Generate traces for a single module
 node .claude/scripts/trace-generate.mjs <module-id>
+
+# Control parallelism (default: auto, 0 = sequential)
+node .claude/scripts/trace-generate.mjs --parallel 4
+node .claude/scripts/trace-generate.mjs --parallel 0
 
 # Bootstrap: auto-detect modules and create initial config (first-run)
 node .claude/scripts/trace-generate.mjs --bootstrap

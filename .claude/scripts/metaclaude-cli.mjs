@@ -10,6 +10,7 @@
  *   verify [project]        - Verify installed artifacts match lock file
  *   add <name> [--path=p]   - Add a project to configuration
  *   remove <name>           - Remove a project from configuration
+ *   clean [project]         - Remove orphaned artifacts from target repos
  *
  * Global Options:
  *   --base-dir=<path>       - Override default base directory
@@ -330,7 +331,12 @@ async function cmdStatus(projectArg, options) {
       }
 
       // Show agent-assisted artifacts with distinct indicator
-      if (projectConfig.sync_overrides?.[artifactPath] === 'agent-assisted') {
+      const [statusCategory] = artifactPath.split('/');
+      const statusCategoryMeta = registry.artifacts[statusCategory];
+      const statusEffectivePolicy = artifact._sync_policy || statusCategoryMeta?._sync_policy;
+      const statusIsAgentAssisted = projectConfig.sync_overrides?.[artifactPath] === 'agent-assisted'
+        || statusEffectivePolicy === 'agent-assisted';
+      if (statusIsAgentAssisted) {
         const installed = lock.installed[artifactPath];
         const hasUpdate = installed ? installed.hash !== artifact.hash : true;
         if (hasUpdate) {
@@ -484,8 +490,10 @@ async function cmdSync(projectArg, options) {
         continue;
       }
 
-      // Check per-artifact sync override (e.g., agent-assisted)
-      if (projectConfig.sync_overrides?.[artifactPath] === 'agent-assisted') {
+      // Check for agent-assisted policy (per-project override OR registry-level)
+      const isAgentAssisted = projectConfig.sync_overrides?.[artifactPath] === 'agent-assisted'
+        || (effectivePolicy === 'agent-assisted' && existsSync(targetFile));
+      if (isAgentAssisted) {
         const srcContent = readFileSync(sourceFile, 'utf-8');
         const srcHash = computeHash(srcContent);
         const installed = lock.installed[artifactPath];
@@ -793,6 +801,61 @@ async function cmdRemove(projectName) {
   log(`Removed project: ${projectName}`, 'green');
 }
 
+// ============== CLEAN (ORPHAN REMOVAL) ==============
+
+async function cmdClean(projectArg, options) {
+  const config = loadProjectsConfig();
+  const registry = loadRegistry();
+  const orphans = registry.orphans || [];
+
+  if (orphans.length === 0) {
+    log('No orphans defined in registry.', 'dim');
+    return;
+  }
+
+  const projects = getProjectsToProcess(config, projectArg);
+
+  for (const projectName of projects) {
+    const projectConfig = config.projects[projectName];
+    const projectPath = resolveProjectPath(projectName, projectConfig, config.defaults, options);
+
+    if (!existsSync(projectPath)) {
+      log(`\nSkipping ${projectName}: directory not found at ${projectPath}`, 'yellow');
+      continue;
+    }
+
+    log(`\n${projectName}`, 'cyan');
+    log(`Target: ${projectPath}`, 'dim');
+
+    let removed = 0;
+    for (const orphanPath of orphans) {
+      const fullPath = join(projectPath, orphanPath);
+      if (existsSync(fullPath)) {
+        const { unlinkSync } = await import('node:fs');
+        unlinkSync(fullPath);
+        log(`  ✗ Removed: ${orphanPath}`, 'yellow');
+        removed++;
+
+        // Clean up empty parent directories
+        try {
+          const { rmdirSync, readdirSync } = await import('node:fs');
+          const parentDir = dirname(fullPath);
+          if (readdirSync(parentDir).length === 0) {
+            rmdirSync(parentDir);
+            log(`  ✗ Removed empty dir: ${dirname(orphanPath)}`, 'dim');
+          }
+        } catch { /* dir not empty, that's fine */ }
+      }
+    }
+
+    if (removed === 0) {
+      log('  No orphans found.', 'dim');
+    } else {
+      log(`  Removed ${removed} orphan(s).`, 'green');
+    }
+  }
+}
+
 // ============== MAIN ==============
 
 async function main() {
@@ -834,6 +897,9 @@ async function main() {
     case 'rm':
       await cmdRemove(projectArg);
       break;
+    case 'clean':
+      await cmdClean(projectArg, options);
+      break;
     case 'help':
     case '--help':
     case '-h':
@@ -848,6 +914,7 @@ Commands:
   verify [project]          Verify installed artifacts match lock
   add <name> [options]      Add a project to configuration
   remove <name>             Remove a project from configuration
+  clean [project]           Remove orphaned artifacts from target repos
 
 Options:
   --base-dir=<path>         Override default base directory for path resolution
