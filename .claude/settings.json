@@ -1,5 +1,73 @@
 {
   "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "_source": "metaclaude",
+            "_id": "trace-read-enforcement",
+            "type": "command",
+            "command": "cd \"$CLAUDE_PROJECT_DIR\" && node .claude/scripts/trace-read-enforcement.mjs"
+          }
+        ]
+      },
+      {
+        "matcher": "Agent",
+        "hooks": [
+          {
+            "_source": "metaclaude",
+            "_id": "workflow-gate-enforcement",
+            "type": "command",
+            "command": "cd \"$CLAUDE_PROJECT_DIR\" && node .claude/scripts/workflow-gate-enforcement.mjs"
+          }
+        ]
+      },
+      {
+        "matcher": "Write",
+        "hooks": [
+          {
+            "_source": "metaclaude",
+            "_id": "workflow-file-protection",
+            "type": "command",
+            "command": "cd \"$CLAUDE_PROJECT_DIR\" && node .claude/scripts/workflow-file-protection.mjs"
+          }
+        ]
+      },
+      {
+        "matcher": "Agent",
+        "hooks": [
+          {
+            "_source": "metaclaude",
+            "_id": "e2e-blackbox-enforcement-agent",
+            "type": "command",
+            "command": "cd \"$CLAUDE_PROJECT_DIR\" && node .claude/scripts/e2e-blackbox-enforcement.mjs"
+          }
+        ]
+      },
+      {
+        "matcher": "Read",
+        "hooks": [
+          {
+            "_source": "metaclaude",
+            "_id": "e2e-blackbox-enforcement-read",
+            "type": "command",
+            "command": "cd \"$CLAUDE_PROJECT_DIR\" && node .claude/scripts/e2e-blackbox-enforcement.mjs"
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "_source": "metaclaude",
+            "_id": "e2e-blackbox-enforcement-write",
+            "type": "command",
+            "command": "cd \"$CLAUDE_PROJECT_DIR\" && node .claude/scripts/e2e-blackbox-enforcement.mjs"
+          }
+        ]
+      }
+    ],
     "PostToolUse": [
       {
         "matcher": "Bash",
@@ -211,74 +279,6 @@
             "_id": "journal-promotion-check",
             "type": "command",
             "command": "cd \"$CLAUDE_PROJECT_DIR\" && node .claude/scripts/journal-promotion-check.mjs"
-          }
-        ]
-      }
-    ],
-    "PreToolUse": [
-      {
-        "matcher": "Edit|Write",
-        "hooks": [
-          {
-            "_source": "metaclaude",
-            "_id": "trace-read-enforcement",
-            "type": "command",
-            "command": "cd \"$CLAUDE_PROJECT_DIR\" && node .claude/scripts/trace-read-enforcement.mjs"
-          }
-        ]
-      },
-      {
-        "matcher": "Agent",
-        "hooks": [
-          {
-            "_source": "metaclaude",
-            "_id": "workflow-gate-enforcement",
-            "type": "command",
-            "command": "cd \"$CLAUDE_PROJECT_DIR\" && node .claude/scripts/workflow-gate-enforcement.mjs"
-          }
-        ]
-      },
-      {
-        "matcher": "Write",
-        "hooks": [
-          {
-            "_source": "metaclaude",
-            "_id": "workflow-file-protection",
-            "type": "command",
-            "command": "cd \"$CLAUDE_PROJECT_DIR\" && node .claude/scripts/workflow-file-protection.mjs"
-          }
-        ]
-      },
-      {
-        "matcher": "Agent",
-        "hooks": [
-          {
-            "_source": "metaclaude",
-            "_id": "e2e-blackbox-enforcement-agent",
-            "type": "command",
-            "command": "cd \"$CLAUDE_PROJECT_DIR\" && node .claude/scripts/e2e-blackbox-enforcement.mjs"
-          }
-        ]
-      },
-      {
-        "matcher": "Read",
-        "hooks": [
-          {
-            "_source": "metaclaude",
-            "_id": "e2e-blackbox-enforcement-read",
-            "type": "command",
-            "command": "cd \"$CLAUDE_PROJECT_DIR\" && node .claude/scripts/e2e-blackbox-enforcement.mjs"
-          }
-        ]
-      },
-      {
-        "matcher": "Edit|Write",
-        "hooks": [
-          {
-            "_source": "metaclaude",
-            "_id": "e2e-blackbox-enforcement-write",
-            "type": "command",
-            "command": "cd \"$CLAUDE_PROJECT_DIR\" && node .claude/scripts/e2e-blackbox-enforcement.mjs"
           }
         ]
       }

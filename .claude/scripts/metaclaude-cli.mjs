@@ -174,15 +174,14 @@ function mergeSettings(sourceContent, targetPath) {
     return { merged: JSON.stringify(source, null, 2) + '\n', report };
   }
 
-  // Merge hooks section
-  if (!target.hooks) {
-    target.hooks = {};
-  }
+  // Merge hooks section — build fresh object to enforce source key order
+  const existingTargetHooks = target.hooks || {};
+  const mergedHooks = {};
 
   // Process each hook type (PostToolUse, Stop, etc.)
   for (const hookType of Object.keys(source.hooks || {})) {
     const sourceHookGroups = source.hooks[hookType] || [];
-    const targetHookGroups = target.hooks[hookType] || [];
+    const targetHookGroups = existingTargetHooks[hookType] || [];
 
     // Build new hook groups array
     const mergedHookGroups = [];
@@ -244,8 +243,17 @@ function mergeSettings(sourceContent, targetPath) {
       }
     }
 
-    target.hooks[hookType] = mergedHookGroups;
+    mergedHooks[hookType] = mergedHookGroups;
   }
+
+  // Preserve any target-only hook types (not in source) at the end
+  for (const hookType of Object.keys(existingTargetHooks)) {
+    if (!mergedHooks[hookType]) {
+      mergedHooks[hookType] = existingTargetHooks[hookType];
+    }
+  }
+
+  target.hooks = mergedHooks;
 
   return { merged: JSON.stringify(target, null, 2) + '\n', report };
 }

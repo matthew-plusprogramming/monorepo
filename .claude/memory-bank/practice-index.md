@@ -1,5 +1,5 @@
 ---
-last_reviewed: 2026-03-12
+last_reviewed: 2026-03-18
 ---
 
 # Practice Index
@@ -17,5 +17,6 @@ Canonical locations for all numbered practices in the metaclaude-assistant syste
 | 1.10     | Assumption Tracking           | `CLAUDE.md`                                            | 313  | Scan TODO(assumption) markers for conflicts across parallel agents       |
 | 2.4      | Independent Verification      | `CLAUDE.md`                                            | 309  | Test-writer must not see implementation; tests verify contract only      |
 | 2.5      | Contract Stratification       | `CLAUDE.md`                                            | 349  | Four contract layers: type, symbol, wire protocol, behavioral            |
-| 4.2      | Progress Heartbeat Discipline | `.claude/memory-bank/tech.context.md`                  | 196  | Implementers must log progress updates; heartbeat monitors staleness     |
+| 4.2      | Progress Heartbeat Discipline | `.claude/memory-bank/tech.context.md`                  | 261  | Implementers must log progress updates; heartbeat monitors staleness     |
+| 4.3      | Workflow Enforcement          | `.claude/memory-bank/tech.context.md`                  | 134  | Two-layer enforcement: cooperative (DAG transitions) + coercive (hooks)  |
 | 4.5      | Integration Verification Gate | `CLAUDE.md`                                            | 331  | Cross-boundary wiring check after parallel implementation                |
