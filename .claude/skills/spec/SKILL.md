@@ -259,6 +259,31 @@ Add to Decision & Work Log:
 - 2026-01-14: Decision - Use toast for confirmation (consistent with existing patterns)
 ```
 
+### Step 8b: Set E2E Testing Opt-Out (if applicable)
+
+If the spec covers work that does not benefit from end-to-end testing, add opt-out fields to the YAML frontmatter:
+
+```yaml
+e2e_skip: true
+e2e_skip_rationale: pure-refactor
+```
+
+**Valid `e2e_skip_rationale` values** (strict enum):
+
+| Value           | Use When                                    |
+| --------------- | ------------------------------------------- |
+| `pure-refactor` | No new behavior to test end-to-end          |
+| `test-infra`    | Changes to test infrastructure itself       |
+| `type-only`     | Type-level changes with no runtime behavior |
+| `docs-only`     | Documentation-only changes                  |
+
+**Rules**:
+
+- `e2e_skip` must be a boolean (`true` or `false`), not a string
+- When `e2e_skip: true`, `e2e_skip_rationale` is required
+- When `e2e_skip` is absent or `false`, e2e-test-writer is dispatched by default
+- If the reason for skipping does not fit one of the four categories, use a gate override instead
+
 ### Step 9: Write spec.md
 
 Save to spec group:

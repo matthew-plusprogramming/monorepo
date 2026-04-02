@@ -800,3 +800,12 @@ Before marking orchestrator task complete, verify:
 - Session state reflects all merges
 - MasterSpec Decision & Work Log updated with completion
 - All superseded specs properly deprecated and archived
+
+## Acceptable Assumption Domains
+
+Per the [Self-Answer Protocol](../memory-bank/self-answer-protocol.md), reasoning-tier (tier 4) self-resolution is permitted only within these domains:
+
+- **Worktree allocation**: Mapping workstreams to worktrees when not explicitly specified
+- **Merge ordering**: Sequencing worktree merges when dependency graph allows flexibility
+
+Escalate all questions about workstream scope, contract interfaces, or conflict resolution strategy.

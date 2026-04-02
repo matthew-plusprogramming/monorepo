@@ -368,3 +368,12 @@ After enforcement:
 
 - Update `manifest.json`: `atomic_specs.enforcement_status: "warnings"`
 - User decides: proceed or refine
+
+## Acceptable Assumption Domains
+
+Per the [Self-Answer Protocol](../memory-bank/self-answer-protocol.md), reasoning-tier (tier 4) self-resolution is permitted only within these domains:
+
+- **Granularity assessment**: Judging whether an atomic spec is too coarse or too fine
+- **Coupling classification**: Identifying implicit dependencies between atomic specs
+
+Escalate all questions about spec content, requirements interpretation, or implementation approach.

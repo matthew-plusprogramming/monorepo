@@ -24,7 +24,9 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-// Canonical convergence field names (11 fields including convergence gates and completion verification)
+// 11 fields: 9 gate-result fields (same as convergence-gate-reminder.mjs CANONICAL_FIELDS)
+// plus 2 convergence process fields (investigation_converged, challenger_converged) that
+// track multi-pass loop state.
 const CANONICAL_FIELDS = new Set([
   'spec_complete',
   'investigation_converged',

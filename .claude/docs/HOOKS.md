@@ -173,8 +173,8 @@ The wrapper:
 | `template-validate`          | `.claude/templates/*`   | `template-validate.mjs`           | Validate template structure and placeholders           |
 | `agent-frontmatter-validate` | `.claude/agents/*.md`   | `validate-agent-frontmatter.mjs`  | Agent frontmatter schema validation                    |
 | `skill-frontmatter-validate` | `*SKILL.md`             | `validate-skill-frontmatter.mjs`  | Skill frontmatter schema validation                    |
-| `spec-schema-validate`       | `.claude/specs/**/*.md` | `spec-schema-validate.mjs`        | JSON schema validation for specs                       |
-| `spec-validate`              | `.claude/specs/**/*.md` | `spec-validate.mjs`               | Spec markdown structure validation                     |
+| `spec-schema-validate`       | `.claude/specs/**/*.md` | `spec-schema-validate.mjs`        | JSON schema validation for specs (incl. e2e_skip)      |
+| `spec-validate`              | `.claude/specs/**/*.md` | `spec-validate.mjs`               | Spec markdown structure and e2e opt-out validation     |
 | `progress-heartbeat-check`   | `.claude/specs/**`      | `progress-heartbeat-check.mjs`    | Enforce progress logging (warn 15min, block 3x)        |
 | `registry-artifact-validate` | `*artifacts.json`       | `registry-artifact-validate.mjs`  | Validate artifact registry schema and semantics        |
 | `convergence-field-validate` | `*manifest.json`        | `validate-convergence-fields.mjs` | Validate convergence field names against canonical set |
@@ -304,25 +304,29 @@ All validation scripts are located in `.claude/scripts/`.
 
 ### spec-schema-validate.mjs
 
-**Purpose**: Validate spec files against their JSON schema definitions.
+**Purpose**: Validate spec files against their JSON schema definitions, including E2E opt-out fields.
 
 **Behavior**:
 
 1. Reads the spec file and extracts frontmatter
 2. Determines the spec type from the frontmatter
 3. Validates frontmatter against the expected schema for that spec type
-4. Reports schema violations (missing required fields, invalid values)
+4. Validates `e2e_skip` as strict boolean type (rejects string `"true"`, integer `1`, etc.)
+5. Validates `e2e_skip_rationale` as enum: `pure-refactor`, `test-infra`, `type-only`, `docs-only`
+6. Reports schema violations (missing required fields, invalid values)
 
 ### spec-validate.mjs
 
-**Purpose**: Validate spec markdown structure and required sections.
+**Purpose**: Validate spec markdown structure, required sections, and E2E opt-out field consistency.
 
 **Behavior**:
 
 1. Parses the spec file as markdown
 2. Checks for required sections based on spec type
 3. Validates section formatting and content structure
-4. Reports structural issues (missing sections, malformed content)
+4. When `e2e_skip: true`: validates that `e2e_skip_rationale` is present and contains a valid enum value (imports `VALID_E2E_SKIP_RATIONALES` from `workflow-dag.mjs`)
+5. When `e2e_skip_rationale` is present but `e2e_skip` is false or absent: emits a warning (not rejection)
+6. Reports structural issues (missing sections, malformed content)
 
 ### progress-heartbeat-check.mjs
 
@@ -549,7 +553,7 @@ All validation scripts are located in `.claude/scripts/`.
 
 **Hook Type**: Stop (runs on session completion)
 
-**Mandatory Dispatches**: `code-reviewer`, `security-reviewer`, `completion-verifier`, `documenter` (any status satisfies -- presence check only).
+**Mandatory Dispatches**: `code-reviewer`, `security-reviewer`, `completion-verifier`, `documenter`, `e2e-test-writer` (any status satisfies -- presence check only). The `e2e-test-writer` dispatch is exempt when the spec opts out via `e2e_skip: true` with a valid rationale.
 
 **Behavior**:
 
@@ -558,14 +562,17 @@ All validation scripts are located in `.claude/scripts/`.
 3. Checks `stop-hook-active` sentinel -- exits 0 if present (re-entry prevention)
 4. If exempt workflow: exits 0
 5. Checks phase-aware mandatory dispatch records in `subagent_tasks`
-6. Checks manifest status obligations for the current phase (see [Status Obligation Enforcement](#status-obligation-enforcement) below)
-7. If all dispatch and obligation checks pass: exits 0
-8. If dispatch violations: checks `gate-override.json` for stop-gate override
-9. If obligation violations: checks for phase-scoped override (`status_obligations:<phase>`)
-10. Builds combined block message distinguishing "Missing mandatory dispatches" from "Manifest status inconsistency"
-11. Creates `stop-hook-active` sentinel, then outputs `{"decision": "block", "reason": "..."}` via stdout
+6. If `e2e-test-writer` is missing from dispatch records, checks spec frontmatter for opt-out (see [E2E Opt-Out Enforcement](#e2e-opt-out-enforcement) below)
+7. If `currentPhase === 'complete'`: checks manifest status obligations (see [Status Obligation Enforcement](#status-obligation-enforcement) below). For all other phases (active or unrecognized), obligation validation is skipped entirely.
+8. If all dispatch and obligation checks pass: exits 0
+9. If dispatch violations: checks `gate-override.json` for stop-gate override
+10. If obligation violations: checks for phase-scoped override (`status_obligations:<phase>`)
+11. Builds combined block message distinguishing "Missing mandatory dispatches" from "Manifest status inconsistency"
+12. Creates `stop-hook-active` sentinel, then outputs `{"decision": "block", "reason": "..."}` via stdout
 
-**Obligation Enforcement Level**: The stop hook reads `enforcement_level` from `session.phase_checkpoint`. At `warn-only`, obligation violations are logged to stderr but do not block. At `graduated`, obligation violations contribute to the block decision. At `off`, obligation validation is skipped.
+**Active-Phase Guard**: Obligation validation in the stop hook only runs when `currentPhase === 'complete'`. During active phases (`implementing`, `reviewing`, `documenting`, etc.), the entire obligation validation block is skipped -- including the `specGroupId` lookup, SEC-001 format validation, and `validateObligations()` call. This prevents false blocks during normal workflow execution. Phase transition obligation enforcement is handled by `session-checkpoint.mjs` instead. Unrecognized phase strings are treated as non-complete (fail-open).
+
+**Obligation Enforcement Level**: When obligation validation runs (i.e., `currentPhase === 'complete'`), the stop hook reads `enforcement_level` from `session.phase_checkpoint`. At `warn-only`, obligation violations are logged to stderr but do not block. At `graduated`, obligation violations contribute to the block decision. At `off`, obligation validation is skipped.
 
 **Blocking Mechanism**: stdout JSON `{"decision": "block", "reason": "..."}` -- NOT stderr + exit 2.
 
@@ -574,6 +581,57 @@ All validation scripts are located in `.claude/scripts/`.
 **Exit Codes**:
 
 - `0`: Always (blocking is via stdout JSON)
+
+#### E2E Opt-Out Enforcement
+
+The stop hook enforces `e2e-test-writer` as a mandatory dispatch for all spec-based workflows (oneoff-spec, orchestrator), with a spec-level opt-out mechanism.
+
+**Data-Flow Path** (oneoff-spec):
+
+```
+session.json -> active_work.spec_group_id
+  -> .claude/specs/groups/<sg-id>/spec.md (convention-based path)
+  -> parse YAML frontmatter
+  -> read e2e_skip (boolean) and e2e_skip_rationale (enum)
+```
+
+**Data-Flow Path** (orchestrator):
+
+```
+session.json -> active_work.spec_group_id
+  -> glob .claude/specs/groups/<sg-id>/atomic/*.md
+  -> parse each spec's YAML frontmatter individually
+  -> per-spec enforcement (mixed opt-out states supported)
+```
+
+**Opt-Out Conditions** (all must be true):
+
+1. `e2e_skip` is strict boolean `true` (`typeof e2e_skip === 'boolean'`)
+2. `e2e_skip_rationale` is one of: `pure-refactor`, `test-infra`, `type-only`, `docs-only`
+3. Rationale validation uses the shared `VALID_E2E_SKIP_RATIONALES` constant from `workflow-dag.mjs`
+
+**Defense in Depth**: The stop hook independently re-validates the rationale enum. It does not trust upstream validation from spec validation hooks.
+
+**Per-Spec Orchestrator Enforcement**: In orchestrator workflows with multiple atomic specs, each spec is checked individually. Non-opted-out specs require a dispatch record. Opted-out specs require a structured opt-out record (`{ type: "e2e_opt_out", spec_id, e2e_skip: true, rationale, timestamp }`).
+
+**Error Behavior**:
+
+| Scenario                                 | Behavior                            |
+| ---------------------------------------- | ----------------------------------- |
+| `session.json` missing or malformed      | Fail-open (exit 0)                  |
+| Spec file not found or unreadable        | Fail-open (structural error)        |
+| Spec exists, `e2e_skip` missing          | Fail-closed (e2e dispatch required) |
+| Spec exists, `e2e_skip` non-boolean type | Fail-closed (e2e dispatch required) |
+| `e2e_skip: true` with invalid rationale  | Block session (invalid opt-out)     |
+| Orchestrator glob returns empty          | Fail-open (structural error)        |
+
+**Escape Hatches**: The `gate-override.json` override and the `gate-enforcement-disabled` kill switch bypass e2e enforcement, consistent with all other mandatory dispatch gates.
+
+**Shared Constants** (exported from `workflow-dag.mjs`):
+
+- `STOP_MANDATORY_DISPATCHES`: 5-element array including `e2e-test-writer`
+- `STOP_PHASE_REQUIREMENTS`: `e2e-test-writer` appears in all four phase arrays (`reviewing`, `completion_verifying`, `documenting`, `complete`)
+- `VALID_E2E_SKIP_RATIONALES`: `['pure-refactor', 'test-infra', 'type-only', 'docs-only']`
 
 ### journal-promotion-check.mjs
 
@@ -656,13 +714,13 @@ All validation scripts are located in `.claude/scripts/`.
 
 ## Status Obligation Enforcement
 
-Status obligation enforcement validates that manifest status fields have the expected values when leaving a workflow phase. It catches manifest drift -- where the manifest stops reflecting actual work completion -- at two enforcement points: phase transitions (`session-checkpoint.mjs`) and session completion (`workflow-stop-enforcement.mjs`).
+Status obligation enforcement validates that manifest status fields have the expected values when leaving a workflow phase. It catches manifest drift -- where the manifest stops reflecting actual work completion -- at two enforcement points: phase transitions (`session-checkpoint.mjs`) and session completion (`workflow-stop-enforcement.mjs`, `complete` phase only).
 
 ### How It Works
 
 A static `PHASE_OBLIGATIONS` mapping (exported from `workflow-dag.mjs`) defines which manifest fields must have which values when exiting each phase. The `validateObligations(phase, manifest)` function checks these fields using strict equality (`===`) and returns any violations.
 
-Both `session-checkpoint.mjs` and `workflow-stop-enforcement.mjs` import and call `validateObligations` at their respective enforcement points.
+`session-checkpoint.mjs` calls `validateObligations` at phase transitions (the primary enforcement point). `workflow-stop-enforcement.mjs` calls `validateObligations` only when `currentPhase === 'complete'` -- during active phases, obligation validation is skipped entirely to avoid false blocks (see [Active-Phase Guard](#workflow-stop-enforcementmjs) above).
 
 ### Phase-to-Obligation Mapping
 
@@ -687,9 +745,9 @@ Both `session-checkpoint.mjs` and `workflow-stop-enforcement.mjs` import and cal
 
 ### Enforcement Points
 
-**Phase transitions** (`session-checkpoint.mjs transition-phase`): Checks obligations for the outgoing phase (the phase being left) after DAG predecessor validation and before the phase is updated. At `graduated` enforcement, violations block immediately with no grace period. At `warn-only`, violations emit warnings but allow the transition.
+**Phase transitions** (`session-checkpoint.mjs transition-phase`): Checks obligations for the outgoing phase (the phase being left) after DAG predecessor validation and before the phase is updated. At `graduated` enforcement, violations block immediately with no grace period. At `warn-only`, violations emit warnings but allow the transition. This is the primary obligation enforcement point.
 
-**Session completion** (`workflow-stop-enforcement.mjs`): Checks obligations for the current phase at session end. Obligations for phases previously skipped via `override-skip` are excluded. The block message clearly separates "Missing mandatory dispatches" from "Manifest status inconsistency" with specific field names and expected values.
+**Session completion** (`workflow-stop-enforcement.mjs`): Checks obligations only when `currentPhase === 'complete'`. During active phases (`implementing`, `reviewing`, `documenting`, etc.), obligation validation is skipped entirely to prevent false blocks -- `session-checkpoint.mjs` handles enforcement at phase transitions instead. When obligation validation does run, phases previously skipped via `override-skip` are excluded. The block message clearly separates "Missing mandatory dispatches" from "Manifest status inconsistency" with specific field names and expected values.
 
 ### Enforcement Levels
 
@@ -724,6 +782,8 @@ The existing kill switch (`.claude/coordination/gate-enforcement-disabled`) disa
 - **Malformed manifest JSON**: Obligation check skipped with warning
 - **Missing spec_group_id**: Obligation check skipped silently
 - **Missing manifest fields**: Treated as `null` (semantic violation, not structural error)
+- **Non-complete active phase**: Obligation check skipped silently (stop hook only)
+- **Unrecognized phase string**: Treated as non-complete, obligation check skipped (stop hook only)
 
 ### Audit Trail
 

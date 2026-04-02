@@ -5,6 +5,15 @@ spec_group: sg-<parent-group>
 requirements_refs: [REQ-001]
 status: pending
 
+# E2E Testing Opt-Out (optional)
+# e2e_skip: false                           # Set to true to skip e2e-test-writer dispatch
+# e2e_skip_rationale:                       # Required when e2e_skip is true
+#   Valid values: pure-refactor, test-infra, type-only, docs-only
+#   - pure-refactor: No new behavior to test end-to-end
+#   - test-infra: Changes to test infrastructure itself
+#   - type-only: Type-level changes with no runtime behavior
+#   - docs-only: Documentation-only changes
+
 # Supersession Metadata (optional - set when this spec is superseded)
 # status: superseded                        # Set to 'superseded' when replaced by newer spec
 # superseded_by: <spec-group-id>            # ID of the spec group that supersedes this one

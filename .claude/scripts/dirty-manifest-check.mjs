@@ -11,7 +11,7 @@
  * 2. Checks if the command contains 'git commit'
  * 3. If so, runs git status --porcelain to find dirty manifest files
  * 4. Scopes warnings to manifests whose spec group had files in the commit
- *    or whose work_state is IMPLEMENTING or VERIFYING
+ *    or whose work_state is IMPLEMENTING, VERIFYING, or READY_TO_MERGE
  * 5. If relevant dirty manifests found, prints warning to stderr and exits
  *    with code 2
  *
@@ -32,7 +32,7 @@ import { readFileSync } from 'node:fs';
  * All other states (DRAFTING, APPROVED, REVIEWING, MERGED, DONE, etc.)
  * are ignored unless the commit touches their spec group directory.
  */
-const ACTIVE_WORK_STATES = new Set(['IMPLEMENTING', 'VERIFYING']);
+const ACTIVE_WORK_STATES = new Set(['IMPLEMENTING', 'VERIFYING', 'READY_TO_MERGE']);
 
 /**
  * Read all stdin as a string.
@@ -152,7 +152,7 @@ function readManifestWorkState(manifestPath) {
  *
  * A manifest is relevant if:
  *   1. Any committed file lives under the same spec group directory, OR
- *   2. The manifest's work_state is actively implementing (IMPLEMENTING or VERIFYING)
+ *   2. The manifest's work_state is actively implementing (IMPLEMENTING, VERIFYING, or READY_TO_MERGE)
  */
 function isRelevantManifest(manifest, committedFiles) {
   const specGroupId = extractSpecGroupId(manifest.path);

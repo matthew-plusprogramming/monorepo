@@ -130,7 +130,7 @@ describe('AC-1.1: Module exports all expected constants and functions', () => {
     expect(EXEMPT_WORKFLOWS).toContain('journal-only');
   });
 
-  it('should export VALID_SUBAGENT_TYPES with 20 entries', async () => {
+  it('should export VALID_SUBAGENT_TYPES with 21 entries', async () => {
     // Arrange
     const mod = await loadModule();
     expect(mod).not.toBeNull();

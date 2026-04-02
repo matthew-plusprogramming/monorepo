@@ -480,3 +480,12 @@ If failures:
 - Implementer fixes UI issues
 - Browser tester re-tests
 - Must pass before merge
+
+## Acceptable Assumption Domains
+
+Per the [Self-Answer Protocol](../memory-bank/self-answer-protocol.md), reasoning-tier (tier 4) self-resolution is permitted only within these domains:
+
+- **Test timing**: Wait durations for animations, network requests, page transitions
+- **Selector strategy**: Choosing between data-testid, aria-label, or CSS selectors
+
+Escalate all questions about expected UI behavior, visual appearance, or user interaction flows.

@@ -332,3 +332,12 @@ After atomization:
 2. `/enforce` validates atomicity criteria
 3. If enforcement fails, `/atomize --refine` iterates
 4. Once passing, spec group moves to implementation
+
+## Acceptable Assumption Domains
+
+Per the [Self-Answer Protocol](../memory-bank/self-answer-protocol.md), reasoning-tier (tier 4) self-resolution is permitted only within these domains:
+
+- **Decomposition boundaries**: Where to split specs into atomic units
+- **Dependency ordering**: Sequencing atomic specs when dependencies are implicit
+
+Escalate all questions about requirements scope, acceptance criteria meaning, or behavioral decisions.

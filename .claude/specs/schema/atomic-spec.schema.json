@@ -111,6 +111,16 @@
           "ac_refs": { "type": "array", "items": { "type": "string" } }
         }
       }
+    },
+    "e2e_skip": {
+      "type": "boolean",
+      "description": "Opt out of mandatory e2e-test-writer dispatch for this spec",
+      "default": false
+    },
+    "e2e_skip_rationale": {
+      "type": "string",
+      "enum": ["pure-refactor", "test-infra", "type-only", "docs-only"],
+      "description": "Required when e2e_skip is true. Reason for opting out of E2E tests."
     }
   }
 }

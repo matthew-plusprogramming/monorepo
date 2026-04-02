@@ -451,3 +451,12 @@ interface Finding {
 - Block commit for advisory gate findings [traces: REQ-013]
 - Make fix decisions -- report findings for the orchestrator to dispatch fix agents
 - Skip blocking gates when applicability evaluation fails (fail-closed) [traces: REQ-021]
+
+## Acceptable Assumption Domains
+
+Per the [Self-Answer Protocol](../memory-bank/self-answer-protocol.md), reasoning-tier (tier 4) self-resolution is permitted only within these domains:
+
+- **Gate applicability**: Whether a verification gate applies to the current project type
+- **Checklist completeness**: Determining if an omission is intentional vs accidental
+
+Escalate all questions about what constitutes "complete", behavioral correctness, or scope decisions.

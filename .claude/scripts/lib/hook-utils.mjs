@@ -53,10 +53,18 @@ export async function readStdin() {
  * Find the .claude directory by walking up from script location.
  * Uses fileURLToPath for correct URL-to-path conversion (security fix L2).
  *
+ * Respects CLAUDE_PROJECT_DIR environment variable when set, enabling
+ * test isolation via temp directories (sg-e2e-default-dispatch).
+ *
  * @param {string} importMetaUrl - The import.meta.url of the calling module
  * @returns {string} Absolute path to .claude directory
  */
 export function findClaudeDir(importMetaUrl) {
+  // Check CLAUDE_PROJECT_DIR first (test isolation, consistent with other scripts)
+  if (process.env.CLAUDE_PROJECT_DIR) {
+    return join(process.env.CLAUDE_PROJECT_DIR, '.claude');
+  }
+
   const callerPath = fileURLToPath(importMetaUrl);
   let currentDir = dirname(resolve(callerPath));
   const root = '/';

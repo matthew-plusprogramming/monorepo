@@ -29,6 +29,7 @@
 
 import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync } from 'node:fs';
 import { dirname, join, resolve, basename } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { safeParseYaml, readAndParseYaml, resolveProjectRoot } from './lib/yaml-utils.mjs';
 
 // =============================================================================
@@ -601,4 +602,24 @@ function main() {
   }
 }
 
-main();
+// =============================================================================
+// Exports (for unit testing)
+// =============================================================================
+
+export {
+  validateContract,
+  extractContractsSection,
+  validateSecurityFields,
+  validateContextContradictions,
+  isBlockerMode,
+  validateSpecFile,
+};
+
+// =============================================================================
+// CLI entry point (only when run as a script, not when imported)
+// =============================================================================
+
+const isDirectRun = process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1]);
+if (isDirectRun) {
+  main();
+}

@@ -579,10 +579,14 @@ For architectural decisions, use the decision-record template:
 After routing:
 
 - **oneoff-vibe**: Proceed directly to implementation (exempt from completion verification gates)
-- **oneoff-spec**: Use `/prd` to gather requirements → `/spec` to create spec group → `/investigate` (MANDATORY, mode: single-spec) → User approval → `/challenge` (MANDATORY, stage: pre-implementation, via `dispatch-subagent --stage pre-implementation`) → `/implement` + `/test` → `/challenge` (MANDATORY, stage: pre-test, via `dispatch-subagent --stage pre-test`) → Integration Verify → `/unify` → `/challenge` (MANDATORY, stage: pre-review, via `dispatch-subagent --stage pre-review`) → `/code-review` → `/security` → completion verification (loop) → `/docs` → (if PRD exists) `/prd amend` to sync discoveries
+- **oneoff-spec**: Use `/prd` to gather requirements → `/spec` to create spec group → `/investigate` (MANDATORY, mode: single-spec) → User approval → `/challenge` (MANDATORY, stage: pre-implementation, via `dispatch-subagent --stage pre-implementation`) → `/implement` + `/test` + `/e2e-test` (default, opt-out via `e2e_skip: true` in spec frontmatter) → `/challenge` (MANDATORY, stage: pre-test, via `dispatch-subagent --stage pre-test`) → Integration Verify → `/unify` → `/challenge` (MANDATORY, stage: pre-review, via `dispatch-subagent --stage pre-review`) → `/code-review` → `/security` → completion verification (loop) → `/docs` → (if PRD exists) `/prd amend` to sync discoveries
 - **orchestrator**: Use `/prd` to create PRD with gather-criticize loop → `/spec` to create MasterSpec with workstream spec groups → For each workstream: `/atomize` + `/enforce` → **MANDATORY: `/investigate` to surface cross-workstream inconsistencies** → Resolve decisions → User approval → `/challenge` (MANDATORY, stage: pre-orchestration, via `dispatch-subagent --stage pre-orchestration`) → Facilitator orchestrates parallel execution → `/challenge` (MANDATORY, stage: pre-test, via `dispatch-subagent --stage pre-test`) → Integration Verify → `/unify` → `/challenge` (MANDATORY, stage: pre-review, via `dispatch-subagent --stage pre-review`) → Code Review → Security → completion verification (loop) → `/docs` → `/prd amend` to sync discoveries
 - **refactor**: Use `/refactor` skill → Define scope and patterns → Run tests (baseline) → Execute refactoring → Run tests (verification) → `/code-review` → `/security` (if applicable)
 - **journal-only**: Create appropriate journal entry → For decisions: use decision-record template at `.claude/templates/decision-record.template.md` → For investigations: document findings, root cause, resolution → For hotfixes: document fix, root cause, prevention measures → Store in `.claude/journal/entries/` directory
+
+### Default E2E Dispatch
+
+The `e2e-test-writer` subagent is dispatched by default for all spec-based workflows (oneoff-spec and orchestrator). Specs opt out by setting `e2e_skip: true` with a valid `e2e_skip_rationale` in frontmatter. The stop hook enforces this: sessions cannot complete without an `e2e-test-writer` dispatch unless the spec has a valid opt-out.
 
 ### Investigation Checkpoint
 
@@ -626,25 +630,7 @@ Investigation is MANDATORY before implementation for both orchestrator and oneof
     - tests: test-writer
 - next_action: Use `/prd` to clarify loading states and error handling
 
-### Example 3: Standard Feature (oneoff-spec)
-
-**Request**: "Add a logout button to the user dashboard"
-
-**Routing**:
-
-- workflow: oneoff-spec
-- rationale: Requires UI component, event handler, API call, state management. Need to clarify placement, behavior on logout, error handling.
-- estimated_scope: medium
-- estimated_files: 4 (component, handler, API client, tests)
-- delegation:
-  - parallel_subtasks:
-    - implementation: implementer
-    - tests: test-writer
-  - sequential_dependencies:
-    - spec approval must complete before implementation
-- next_action: Use `/prd` to gather UI/UX requirements
-
-### Example 4: Large Task (Full Orchestration)
+### Example 3: Large Task (Full Orchestration)
 
 **Request**: "Implement real-time notifications across the application"
 
@@ -669,7 +655,7 @@ Investigation is MANDATORY before implementation for both orchestrator and oneof
   - investigation_required: true (MANDATORY for orchestrator - surface cross-workstream conflicts before implementation)
 - next_action: Use `/prd` to create PRD with gather-criticize loop, dispatch Explore subagent for WebSocket research
 
-### Example 4b: Orchestrator with Investigation Findings
+### Example 4: Orchestrator with Investigation Findings
 
 **Request**: "Build deployment pipeline with build, deploy, and monitoring workstreams"
 
@@ -762,23 +748,7 @@ User must resolve decisions before implementation proceeds.
     - tests must pass after refactoring (verification)
 - next_action: Use `/refactor` skill to define scope and execute
 
-### Example 8: Tech Debt Reduction (refactor workflow)
-
-**Request**: "Clean up the utils folder - too much duplicated code"
-
-**Routing**:
-
-- workflow: refactor
-- rationale: Tech debt reduction request focused on code consolidation. "Clean up" and "duplicated code" are refactor triggers. No feature changes.
-- estimated_scope: small-medium
-- estimated_files: 4-8 (multiple utils files to consolidate)
-- delegation:
-  - exploration_needed: true (identify duplication patterns)
-  - parallel_subtasks:
-    - duplication analysis: Explore subagent
-- next_action: Use `/refactor` skill to identify duplications and consolidate
-
-### Example 9: Refactor with Feature (routes to oneoff-spec, NOT refactor)
+### Example 8: Refactor with Feature (routes to oneoff-spec, NOT refactor)
 
 **Request**: "Refactor the payment service and add support for crypto payments"
 
@@ -796,7 +766,7 @@ User must resolve decisions before implementation proceeds.
 
 **Note**: Mixed requests (refactor + feature) always route to oneoff-spec because behavior changes need formal specification.
 
-### Example 10: Investigation Complete (journal-only)
+### Example 9: Investigation Complete (journal-only)
 
 **Request**: "I just spent an hour debugging why the cache was stale. Found that Redis TTL was being set incorrectly. Document this for the team."
 
@@ -808,31 +778,7 @@ User must resolve decisions before implementation proceeds.
 - delegation: none
 - next_action: Create investigation journal documenting the Redis TTL issue, root cause, and fix applied
 
-### Example 11: Architectural Decision (journal-only with decision-record)
-
-**Request**: "We decided to use WebSockets instead of polling for real-time updates. Record this decision."
-
-**Routing**:
-
-- workflow: journal-only
-- rationale: Architectural decision has been made. Should be recorded with rationale and trade-offs for future reference.
-- journal_type: decision-record
-- delegation: none
-- next_action: Create decision record using `.claude/templates/decision-record.template.md` documenting WebSocket vs polling decision
-
-### Example 12: Hotfix Documentation (journal-only)
-
-**Request**: "Just pushed a hotfix for the auth bug in production. Need to document what happened."
-
-**Routing**:
-
-- workflow: journal-only
-- rationale: Emergency fix is complete. Root cause analysis and documentation valuable for preventing recurrence.
-- journal_type: hotfix
-- delegation: none
-- next_action: Create hotfix journal documenting the incident, root cause, fix applied, and prevention measures
-
-### Example 13: NOT Journal-Only (needs spec)
+### Example 10: NOT Journal-Only (needs spec)
 
 **Request**: "Found a bug during investigation. Want to fix it and document the fix."
 

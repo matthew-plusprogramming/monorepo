@@ -932,3 +932,12 @@ If not converged:
 - Implementer fixes issues
 - Test-writer adds tests
 - Unifier re-validates
+
+## Acceptable Assumption Domains
+
+Per the [Self-Answer Protocol](../memory-bank/self-answer-protocol.md), reasoning-tier (tier 4) self-resolution is permitted only within these domains:
+
+- **Alignment assessment**: Judging degree of spec-impl-test alignment
+- **Coverage evaluation**: Determining if test coverage adequately verifies ACs
+
+Escalate all questions about spec interpretation, behavioral correctness, or contract definitions.

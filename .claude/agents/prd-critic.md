@@ -198,3 +198,12 @@ Assign confidence based on your certainty in the finding:
 - Rate findings as Critical unless they would truly require architectural rework
 - Speculate about implementation approaches (focus on WHAT is missing, not HOW to build it)
 - Produce findings about implementation details (that is the spec's job, not the PRD's)
+
+## Acceptable Assumption Domains
+
+Per the [Self-Answer Protocol](../memory-bank/self-answer-protocol.md), reasoning-tier (tier 4) self-resolution is permitted only within these domains:
+
+- **Finding severity**: Rating critique findings as Critical/High/Medium/Low
+- **Completeness assessment**: Judging whether PRD sections are sufficient for their purpose
+
+Escalate all questions about business requirements, stakeholder intent, or product decisions.

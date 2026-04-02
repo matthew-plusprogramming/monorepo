@@ -14,6 +14,7 @@
  *   2. security-reviewer
  *   3. completion-verifier
  *   4. documenter
+ *   5. e2e-test-writer (unless spec opts out via e2e_skip: true)
  *
  * Note: awaiting_approval is NOT in any mandatory check list (AC-1.13).
  *
@@ -27,11 +28,12 @@
  * Spec: sg-coercive-gate-enforcement
  */
 
-import { existsSync, readFileSync, writeFileSync, renameSync, unlinkSync } from 'node:fs';
-import { join } from 'node:path';
+import { existsSync, readFileSync, writeFileSync, renameSync, unlinkSync, readdirSync, mkdirSync } from 'node:fs';
+import { join, isAbsolute, basename } from 'node:path';
 import {
   STOP_MANDATORY_DISPATCHES,
   STOP_PHASE_REQUIREMENTS,
+  VALID_E2E_SKIP_RATIONALES,
   OVERRIDE_GATE_NAMES,
   getWorkflowTypeStrict,
   isExemptWorkflow,
@@ -160,88 +162,348 @@ async function main() {
       }
     }
 
-    // Step 7.5: Manifest status obligation check (status-obligation-enforcement)
+    // Step 7.4: E2E opt-out recognition (sg-e2e-default-dispatch)
+    // If e2e-test-writer is missing, check spec frontmatter for opt-out.
+    // Data-flow: session.json -> spec_group_id -> convention-based spec path -> frontmatter.
+    const e2eIdx = missingDispatches.indexOf('e2e-test-writer');
+    if (e2eIdx !== -1) {
+      const sgId = session.active_work?.spec_group_id;
+      let e2eOptedOut = false;
+
+      if (sgId && /^sg-[a-z0-9-]+$/.test(sgId)) {
+        try {
+          const sgDir = join(claudeDir, 'specs', 'groups', sgId);
+
+          // Check for orchestrator workflows with atomic specs
+          const atomicDir = join(sgDir, 'atomic');
+          let specFiles = [];
+
+          if (existsSync(atomicDir)) {
+            // Orchestrator: glob atomic/*.md for per-spec checking (AC-5.1)
+            try {
+              const atomicEntries = readdirSync(atomicDir).filter(f => f.endsWith('.md'));
+              specFiles = atomicEntries.map(f => join(atomicDir, f));
+            } catch {
+              // AC-9.3: glob returns empty/fails -> fail-open (structural error)
+              e2eOptedOut = false;
+            }
+          }
+
+          if (specFiles.length === 0) {
+            // Oneoff-spec: single spec path (convention-based)
+            const specPath = join(sgDir, 'spec.md');
+            specFiles = [specPath];
+          }
+
+          // Per-spec checking: each spec evaluated individually (AC-5.4)
+          let allSpecsSatisfied = true;
+          const optOutRecords = [];
+
+          for (const specFile of specFiles) {
+            if (!existsSync(specFile)) {
+              // AC-9.1/AC-9.3: spec file not found -> fail-open (structural error)
+              continue;
+            }
+
+            try {
+              const specContent = readFileSync(specFile, 'utf8');
+              const fmMatch = specContent.match(/^---\r?\n([\s\S]*?)\r?\n---/);
+
+              if (!fmMatch) {
+                // No frontmatter -> fail-closed: treat as e2e required (AC-9.2)
+                allSpecsSatisfied = false;
+                continue;
+              }
+
+              // Parse e2e_skip from frontmatter
+              const fmLines = fmMatch[1].split('\n');
+              let e2eSkipRaw = undefined;
+              let e2eSkipRationale = undefined;
+
+              for (const line of fmLines) {
+                const colonIdx = line.indexOf(':');
+                if (colonIdx === -1) continue;
+                const key = line.slice(0, colonIdx).trim();
+                const val = line.slice(colonIdx + 1).trim();
+                if (key === 'e2e_skip') e2eSkipRaw = val;
+                if (key === 'e2e_skip_rationale') e2eSkipRationale = val;
+              }
+
+              // AC-3.1: Strict boolean validation
+              // YAML booleans true/false are parsed as strings by simple frontmatter parsers.
+              // Accept only literal "true" or "false" (strict YAML boolean representation).
+              if (e2eSkipRaw === 'true') {
+                // AC-2.3: Defense-in-depth rationale validation (independent of spec-validate)
+                if (e2eSkipRationale && VALID_E2E_SKIP_RATIONALES.includes(e2eSkipRationale)) {
+                  // Valid opt-out (AC-2.2)
+                  const specId = basename(specFile, '.md');
+                  optOutRecords.push({
+                    type: 'e2e_opt_out',
+                    spec_id: specId,
+                    e2e_skip: true,
+                    rationale: e2eSkipRationale,
+                    timestamp: new Date().toISOString(),
+                  });
+                } else {
+                  // Invalid rationale -> fail-closed (treat as e2e required)
+                  allSpecsSatisfied = false;
+                }
+              } else if (e2eSkipRaw === undefined) {
+                // AC-9.2: e2e_skip missing -> fail-closed (treat as e2e required)
+                // Check if this spec has a dispatch record instead
+                const specId = basename(specFile, '.md');
+                const hasDispatch = allTasks.some(t => t.subagent_type === 'e2e-test-writer');
+                if (!hasDispatch) {
+                  allSpecsSatisfied = false;
+                }
+              } else if (e2eSkipRaw === 'false' || e2eSkipRaw === '') {
+                // EC-3: e2e_skip: false -> same as absent, e2e required
+                const hasDispatch = allTasks.some(t => t.subagent_type === 'e2e-test-writer');
+                if (!hasDispatch) {
+                  allSpecsSatisfied = false;
+                }
+              } else {
+                // AC-3.1: Non-boolean values ("yes", "1", string "true" with quotes) -> fail-closed
+                allSpecsSatisfied = false;
+              }
+            } catch {
+              // AC-9.1: Spec file read error -> fail-open (structural error)
+              continue;
+            }
+          }
+
+          if (allSpecsSatisfied) {
+            e2eOptedOut = true;
+            // AC-6.1, AC-6.2: Log structured opt-out records in session.json
+            if (optOutRecords.length > 0) {
+              try {
+                const sessionPath = join(claudeDir, 'context', 'session.json');
+                const freshSession = loadSession(sessionPath);
+                if (freshSession) {
+                  freshSession.e2e_opt_outs = freshSession.e2e_opt_outs || [];
+                  freshSession.e2e_opt_outs.push(...optOutRecords);
+                  freshSession.updated_at = new Date().toISOString();
+                  const tmpPath = sessionPath + '.tmp.' + process.pid;
+                  writeFileSync(tmpPath, JSON.stringify(freshSession, null, 2) + '\n');
+                  renameSync(tmpPath, sessionPath);
+                }
+              } catch {
+                // Fail-open on session write errors
+              }
+            }
+          }
+        } catch {
+          // AC-9.1: Structural error -> fail-open (don't require e2e)
+          e2eOptedOut = true;
+        }
+      } else if (!sgId) {
+        // No spec_group_id -> fail-open
+        e2eOptedOut = true;
+      }
+      // Invalid sgId format -> fail-open (structural error)
+      else {
+        e2eOptedOut = true;
+      }
+
+      if (e2eOptedOut) {
+        missingDispatches.splice(e2eIdx, 1);
+      }
+    }
+
+    // Step 7.5: Shared manifest read (CR-M2: avoid redundant I/O)
+    // Both obligation check and PRD staleness check use the same manifest.
+    // Read it once here and reuse the parsed object in both code paths.
+    const specGroupId = session.active_work?.spec_group_id;
+    let sharedManifest = null;
+    let manifestReadFailed = false;
+
+    if (specGroupId) {
+      // SEC-001: Validate spec_group_id format before constructing file path
+      if (!/^sg-[a-z0-9-]+$/.test(specGroupId)) {
+        process.stderr.write(`Warning: Invalid spec_group_id format '${specGroupId}' -- manifest checks skipped\n`);
+        manifestReadFailed = true;
+      } else {
+        const manifestPath = join(claudeDir, 'specs', 'groups', specGroupId, 'manifest.json');
+        try {
+          if (existsSync(manifestPath)) {
+            sharedManifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
+          } else {
+            // AC-7.1: Missing manifest -- fail-open with warning
+            process.stderr.write(`Warning: Manifest not found at ${manifestPath}\n`);
+            manifestReadFailed = true;
+          }
+        } catch (err) {
+          // Fail-open on structural errors (malformed JSON, read failure)
+          process.stderr.write(`Warning: Manifest read failed: ${err.message}\n`);
+          manifestReadFailed = true;
+        }
+      }
+    }
+
+    // Step 7.5a: Manifest status obligation check (status-obligation-enforcement)
     // Implements: REQ-006, REQ-007, REQ-008, REQ-009, REQ-010, REQ-013, REQ-014, REQ-015
     let obligationViolations = [];
     let obligationOverridden = false;
 
-    const specGroupId = session.active_work?.spec_group_id;
-    if (specGroupId) {
-      // SEC-001: Validate spec_group_id format before constructing file path
-      if (!/^sg-[a-z0-9-]+$/.test(specGroupId)) {
-        process.stderr.write(`Warning: Invalid spec_group_id format '${specGroupId}' -- obligation check skipped\n`);
-      } else {
-      const manifestPath = join(claudeDir, 'specs', 'groups', specGroupId, 'manifest.json');
-      try {
-        if (existsSync(manifestPath)) {
-          const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
+    // Guard: Only validate obligations when currentPhase is 'complete'.
+    // Active phases (implementing, reviewing, etc.) skip obligation validation entirely --
+    // session-checkpoint.mjs handles obligation enforcement at phase transitions.
+    // Unrecognized phase strings also skip (fail-open, consistent with REQ-018).
+    if (currentPhase === 'complete' && specGroupId && sharedManifest) {
+      // AC-5.4: Identify skipped phases from session history (exclude from validation)
+      const skippedPhases = (session.history || [])
+        .filter(h => h.event_type === 'override_skip')
+        .map(h => h.details?.phase)
+        .filter(Boolean);
 
-          // AC-5.4: Identify skipped phases from session history (exclude from validation)
-          const skippedPhases = (session.history || [])
-            .filter(h => h.event_type === 'override_skip')
-            .map(h => h.details?.phase)
-            .filter(Boolean);
+      // Only check obligations for current phase if it wasn't skipped
+      if (!skippedPhases.includes(currentPhase)) {
+        // Check for phase-scoped override (REQ-014)
+        const overrideGateName = `status_obligations:${currentPhase}`;
+        const overridePath = join(coordinationDir, OVERRIDE_FILENAME);
+        const overrides = loadOverrides(overridePath);
 
-          // Only check obligations for current phase if it wasn't skipped
-          if (!skippedPhases.includes(currentPhase)) {
-            // Check for phase-scoped override (REQ-014)
-            const overrideGateName = `status_obligations:${currentPhase}`;
-            const overridePath = join(coordinationDir, OVERRIDE_FILENAME);
-            const overrides = loadOverrides(overridePath);
-
-            if (overrides) {
-              // CR-H1: Use spec_group_id for override matching (AC-8.5), consistent with session-checkpoint.mjs
-              const obligationOverride = findMatchingOverride(overrides, overrideGateName, specGroupId);
-              if (obligationOverride) {
-                obligationOverridden = true;
-              }
-            }
-
-            if (!obligationOverridden) {
-              const result = validateObligations(currentPhase, manifest);
-              if (!result.passed) {
-                obligationViolations = result.violations;
-              }
-            }
+        if (overrides) {
+          // CR-H1: Use spec_group_id for override matching (AC-8.5), consistent with session-checkpoint.mjs
+          const obligationOverride = findMatchingOverride(overrides, overrideGateName, specGroupId);
+          if (obligationOverride) {
+            obligationOverridden = true;
           }
-        } else {
-          // AC-7.1: Missing manifest -- fail-open with warning
-          process.stderr.write(`Warning: Obligation check skipped -- manifest not found at ${manifestPath}\n`);
         }
-      } catch (err) {
-        // Fail-open on structural errors (malformed JSON, read failure)
-        process.stderr.write(`Warning: Obligation check skipped: ${err.message}\n`);
+
+        if (!obligationOverridden) {
+          const result = validateObligations(currentPhase, sharedManifest);
+          if (!result.passed) {
+            obligationViolations = result.violations;
+          }
+        }
       }
-      } // end SEC-001 else block
     }
-    // No spec_group_id: obligation check skipped silently (REQ-009, AC-6.5)
+    // No specGroupId or manifest: obligation check skipped silently (REQ-009, AC-6.5)
 
     // Step 7.6: Determine enforcement level for obligation violations
     // Read enforcement_level directly from session.phase_checkpoint (not a shared function).
     // Default to 'graduated' when phase_checkpoint is null (e.g., after complete-work).
     const enforcementLevel = session.phase_checkpoint?.enforcement_level || 'graduated';
 
+    // Step 7.7: PRD staleness check (REQ-002, AC-2.1 through AC-2.7)
+    // Only check when work_state is READY_TO_MERGE. Warning only, never blocks.
+    // CR-M2: Reuses sharedManifest from Step 7.5 instead of re-reading.
+    let prdWarning = '';
+    try {
+      if (specGroupId && sharedManifest && !manifestReadFailed) {
+        if (sharedManifest.work_state === 'READY_TO_MERGE') {
+          // AC-2.1, AC-2.7: Locate PRD via manifest.prd.file_path || manifest.prd.prd_path
+          let prdPath = sharedManifest.prd?.file_path || sharedManifest.prd?.prd_path || null;
+
+          // AC-2.6: Fall back to requirements.md prd_path frontmatter
+          if (!prdPath) {
+            try {
+              const reqPath = join(claudeDir, 'specs', 'groups', specGroupId, 'requirements.md');
+              if (existsSync(reqPath)) {
+                const reqContent = readFileSync(reqPath, 'utf8');
+                const fmMatch = reqContent.match(/^---\n([\s\S]*?)\n---/);
+                if (fmMatch) {
+                  const prdPathMatch = fmMatch[1].match(/^prd_path:\s*(.+)$/m);
+                  if (prdPathMatch) {
+                    prdPath = prdPathMatch[1].trim();
+                  }
+                }
+              }
+            } catch {
+              // Fail-open: requirements.md parsing error
+            }
+          }
+
+          // AC-2.3: No PRD linked -- skip silently
+          if (prdPath) {
+            // CR-H1: Validate PRD path against path traversal (defense-in-depth)
+            if (prdPath.includes('..') || isAbsolute(prdPath)) {
+              // Skip PRD check for suspicious paths
+              process.stderr.write(`Warning: PRD path rejected (path traversal check): ${prdPath}\n`);
+            } else {
+              // Resolve PRD path relative to project root (parent of .claude dir)
+              const projectRoot = join(claudeDir, '..');
+              const resolvedPrdPath = join(projectRoot, prdPath);
+
+              // Secondary containment: ensure resolved path stays within project root
+              if (!resolvedPrdPath.startsWith(projectRoot)) {
+                process.stderr.write(`Warning: PRD path escaped project root: ${prdPath}\n`);
+              } else {
+                // AC-2.4: PRD file does not exist -- skip silently
+                if (existsSync(resolvedPrdPath)) {
+                  const prdContent = readFileSync(resolvedPrdPath, 'utf8');
+                  const prdFmMatch = prdContent.match(/^---\n([\s\S]*?)\n---/);
+                  if (prdFmMatch) {
+                    const stateMatch = prdFmMatch[1].match(/^state:\s*(.+)$/m);
+                    if (stateMatch) {
+                      const prdState = stateMatch[1].trim();
+                      // AC-2.1: Warn when state is draft; AC-2.2: Skip when non-draft
+                      if (prdState === 'draft') {
+                        prdWarning = `WARNING: Linked PRD is still in "draft" state: ${prdPath}. ` +
+                          `Consider promoting it before merge with: /prd status <prd-id>`;
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    } catch {
+      // AC-2.5: Fail-open -- any PRD check error must not block session
+    }
+
     // If no dispatch violations and no obligation violations, allow completion
     if (missingDispatches.length === 0 && obligationViolations.length === 0) {
       safeDelete(sentinelPath);
+      // AC-2.1: Emit PRD warning via additionalContext if present
+      if (prdWarning) {
+        console.log(JSON.stringify({ additionalContext: prdWarning }));
+      }
       process.exit(0);
     }
 
     // Step 8: Check for stop-gate dispatch override
     const overridePath = join(coordinationDir, OVERRIDE_FILENAME);
-    const overrides = loadOverrides(overridePath);
     let dispatchOverridden = false;
 
-    if (overrides && missingDispatches.length > 0) {
-      const stopOverride = findMatchingOverride(overrides, OVERRIDE_GATE_NAMES.stop_mandatory_dispatches, sessionId);
-      if (stopOverride) {
-        dispatchOverridden = true;
+    if (missingDispatches.length > 0 && existsSync(overridePath)) {
+      // Support two override formats:
+      // 1. Array format: { "overrides": [{ gate, session_id, timestamp, rationale }] }
+      // 2. Flat-key format: { "stop_mandatory_dispatches": { session_id, timestamp, rationale } }
+      const overrides = loadOverrides(overridePath);
+      if (overrides) {
+        const stopOverride = findMatchingOverride(overrides, OVERRIDE_GATE_NAMES.stop_mandatory_dispatches, sessionId);
+        if (stopOverride) {
+          dispatchOverridden = true;
+        }
+      }
+
+      // Flat-key format fallback (AC-4.1)
+      if (!dispatchOverridden) {
+        try {
+          const rawOverride = JSON.parse(readFileSync(overridePath, 'utf8'));
+          const gateName = OVERRIDE_GATE_NAMES.stop_mandatory_dispatches;
+          if (rawOverride && rawOverride[gateName] && typeof rawOverride[gateName] === 'object') {
+            const entry = rawOverride[gateName];
+            if (entry.rationale && entry.timestamp) {
+              dispatchOverridden = true;
+            }
+          }
+        } catch {
+          // Fail-open on parse error
+        }
       }
     }
 
     // If both dispatch and obligation issues are overridden/resolved, allow
     if (dispatchOverridden && obligationViolations.length === 0) {
       safeDelete(sentinelPath);
+      if (prdWarning) {
+        console.log(JSON.stringify({ additionalContext: prdWarning }));
+      }
       process.exit(0);
     }
 
@@ -291,6 +553,9 @@ async function main() {
       // If no dispatch issues remain, allow completion
       if (!hasDispatchIssues) {
         safeDelete(sentinelPath);
+        if (prdWarning) {
+          console.log(JSON.stringify({ additionalContext: prdWarning }));
+        }
         process.exit(0);
       }
     }
@@ -355,6 +620,7 @@ async function main() {
         'security-reviewer': '/security',
         'completion-verifier': 'completion-verifier agent (dispatch directly)',
         'documenter': '/docs',
+        'e2e-test-writer': '/e2e-test (or add e2e_skip: true with valid rationale to spec frontmatter)',
       };
       const skillInstructions = missingDispatches
         .map(d => `  - ${d}: Run ${skillMap[d] || d}`)
@@ -377,6 +643,7 @@ async function main() {
 
     // Create sentinel BEFORE outputting block decision (AC-4.6)
     try {
+      mkdirSync(coordinationDir, { recursive: true });
       writeFileSync(sentinelPath, new Date().toISOString());
     } catch {
       // If we can't create the sentinel, proceed with block anyway
@@ -385,7 +652,12 @@ async function main() {
 
     // AC-4.10: Block via stdout JSON, NOT stderr + exit 2
     const reason = reasonParts.join('\n\n');
-    console.log(JSON.stringify({ decision: 'block', reason }));
+    const blockOutput = { decision: 'block', reason };
+    // Include PRD warning alongside block decision if present
+    if (prdWarning) {
+      blockOutput.additionalContext = prdWarning;
+    }
+    console.log(JSON.stringify(blockOutput));
     process.exit(0);
   } catch (err) {
     // Fail-open on any error

@@ -36,6 +36,16 @@
     "implementation_status": {
       "type": "string",
       "enum": ["not_started", "in_progress", "complete"]
+    },
+    "e2e_skip": {
+      "type": "boolean",
+      "description": "Opt out of mandatory e2e-test-writer dispatch for this spec",
+      "default": false
+    },
+    "e2e_skip_rationale": {
+      "type": "string",
+      "enum": ["pure-refactor", "test-infra", "type-only", "docs-only"],
+      "description": "Required when e2e_skip is true. Reason for opting out of E2E tests."
     }
   },
   "additionalProperties": false

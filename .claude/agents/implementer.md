@@ -218,84 +218,97 @@ If you encounter missing requirements:
 
 **NEVER make the decision yourself.** Escalate.
 
-### 4b. Document Implementation Assumptions
+### 4b. Self-Resolution and Assumptions (Self-Answer Protocol)
 
-Not all uncertainty requires escalation. When the spec is silent on **non-behavioral implementation details**, you may proceed with a documented assumption rather than blocking on an Open Question.
+Before escalating or documenting an assumption, consult the [Self-Answer Protocol](../memory-bank/self-answer-protocol.md). The four-tier assumption hierarchy determines whether to self-resolve, assume, or escalate.
 
-#### When to Assume vs Escalate
+#### Decision Flow
 
 ```
 Uncertainty encountered during implementation
                     │
                     ▼
-        Does it change observable behavior?
+   Consult four-tier hierarchy (code > spec > memory > reasoning)
                     │
-           ┌───────┴───────┐
-           │ YES           │ NO
-           ▼               ▼
-    ESCALATE as       DOCUMENT as
-    Open Question      Assumption
-    (blocking)        (non-blocking)
+        ┌───────────┼───────────┐
+        │           │           │
+    FOUND at     FOUND only   NOT FOUND
+    tier 1-3     at tier 4    at any tier
+        │           │           │
+        ▼           ▼           ▼
+  SELF-RESOLVED  Observable   Does it change
+  Use tier       behavior?    observable behavior?
+  format         │            │
+        ┌────────┤     ┌──────┤
+        │ YES    │ NO  │ YES  │ NO
+        ▼        ▼     ▼      ▼
+    ESCALATE  SELF-  ESCALATE TODO(assumption)
+    (always)  RESOLVED         [confidence]
+              (reasoning)
 ```
 
-**Observable behavior** includes: user-visible output, API responses, error codes, redirect destinations, data persistence. If your decision would change what a user or caller sees/receives, escalate.
+**Observable behavior** includes: user-visible output, API responses, error codes, redirect destinations, data persistence, exit codes, stdout/stderr, HTTP status, return values.
 
 **Non-behavioral details** include: timeout durations, log message formatting, internal variable names, error message exact wording (when format is consistent), default values for optional parameters.
 
+#### Self-Resolution Format
+
+When a source tier provides an answer, use `SELF-RESOLVED` instead of `TODO(assumption)`:
+
+**Tier 1-2** (evidence snippet required):
+
+```
+// SELF-RESOLVED(code): Timeout is 30s -- evidence: "const TIMEOUT_MS = 30000" @ src/config.ts:42
+// SELF-RESOLVED(spec): Max retries is 3 -- evidence: "retry up to 3 times" @ spec.md:156
+```
+
+**Tier 3-4** (no snippet required):
+
+```
+// SELF-RESOLVED(memory): Page size is 20 per pagination conventions in memory-bank
+// SELF-RESOLVED(reasoning): Using camelCase for internal helper (within assumption domain)
+```
+
+#### TODO(assumption) -- Last Resort Only
+
+`TODO(assumption)` is reserved for genuinely unresolvable questions where **no tier provides evidence**:
+
+```typescript
+// TODO(assumption): Using 30s timeout -- no source defines this value [confidence: medium]
+const TIMEOUT_MS = 30000;
+```
+
+**Confidence levels**: high (clear pattern), medium (reasonable choice), low (best guess).
+
+If you can cite a source from any tier, use `SELF-RESOLVED` instead.
+
 #### Examples
 
-| Scenario                                                             | Decision                           | Rationale                                        |
-| -------------------------------------------------------------------- | ---------------------------------- | ------------------------------------------------ |
-| Spec says "redirect to login" but not whether to preserve return URL | **ESCALATE**                       | Changes user experience                          |
-| Spec says "show error" but not the exact message text                | **ASSUMPTION**                     | Implementation detail, follows existing patterns |
-| Spec says "timeout" but not the duration                             | **ASSUMPTION** (medium confidence) | Reasonable default can be chosen                 |
-| Spec says "validate input" but not what error code to return         | **ESCALATE**                       | API contract decision                            |
-| Spec says "log the event" but not the log level                      | **ASSUMPTION**                     | Internal detail, follows codebase convention     |
-| Spec says "retry on failure" but not how many times                  | **ESCALATE**                       | Affects reliability guarantees                   |
-
-#### TODO Comment Format
-
-When documenting an assumption in code, use this format:
-
-```typescript
-// TODO(assumption): <description> [confidence: high|medium|low]
-```
-
-**Confidence levels**:
-
-- **high**: Following clear codebase pattern, very likely correct
-- **medium**: Reasonable choice, but spec author should validate
-- **low**: Best guess, definitely needs review
-
-**Examples**:
-
-```typescript
-// TODO(assumption): Using 30s timeout based on similar service patterns [confidence: medium]
-const TIMEOUT_MS = 30000;
-
-// TODO(assumption): Error message follows existing toast format [confidence: high]
-showToast({ message: 'Logout failed. Please try again.', type: 'error' });
-
-// TODO(assumption): Default page size matches pagination elsewhere in app [confidence: high]
-const DEFAULT_PAGE_SIZE = 20;
-```
+| Scenario                                                             | Decision                                          | Rationale                                            |
+| -------------------------------------------------------------------- | ------------------------------------------------- | ---------------------------------------------------- |
+| Spec says "redirect to login" but not whether to preserve return URL | **ESCALATE**                                      | Observable behavior, no source answers               |
+| Spec says "show error" but not the exact message text                | **SELF-RESOLVED(memory)** or **TODO(assumption)** | Check memory-bank for conventions; if none, assume   |
+| Spec says "timeout" but not the duration                             | **SELF-RESOLVED(code)** or **TODO(assumption)**   | Check codebase for similar timeouts; if none, assume |
+| Spec says "validate input" but not what error code to return         | **ESCALATE**                                      | Observable behavior (API contract)                   |
+| Spec says "log the event" but not the log level                      | **SELF-RESOLVED(memory)**                         | Logging conventions in memory-bank                   |
+| Spec says "retry on failure" but not how many times                  | **ESCALATE**                                      | Affects reliability guarantees                       |
 
 #### Update Atomic Spec
 
-After making an assumption, update the atomic spec's "Assumptions Made" section:
+After making a self-resolution or assumption, update the atomic spec's "Assumptions Made" section:
 
 ```markdown
 ## Assumptions Made
 
-| ID      | Assumption                 | Confidence | Rationale                         | Needs Review |
-| ------- | -------------------------- | ---------- | --------------------------------- | ------------ |
-| ASM-001 | Used 30s timeout           | Medium     | Based on similar service patterns | Yes          |
-| ASM-002 | Error follows toast format | High       | Matches existing codebase pattern | Yes          |
+| ID      | Assumption                 | Type                    | Rationale                        | Needs Review |
+| ------- | -------------------------- | ----------------------- | -------------------------------- | ------------ |
+| ASM-001 | Used 30s timeout           | SELF-RESOLVED(code)     | Matches src/config.ts:42         | Yes          |
+| ASM-002 | Error follows toast format | TODO(assumption) medium | No source found, follows pattern | Yes          |
 ```
 
-**All assumptions need review** regardless of confidence level. The code review phase will validate each assumption and either accept it, reject it (requiring code changes), or escalate it to a spec amendment.
+**All assumptions and self-resolutions need review** regardless of confidence level. The code review phase validates each one.
 
-**Important**: Assumptions are for implementation details only. If you find yourself documenting an assumption about behavior, STOP and escalate instead.
+**Important**: If a question involves observable behavior and only reasoning-tier evidence exists, STOP and escalate. Never self-resolve observable behavior via reasoning alone.
 
 ### 5. Maintain Spec Conformance
 
@@ -878,3 +891,13 @@ Before committing a non-spec bug fix:
 - [ ] Listed all files modified
 - [ ] Added tests if applicable
 - [ ] Filled verification checklist
+
+## Acceptable Assumption Domains
+
+Per the [Self-Answer Protocol](../memory-bank/self-answer-protocol.md), reasoning-tier (tier 4) self-resolution is permitted only within these domains:
+
+- **Implementation patterns**: Internal variable names, log message formatting, code structure
+- **Non-behavioral defaults**: Timeout durations, buffer sizes, retry delays (when spec is silent)
+- **Error message wording**: Exact text of error messages when format follows existing conventions
+
+Escalate all questions about observable behavior, API contracts, or spec interpretation.

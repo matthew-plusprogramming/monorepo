@@ -774,3 +774,12 @@ Before committing a non-spec bug fix:
 - [ ] Listed all files modified
 - [ ] Verified tests pass after fix
 - [ ] Filled verification checklist
+
+## Acceptable Assumption Domains
+
+Per the [Self-Answer Protocol](../memory-bank/self-answer-protocol.md), reasoning-tier (tier 4) self-resolution is permitted only within these domains:
+
+- **Test structure**: AAA pattern application, describe/it nesting, fixture organization
+- **Mock boundaries**: What to mock vs what to use real implementations for
+
+Escalate all questions about expected behavior, acceptance criteria interpretation, or error semantics.

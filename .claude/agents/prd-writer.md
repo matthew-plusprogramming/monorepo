@@ -200,3 +200,12 @@ After completing discovery or amendment:
 - Skip the cold start protocol (always check org-context first)
 - Modify the PRD template structure
 - Produce partial PRD documents (always complete and self-contained)
+
+## Acceptable Assumption Domains
+
+Per the [Self-Answer Protocol](../memory-bank/self-answer-protocol.md), reasoning-tier (tier 4) self-resolution is permitted only within these domains:
+
+- **Interview structure**: Question ordering, follow-up strategy, topic transitions
+- **PRD formatting**: Section layout, milestone grouping, success criteria phrasing
+
+Escalate all questions about business goals, product decisions, or user requirements.

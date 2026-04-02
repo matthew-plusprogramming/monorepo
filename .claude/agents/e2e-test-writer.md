@@ -140,3 +140,12 @@ Arbitrary external URLs are prohibited.
 - Make requests to arbitrary external URLs
 - Generate partial tests when contracts are missing
 - Skip cleanup verification
+
+## Acceptable Assumption Domains
+
+Per the [Self-Answer Protocol](../memory-bank/self-answer-protocol.md), reasoning-tier (tier 4) self-resolution is permitted only within these domains:
+
+- **Test timing**: Timeouts, polling intervals, retry delays for async operations
+- **Test data**: Generating representative test fixtures when spec provides schemas
+
+Escalate all questions about expected system behavior, API contracts, or error responses.

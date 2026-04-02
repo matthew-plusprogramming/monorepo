@@ -215,10 +215,36 @@ Mandatory workflow stages (challenger dispatches, completion verification, docum
 
 ---
 
+## Self-Answer Protocol
+
+Agents must consult the four-tier assumption hierarchy (code > spec > memory > reasoning) before escalating questions to humans. The full protocol is at `.claude/memory-bank/self-answer-protocol.md`.
+
+**Key rules**:
+
+- Use `SELF-RESOLVED(<tier>)` format when a source tier provides an answer
+- Reserve `TODO(assumption)` only for genuinely unresolvable questions (no tier provides evidence)
+- Always escalate observable behavior questions when only reasoning-tier evidence exists
+- Always escalate cross-tier conflicts (code says X, spec says Y)
+- Each agent declares its Acceptable Assumption Domains in `.claude/agents/*.md`
+- All self-resolutions are written to `.claude/audit/self-resolutions.jsonl` via the shared `writeAuditEntry()` function
+
+---
+
 ## Persistence & State Guarantees
 
 - Long-lived plans, decisions, or discoveries must be persisted externally. Do not rely on conversation history as durable memory.
 - At any stopping point, ensure an external artifact captures: current objective, completed work, current phase, next steps, and unresolved questions. This artifact must be sufficient to resume work after context reset.
+
+### Artifact Storage Paths
+
+| Artifact                             | Storage Path                                             |
+| ------------------------------------ | -------------------------------------------------------- |
+| Journal entries                      | `.claude/journal/entries/<date>-<slug>.md`               |
+| Decision records                     | `.claude/journal/decisions/<id>.md`                      |
+| Handoff documents                    | `.claude/context/archive/<slug>-handoff.md`              |
+| Investigation reports (spec-coupled) | `.claude/specs/groups/<sg-id>/investigation-report.md`   |
+| Investigation reports (standalone)   | `.claude/journal/entries/investigation-<date>-<slug>.md` |
+| Fix reports                          | `.claude/journal/entries/fix-<date>-<slug>.md`           |
 
 ---
 
@@ -264,6 +290,7 @@ Load memory-bank files based on task context:
 | `best-practices/software-principles.md` | Implementation routed                                                             | Implementer, Code-reviewer                                              |
 | `best-practices/typescript.md`          | TypeScript work dispatched                                                        | Implementer                                                             |
 | `best-practices/subagent-design.md`     | Subagent dispatch                                                                 | route/SKILL.md, implement/SKILL.md, orchestrate/SKILL.md, spec/SKILL.md |
+| `self-answer-protocol.md`               | All agent dispatches                                                              | All 21 agents                                                           |
 | `traces/low-level/*.json`               | Implementation routed, Test dispatched, Review dispatched, Exploration dispatched | Implementer, Test-writer, Code-reviewer, Security-reviewer, Explore     |
 | `traces/high-level.json`                | Dispatch planning (main agent)                                                    | Main agent                                                              |
 | `traces/high-level.md`                  | Routing, dispatch planning                                                        | Main agent, Route                                                       |

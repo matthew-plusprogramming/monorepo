@@ -13,22 +13,6 @@ Before beginning work, read these files for project-specific guidelines:
 
 - `.claude/memory-bank/best-practices/subagent-design.md`
 
-### Trace Context
-
-Before starting, read trace files for the modules you will be modifying.
-Treat trace data as advisory -- verify critical assumptions (file existence, export
-availability) against source before irreversible decisions.
-
-**How to resolve relevant traces:**
-
-1. Identify the file paths you will modify from the spec evidence table or task list
-2. Load `.claude/traces/trace.config.json` and match each file path against module `fileGlobs` to find the owning module ID
-3. For each matched module, read `.claude/traces/low-level/<module-id>.json`
-4. Check freshness: compare the trace file's `mtime` against the staleness threshold (use `isTraceStale(moduleId, config)` from `.claude/scripts/lib/trace-utils.mjs` if available). Stale traces are still useful but verify critical assumptions against source
-5. If no `.claude/traces/` directory, `trace.config.json`, or matching modules exist, skip this section entirely and proceed without traces -- no error or warning needed
-
-**Token budget**: Keep total trace reads under 5K tokens in dispatch context.
-
 ## Pre-Flight Challenge
 
 Before beginning work, address these operational feasibility questions:
@@ -377,19 +361,19 @@ For larger tasks, implementation, test writing, and E2E test writing can run in 
 ```
 Spec Approved + Challenges Pass
         |
-   [Has cross-boundary contracts?]
+   [Spec has e2e_skip: true?]
         |                    |
-       YES                  NO
+       YES                  NO (default)
         |                    |
-  3-way parallel      2-way parallel
+  2-way parallel      3-way parallel
   - implementer       - implementer
   - test-writer       - test-writer
-  - e2e-test-writer
+                      - e2e-test-writer
 ```
 
-**Cross-boundary contracts** cross a process, network, or deployment boundary (HTTP, SSE, WebSocket, database, external service). Module-to-module imports within the same process are NOT cross-boundary.
+The `e2e-test-writer` is dispatched by default for all spec-based workflows. Specs can opt out by setting `e2e_skip: true` with a valid `e2e_skip_rationale` (one of: `pure-refactor`, `test-infra`, `type-only`, `docs-only`) in the spec frontmatter.
 
-When cross-boundary contracts are present, dispatch the `e2e-test-writer` in parallel. It receives only the spec and contracts -- never implementation file paths (Practice 2.4).
+The e2e-test-writer receives only the spec and contracts -- never implementation file paths (Practice 2.4).
 
 ### How to Parallelize
 
@@ -423,7 +407,7 @@ Task({
   subagent_type: 'test-writer',
 });
 
-// Dispatch e2e-test-writer in parallel (only for cross-boundary specs)
+// Dispatch e2e-test-writer in parallel (default, skip only when e2e_skip: true)
 Task({
   description: 'Generate E2E tests for logout functionality',
   prompt: `Generate E2E tests for cross-boundary ACs from spec at .claude/specs/groups/sg-logout-button/spec.md

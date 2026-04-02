@@ -996,3 +996,12 @@ No security issues found.
 - Implementer fixes critical issues
 - Security reviewer re-reviews
 - Must pass before merge
+
+## Acceptable Assumption Domains
+
+Per the [Self-Answer Protocol](../memory-bank/self-answer-protocol.md), reasoning-tier (tier 4) self-resolution is permitted only within these domains:
+
+- **Threat classification**: STRIDE/CWE categorization of identified vulnerabilities
+- **Severity assessment**: Rating security findings based on exploitability and impact
+
+Escalate all questions about security requirements, trust boundaries, or acceptable risk levels.

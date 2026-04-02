@@ -19,8 +19,22 @@
  */
 
 import { readFileSync, existsSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const REQUIRED_FRONTMATTER_FIELDS = ['id', 'title', 'date', 'status'];
+
+// Import VALID_E2E_SKIP_RATIONALES from workflow-dag.mjs for defense-in-depth
+// Falls back to inline constant if import fails (fail-open)
+let VALID_E2E_SKIP_RATIONALES;
+try {
+  const __filename = fileURLToPath(import.meta.url);
+  const __dirname = dirname(__filename);
+  const dagModule = await import(join(__dirname, 'lib', 'workflow-dag.mjs'));
+  VALID_E2E_SKIP_RATIONALES = dagModule.VALID_E2E_SKIP_RATIONALES;
+} catch {
+  VALID_E2E_SKIP_RATIONALES = ['pure-refactor', 'test-infra', 'type-only', 'docs-only'];
+}
 
 // Sections that must be present (case-insensitive match)
 // Note: "Requirements" or "Requirements Summary" both satisfy the requirements check
@@ -55,8 +69,16 @@ function parseFrontmatter(content) {
     const value = line.slice(colonIndex + 1).trim();
 
     if (key) {
-      // Allow empty values for some fields, just record presence
-      fields[key] = value || '';
+      // Recognize YAML boolean literals (true/false without quotes -> boolean type)
+      // AC-7.4 approach (a): defense-in-depth boolean recognition
+      if (value === 'true') {
+        fields[key] = true;
+      } else if (value === 'false') {
+        fields[key] = false;
+      } else {
+        // Allow empty values for some fields, just record presence
+        fields[key] = value || '';
+      }
     }
   }
 
@@ -129,6 +151,36 @@ function validateSpecFile(filePath) {
   ];
   if (frontmatter.status && !validStatuses.includes(frontmatter.status)) {
     warnings.push(`unknown status '${frontmatter.status}' (expected one of: draft, review, approved, implementing, complete, archived [top-level] or pending, implementing, implemented, tested, verified [atomic])`);
+  }
+
+  // Validate e2e_skip fields (AC-7.3, AC-7.4, AC-7.5)
+  if (frontmatter.e2e_skip !== undefined) {
+    // AC-7.4: Strict boolean type enforcement
+    if (typeof frontmatter.e2e_skip !== 'boolean') {
+      errors.push(`e2e_skip must be a boolean (true or false), got '${frontmatter.e2e_skip}'`);
+    }
+
+    // AC-7.3: When e2e_skip is true, e2e_skip_rationale is required (EC-1)
+    if (frontmatter.e2e_skip === true) {
+      if (!frontmatter.e2e_skip_rationale) {
+        errors.push('e2e_skip: true requires e2e_skip_rationale (one of: pure-refactor, test-infra, type-only, docs-only)');
+      } else if (!VALID_E2E_SKIP_RATIONALES.includes(frontmatter.e2e_skip_rationale)) {
+        errors.push(`e2e_skip_rationale '${frontmatter.e2e_skip_rationale}' is not valid (must be one of: ${VALID_E2E_SKIP_RATIONALES.join(', ')})`);
+      }
+    }
+  }
+
+  // AC-7.5: Warn on orphaned e2e_skip_rationale (rationale present without e2e_skip: true)
+  if (frontmatter.e2e_skip_rationale && frontmatter.e2e_skip !== true) {
+    warnings.push('e2e_skip_rationale is present but e2e_skip is not true -- rationale has no effect');
+  }
+
+  // Validate e2e_skip_rationale even when standalone (if it's an invalid value)
+  // Guard: only when e2e_skip !== true, since the e2e_skip === true path (lines 164-169) already validates rationale
+  if (frontmatter.e2e_skip !== true && frontmatter.e2e_skip_rationale && typeof frontmatter.e2e_skip_rationale === 'string' && frontmatter.e2e_skip_rationale !== '') {
+    if (!VALID_E2E_SKIP_RATIONALES.includes(frontmatter.e2e_skip_rationale)) {
+      errors.push(`e2e_skip_rationale '${frontmatter.e2e_skip_rationale}' is not valid (must be one of: ${VALID_E2E_SKIP_RATIONALES.join(', ')})`);
+    }
   }
 
   // Validate required sections

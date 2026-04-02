@@ -233,8 +233,8 @@ function loadSchema(schemaName) {
  * This allows us to validate only the frontmatter portion of markdown files.
  */
 const FRONTMATTER_FIELDS = {
-  'atomic-spec': ['id', 'title', 'requirements_refs', 'status', 'spec_group', 'parent_spec_section'],
-  'workstream-spec': ['id', 'title', 'owner', 'scope', 'dependencies', 'contracts', 'status', 'implementation_status'],
+  'atomic-spec': ['id', 'title', 'requirements_refs', 'status', 'spec_group', 'parent_spec_section', 'e2e_skip', 'e2e_skip_rationale'],
+  'workstream-spec': ['id', 'title', 'owner', 'scope', 'dependencies', 'contracts', 'status', 'implementation_status', 'e2e_skip', 'e2e_skip_rationale'],
   'master-spec': ['id', 'title', 'workstreams', 'contracts', 'gates', 'status'],
   'spec-group': null, // JSON file - validate all fields
 };

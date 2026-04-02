@@ -436,3 +436,12 @@ Findings may miss:
 
 Recommendation: Add spec or accept limited review
 ```
+
+## Acceptable Assumption Domains
+
+Per the [Self-Answer Protocol](../memory-bank/self-answer-protocol.md), reasoning-tier (tier 4) self-resolution is permitted only within these domains:
+
+- **Severity classification**: Rating findings as High/Medium/Low based on standard criteria
+- **Pattern recognition**: Identifying code quality anti-patterns from established conventions
+
+Escalate all questions about intended behavior, spec interpretation, or architectural decisions.

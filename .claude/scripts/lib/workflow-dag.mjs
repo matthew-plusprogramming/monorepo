@@ -146,6 +146,7 @@ export const STOP_MANDATORY_DISPATCHES = [
   'security-reviewer',
   'completion-verifier',
   'documenter',
+  'e2e-test-writer',
 ];
 
 /**
@@ -163,13 +164,27 @@ export const STOP_PHASE_REQUIREMENTS = {
   // Implementation phases: no dispatches required (implicit default)
 
   // Review phases
-  reviewing: ['code-reviewer', 'security-reviewer'],
-  completion_verifying: ['code-reviewer', 'security-reviewer', 'completion-verifier'],
+  reviewing: ['code-reviewer', 'security-reviewer', 'e2e-test-writer'],
+  completion_verifying: ['code-reviewer', 'security-reviewer', 'completion-verifier', 'e2e-test-writer'],
 
   // Terminal phases
-  documenting: ['code-reviewer', 'security-reviewer', 'completion-verifier', 'documenter'],
-  complete: ['code-reviewer', 'security-reviewer', 'completion-verifier', 'documenter'],
+  documenting: ['code-reviewer', 'security-reviewer', 'completion-verifier', 'documenter', 'e2e-test-writer'],
+  complete: ['code-reviewer', 'security-reviewer', 'completion-verifier', 'documenter', 'e2e-test-writer'],
 };
+
+/**
+ * Valid rationale values for e2e_skip opt-out in spec frontmatter.
+ * Shared across spec validation hooks and the stop hook for defense-in-depth.
+ *
+ * Implements: REQ-003 of sg-e2e-default-dispatch
+ * @type {string[]}
+ */
+export const VALID_E2E_SKIP_RATIONALES = [
+  'pure-refactor',
+  'test-infra',
+  'type-only',
+  'docs-only',
+];
 
 /**
  * Override gate name mapping.

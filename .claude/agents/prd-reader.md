@@ -429,3 +429,12 @@ After extraction:
    - PRD file path
    - Version read
 5. Suggest next steps: review requirements, run /spec
+
+## Acceptable Assumption Domains
+
+Per the [Self-Answer Protocol](../memory-bank/self-answer-protocol.md), reasoning-tier (tier 4) self-resolution is permitted only within these domains:
+
+- **Extraction structure**: Organizing extracted requirements into categories
+- **Requirement identification**: Distinguishing explicit requirements from context
+
+Escalate all questions about requirement priority, scope boundaries, or stakeholder intent.

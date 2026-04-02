@@ -7,6 +7,10 @@
  * outputs a JSON object with `additionalContext` reminding the main agent
  * to update the relevant convergence gate in the spec group manifest.
  *
+ * Additionally, auto-updates the manifest convergence boolean when the
+ * subagent completes with success status (or no status field for backwards
+ * compatibility). Falls back to text-only reminder on any error (fail-open).
+ *
  * Agent type -> convergence gate mapping:
  *   implementer       -> all_acs_implemented
  *   test-writer       -> all_tests_passing
@@ -25,7 +29,12 @@
  *   0 - Always (hooks must not block)
  *
  * Implements: REQ-1, AC1.1-AC1.10 from as-001-subagent-stop-hook
+ * Implements: REQ-001, AC-1.1 through AC-1.9 from sg-manifest-prd-staleness-fix
  */
+
+import { existsSync, readFileSync, writeFileSync, renameSync } from 'node:fs';
+import { join } from 'node:path';
+import { findClaudeDir, loadSession } from './lib/hook-utils.mjs';
 
 const GATE_MAP = {
   implementer: {
@@ -62,7 +71,9 @@ const GATE_MAP = {
   },
 };
 
-// All 9 canonical convergence gate fields.
+// 9 gate-result fields. The validate-convergence-fields.mjs script accepts a
+// superset (11 fields) that includes convergence process fields
+// (investigation_converged, challenger_converged) which are not individual gate results.
 // GATE_MAP has 8 entries because spec_complete has no corresponding subagent
 // (it is set by the spec-authoring workflow, not by a SubagentStop event).
 const CANONICAL_FIELDS = [
@@ -111,6 +122,89 @@ async function readStdin() {
   });
 }
 
+/** SEC-001: Validate spec_group_id format before using in file paths. */
+const SPEC_GROUP_ID_PATTERN = /^sg-[a-z0-9-]+$/;
+
+/**
+ * Attempt to auto-update the manifest convergence boolean for the given gate.
+ * Returns true if the update succeeded, false otherwise.
+ * Never throws -- all errors are caught and logged to stderr.
+ *
+ * AC-1.1: Locate manifest via session.json active_work.spec_group_id
+ * AC-1.4: Append decision_log entry with convergence_auto_updated action
+ * AC-1.6: Fail-open on any error
+ * AC-1.7: Fall back when session has no spec_group_id
+ * AC-1.8: Fall back when spec_group_id fails format validation
+ *
+ * @param {object} gate - The GATE_MAP entry with field and label
+ * @param {string} agentType - The subagent type string
+ * @returns {boolean} true if manifest was successfully updated
+ */
+function tryUpdateManifest(gate, agentType) {
+  try {
+    const claudeDir = findClaudeDir(import.meta.url);
+    const sessionPath = join(claudeDir, 'context', 'session.json');
+    const session = loadSession(sessionPath);
+
+    // AC-1.7: No session or no spec_group_id -- fall back
+    if (!session || !session.active_work || !session.active_work.spec_group_id) {
+      return false;
+    }
+
+    const specGroupId = session.active_work.spec_group_id;
+
+    // AC-1.8: Validate spec_group_id format (SEC-001 path traversal prevention)
+    if (!SPEC_GROUP_ID_PATTERN.test(specGroupId)) {
+      process.stderr.write(
+        `[convergence-gate-reminder] WARNING: Invalid spec_group_id format '${specGroupId}' -- manifest update skipped\n`
+      );
+      return false;
+    }
+
+    const manifestPath = join(claudeDir, 'specs', 'groups', specGroupId, 'manifest.json');
+
+    if (!existsSync(manifestPath)) {
+      return false;
+    }
+
+    // Read and parse manifest
+    const manifestContent = readFileSync(manifestPath, 'utf-8');
+    const manifest = JSON.parse(manifestContent);
+
+    // AC-1.1: Set convergence boolean
+    if (!manifest.convergence) {
+      manifest.convergence = {};
+    }
+    manifest.convergence[gate.field] = true;
+
+    // AC-1.4: Append decision_log entry
+    if (!Array.isArray(manifest.decision_log)) {
+      manifest.decision_log = [];
+    }
+    manifest.decision_log.push({
+      timestamp: new Date().toISOString(),
+      actor: 'agent',
+      action: 'convergence_auto_updated',
+      details: `Auto-set convergence.${gate.field} = true after ${agentType} subagent completion.`,
+    });
+
+    manifest.updated_at = new Date().toISOString();
+
+    // Atomic write: write to temp file then rename over original
+    const tmpPath = manifestPath + '.tmp.' + process.pid;
+    writeFileSync(tmpPath, JSON.stringify(manifest, null, 2) + '\n');
+    renameSync(tmpPath, manifestPath);
+
+    return true;
+  } catch (err) {
+    // AC-1.6: Fail-open on any error -- fall back to text-only reminder
+    process.stderr.write(
+      `[convergence-gate-reminder] WARNING: Manifest auto-update failed: ${err.message}\n`
+    );
+    return false;
+  }
+}
+
 async function main() {
   try {
     const raw = await readStdin();
@@ -131,15 +225,27 @@ async function main() {
 
     // AC1.2: Extract agent_type field (DEC-001)
     const agentType = input.agent_type || '';
-    const reminder = buildReminder(agentType);
+    const gate = GATE_MAP[agentType];
 
-    if (reminder) {
-      // AC1.4: Output additionalContext for mapped subagent types
-      console.log(JSON.stringify({ additionalContext: reminder }));
-    } else {
-      // AC1.5: Output {} for unmapped subagent types
+    if (!gate) {
+      // AC-1.9: Unmapped agent type -- output {} with no manifest interaction
       console.log('{}');
+      process.exit(0);
     }
+
+    // AC-1.2, AC-1.3: Check status field for manifest update eligibility
+    // Absent/undefined status is treated as success (backwards compatibility)
+    const status = input.status;
+    const shouldUpdateManifest = status === undefined || status === 'success';
+
+    if (shouldUpdateManifest) {
+      // AC-1.1: Attempt manifest auto-update (fail-open via tryUpdateManifest)
+      tryUpdateManifest(gate, agentType);
+    }
+
+    // AC-1.5: Always emit text reminder regardless of manifest update result
+    const reminder = buildReminder(agentType);
+    console.log(JSON.stringify({ additionalContext: reminder }));
   } catch {
     // AC1.7: Any unexpected error -- output empty JSON and exit cleanly
     console.log('{}');

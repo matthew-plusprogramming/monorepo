@@ -651,3 +651,12 @@ Before committing a bug fix discovered during refactoring:
 - [ ] Verified all tests still pass
 - [ ] Filled verification checklist
 - [ ] Kept bug fix commit separate from refactoring commits
+
+## Acceptable Assumption Domains
+
+Per the [Self-Answer Protocol](../memory-bank/self-answer-protocol.md), reasoning-tier (tier 4) self-resolution is permitted only within these domains:
+
+- **Refactoring scope**: Boundaries of safe structural changes that preserve behavior
+- **Pattern selection**: Choosing between equivalent refactoring strategies
+
+Escalate all questions about intended behavior, API contracts, or functional requirements.

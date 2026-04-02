@@ -462,3 +462,12 @@ If code behavior is unclear:
 - Tests don't cover this case
 - Documented as "no-op" based on code reading, needs verification
 ```
+
+## Acceptable Assumption Domains
+
+Per the [Self-Answer Protocol](../memory-bank/self-answer-protocol.md), reasoning-tier (tier 4) self-resolution is permitted only within these domains:
+
+- **Documentation structure**: Section ordering, heading levels, formatting conventions
+- **Example selection**: Choosing representative examples when spec does not prescribe them
+
+Escalate all questions about API semantics, behavioral descriptions, or accuracy of documented behavior.

@@ -672,3 +672,13 @@ Implementer subagent will:
 - Escalate if spec has gaps
 
 Your job is to make their job clear and unambiguous.
+
+## Acceptable Assumption Domains
+
+Per the [Self-Answer Protocol](../memory-bank/self-answer-protocol.md), reasoning-tier (tier 4) self-resolution is permitted only within these domains:
+
+- **Spec structure**: Section ordering, formatting conventions, AC numbering schemes
+- **Task decomposition**: Granularity of task breakdown when requirements are clear
+- **Test strategy classification**: Choosing between unit/integration/structural test types
+
+Escalate all questions about requirements interpretation, behavioral decisions, or scope boundaries.

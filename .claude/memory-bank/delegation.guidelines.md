@@ -144,6 +144,17 @@ You retain ownership of:
 
 **Subagent outputs must be summarized to < 200 words before reuse in main context.**
 
+## Self-Answer Protocol Integration
+
+All dispatched subagents follow the [Self-Answer Protocol](./self-answer-protocol.md). When dispatching agents:
+
+- Agents self-resolve questions by consulting the four-tier hierarchy (code > spec > memory > reasoning) before escalating
+- Each agent's Acceptable Assumption Domains (declared in `.claude/agents/*.md`) constrain reasoning-tier self-resolution
+- Agents include a `self_resolutions` sideband field in their return payload (alongside status, summary, blockers, artifacts)
+- If an agent's return contains `research_depth_warning`, review whether the agent is under-researching
+
+The protocol reduces unnecessary escalations without removing the human from genuinely ambiguous decisions.
+
 ---
 
 ## Hard Token Budgets

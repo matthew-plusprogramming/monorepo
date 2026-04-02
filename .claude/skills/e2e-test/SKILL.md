@@ -11,7 +11,7 @@ user-invocable: true
 
 Generate end-to-end tests that exercise the real deployed system through its external surfaces. Tests are derived from spec contracts only -- never from implementation code.
 
-**Key Input**: Spec group with cross-boundary contracts at `.claude/specs/groups/<spec-group-id>/`
+**Key Input**: Spec group at `.claude/specs/groups/<spec-group-id>/`. Dispatched by default for all spec-based workflows; specs opt out via `e2e_skip: true` in frontmatter.
 
 ## Usage
 
@@ -25,30 +25,30 @@ Generate end-to-end tests that exercise the real deployed system through its ext
 Before using this skill, verify:
 
 1. **Spec group exists** at `.claude/specs/groups/<spec-group-id>/`
-2. **Spec has cross-boundary contracts** (HTTP, SSE, WebSocket, database, external service boundaries)
-3. **Contract templates available** at `.claude/contracts/templates/` (REST API, event, data model, behavioral)
+2. **Spec does not have `e2e_skip: true`** -- if it does, report E2E gate as **opted-out** and exit
+3. **Contract templates available** at `.claude/contracts/templates/` (REST API, event, data model, behavioral) -- if the spec has cross-boundary contracts
 4. **`tests/e2e/` directory exists** (created by Task 3b or present in project)
 
-If the spec has only internal contracts (module-to-module within same process), report E2E gate as **N/A** and exit.
+For specs without cross-boundary contracts, generate smoke tests that verify the spec's acceptance criteria are exercisable through external surfaces.
 
-## 3-Way Parallel Dispatch
+## 3-Way Parallel Dispatch (Default)
 
-This skill runs as part of a 3-way parallel dispatch when a spec has cross-boundary contracts:
+This skill runs as part of a 3-way parallel dispatch by default for all spec-based workflows:
 
 ```
 Spec Approved + Challenges Pass
         |
-   [Has cross-boundary contracts?]
+   [Spec has e2e_skip: true?]
         |                    |
-       YES                  NO
+       YES                  NO (default)
         |                    |
-  3-way parallel      2-way parallel
+  2-way parallel      3-way parallel
   - implementer       - implementer
   - test-writer       - test-writer
-  - e2e-test-writer
+                      - e2e-test-writer
 ```
 
-The e2e-test-writer has no ordering dependency on the implementer or test-writer. All three agents work from the spec only.
+The e2e-test-writer is dispatched by default. Specs opt out by setting `e2e_skip: true` with a valid `e2e_skip_rationale` (one of: `pure-refactor`, `test-infra`, `type-only`, `docs-only`) in the spec frontmatter. The e2e-test-writer has no ordering dependency on the implementer or test-writer. All three agents work from the spec only.
 
 ## Independent Verification (Practice 2.4)
 

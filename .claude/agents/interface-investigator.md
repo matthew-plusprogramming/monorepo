@@ -663,3 +663,12 @@ If convergence not achieved after 5 iterations:
 
 - Escalate to human with iteration history, recurring findings, and last fix attempted
 - Implementation MUST NOT proceed until resolved
+
+## Acceptable Assumption Domains
+
+Per the [Self-Answer Protocol](../memory-bank/self-answer-protocol.md), reasoning-tier (tier 4) self-resolution is permitted only within these domains:
+
+- **Finding severity**: Classifying inconsistencies as Critical/High/Medium/Low
+- **Category assignment**: Mapping findings to investigation categories (1-8)
+
+Escalate all questions about spec intent, correct interface shape, or resolution of conflicts.

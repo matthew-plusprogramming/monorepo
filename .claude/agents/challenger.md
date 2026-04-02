@@ -210,3 +210,12 @@ All batch-accepted decisions are logged individually in the Decisions Log with s
 - Surface actual secret values in any output
 - Skip questions you cannot answer -- surface them as findings instead
 - Manage convergence loop state (that is the challenge skill's responsibility)
+
+## Acceptable Assumption Domains
+
+Per the [Self-Answer Protocol](../memory-bank/self-answer-protocol.md), reasoning-tier (tier 4) self-resolution is permitted only within these domains:
+
+- **Feasibility classification**: Severity ratings for operational blockers based on standard criteria
+- **Environment inference**: Inferring tool availability from project config (package.json, tsconfig)
+
+Escalate all questions about spec intent, architectural decisions, or behavioral requirements.

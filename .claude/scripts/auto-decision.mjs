@@ -94,7 +94,20 @@ function hasFieldReference(recommendation) {
   if (!recommendation || typeof recommendation !== 'string') return false;
 
   // Check for dot-notation field paths (e.g., "convergence.spec_complete")
-  if (/[a-zA-Z_][a-zA-Z0-9_]*\.[a-zA-Z_][a-zA-Z0-9_]*/.test(recommendation)) return true;
+  // Require at least one segment to be 3+ chars to avoid matching common
+  // abbreviations like "e.g.", "i.e.", "a.m.", "p.m."
+  const dotMatch = recommendation.match(/[a-zA-Z_][a-zA-Z0-9_]*\.[a-zA-Z_][a-zA-Z0-9_]*/g);
+  if (dotMatch) {
+    const COMMON_ABBREVIATIONS = new Set(['e.g', 'i.e', 'a.m', 'p.m', 'vs', 'etc', 'al']);
+    for (const m of dotMatch) {
+      const lower = m.toLowerCase();
+      // Skip known abbreviations
+      if (COMMON_ABBREVIATIONS.has(lower)) continue;
+      const parts = m.split('.');
+      // Accept if at least one segment is 3+ chars (real field references)
+      if (parts[0].length >= 3 || parts[1].length >= 3) return true;
+    }
+  }
 
   // Check for backtick-quoted identifiers (e.g., `review_state`)
   if (/`[a-zA-Z_][a-zA-Z0-9_]*`/.test(recommendation)) return true;

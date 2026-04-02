@@ -205,3 +205,12 @@ After successful push:
 3. Manifest updated with new PRD version
 4. Report changes to orchestrator
 5. Remind user PRD is now draft and needs human review
+
+## Acceptable Assumption Domains
+
+Per the [Self-Answer Protocol](../memory-bank/self-answer-protocol.md), reasoning-tier (tier 4) self-resolution is permitted only within these domains:
+
+- **Amendment formatting**: D-028 entry structure, section placement
+- **Discovery classification**: Categorizing implementation findings for PRD relevance
+
+Escalate all questions about requirement changes, scope adjustments, or stakeholder intent.

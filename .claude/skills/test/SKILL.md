@@ -9,22 +9,6 @@ user-invocable: true
 
 ## Required Context
 
-### Trace Context
-
-Before starting, read trace files for the modules relevant to your test targets.
-Treat trace data as advisory -- verify critical assumptions (file existence, export
-availability) against source before irreversible decisions.
-
-**How to resolve relevant traces:**
-
-1. Identify the file paths under test from the spec evidence table or acceptance criteria
-2. Load `.claude/traces/trace.config.json` and match each file path against module `fileGlobs` to find the owning module ID
-3. For each matched module, read `.claude/traces/low-level/<module-id>.json`
-4. Check freshness: compare the trace file's `mtime` against the staleness threshold (use `isTraceStale(moduleId, config)` from `.claude/scripts/lib/trace-utils.mjs` if available). Stale traces are still useful but verify critical assumptions against source
-5. If no `.claude/traces/` directory, `trace.config.json`, or matching modules exist, skip this section entirely and proceed without traces -- no error or warning needed
-
-**Token budget**: Keep total trace reads under 5K tokens in dispatch context.
-
 ## Pre-Flight Challenge
 
 Before beginning work, address these operational feasibility questions:
