@@ -209,3 +209,11 @@ agents/ephemeral/*
 .worktrees/
 
 # End of https://www.toptal.com/developers/gitignore/api/macos,windows,node
+
+# metaclaude:begin (managed by metaclaude sync - do not edit)
+.claude/context/session.json
+.claude/context/session.log
+!.claude/context/archive/
+.claude/.backups/
+.claude/coordination/trace-reads.json
+# metaclaude:end
