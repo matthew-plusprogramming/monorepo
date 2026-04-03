@@ -136,13 +136,13 @@ Quality gates are not single-pass. Each gate runs in an iterative loop: **check 
 
 **Loop state** (owned by orchestrating agent, not subagents): `{ gate, iteration_count, clean_pass_count, max_iterations: 5, required_clean_passes: 2, findings_history: [] }`
 
-**Recording convergence**: After a gate converges (2 consecutive clean passes), record it for enforcement:
+**Recording convergence**: After a gate converges (2 consecutive clean passes), record it for enforcement. The `clean_pass_count` is derived from the evidence array -- you do not pass a count:
 
 ```
-node .claude/scripts/session-checkpoint.mjs update-convergence <gate_name> <clean_pass_count>
+node .claude/scripts/session-checkpoint.mjs update-convergence <gate_name>
 ```
 
-Gate names: `code_review`, `security_review`, `investigation`, `challenger`. This writes to `session.convergence.<gate>.clean_pass_count` which the coercive hooks read. Do NOT write to session.json manually — always use this command.
+Gate names: `code_review`, `security_review`, `investigation`, `challenger`, `unifier`, `completion_verifier`. This derives `session.convergence.<gate>.clean_pass_count` from the evidence array, which the coercive hooks read. Do NOT write to session.json manually -- always use this command.
 
 ### Autonomous Convergence
 

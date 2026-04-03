@@ -22,7 +22,7 @@
  * Spec: as-004-low-level-trace, as-005-trace-generate-command, as-013-trace-bootstrap
  */
 
-import { readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync, statSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync, statSync, renameSync, unlinkSync } from 'node:fs';
 import { join, dirname, basename } from 'node:path';
 
 import { cpus } from 'node:os';
@@ -36,6 +36,7 @@ import {
   resolveProjectRoot,
   formatTimestamp,
   sanitizeMarkdown,
+  matchesGlob,
   LOW_LEVEL_TRACE_DIR,
   loadStalenessMetadata,
   writeStalenessMetadata,
@@ -69,6 +70,50 @@ const WORKER_CACHE_THRESHOLD_BYTES = 256 * 1024 * 1024;
 
 /** Default worker concurrency cap (AC-7) */
 const DEFAULT_MAX_WORKERS = 4;
+
+/** AC-5.2: Sidecar file size warning threshold in bytes (default 10MB) */
+const SIDECAR_SIZE_WARNING_BYTES = 10 * 1024 * 1024;
+
+/** AC-3.6: Stale temp file age threshold in milliseconds (1 hour) */
+const STALE_TEMP_FILE_AGE_MS = 60 * 60 * 1000;
+
+// =============================================================================
+// Stale Temp File Cleanup (AC-3.6)
+// =============================================================================
+
+/**
+ * Clean up stale .tmp.* files in the given directory.
+ *
+ * AC-3.6: On startup, scans for .tmp.* files older than STALE_TEMP_FILE_AGE_MS
+ * (1 hour) and deletes them. These can accumulate from crashed trace generation
+ * processes.
+ *
+ * @param {string} dir - Directory to scan for stale temp files
+ */
+function cleanupStaleTempFiles(dir) {
+  try {
+    const entries = readdirSync(dir);
+    const now = Date.now();
+
+    for (const entry of entries) {
+      if (!entry.includes('.tmp.')) continue;
+
+      const filePath = join(dir, entry);
+      try {
+        const stat = statSync(filePath);
+        const ageMs = now - stat.mtimeMs;
+        if (ageMs > STALE_TEMP_FILE_AGE_MS) {
+          unlinkSync(filePath);
+          process.stderr.write(`[trace] Cleaned up stale temp file: ${entry} (age: ${Math.round(ageMs / 60000)}min)\n`);
+        }
+      } catch {
+        // Stat or unlink failed -- skip this file
+      }
+    }
+  } catch {
+    // Directory read failed -- skip cleanup
+  }
+}
 
 // =============================================================================
 // File Content Cache (AC-4)
@@ -906,7 +951,42 @@ export function analyzeFile(filePath, projectRoot, configOrExports) {
  */
 export function generateLowLevelTrace(moduleConfig, traceConfig, projectRoot, knownExports) {
   // Find all files matching the module's globs
-  const matchingFiles = findFilesMatchingGlobs(moduleConfig.fileGlobs, projectRoot);
+  let matchingFiles = findFilesMatchingGlobs(moduleConfig.fileGlobs, projectRoot);
+
+  // AC-2.1: Filter out files matching globalExcludes (exclusion takes precedence over fileGlobs)
+  const globalExcludes = traceConfig.globalExcludes || [];
+  if (globalExcludes.length > 0) {
+    const preFilterCount = matchingFiles.length;
+    matchingFiles = matchingFiles.filter(filePath => {
+      for (const pattern of globalExcludes) {
+        if (matchesGlob(filePath, pattern)) {
+          return false; // Excluded
+        }
+      }
+      return true;
+    });
+
+    // AC-1.6: Warn if any pattern matches >90% of a module's files
+    if (preFilterCount > 0) {
+      const excludedCount = preFilterCount - matchingFiles.length;
+      const excludedPct = excludedCount / preFilterCount;
+      if (excludedPct > 0.9) {
+        process.stderr.write(
+          `[trace] WARNING: globalExcludes patterns matched ${excludedCount}/${preFilterCount} files ` +
+          `(${(excludedPct * 100).toFixed(0)}%) in module "${moduleConfig.id}". ` +
+          `Patterns: ${globalExcludes.join(', ')}\n`
+        );
+      }
+    }
+
+    // AC-2.3: Warn when all files in a module are excluded
+    if (matchingFiles.length === 0 && preFilterCount > 0) {
+      process.stderr.write(
+        `[trace] WARNING: All ${preFilterCount} files in module "${moduleConfig.id}" ` +
+        `were excluded by globalExcludes. Module will have an empty files array.\n`
+      );
+    }
+  }
 
   // Sort files for deterministic output
   matchingFiles.sort();
@@ -950,10 +1030,23 @@ export function generateLowLevelTrace(moduleConfig, traceConfig, projectRoot, kn
  */
 export function buildExportIndex(config, projectRoot) {
   const exportIndex = new Map();
+  const globalExcludes = config.globalExcludes || [];
 
   for (const mod of config.modules) {
     const matchingFiles = findFilesMatchingGlobs(mod.fileGlobs, projectRoot);
     for (const filePath of matchingFiles) {
+      // AC-2.1: Skip files matching globalExcludes
+      if (globalExcludes.length > 0) {
+        let excluded = false;
+        for (const pattern of globalExcludes) {
+          if (matchesGlob(filePath, pattern)) {
+            excluded = true;
+            break;
+          }
+        }
+        if (excluded) continue;
+      }
+
       // Only analyze TS/JS files
       if (!/\.(ts|tsx|js|jsx|mjs|cjs)$/.test(filePath)) continue;
 
@@ -1096,14 +1189,68 @@ export function writeLowLevelTrace(moduleConfig, traceConfig, projectRoot, known
   const lowLevelDir = join(projectRoot, LOW_LEVEL_TRACE_DIR);
   mkdirSync(lowLevelDir, { recursive: true });
 
-  // REQ-012: Write JSON using atomic write-rename (trace file first per write ordering guarantee)
-  const jsonPath = join(lowLevelDir, `${moduleConfig.id}.json`);
-  atomicWriteFile(jsonPath, JSON.stringify(trace, null, 2) + '\n');
+  // AC-3.1, AC-3.2: Separate calls data into sidecar file
+  const sidecarFileName = `${moduleConfig.id}.calls.json`;
+  const sidecarPath = join(lowLevelDir, sidecarFileName);
+  const sidecarData = {};
 
-  // Write markdown using atomic write-rename
+  for (const file of trace.files) {
+    // Build per-file keyed sidecar object
+    if (file.calls && file.calls.length > 0) {
+      sidecarData[file.filePath] = file.calls;
+    } else {
+      sidecarData[file.filePath] = [];
+    }
+  }
+
+  // AC-3.4, AC-3.5: Atomic write-then-rename with PID-based temp filename
+  const sidecarTmpPath = `${sidecarPath}.tmp.${process.pid}`;
+  try {
+    writeFileSync(sidecarTmpPath, JSON.stringify(sidecarData, null, 2) + '\n');
+    renameSync(sidecarTmpPath, sidecarPath);
+  } catch (err) {
+    // AC-5.1: Log error with OS code, clean up temp (best-effort), continue
+    process.stderr.write(
+      `[trace] ERROR: Failed to write sidecar ${sidecarFileName}: ${err.message}` +
+      (err.code ? ` (${err.code})` : '') + '\n'
+    );
+    try { unlinkSync(sidecarTmpPath); } catch { /* best-effort cleanup */ }
+  }
+
+  // AC-5.2: Size warning for large sidecar files
+  try {
+    const sidecarStat = statSync(sidecarPath);
+    if (sidecarStat.size > SIDECAR_SIZE_WARNING_BYTES) {
+      process.stderr.write(
+        `[trace] WARNING: Sidecar file ${sidecarFileName} exceeds ${SIDECAR_SIZE_WARNING_BYTES / (1024 * 1024)}MB ` +
+        `(actual: ${(sidecarStat.size / (1024 * 1024)).toFixed(1)}MB)\n`
+      );
+    }
+  } catch { /* sidecar stat failed -- skip */ }
+
+  // AC-3.2: Remove inline calls from file entries, add callsFile reference
+  for (const file of trace.files) {
+    delete file.calls;
+  }
+  trace.callsFile = sidecarFileName;
+
+  // Write markdown using the full trace data (before calls removal -- use sidecar data for markdown)
+  // Reconstruct file.calls temporarily for markdown generation
+  for (const file of trace.files) {
+    file.calls = sidecarData[file.filePath] || [];
+  }
   const mdPath = join(lowLevelDir, `${moduleConfig.id}.md`);
   const markdown = generateLowLevelMarkdown(trace, moduleConfig);
   atomicWriteFile(mdPath, markdown);
+
+  // Remove calls again for the JSON write
+  for (const file of trace.files) {
+    delete file.calls;
+  }
+
+  // REQ-012: Write JSON using atomic write-rename (trace file first per write ordering guarantee)
+  const jsonPath = join(lowLevelDir, `${moduleConfig.id}.json`);
+  atomicWriteFile(jsonPath, JSON.stringify(trace, null, 2) + '\n');
 
   // REQ-013: Check trace file size and emit warnings
   checkTraceFileSize(jsonPath, moduleConfig.id);
@@ -1134,6 +1281,9 @@ export async function generateAllLowLevelTraces(targetModuleId, projectRoot, par
   // Ensure traces directory structure exists
   const lowLevelDir = join(root, LOW_LEVEL_TRACE_DIR);
   mkdirSync(lowLevelDir, { recursive: true });
+
+  // AC-3.6: Clean up stale .tmp.* files older than 1 hour before generation begins
+  cleanupStaleTempFiles(lowLevelDir);
 
   // M1: Build cross-module export index for call graph resolution (REQ-002)
   const knownExports = buildExportIndex(config, root);
@@ -1322,6 +1472,16 @@ export function validateLowLevelTrace(trace) {
     return { valid: false, errors };
   }
 
+  // AC-3.7: When callsFile is present, file.calls is allowed to be absent/undefined
+  const hasCallsFile = typeof trace.callsFile === 'string' || trace.callsFile === null;
+
+  // Validate callsFile field if present (AC-3.2: string | null)
+  if (trace.callsFile !== undefined) {
+    if (trace.callsFile !== null && typeof trace.callsFile !== 'string') {
+      errors.push('callsFile must be a string or null');
+    }
+  }
+
   // Validate each file entry
   for (let i = 0; i < trace.files.length; i++) {
     const file = trace.files[i];
@@ -1361,29 +1521,35 @@ export function validateLowLevelTrace(trace) {
         }
       }
     }
-    if (!Array.isArray(file.calls)) {
-      errors.push(`${prefix}.calls must be an array`);
-    } else {
-      // M1 (Task 1.5d): Validate each calls[] entry against CallEntry schema
-      for (let j = 0; j < file.calls.length; j++) {
-        const call = file.calls[j];
-        const callPrefix = `${prefix}.calls[${j}]`;
-        if (typeof call.callerFile !== 'string') {
-          errors.push(`${callPrefix}.callerFile must be a string`);
-        }
-        if (typeof call.callerLine !== 'number' || !Number.isInteger(call.callerLine)) {
-          errors.push(`${callPrefix}.callerLine must be an integer`);
-        }
-        if (typeof call.calleeName !== 'string') {
-          errors.push(`${callPrefix}.calleeName must be a string`);
-        }
-        if (call.calleeFile !== null && typeof call.calleeFile !== 'string') {
-          errors.push(`${callPrefix}.calleeFile must be a string or null`);
-        }
-        if (call.calleeLine !== null && (typeof call.calleeLine !== 'number' || !Number.isInteger(call.calleeLine))) {
-          errors.push(`${callPrefix}.calleeLine must be an integer or null`);
+    // AC-3.7: file.calls is accepted as either an array or absent/undefined when callsFile is present
+    if (file.calls !== undefined) {
+      if (!Array.isArray(file.calls)) {
+        errors.push(`${prefix}.calls must be an array`);
+      } else {
+        // M1 (Task 1.5d): Validate each calls[] entry against CallEntry schema
+        for (let j = 0; j < file.calls.length; j++) {
+          const call = file.calls[j];
+          const callPrefix = `${prefix}.calls[${j}]`;
+          if (typeof call.callerFile !== 'string') {
+            errors.push(`${callPrefix}.callerFile must be a string`);
+          }
+          if (typeof call.callerLine !== 'number' || !Number.isInteger(call.callerLine)) {
+            errors.push(`${callPrefix}.callerLine must be an integer`);
+          }
+          if (typeof call.calleeName !== 'string') {
+            errors.push(`${callPrefix}.calleeName must be a string`);
+          }
+          if (call.calleeFile !== null && typeof call.calleeFile !== 'string') {
+            errors.push(`${callPrefix}.calleeFile must be a string or null`);
+          }
+          if (call.calleeLine !== null && (typeof call.calleeLine !== 'number' || !Number.isInteger(call.calleeLine))) {
+            errors.push(`${callPrefix}.calleeLine must be an integer or null`);
+          }
         }
       }
+    } else if (!hasCallsFile) {
+      // file.calls is absent and no callsFile -- this is an error in legacy format
+      errors.push(`${prefix}.calls must be an array`);
     }
     if (!Array.isArray(file.events)) {
       errors.push(`${prefix}.events must be an array`);
@@ -1762,7 +1928,7 @@ export async function generateAllTraces(options = {}) {
       const result = writeLowLevelTrace(mod, config, root, knownExports);
       lowLevelResults.push(result);
       modulesProcessed++;
-      filesGenerated += 2; // .json + .md
+      filesGenerated += 3; // .json + .md + .calls.json
 
       // Update staleness.json for this module's files
       if (!stalenessData.modules[mod.id]) {
@@ -1863,7 +2029,7 @@ export async function generateAllTraces(options = {}) {
   // Step 1: Generate low-level traces for all modules (or target module)
   // Must happen before high-level trace so dependency aggregation has import data.
   const { modulesProcessed, results: lowLevelResults } = await generateAllLowLevelTraces(targetModuleId, root, parallelWorkers);
-  filesGenerated += lowLevelResults.length * 2; // .json + .md per module
+  filesGenerated += lowLevelResults.length * 3; // .json + .md + .calls.json per module
 
   // Step 2: Build/rebuild staleness.json from the generated traces
   const config = loadTraceConfig(root);

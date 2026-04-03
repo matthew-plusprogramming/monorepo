@@ -185,6 +185,38 @@
       },
       "required": ["in_flight", "completed_this_session"]
     },
+    "convergence": {
+      "type": "object",
+      "description": "Per-gate convergence state tracking with clean pass counts",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "clean_pass_count": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Number of consecutive clean passes recorded for this gate"
+          }
+        },
+        "required": ["clean_pass_count"]
+      }
+    },
+    "convergence_evidence": {
+      "type": "object",
+      "description": "Per-gate evidence arrays recording each convergence pass with structured metadata",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "passes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/pass_evidence_record"
+            },
+            "description": "Ordered array of pass evidence records for this gate"
+          }
+        },
+        "required": ["passes"]
+      }
+    },
     "history": {
       "type": "array",
       "items": {
@@ -281,6 +313,62 @@
         "status"
       ]
     },
+    "pass_evidence_record": {
+      "type": "object",
+      "description": "A structured record of a single convergence pass with verifiable metadata",
+      "properties": {
+        "pass_number": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Auto-incremented pass number (1-indexed)"
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "description": "ISO 8601 timestamp when the pass was recorded"
+        },
+        "agent_type": {
+          "type": "string",
+          "description": "The convergence agent type that performed this pass"
+        },
+        "findings_count": {
+          "type": ["integer", "null"],
+          "minimum": 0,
+          "description": "Number of findings reported by the agent (null if extraction failed)"
+        },
+        "findings_hash": {
+          "type": ["string", "null"],
+          "pattern": "^[a-f0-9]{64}$",
+          "description": "SHA-256 hex hash of sorted finding IDs (null if extraction failed)"
+        },
+        "clean": {
+          "type": "boolean",
+          "description": "Whether this pass was clean (no findings)"
+        },
+        "record_source": {
+          "type": "string",
+          "enum": ["hook", "manual", "manual_fallback"],
+          "description": "How this record was created: hook (automated), manual (agent CLI), manual_fallback (hook extraction failure)"
+        },
+        "auto_decision_batch_id": {
+          "type": ["string", "null"],
+          "description": "Optional link to the auto-decision engine batch that processed findings"
+        },
+        "auto_decision_complete": {
+          "type": ["boolean", "null"],
+          "description": "Whether the auto-decision batch completed successfully (null if no batch)"
+        }
+      },
+      "required": [
+        "pass_number",
+        "timestamp",
+        "agent_type",
+        "findings_count",
+        "findings_hash",
+        "clean",
+        "record_source"
+      ]
+    },
     "history_entry": {
       "type": "object",
       "description": "A historical record of a session event",
@@ -306,7 +394,9 @@
             "override_skip",
             "reset_enforcement",
             "enforcement_level_change",
-            "completion_checklist"
+            "completion_checklist",
+            "convergence_update",
+            "convergence_pass_recorded"
           ],
           "description": "Type of event that occurred"
         },

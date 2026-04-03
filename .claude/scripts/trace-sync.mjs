@@ -31,8 +31,8 @@
  * Spec: as-011-trace-sync-core, as-012-trace-sync-conflicts
  */
 
-import { readFileSync, writeFileSync, existsSync, readdirSync, statSync } from 'node:fs';
-import { join, basename } from 'node:path';
+import { readFileSync, writeFileSync, existsSync, readdirSync, statSync, renameSync, unlinkSync } from 'node:fs';
+import { join, basename, dirname } from 'node:path';
 
 import {
   resolveProjectRoot,
@@ -46,6 +46,33 @@ import {
 
 const HIGH_LEVEL_MD_PATH = '.claude/traces/high-level.md';
 const LOW_LEVEL_MD_DIR = '.claude/traces/low-level';
+
+/**
+ * Write sidecar calls file using atomic write-then-rename.
+ *
+ * AC-8.5: Writes calls data to sidecar file when sync updates calls.
+ *
+ * @param {string} jsonPath - Path to the main trace JSON file (used to derive sidecar path)
+ * @param {object} updatedJson - Updated trace JSON (with callsFile reference)
+ * @param {object} sidecarCalls - Per-file keyed calls data
+ */
+function writeSidecarCallsFile(jsonPath, updatedJson, sidecarCalls) {
+  if (!updatedJson.callsFile) return;
+
+  const dir = dirname(jsonPath);
+  const sidecarPath = join(dir, updatedJson.callsFile);
+  const sidecarTmpPath = `${sidecarPath}.tmp.${process.pid}`;
+
+  try {
+    writeFileSync(sidecarTmpPath, JSON.stringify(sidecarCalls, null, 2) + '\n');
+    renameSync(sidecarTmpPath, sidecarPath);
+  } catch (err) {
+    process.stderr.write(
+      `[trace-sync] WARNING: Failed to write sidecar ${updatedJson.callsFile}: ${err.message}\n`
+    );
+    try { unlinkSync(sidecarTmpPath); } catch { /* best-effort cleanup */ }
+  }
+}
 
 // =============================================================================
 // HTML Comment Metadata Parser
@@ -835,6 +862,20 @@ export function applyLowLevelSync(existingJson, parsedMd) {
   const changes = [];
   const updatedJson = JSON.parse(JSON.stringify(existingJson)); // Deep clone
 
+  // AC-8.5: Track sidecar calls data separately from main JSON
+  // Load existing sidecar data if callsFile reference exists
+  let sidecarCalls = {};
+  const hasSidecarFormat = typeof updatedJson.callsFile === 'string';
+
+  // If existing JSON already has sidecar format, initialize sidecar with existing file data
+  if (hasSidecarFormat) {
+    for (const file of updatedJson.files) {
+      sidecarCalls[file.filePath] = []; // Initialize empty
+    }
+  }
+
+  let callsChanged = false;
+
   for (const parsedFile of parsedMd.files) {
     const jsonFile = updatedJson.files.find(f => f.filePath === parsedFile.filePath);
     if (!jsonFile) {
@@ -854,11 +895,18 @@ export function applyLowLevelSync(existingJson, parsedMd) {
       changes.push(`Updated imports in ${parsedFile.filePath}`);
     }
 
-    // Compare and update calls
-    if (!arraysDeepEqual(jsonFile.calls, parsedFile.calls)) {
-      jsonFile.calls = parsedFile.calls;
+    // AC-8.5: Compare and update calls -- write to sidecar, not inline
+    // For comparison, use existing inline calls or empty (sidecar format has no inline calls)
+    const existingCalls = Array.isArray(jsonFile.calls) ? jsonFile.calls : [];
+    if (!arraysDeepEqual(existingCalls, parsedFile.calls)) {
+      callsChanged = true;
       changes.push(`Updated function calls in ${parsedFile.filePath}`);
     }
+    // Always populate sidecar data with parsed calls
+    sidecarCalls[parsedFile.filePath] = parsedFile.calls;
+
+    // AC-8.5: Remove inline calls from main JSON (never re-introduce)
+    delete jsonFile.calls;
 
     // Compare and update events
     if (!arraysDeepEqual(jsonFile.events, parsedFile.events)) {
@@ -867,7 +915,12 @@ export function applyLowLevelSync(existingJson, parsedMd) {
     }
   }
 
-  return { updatedJson, changes };
+  // AC-8.5: Ensure callsFile reference exists on main JSON
+  if (!updatedJson.callsFile && updatedJson.moduleId) {
+    updatedJson.callsFile = `${updatedJson.moduleId}.calls.json`;
+  }
+
+  return { updatedJson, changes, sidecarCalls, callsChanged };
 }
 
 // =============================================================================
@@ -1155,10 +1208,12 @@ export function syncAll(options = {}) {
             }
           } else {
             // JSON was modified but no field differences -- safe to proceed
-            const { updatedJson, changes } = applyLowLevelSync(jsonContent, parsed);
+            const { updatedJson, changes, sidecarCalls } = applyLowLevelSync(jsonContent, parsed);
             if (changes.length > 0) {
               if (!dryRun) {
                 writeFileSync(jsonPath, JSON.stringify(updatedJson, null, 2) + '\n');
+                // AC-8.5: Write calls to sidecar file
+                writeSidecarCallsFile(jsonPath, updatedJson, sidecarCalls);
               }
               allChanges.push(...changes.map(c => `[${moduleId}] ${c}`));
               filesUpdated++;
@@ -1166,10 +1221,12 @@ export function syncAll(options = {}) {
           }
         } else {
           // JSON not independently modified or --force: apply sync directly
-          const { updatedJson, changes } = applyLowLevelSync(jsonContent, parsed);
+          const { updatedJson, changes, sidecarCalls } = applyLowLevelSync(jsonContent, parsed);
           if (changes.length > 0) {
             if (!dryRun) {
               writeFileSync(jsonPath, JSON.stringify(updatedJson, null, 2) + '\n');
+              // AC-8.5: Write calls to sidecar file
+              writeSidecarCallsFile(jsonPath, updatedJson, sidecarCalls);
             }
             allChanges.push(...changes.map(c => `[${moduleId}] ${c}`));
             filesUpdated++;

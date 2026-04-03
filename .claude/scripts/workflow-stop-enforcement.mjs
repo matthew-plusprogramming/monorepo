@@ -28,7 +28,7 @@
  * Spec: sg-coercive-gate-enforcement
  */
 
-import { existsSync, readFileSync, writeFileSync, renameSync, unlinkSync, readdirSync, mkdirSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync, unlinkSync, readdirSync, mkdirSync } from 'node:fs';
 import { join, isAbsolute, basename } from 'node:path';
 import {
   STOP_MANDATORY_DISPATCHES,
@@ -47,6 +47,7 @@ import {
   loadOverrides,
   findMatchingOverride,
 } from './lib/hook-utils.mjs';
+import { atomicModifyJSON } from './lib/atomic-write.mjs';
 
 // =============================================================================
 // Constants
@@ -277,16 +278,14 @@ async function main() {
             // AC-6.1, AC-6.2: Log structured opt-out records in session.json
             if (optOutRecords.length > 0) {
               try {
-                const sessionPath = join(claudeDir, 'context', 'session.json');
-                const freshSession = loadSession(sessionPath);
-                if (freshSession) {
-                  freshSession.e2e_opt_outs = freshSession.e2e_opt_outs || [];
-                  freshSession.e2e_opt_outs.push(...optOutRecords);
-                  freshSession.updated_at = new Date().toISOString();
-                  const tmpPath = sessionPath + '.tmp.' + process.pid;
-                  writeFileSync(tmpPath, JSON.stringify(freshSession, null, 2) + '\n');
-                  renameSync(tmpPath, sessionPath);
-                }
+                const sessionWritePath = join(claudeDir, 'context', 'session.json');
+                atomicModifyJSON(sessionWritePath, (current) => {
+                  const s = current || {};
+                  s.e2e_opt_outs = s.e2e_opt_outs || [];
+                  s.e2e_opt_outs.push(...optOutRecords);
+                  s.updated_at = new Date().toISOString();
+                  return s;
+                });
               } catch {
                 // Fail-open on session write errors
               }
@@ -523,12 +522,12 @@ async function main() {
 
       // Record warned violation events in session.json (REQ-015)
       try {
-        const sessionPath = join(claudeDir, 'context', 'session.json');
-        const freshSession = loadSession(sessionPath);
-        if (freshSession) {
+        const sessionWritePath = join(claudeDir, 'context', 'session.json');
+        atomicModifyJSON(sessionWritePath, (current) => {
+          const s = current || {};
           for (const v of obligationViolations) {
-            freshSession.history = freshSession.history || [];
-            freshSession.history.push({
+            s.history = s.history || [];
+            s.history.push({
               timestamp: new Date().toISOString(),
               event_type: 'obligation_violation',
               details: {
@@ -540,12 +539,9 @@ async function main() {
               },
             });
           }
-          freshSession.updated_at = new Date().toISOString();
-          // CR-M2/SEC-003: Atomic write-to-temp-then-rename to prevent partial writes
-          const tmpPath = sessionPath + '.tmp.' + process.pid;
-          writeFileSync(tmpPath, JSON.stringify(freshSession, null, 2) + '\n');
-          renameSync(tmpPath, sessionPath);
-        }
+          s.updated_at = new Date().toISOString();
+          return s;
+        });
       } catch {
         // Fail-open on session write errors
       }
@@ -563,12 +559,12 @@ async function main() {
     // Record blocked obligation violation events in session.json (REQ-015)
     if (hasObligationIssues && enforcementLevel === 'graduated') {
       try {
-        const sessionPath = join(claudeDir, 'context', 'session.json');
-        const freshSession = loadSession(sessionPath);
-        if (freshSession) {
+        const sessionWritePath = join(claudeDir, 'context', 'session.json');
+        atomicModifyJSON(sessionWritePath, (current) => {
+          const s = current || {};
           for (const v of obligationViolations) {
-            freshSession.history = freshSession.history || [];
-            freshSession.history.push({
+            s.history = s.history || [];
+            s.history.push({
               timestamp: new Date().toISOString(),
               event_type: 'obligation_violation',
               details: {
@@ -580,12 +576,9 @@ async function main() {
               },
             });
           }
-          freshSession.updated_at = new Date().toISOString();
-          // CR-M2/SEC-003: Atomic write-to-temp-then-rename to prevent partial writes
-          const tmpPath2 = sessionPath + '.tmp.' + process.pid;
-          writeFileSync(tmpPath2, JSON.stringify(freshSession, null, 2) + '\n');
-          renameSync(tmpPath2, sessionPath);
-        }
+          s.updated_at = new Date().toISOString();
+          return s;
+        });
       } catch {
         // Fail-open on session write errors
       }
@@ -631,7 +624,7 @@ async function main() {
       const obligationInstructions = obligationViolations.map(v => {
         if (v.field.startsWith('convergence.')) {
           const gate = v.field.replace('convergence.', '').replace('_passed', '').replace('_converged', '');
-          return `  - ${v.field}: Run the convergence loop, then: node .claude/scripts/session-checkpoint.mjs update-convergence ${gate} 2`;
+          return `  - ${v.field}: Run the convergence loop, then: node .claude/scripts/session-checkpoint.mjs update-convergence ${gate}`;
         }
         return `  - ${v.field}: Update manifest.json to set ${v.field} = ${JSON.stringify(v.expected)}`;
       }).join('\n');

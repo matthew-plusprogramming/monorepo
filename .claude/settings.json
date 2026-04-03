@@ -249,6 +249,12 @@
             "_id": "convergence-gate-reminder",
             "type": "command",
             "command": "cd \"$CLAUDE_PROJECT_DIR\" && node .claude/scripts/convergence-gate-reminder.mjs"
+          },
+          {
+            "_source": "metaclaude",
+            "_id": "convergence-pass-recorder",
+            "type": "command",
+            "command": "cd \"$CLAUDE_PROJECT_DIR\" && node .claude/scripts/convergence-pass-recorder.mjs"
           }
         ]
       }

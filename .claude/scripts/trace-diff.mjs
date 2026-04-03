@@ -96,11 +96,25 @@ function loadCurrentLowLevelTraces(projectRoot) {
   if (!existsSync(dir)) return traces;
 
   try {
-    const jsonFiles = readdirSync(dir).filter(f => f.endsWith('.json'));
+    // AC-4.5: Exclude .calls.json sidecar files from main trace loading
+    const jsonFiles = readdirSync(dir).filter(f => f.endsWith('.json') && !f.endsWith('.calls.json'));
     for (const file of jsonFiles) {
       try {
         const data = JSON.parse(readFileSync(join(dir, file), 'utf-8'));
         const moduleId = basename(file, '.json');
+
+        // AC-4.5: If trace has callsFile, load sidecar calls data and attach to trace
+        if (data.callsFile) {
+          try {
+            const sidecarPath = join(dir, data.callsFile);
+            const sidecarData = JSON.parse(readFileSync(sidecarPath, 'utf-8'));
+            data._sidecarCalls = sidecarData;
+          } catch {
+            // Sidecar missing or corrupt -- collectCalls will handle gracefully
+            data._sidecarCalls = {};
+          }
+        }
+
         traces.set(moduleId, data);
       } catch {
         // Skip malformed files
@@ -159,7 +173,8 @@ function loadRefLowLevelTraces(ref, projectRoot) {
       { cwd: projectRoot, encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'] },
     );
 
-    const jsonFiles = listing.trim().split('\n').filter(f => f.endsWith('.json'));
+    // AC-4.5: Exclude .calls.json sidecar files from main trace loading
+    const jsonFiles = listing.trim().split('\n').filter(f => f.endsWith('.json') && !f.endsWith('.calls.json'));
 
     for (const file of jsonFiles) {
       try {
@@ -386,9 +401,19 @@ function collectCalls(trace) {
   const calls = [];
   if (!trace.files) return calls;
 
+  // AC-4.5: Use sidecar calls data when available (callsFile present, no inline file.calls)
+  const sidecarCalls = trace._sidecarCalls || null;
+
   for (const file of trace.files) {
-    if (!Array.isArray(file.calls)) continue;
-    for (const call of file.calls) {
+    // Determine calls source: sidecar or inline
+    let fileCalls;
+    if (sidecarCalls !== null) {
+      fileCalls = sidecarCalls[file.filePath] || [];
+    } else {
+      fileCalls = Array.isArray(file.calls) ? file.calls : [];
+    }
+
+    for (const call of fileCalls) {
       calls.push({
         key: `${call.callerFile}:${call.callerLine}->${call.calleeName}`,
         callerFile: call.callerFile,

@@ -41,8 +41,13 @@ function hookWrapperGlobToRegex(pattern) {
 
     if (char === '*') {
       if (pattern[i + 1] === '*') {
-        regexStr += '.*';
-        i += 2;
+        if (pattern[i + 2] === '/') {
+          regexStr += '(.*/)?';
+          i += 3;
+        } else {
+          regexStr += '.*';
+          i += 2;
+        }
       } else {
         regexStr += '[^/]*';
         i += 1;
@@ -148,7 +153,7 @@ describe('globToRegex', () => {
 
   it('should handle complex patterns with mixed wildcards', () => {
     const result = globToRegex('apps/*/src/**/*.ts');
-    expect(result).toBe('apps/[^/]*/src/.*/[^/]*\\.ts');
+    expect(result).toBe('apps/[^/]*/src/(.*/)?[^/]*\\.ts');
   });
 });
 

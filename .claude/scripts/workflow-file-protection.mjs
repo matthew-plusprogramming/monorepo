@@ -31,6 +31,7 @@ import { readStdin } from './lib/hook-utils.mjs';
 const PROTECTED_FILENAMES = [
   'gate-override.json',
   'gate-enforcement-disabled',
+  'session.json',
 ];
 
 async function main() {
@@ -62,16 +63,25 @@ async function main() {
     const fileName = basename(normalizedPath);
 
     for (const protectedName of PROTECTED_FILENAMES) {
-      if (fileName === protectedName &&
-          normalizedPath.includes(sep + 'coordination' + sep)) {
+      // Check directory context: coordination/ for enforcement files, context/ for session.json
+      const isCoordinationFile = normalizedPath.includes(sep + 'coordination' + sep);
+      const isContextFile = normalizedPath.includes(sep + 'context' + sep);
+      const isProtectedPath = protectedName === 'session.json' ? isContextFile : isCoordinationFile;
+
+      if (fileName === protectedName && isProtectedPath) {
         // AC-3.1, AC-3.2: Block the write
         process.stderr.write('\n');
         process.stderr.write('========================================\n');
         process.stderr.write('BLOCKED: Protected Enforcement File\n');
         process.stderr.write('========================================\n');
         process.stderr.write('\n');
-        process.stderr.write(`Cannot write to '${protectedName}' -- this file is protected.\n`);
-        process.stderr.write('Only human terminal writes are permitted for enforcement files.\n');
+        if (protectedName === 'session.json') {
+          process.stderr.write(`Cannot write to '${protectedName}' directly -- this file is protected.\n`);
+          process.stderr.write('All session.json writes must go through session-checkpoint.mjs CLI.\n');
+        } else {
+          process.stderr.write(`Cannot write to '${protectedName}' -- this file is protected.\n`);
+          process.stderr.write('Only human terminal writes are permitted for enforcement files.\n');
+        }
         process.stderr.write('\n');
         process.stderr.write('========================================\n');
         process.stderr.write('\n');

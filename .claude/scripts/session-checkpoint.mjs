@@ -29,8 +29,8 @@
  *   1 - Validation or operational error
  */
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync, renameSync } from 'node:fs';
-import { randomUUID } from 'node:crypto';
+import { existsSync, mkdirSync, readFileSync, writeFileSync, renameSync, unlinkSync } from 'node:fs';
+import { randomUUID, createHash } from 'node:crypto';
 import { basename, dirname, join, resolve } from 'node:path';
 import {
   ORCHESTRATOR_PREDECESSORS,
@@ -49,6 +49,8 @@ import {
   loadOverrides,
   findMatchingOverride,
 } from './lib/hook-utils.mjs';
+import { acquireLock, releaseLock } from './lib/session-lock.mjs';
+import { computeFindingsHash } from './lib/findings-hash.mjs';
 
 // Schema version for session.json
 const SESSION_VERSION = '1.0.0';
@@ -218,6 +220,7 @@ function ensureContextDir() {
 
 /**
  * Load session.json, returning null if it doesn't exist.
+ * AC-1.9: On corrupt JSON, returns null so caller can create fresh session.
  */
 function loadSession() {
   if (!existsSync(SESSION_PATH)) {
@@ -228,22 +231,57 @@ function loadSession() {
     const content = readFileSync(SESSION_PATH, 'utf-8');
     return JSON.parse(content);
   } catch (err) {
-    console.error(`Error loading session.json: ${err.message}`);
+    // AC-1.9: Corrupt JSON -- return null for fresh session creation
+    console.error(`Error loading session.json (corrupt JSON): ${err.message}. Will create fresh session.`);
     return null;
   }
 }
 
+/** Path to the session.json lockfile. */
+const LOCK_PATH = SESSION_PATH + '.lock';
+
 /**
- * Save session.json atomically using write-to-temp-then-rename pattern (AC-1.9).
- * Writes to a temporary file first, then atomically renames to prevent partial writes.
+ * Save session.json atomically using lockfile + write-to-temp-then-rename.
+ * AC-1.8: Atomic write via temp file + rename
+ * AC-1.11: Lockfile with PID and timestamp
+ * AC-1.10: Corruption recovery on rename failure
+ *
+ * @param {session} session - Session object to save
+ * @param {object} [opts] - Options
+ * @param {boolean} [opts.failOpen=false] - Lock failure behavior (default: fail-closed for CLI)
  */
-function saveSession(session) {
+function saveSession(session, opts = {}) {
   ensureContextDir();
   session.updated_at = now();
-  const data = JSON.stringify(session, null, 2) + '\n';
-  const tempPath = SESSION_PATH + '.tmp.' + process.pid;
-  writeFileSync(tempPath, data);
-  renameSync(tempPath, SESSION_PATH);
+
+  const failOpen = opts.failOpen !== undefined ? opts.failOpen : false;
+  const lockAcquired = acquireLock(LOCK_PATH, { failOpen });
+  if (!lockAcquired) {
+    if (failOpen) {
+      console.error('[session-checkpoint] WARNING: Could not acquire lock -- skipping write (fail-open)');
+      return;
+    }
+    // fail-closed: acquireLock throws
+  }
+
+  try {
+    const data = JSON.stringify(session, null, 2) + '\n';
+    const tempPath = SESSION_PATH + '.tmp.' + process.pid;
+    writeFileSync(tempPath, data);
+    try {
+      renameSync(tempPath, SESSION_PATH);
+    } catch (renameErr) {
+      // AC-1.10: Rename failure -- corruption recovery
+      console.error(
+        `[session-checkpoint] ERROR: Atomic rename failed -- OS error: ${renameErr.code || renameErr.message}, ` +
+        `source: ${tempPath}, target: ${SESSION_PATH}. Creating fresh session.`
+      );
+      const freshSession = createEmptySession();
+      writeFileSync(SESSION_PATH, JSON.stringify(freshSession, null, 2) + '\n');
+    }
+  } finally {
+    releaseLock(LOCK_PATH);
+  }
 }
 
 /**
@@ -1322,47 +1360,256 @@ function opGetStatus() {
 }
 
 /**
- * update-convergence - Write convergence state to session.json (AC-5.1 through AC-5.6).
+ * record-pass - Append a pass evidence record to convergence_evidence in session.json.
  *
- * Usage: update-convergence <gate_name> <clean_pass_count>
- * Valid gate_name: code_review, security_review, investigation, challenger
- * clean_pass_count: non-negative integer
+ * Usage: record-pass <gate_name> --findings-count <N> --findings-hash <hash>
+ *        --clean <true|false> --agent-type <type> [--source <hook|manual>]
+ *        [--auto-decision-batch-id <id>] [--auto-decision-complete <true|false>]
  *
- * Implements: REQ-016, REQ-017, REQ-018, REQ-019
+ * Implements: REQ-001 (AC-1.1), REQ-009 (AC-1.2), REQ-018 (AC-1.3),
+ *   REQ-010 (AC-1.4), REQ-007 (AC-1.5), REQ-020 (AC-1.7)
+ * Spec: sg-convergence-audit-enforcement
  */
-function opUpdateConvergence(gateName, countStr) {
-  if (!gateName || countStr === undefined || countStr === null || countStr === '') {
-    throw new Error('Usage: update-convergence <gate_name> <clean_pass_count>');
+function opRecordPass(args) {
+  // Parse gate name (first positional arg)
+  const gateName = args[0];
+  if (!gateName) {
+    throw new Error('Usage: record-pass <gate_name> --findings-count <N> --clean <true|false> --agent-type <type>');
   }
 
-  // AC-5.3: Validate gate_name against enum (REQ-018)
+  // Validate gate name
   if (!VALID_CONVERGENCE_GATES.includes(gateName)) {
     throw new Error(
       `Invalid gate_name '${gateName}'. Valid gate names: ${VALID_CONVERGENCE_GATES.join(', ')}`
     );
   }
 
-  // AC-5.4: Validate clean_pass_count is non-negative integer (REQ-018)
-  const cleanPassCount = Number(countStr);
-  if (!Number.isInteger(cleanPassCount) || cleanPassCount < 0) {
+  // Parse named arguments
+  let findingsCount = null;
+  let findingsHash = null;
+  let clean = null;
+  let agentType = null;
+  let source = 'hook';
+  let autoDecisionBatchId = null;
+  let autoDecisionComplete = null;
+
+  for (let i = 1; i < args.length; i++) {
+    switch (args[i]) {
+      case '--findings-count':
+        i++;
+        findingsCount = args[i] === 'null' ? null : Number(args[i]);
+        break;
+      case '--findings-hash':
+        i++;
+        findingsHash = args[i] === 'null' ? null : args[i];
+        break;
+      case '--clean':
+        i++;
+        clean = args[i] === 'true';
+        break;
+      case '--agent-type':
+        i++;
+        agentType = args[i];
+        break;
+      case '--source':
+        i++;
+        source = args[i];
+        break;
+      case '--auto-decision-batch-id':
+        i++;
+        autoDecisionBatchId = args[i];
+        break;
+      case '--auto-decision-complete':
+        i++;
+        autoDecisionComplete = args[i] === 'true';
+        break;
+    }
+  }
+
+  // Validate required fields
+  if (clean === null) {
+    throw new Error('Missing required argument: --clean <true|false>');
+  }
+  if (!agentType) {
+    throw new Error('Missing required argument: --agent-type <type>');
+  }
+
+  // Validate source
+  const validSources = ['hook', 'manual', 'manual_fallback'];
+  if (!validSources.includes(source)) {
+    throw new Error(`Invalid source '${source}'. Valid sources: ${validSources.join(', ')}`);
+  }
+
+  // Validate findings-hash format (64-char hex or null)
+  if (findingsHash !== null && !/^[a-f0-9]{64}$/.test(findingsHash)) {
+    throw new Error(`Invalid findings-hash '${findingsHash}'. Must be a 64-character hex string or null.`);
+  }
+
+  // Validate findings-count is non-negative integer or null
+  if (findingsCount !== null && (!Number.isInteger(findingsCount) || findingsCount < 0)) {
+    throw new Error(`Invalid findings-count '${findingsCount}'. Must be a non-negative integer or null.`);
+  }
+
+  // Load session (fail-closed for record-pass)
+  let session = loadSession();
+  if (!session) {
+    // AC-1.9: Corrupt or missing -- create fresh session
+    session = createEmptySession();
+  }
+
+  // AC-1.5: Initialize convergence_evidence schema if missing
+  if (!session.convergence_evidence) {
+    session.convergence_evidence = {};
+  }
+  if (!session.convergence_evidence[gateName]) {
+    session.convergence_evidence[gateName] = { passes: [] };
+  }
+
+  const passes = session.convergence_evidence[gateName].passes;
+
+  // AC-1.3: Duplicate detection -- compute next pass_number
+  const nextPassNumber = passes.length > 0
+    ? passes[passes.length - 1].pass_number + 1
+    : 1;
+
+  // Check for duplicate pass_number
+  if (passes.some(p => p.pass_number === nextPassNumber)) {
+    console.error(`WARNING: Duplicate pass_number ${nextPassNumber} for gate '${gateName}' -- record rejected.`);
+    process.exit(1);
+  }
+
+  // AC-1.7: Incomplete auto-decision batch marks pass as dirty
+  let effectiveClean = clean;
+  let effectiveAutoDecisionComplete = autoDecisionComplete;
+  if (autoDecisionBatchId && autoDecisionComplete === false) {
+    effectiveClean = false;
+    effectiveAutoDecisionComplete = false;
+  }
+
+  // Build pass evidence record (AC-1.1)
+  const record = {
+    pass_number: nextPassNumber,
+    timestamp: now(),
+    agent_type: agentType,
+    findings_count: findingsCount,
+    findings_hash: findingsHash,
+    clean: effectiveClean,
+    record_source: source,
+  };
+
+  // AC-1.2: Include auto-decision fields if provided
+  if (autoDecisionBatchId !== null) {
+    record.auto_decision_batch_id = autoDecisionBatchId;
+    record.auto_decision_complete = effectiveAutoDecisionComplete !== null
+      ? effectiveAutoDecisionComplete
+      : true; // defaults to true if batch ID is present
+  }
+
+  // AC-1.4: Append-only -- push new record without modifying existing ones
+  passes.push(record);
+
+  // Add history entry
+  addHistoryEntry(session, 'convergence_pass_recorded', {
+    gate_name: gateName,
+    pass_number: nextPassNumber,
+    clean: effectiveClean,
+    record_source: source,
+    agent_type: agentType,
+    message: `Recorded pass ${nextPassNumber} for ${gateName}: clean=${effectiveClean}, source=${source}`,
+  });
+
+  saveSession(session);
+  console.error(`Recorded pass ${nextPassNumber} for ${gateName}: clean=${effectiveClean}, source=${source}`);
+}
+
+/**
+ * Count consecutive clean, hook-sourced passes from the tail of the evidence array.
+ * Only passes with record_source === "hook" and clean === true count.
+ *
+ * @param {Array} passes - Array of pass evidence records
+ * @returns {number} Number of consecutive clean hook-sourced passes from tail
+ */
+function countConsecutiveCleanFromTail(passes) {
+  let count = 0;
+  for (let i = passes.length - 1; i >= 0; i--) {
+    const pass = passes[i];
+    if (pass.record_source === 'hook' && pass.clean === true) {
+      count++;
+    } else {
+      break;
+    }
+  }
+  return count;
+}
+
+/**
+ * update-convergence - Derive clean_pass_count from evidence array.
+ *
+ * Usage: update-convergence <gate_name>
+ * Valid gate_name: code_review, security_review, investigation, challenger, unifier, completion_verifier
+ *
+ * AC-2.1: Derives count from evidence (no count argument)
+ * AC-2.2: Rejects old API with numeric second argument
+ * AC-2.3: Counts consecutive clean from tail
+ * AC-2.4: Manual passes not counted
+ * AC-2.5: Empty evidence yields 0
+ * AC-2.8: >50% manual passes emits warning
+ *
+ * Implements: REQ-002, REQ-004, REQ-017, REQ-019, REQ-022
+ * Spec: sg-convergence-audit-enforcement
+ */
+function opUpdateConvergence(gateName, countStr) {
+  // AC-2.2: Reject old API with numeric second argument
+  if (countStr !== undefined && countStr !== null && countStr !== '') {
     throw new Error(
-      `Invalid clean_pass_count '${countStr}'. Must be a non-negative integer.`
+      `The update-convergence command no longer accepts a count argument.\n` +
+      `The clean_pass_count is now derived from the evidence array.\n\n` +
+      `Old API (rejected): update-convergence ${gateName} ${countStr}\n` +
+      `New API:            update-convergence ${gateName}\n\n` +
+      `To record a pass, use: record-pass ${gateName} --findings-count <N> --clean <true|false> --agent-type <type>\n` +
+      `Then call: update-convergence ${gateName}`
     );
   }
 
-  // AC-5.5: Atomic read-modify-write via saveSession (REQ-019)
+  if (!gateName) {
+    throw new Error('Usage: update-convergence <gate_name>');
+  }
+
+  // Validate gate_name against enum
+  if (!VALID_CONVERGENCE_GATES.includes(gateName)) {
+    throw new Error(
+      `Invalid gate_name '${gateName}'. Valid gate names: ${VALID_CONVERGENCE_GATES.join(', ')}`
+    );
+  }
+
+  // Atomic read-modify-write
   const session = loadSession();
   if (!session) {
     throw new Error('No session.json exists. Run "init" first.');
   }
 
-  // AC-5.6: Create convergence object if it doesn't exist (backward compatibility)
+  // Create convergence object if it doesn't exist (backward compatibility)
   if (!session.convergence) {
     session.convergence = {};
   }
-
   if (!session.convergence[gateName]) {
     session.convergence[gateName] = {};
+  }
+
+  // AC-2.1, AC-2.5: Derive clean_pass_count from evidence
+  const evidence = session.convergence_evidence?.[gateName]?.passes || [];
+  const cleanPassCount = countConsecutiveCleanFromTail(evidence);
+
+  // AC-2.8: Warn if >50% of passes are manual-sourced
+  if (evidence.length > 0) {
+    const manualCount = evidence.filter(p => p.record_source !== 'hook').length;
+    if (manualCount / evidence.length > 0.5) {
+      const warningMsg = `WARNING: >50% of passes for '${gateName}' are manual-sourced (${manualCount}/${evidence.length}). ` +
+        `The SubagentStop hook may not be functioning correctly.`;
+      console.error(warningMsg);
+      // Also emit to stdout so callers using execFileSync can capture the warning
+      console.log(warningMsg);
+    }
   }
 
   session.convergence[gateName].clean_pass_count = cleanPassCount;
@@ -1370,12 +1617,13 @@ function opUpdateConvergence(gateName, countStr) {
   addHistoryEntry(session, 'convergence_update', {
     gate_name: gateName,
     clean_pass_count: cleanPassCount,
+    evidence_count: evidence.length,
     spec_group_id: session.active_work?.spec_group_id,
-    message: `Updated convergence: ${gateName}.clean_pass_count = ${cleanPassCount}`
+    message: `Updated convergence: ${gateName}.clean_pass_count = ${cleanPassCount} (derived from ${evidence.length} evidence records)`
   });
 
   saveSession(session);
-  console.error(`Updated convergence: ${gateName}.clean_pass_count = ${cleanPassCount}`);
+  console.error(`Updated convergence: ${gateName}.clean_pass_count = ${cleanPassCount} (derived from ${evidence.length} evidence records)`);
 }
 
 // =============================================================================
@@ -1401,7 +1649,8 @@ Operations:
   set-enforcement-level <off|warn-only|graduated> Change enforcement level
   complete-work                                   Finalize completed work
   archive-incomplete                              Archive incomplete work
-  update-convergence <gate_name> <count>           Update convergence state
+  record-pass <gate> --findings-count <N> ...      Record convergence pass evidence
+  update-convergence <gate_name>                   Derive convergence count from evidence
   get-status                                      Output session state (JSON)
 
 Phases:
@@ -1528,6 +1777,10 @@ function main() {
 
       case 'set-enforcement-level':
         opSetEnforcementLevel(args[1]);
+        break;
+
+      case 'record-pass':
+        opRecordPass(args.slice(1));
         break;
 
       case 'update-convergence':

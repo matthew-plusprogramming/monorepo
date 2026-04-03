@@ -136,7 +136,7 @@ fs.writeFileSync(path, JSON.stringify(m, null, 2) + '\\n');
 "
 
 # Set session.json for coercive enforcement
-node .claude/scripts/session-checkpoint.mjs update-convergence investigation 2
+node .claude/scripts/session-checkpoint.mjs update-convergence investigation
 ```
 
 ### 4. Report Results

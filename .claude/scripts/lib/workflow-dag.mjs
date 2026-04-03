@@ -217,7 +217,7 @@ export const REQUIRED_CLEAN_PASSES = 2;
  * Valid convergence gate names for the update-convergence command.
  * @type {string[]}
  */
-export const VALID_CONVERGENCE_GATES = ['code_review', 'security_review', 'investigation', 'challenger'];
+export const VALID_CONVERGENCE_GATES = ['code_review', 'security_review', 'investigation', 'challenger', 'unifier', 'completion_verifier'];
 
 // =============================================================================
 // Phase Obligations (Status Obligation Enforcement)

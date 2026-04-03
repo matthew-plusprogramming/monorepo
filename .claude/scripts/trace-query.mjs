@@ -34,6 +34,65 @@ const EXIT_USAGE_ERROR = 1;
 const EXIT_NOT_FOUND = 2;
 
 // =============================================================================
+// Sidecar Calls Loading (AC-4.1, AC-4.2, AC-4.3)
+// =============================================================================
+
+/**
+ * Load calls data from a sidecar file for a given module trace.
+ *
+ * AC-4.1: When callsFile reference exists, loads from sidecar file.
+ * AC-4.2: Missing sidecar returns empty object with warning.
+ * AC-4.3: Corrupt sidecar returns empty object with warning.
+ *
+ * @param {object} trace - Parsed low-level trace JSON
+ * @param {string} projectRoot - Absolute path to project root
+ * @returns {object} Per-file keyed calls object: { [filePath]: CallEntry[] }
+ */
+function loadSidecarCalls(trace, projectRoot) {
+  // No callsFile reference -- check for inline calls (backward compat)
+  if (!trace.callsFile) {
+    return null; // Signal: use inline file.calls if available
+  }
+
+  const sidecarPath = join(projectRoot, LOW_LEVEL_TRACE_DIR, trace.callsFile);
+
+  if (!existsSync(sidecarPath)) {
+    // AC-4.2: Missing sidecar -- warn and return empty
+    process.stderr.write(`[trace-query] WARNING: Sidecar file not found: ${trace.callsFile}\n`);
+    return {};
+  }
+
+  try {
+    const raw = readFileSync(sidecarPath, 'utf-8');
+    return JSON.parse(raw);
+  } catch (err) {
+    // AC-4.3: Corrupt sidecar -- warn with parse error and return empty
+    process.stderr.write(
+      `[trace-query] WARNING: Failed to parse sidecar ${trace.callsFile}: ${err.message}\n`
+    );
+    return {};
+  }
+}
+
+/**
+ * Get calls array for a file, using sidecar data if available.
+ *
+ * Falls back to inline file.calls for backward compatibility (AC-4.4).
+ *
+ * @param {object} file - File entry from trace
+ * @param {object|null} sidecarCalls - Per-file keyed calls data, or null for inline mode
+ * @returns {Array} Calls array
+ */
+function getFileCalls(file, sidecarCalls) {
+  if (sidecarCalls !== null) {
+    // Sidecar mode: look up by file path
+    return sidecarCalls[file.filePath] || [];
+  }
+  // Legacy inline mode (AC-4.4: graceful degradation -- undefined becomes empty)
+  return Array.isArray(file.calls) ? file.calls : [];
+}
+
+// =============================================================================
 // High-Level Trace Loading
 // =============================================================================
 
@@ -163,6 +222,9 @@ function formatModuleQuery(queryResult, includeDetail, projectRoot) {
       lines.push(`*${lowLevel.files.length} files in module (v${lowLevel.version}, generated ${lowLevel.lastGenerated})*`);
       lines.push('');
 
+      // AC-4.6: Load calls from sidecar file when callsFile is present
+      const sidecarCalls = loadSidecarCalls(lowLevel, projectRoot);
+
       for (const file of lowLevel.files) {
         lines.push(`### ${file.filePath}`);
         lines.push('');
@@ -180,9 +242,10 @@ function formatModuleQuery(queryResult, includeDetail, projectRoot) {
           }).join(', '));
         }
 
-        // Function calls (M1: updated to use contract-calls-events-schema field names)
-        if (file.calls.length > 0) {
-          lines.push('**Calls**: ' + file.calls.map(c => {
+        // Function calls (AC-4.6: use sidecar calls when available)
+        const fileCalls = getFileCalls(file, sidecarCalls);
+        if (fileCalls.length > 0) {
+          lines.push('**Calls**: ' + fileCalls.map(c => {
             const target = c.calleeFile ? `${c.calleeFile}:${c.calleeLine || '?'}` : '(unresolved)';
             return `\`${c.calleeName}\` -> ${target}`;
           }).join(', '));
@@ -360,10 +423,14 @@ function queryCallGraph(functionName, projectRoot) {
     const lowLevel = loadLowLevelTrace(mod.id, projectRoot);
     if (!lowLevel || !lowLevel.files) continue;
 
-    for (const file of lowLevel.files) {
-      if (!Array.isArray(file.calls)) continue;
+    // AC-4.1: Load calls from sidecar file when callsFile is present
+    const sidecarCalls = loadSidecarCalls(lowLevel, projectRoot);
 
-      for (const call of file.calls) {
+    for (const file of lowLevel.files) {
+      // AC-4.1, AC-4.4: Use sidecar calls or fall back to inline
+      const fileCalls = getFileCalls(file, sidecarCalls);
+
+      for (const call of fileCalls) {
         // Find callers: entries where calleeName matches the function
         if (call.calleeName === functionName) {
           callers.push({
@@ -383,7 +450,7 @@ function queryCallGraph(functionName, projectRoot) {
       // Find callees: look for calls made FROM files that export this function
       const exportsFunction = file.exports && file.exports.some(e => e.symbol === functionName);
       if (exportsFunction) {
-        for (const call of file.calls) {
+        for (const call of fileCalls) {
           callees.push({
             moduleId: mod.id,
             callerFile: call.callerFile,

@@ -50,9 +50,14 @@ function globToRegex(pattern) {
 
     if (char === '*') {
       if (pattern[i + 1] === '*') {
-        // ** matches anything including /
-        regexStr += '.*';
-        i += 2;
+        // ** matches zero or more path segments including /
+        if (pattern[i + 2] === '/') {
+          regexStr += '(.*/)?';
+          i += 3; // skip **, /
+        } else {
+          regexStr += '.*';
+          i += 2;
+        }
       } else {
         // * matches anything except /
         regexStr += '[^/]*';

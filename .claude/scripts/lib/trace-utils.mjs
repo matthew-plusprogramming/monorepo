@@ -14,8 +14,8 @@
  * Spec: as-002-trace-utils
  */
 
-import { readFileSync, writeFileSync, statSync, renameSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { readFileSync, writeFileSync, statSync, renameSync, readdirSync, existsSync } from 'node:fs';
+import { join, resolve, relative } from 'node:path';
 import { execSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 
@@ -24,12 +24,17 @@ import { createHash } from 'node:crypto';
 
 /** Module-scoped cache for git ls-files result (AC-1). Populated on first call, reused thereafter. */
 let cachedGitFiles = null;
+/** Root directory the cachedGitFiles was built for. Cache invalidated when root changes. */
+let cachedGitFilesRoot = null;
 
 /** Module-scoped cache for compiled regex objects keyed by glob pattern (AC-6). */
 const regexCache = new Map();
 
 /** Default path to trace.config.json relative to project root */
 const TRACE_CONFIG_RELATIVE_PATH = '.claude/traces/trace.config.json';
+
+/** Default globalExcludes patterns applied when field is omitted from config (AC-1.1) */
+const DEFAULT_GLOBAL_EXCLUDES = ['**/__tests__/**', '**/*.test.ts', '**/*.spec.ts'];
 
 /** Default path to high-level trace JSON relative to project root */
 const HIGH_LEVEL_TRACE_RELATIVE_PATH = '.claude/traces/high-level.json';
@@ -56,9 +61,15 @@ export function globToRegex(pattern) {
 
     if (char === '*') {
       if (pattern[i + 1] === '*') {
-        // ** matches anything including /
-        regexStr += '.*';
-        i += 2;
+        // ** matches zero or more path segments including /
+        // Handle **/ pattern: match zero or more directory levels
+        if (pattern[i + 2] === '/') {
+          regexStr += '(.*/)?';
+          i += 3; // skip **, /
+        } else {
+          regexStr += '.*';
+          i += 2;
+        }
       } else {
         // * matches anything except /
         regexStr += '[^/]*';
@@ -199,6 +210,33 @@ export function loadTraceConfig(projectRoot) {
         `trace.config.json: modules[${i}].fileGlobs must be a non-empty array`,
       );
     }
+  }
+
+  // AC-1.1, AC-1.2, AC-1.3: Resolve globalExcludes with defaults
+  if (config.globalExcludes === undefined) {
+    // AC-1.1: When omitted, apply default test exclusion patterns
+    config.globalExcludes = [...DEFAULT_GLOBAL_EXCLUDES];
+  } else if (Array.isArray(config.globalExcludes)) {
+    // AC-1.2: Explicit patterns used as-is (no merge with defaults)
+    // AC-1.3: Explicit empty array [] means exclude nothing
+
+    // AC-1.4, AC-1.5: Validate each pattern for safety
+    for (let i = 0; i < config.globalExcludes.length; i++) {
+      const pattern = config.globalExcludes[i];
+      if (typeof pattern !== 'string') {
+        throw new Error(`trace.config.json: globalExcludes[${i}] must be a string, got ${typeof pattern}`);
+      }
+      // AC-1.4: Reject path traversal patterns
+      if (pattern.includes('..')) {
+        throw new Error(`trace.config.json: globalExcludes[${i}] contains path traversal ("..") which is not allowed: "${pattern}"`);
+      }
+      // AC-1.5: Reject absolute path patterns
+      if (pattern.startsWith('/')) {
+        throw new Error(`trace.config.json: globalExcludes[${i}] starts with "/" (absolute path) which is not allowed: "${pattern}"`);
+      }
+    }
+  } else {
+    throw new Error('trace.config.json: "globalExcludes" must be an array of glob pattern strings when present');
   }
 
   return config;
@@ -409,12 +447,12 @@ export function isTraceStale(moduleId, config, projectRoot, options) {
 export function findFilesMatchingGlobs(globs, root) {
   const matchingFiles = [];
 
-  try {
-    // AC-1: Use cached git ls-files result to avoid repeated subprocess spawns.
-    // The cache is populated on first call and reused for all subsequent calls
-    // within the same generation run.
-    let allFiles = cachedGitFiles;
-    if (!allFiles) {
+  // AC-1: Use cached git ls-files result to avoid repeated subprocess spawns.
+  // The cache is populated on first call and reused for all subsequent calls
+  // within the same generation run. Cache is invalidated when root changes.
+  let allFiles = cachedGitFiles;
+  if (!allFiles || cachedGitFilesRoot !== root) {
+    try {
       allFiles = execSync('git ls-files', {
         encoding: 'utf-8',
         cwd: root,
@@ -424,21 +462,55 @@ export function findFilesMatchingGlobs(globs, root) {
         .split('\n')
         .filter(Boolean);
       cachedGitFiles = allFiles;
+      cachedGitFilesRoot = root;
+    } catch {
+      // Git not available -- fall back to recursive filesystem walk
+      allFiles = walkDirectoryRecursive(root, root);
+      cachedGitFiles = allFiles;
+      cachedGitFilesRoot = root;
     }
+  }
 
-    for (const file of allFiles) {
-      for (const glob of globs) {
-        if (matchesGlob(file, glob)) {
-          matchingFiles.push(file);
-          break; // File matched, no need to check more globs for this file
-        }
+  for (const file of allFiles) {
+    for (const glob of globs) {
+      if (matchesGlob(file, glob)) {
+        matchingFiles.push(file);
+        break; // File matched, no need to check more globs for this file
       }
     }
-  } catch {
-    // Git not available -- return empty (callers handle gracefully)
   }
 
   return matchingFiles;
+}
+
+/**
+ * Recursively walk a directory and return all file paths relative to the root.
+ * Used as fallback when git ls-files is not available (e.g., non-git directories).
+ *
+ * @param {string} dir - Current directory to walk
+ * @param {string} root - Root directory for computing relative paths
+ * @returns {string[]} Array of relative file paths
+ */
+function walkDirectoryRecursive(dir, root) {
+  const results = [];
+  try {
+    const entries = readdirSync(dir, { withFileTypes: true });
+    for (const entry of entries) {
+      const fullPath = join(dir, entry.name);
+      if (entry.isDirectory()) {
+        // Skip hidden directories and node_modules
+        if (entry.name.startsWith('.') || entry.name === 'node_modules') {
+          continue;
+        }
+        results.push(...walkDirectoryRecursive(fullPath, root));
+      } else if (entry.isFile()) {
+        results.push(relative(root, fullPath));
+      }
+    }
+  } catch {
+    // Directory not readable -- skip
+  }
+  return results;
 }
 
 
@@ -451,6 +523,7 @@ export function findFilesMatchingGlobs(globs, root) {
  */
 export function resetFileCache() {
   cachedGitFiles = null;
+  cachedGitFilesRoot = null;
   regexCache.clear();
 }
 
@@ -978,3 +1051,4 @@ export const TRACE_CONFIG_PATH = TRACE_CONFIG_RELATIVE_PATH;
 export const HIGH_LEVEL_TRACE_PATH = HIGH_LEVEL_TRACE_RELATIVE_PATH;
 export const LOW_LEVEL_TRACE_DIR = LOW_LEVEL_TRACE_DIR_RELATIVE_PATH;
 export const STALENESS_JSON_PATH = STALENESS_JSON_RELATIVE_PATH;
+export { DEFAULT_GLOBAL_EXCLUDES };

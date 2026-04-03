@@ -92,11 +92,13 @@ function blockDispatch(subagentType, missing, sessionId) {
         challenger: '/challenge',
         code_review: '/code-review',
         security_review: '/security',
+        unifier: '/unify',
+        completion_verifier: '/docs (then completion-verifier)',
       };
       const skill = skillMap[prereq.gate] || prereq.gate;
       process.stderr.write(
         `  - Run the convergence loop for '${prereq.gate}' until ${prereq.required_count} consecutive clean passes are recorded.\n` +
-        `    Use: ${skill} (repeat until clean), then record with: node .claude/scripts/session-checkpoint.mjs update-convergence ${prereq.gate} ${prereq.required_count}\n`
+        `    Use: ${skill} (repeat until clean), then record with: node .claude/scripts/session-checkpoint.mjs update-convergence ${prereq.gate}\n`
       );
     }
   }
@@ -110,6 +112,90 @@ function blockDispatch(subagentType, missing, sessionId) {
   process.stderr.write('\n');
 
   process.exit(2);
+}
+
+// =============================================================================
+// Evidence Integrity Verification (AC-4.1 through AC-4.5)
+// =============================================================================
+
+/** Minimum time between passes in milliseconds (10 seconds per AC-4.2). */
+const MIN_PASS_INTERVAL_MS = 10_000;
+
+/**
+ * Verify the integrity of convergence evidence for a given gate.
+ * This is advisory-only -- anomalies produce warnings but never block dispatch.
+ *
+ * Checks (AC-4.1):
+ *   - pass_number values are sequential with no gaps
+ *   - timestamps are sequential (non-decreasing)
+ *   - evidence array length matches the highest pass_number
+ *
+ * Timing (AC-4.2):
+ *   - Passes less than 10s apart flagged as suspicious
+ *
+ * Fallback (AC-4.3, AC-4.4):
+ *   - On any error or anomaly, falls back to count-only verification
+ *
+ * @param {object} session - Session object from session.json
+ * @param {string} gateName - Gate name to verify
+ * @returns {{ warnings: string[] }} Array of advisory warnings (empty = clean)
+ */
+function verifyEvidenceIntegrity(session, gateName) {
+  const warnings = [];
+
+  try {
+    const evidence = session.convergence_evidence?.[gateName]?.passes;
+
+    if (!evidence || !Array.isArray(evidence) || evidence.length === 0) {
+      // No evidence -- nothing to verify (legacy session or empty)
+      return { warnings };
+    }
+
+    // Check sequential pass_number with no gaps
+    for (let i = 0; i < evidence.length; i++) {
+      const expectedNum = i + 1;
+      if (evidence[i].pass_number !== expectedNum) {
+        warnings.push(
+          `[evidence-integrity] WARNING: ${gateName} pass_number gap: expected ${expectedNum}, got ${evidence[i].pass_number}`
+        );
+      }
+    }
+
+    // Check array length matches highest pass_number
+    const highestPassNum = evidence[evidence.length - 1]?.pass_number;
+    if (highestPassNum !== evidence.length) {
+      warnings.push(
+        `[evidence-integrity] WARNING: ${gateName} array length (${evidence.length}) does not match highest pass_number (${highestPassNum})`
+      );
+    }
+
+    // Check sequential timestamps
+    for (let i = 1; i < evidence.length; i++) {
+      const prevTime = new Date(evidence[i - 1].timestamp).getTime();
+      const currTime = new Date(evidence[i].timestamp).getTime();
+
+      if (currTime < prevTime) {
+        warnings.push(
+          `[evidence-integrity] WARNING: ${gateName} non-sequential timestamps at passes ${i} and ${i + 1}`
+        );
+      }
+
+      // AC-4.2: Check timing plausibility (10s minimum between passes)
+      const intervalMs = currTime - prevTime;
+      if (intervalMs < MIN_PASS_INTERVAL_MS) {
+        warnings.push(
+          `[evidence-integrity] WARNING: ${gateName} suspicious timing: passes ${i} and ${i + 1} are only ${Math.round(intervalMs / 1000)}s apart (minimum: 10s)`
+        );
+      }
+    }
+  } catch (err) {
+    // AC-4.4: Script error -- fall back to trust-based count (fail-open)
+    warnings.push(
+      `[evidence-integrity] WARNING: Verification error for ${gateName}: ${err.message} -- falling back to count-only`
+    );
+  }
+
+  return { warnings };
 }
 
 // =============================================================================
@@ -193,6 +279,20 @@ async function main() {
     const result = werePrerequisitesMet(session, prerequisites);
 
     if (result.met) {
+      // Step 9b: Optional evidence integrity verification (AC-4.1 through AC-4.5)
+      // Advisory only -- warnings are logged but never block dispatch
+      try {
+        for (const prereq of prerequisites) {
+          if (prereq.type === 'convergence') {
+            const { warnings } = verifyEvidenceIntegrity(session, prereq.gate);
+            for (const w of warnings) {
+              process.stderr.write(w + '\n');
+            }
+          }
+        }
+      } catch {
+        // AC-4.4: Fail-open on any verification error
+      }
       process.exit(0); // All prerequisites met -- allow dispatch
     }
 
