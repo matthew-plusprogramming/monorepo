@@ -226,7 +226,6 @@ Agents must consult the four-tier assumption hierarchy (code > spec > memory > r
 - Always escalate observable behavior questions when only reasoning-tier evidence exists
 - Always escalate cross-tier conflicts (code says X, spec says Y)
 - Each agent declares its Acceptable Assumption Domains in `.claude/agents/*.md`
-- All self-resolutions are written to `.claude/audit/self-resolutions.jsonl` via the shared `writeAuditEntry()` function
 
 ---
 
