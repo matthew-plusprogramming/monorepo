@@ -17,6 +17,7 @@
  *   node .claude/scripts/trace-generate.mjs <module-id>      # Generate single module (low-level + high-level update)
  *   node .claude/scripts/trace-generate.mjs --low-level-only # Skip high-level trace
  *   node .claude/scripts/trace-generate.mjs --bootstrap      # Auto-detect modules and generate starter config
+ *   node .claude/scripts/trace-generate.mjs --skip-architecture  # Skip architecture.yaml generation from trace config
  *
  * Implements: REQ-AT-004, REQ-AT-005, REQ-AT-006, REQ-AT-008, REQ-AT-009, REQ-AT-011
  * Spec: as-004-low-level-trace, as-005-trace-generate-command, as-013-trace-bootstrap
@@ -58,6 +59,8 @@ import {
 import {
   analyzeSourceWithCompiler,
 } from './lib/ts-analyzer.mjs';
+
+import YAML from 'yaml';
 
 // =============================================================================
 // Constants
@@ -1867,7 +1870,8 @@ function buildExternalRefsForFile(file, mod, fileToModuleMap) {
  * @param {boolean} [options.full] - Force full regeneration, ignoring staleness state (REQ-009)
  * @param {boolean} [options.incremental] - Enable incremental mode using staleness.json (REQ-005)
  * @param {number} [options.parallelWorkers=0] - Number of worker threads for parallel module analysis (AC-7, 0 = sequential)
- * @returns {{ modulesProcessed: number, filesGenerated: number, durationMs: number, lowLevelResults: Array, highLevelVersion: number | null, incremental: boolean }}
+ * @param {boolean} [options.skipArchitecture] - Skip architecture.yaml generation from trace config
+ * @returns {{ modulesProcessed: number, filesGenerated: number, durationMs: number, lowLevelResults: Array, highLevelVersion: number | null, incremental: boolean, architectureBridge?: { written: boolean, moduleCount: number, path: string } }}
  */
 export async function generateAllTraces(options = {}) {
   const startTime = Date.now();
@@ -1877,6 +1881,7 @@ export async function generateAllTraces(options = {}) {
   const forceFull = options.full || false;
   const requestIncremental = options.incremental || false;
   const parallelWorkers = options.parallelWorkers != null ? options.parallelWorkers : 0;
+  const skipArchitecture = options.skipArchitecture || false;
 
   // AC-5.3: Ensure directory structure exists
   const tracesDir = join(root, '.claude', 'traces');
@@ -2009,6 +2014,13 @@ export async function generateAllTraces(options = {}) {
       filesGenerated += 2;
     }
 
+    // Architecture bridge: generate architecture.yaml from trace config
+    let architectureBridge;
+    if (!skipArchitecture) {
+      const traceConfig = loadTraceConfig(root);
+      architectureBridge = generateArchitectureFromTrace(traceConfig, root);
+    }
+
     // Clear file content cache after generation run to free memory
     fileContentCache.clear();
     resetFileCache();
@@ -2021,6 +2033,7 @@ export async function generateAllTraces(options = {}) {
       lowLevelResults,
       highLevelVersion,
       incremental: true,
+      ...(architectureBridge ? { architectureBridge } : {}),
     };
   }
 
@@ -2111,6 +2124,12 @@ export async function generateAllTraces(options = {}) {
     filesGenerated += 2; // high-level.json + high-level.md
   }
 
+  // Architecture bridge: generate architecture.yaml from trace config
+  let architectureBridge;
+  if (!skipArchitecture) {
+    architectureBridge = generateArchitectureFromTrace(config, root);
+  }
+
   // Clear file content cache after generation run to free memory
   fileContentCache.clear();
   resetFileCache();
@@ -2124,6 +2143,7 @@ export async function generateAllTraces(options = {}) {
     lowLevelResults,
     highLevelVersion,
     incremental: false,
+    ...(architectureBridge ? { architectureBridge } : {}),
   };
 }
 
@@ -2136,6 +2156,119 @@ export async function generateAllTraces(options = {}) {
  * @param {string} importPath - Import specifier
  * @returns {string | null} Resolved path or null
  */
+
+// =============================================================================
+// Architecture Bridge: Generate architecture.yaml from trace.config.json
+// =============================================================================
+
+/**
+ * Find the longest common path prefix of an array of glob patterns.
+ *
+ * Strips glob-specific characters (*, ?, {, }) and finds the common directory prefix.
+ * Returns the common prefix with `/**` appended.
+ *
+ * @param {string[]} globs - Array of file glob patterns
+ * @returns {string} Common parent directory with `/**` suffix
+ */
+export function findCommonGlobPrefix(globs) {
+  if (!globs || globs.length === 0) return '**';
+
+  // Extract the directory portion of each glob (before any glob chars)
+  const directories = globs.map(g => {
+    // Find the first glob character
+    const firstGlob = Math.min(
+      ...[g.indexOf('*'), g.indexOf('?'), g.indexOf('{')]
+        .filter(i => i !== -1)
+        .concat([g.length]) // fallback: no glob chars => use full length
+    );
+    // Take the substring up to the first glob char, then get the directory part
+    const prefix = g.substring(0, firstGlob);
+    // Remove trailing filename component (everything after last /)
+    const lastSlash = prefix.lastIndexOf('/');
+    return lastSlash >= 0 ? prefix.substring(0, lastSlash) : '';
+  });
+
+  if (directories.length === 0) return '**';
+
+  // Find the longest common prefix among the directory paths
+  let common = directories[0];
+  for (let i = 1; i < directories.length; i++) {
+    while (!directories[i].startsWith(common)) {
+      const lastSlash = common.lastIndexOf('/');
+      if (lastSlash < 0) {
+        common = '';
+        break;
+      }
+      common = common.substring(0, lastSlash);
+    }
+  }
+
+  return common ? `${common}/**` : '**';
+}
+
+/**
+ * Generate architecture.yaml content from trace.config.json modules.
+ *
+ * Transforms each trace module into the architecture.yaml format:
+ * - name: module.name
+ * - id: module.id (for traceability)
+ * - description: module.description
+ * - path: consolidated common parent of fileGlobs + /**
+ * - responsibilities: [module.description] (single-item array)
+ * - depends_on: [] (default, no dependency info in trace config)
+ *
+ * Only overwrites architecture.yaml if content has actually changed.
+ *
+ * @param {{ modules: Array<{ id: string, name: string, description: string, fileGlobs: string[] }> }} traceConfig - Parsed trace.config.json
+ * @param {string} projectRoot - Absolute path to project root
+ * @returns {{ written: boolean, moduleCount: number, path: string }} Result summary
+ */
+export function generateArchitectureFromTrace(traceConfig, projectRoot) {
+  const archDoc = {
+    schema_version: 1,
+    modules: traceConfig.modules.map(mod => ({
+      name: mod.name,
+      id: mod.id,
+      description: mod.description,
+      path: findCommonGlobPrefix(mod.fileGlobs),
+      responsibilities: [mod.description],
+      depends_on: [],
+    })),
+  };
+
+  const header = [
+    '# Auto-generated from trace.config.json — do not edit manually',
+    '# Regenerate with: node .claude/scripts/trace-generate.mjs --full',
+    '',
+  ].join('\n');
+
+  const yamlStr = YAML.stringify(archDoc, {
+    lineWidth: 120,
+    defaultKeyType: 'PLAIN',
+    defaultStringType: 'PLAIN',
+  });
+
+  const content = header + yamlStr;
+
+  const docsDir = join(projectRoot, '.claude', 'docs', 'structured');
+  mkdirSync(docsDir, { recursive: true });
+  const archPath = join(docsDir, 'architecture.yaml');
+
+  // Only overwrite if content has changed
+  let existing = '';
+  try {
+    existing = readFileSync(archPath, 'utf-8');
+  } catch {
+    // File does not exist yet
+  }
+
+  if (existing === content) {
+    return { written: false, moduleCount: archDoc.modules.length, path: archPath };
+  }
+
+  writeFileSync(archPath, content);
+  return { written: true, moduleCount: archDoc.modules.length, path: archPath };
+}
 
 // =============================================================================
 // Bootstrap: Auto-Detection and Initial Config Generation (AC-13.1 through AC-13.4)
@@ -2301,6 +2434,7 @@ async function main() {
   const bootstrapFlag = args.includes('--bootstrap');
   const fullFlag = args.includes('--full');
   const incrementalFlag = args.includes('--incremental');
+  const skipArchitectureFlag = args.includes('--skip-architecture');
 
   // AC-7: Parse --parallel flag (default: auto, 0 = sequential)
   let parallelWorkers = Math.min(cpus().length, DEFAULT_MAX_WORKERS);
@@ -2351,6 +2485,7 @@ async function main() {
       full: fullFlag,
       incremental: !fullFlag,
       parallelWorkers,
+      skipArchitecture: skipArchitectureFlag,
     });
 
     // AC-5.4: Output summary reporting modules processed and files generated
@@ -2367,6 +2502,10 @@ async function main() {
     }
     for (const r of result.lowLevelResults) {
       console.log(`  ${r.moduleId}: ${r.fileCount} files, version ${r.version}`);
+    }
+    if (result.architectureBridge) {
+      const ab = result.architectureBridge;
+      console.log(`  Architecture bridge: ${ab.moduleCount} modules${ab.written ? ' (updated)' : ' (unchanged)'}`);
     }
 
     process.exit(0);
