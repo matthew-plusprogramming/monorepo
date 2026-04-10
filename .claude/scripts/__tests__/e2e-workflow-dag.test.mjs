@@ -51,7 +51,7 @@ describe('AC-12.1: VALID_SUBAGENT_TYPES includes e2e-test-writer', () => {
     expect(VALID_SUBAGENT_TYPES).toContain('e2e-test-writer');
   });
 
-  it('should have 21 entries in VALID_SUBAGENT_TYPES (20 existing + e2e-test-writer) (AC-12.1)', async () => {
+  it('should have 22 entries in VALID_SUBAGENT_TYPES (20 existing + e2e-test-writer + flow-verifier) (AC-12.1)', async () => {
     // Arrange
     const mod = await loadModule();
     expect(mod).not.toBeNull();
@@ -60,7 +60,7 @@ describe('AC-12.1: VALID_SUBAGENT_TYPES includes e2e-test-writer', () => {
     const { VALID_SUBAGENT_TYPES } = mod;
 
     // Assert
-    expect(VALID_SUBAGENT_TYPES.length).toBe(21);
+    expect(VALID_SUBAGENT_TYPES.length).toBe(22);
   });
 });
 

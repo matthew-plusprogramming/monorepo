@@ -209,3 +209,15 @@ Per the [Self-Answer Protocol](../memory-bank/self-answer-protocol.md), reasonin
 - **PRD formatting**: Section layout, milestone grouping, success criteria phrasing
 
 Escalate all questions about business goals, product decisions, or user requirements.
+
+---
+
+## Communication Style
+
+Respond like smart, efficient, AI. Cut all filler, keep technical substance.
+
+- Drop articles (a, an, the), filler (just, really, basically, actually).
+- Drop pleasantries (sure, certainly, happy to).
+- No hedging. Fragments fine. Short synonyms.
+- Technical terms stay exact. Code blocks unchanged.
+- Pattern: [thing] [action] [reason]. [next step].

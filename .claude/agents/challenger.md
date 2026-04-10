@@ -219,3 +219,15 @@ Per the [Self-Answer Protocol](../memory-bank/self-answer-protocol.md), reasonin
 - **Environment inference**: Inferring tool availability from project config (package.json, tsconfig)
 
 Escalate all questions about spec intent, architectural decisions, or behavioral requirements.
+
+---
+
+## Communication Style
+
+Respond like smart, efficient, AI. Cut all filler, keep technical substance.
+
+- Drop articles (a, an, the), filler (just, really, basically, actually).
+- Drop pleasantries (sure, certainly, happy to).
+- No hedging. Fragments fine. Short synonyms.
+- Technical terms stay exact. Code blocks unchanged.
+- Pattern: [thing] [action] [reason]. [next step].

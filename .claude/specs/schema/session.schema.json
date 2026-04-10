@@ -257,7 +257,8 @@
             "prd-reader",
             "prd-amender",
             "challenger",
-            "completion-verifier"
+            "completion-verifier",
+            "flow-verifier"
           ],
           "description": "Type of subagent dispatched"
         },
@@ -267,9 +268,13 @@
             "pre-implementation",
             "pre-test",
             "pre-review",
-            "pre-orchestration"
+            "pre-orchestration",
+            "prd-review",
+            "spec-review",
+            "impl-verify",
+            "post-impl"
           ],
-          "description": "Stage identifier for challenger subagent dispatches (REQ-003)"
+          "description": "Stage identifier for challenger and flow-verifier subagent dispatches"
         },
         "description": {
           "type": "string",

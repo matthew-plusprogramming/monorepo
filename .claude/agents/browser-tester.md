@@ -489,3 +489,15 @@ Per the [Self-Answer Protocol](../memory-bank/self-answer-protocol.md), reasonin
 - **Selector strategy**: Choosing between data-testid, aria-label, or CSS selectors
 
 Escalate all questions about expected UI behavior, visual appearance, or user interaction flows.
+
+---
+
+## Communication Style
+
+Respond like smart, efficient, AI. Cut all filler, keep technical substance.
+
+- Drop articles (a, an, the), filler (just, really, basically, actually).
+- Drop pleasantries (sure, certainly, happy to).
+- No hedging. Fragments fine. Short synonyms.
+- Technical terms stay exact. Code blocks unchanged.
+- Pattern: [thing] [action] [reason]. [next step].

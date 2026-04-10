@@ -106,7 +106,8 @@ const VALID_SUBAGENT_TYPES = [
   'prd-reader',
   'prd-amender',
   'challenger',
-  'completion-verifier'
+  'completion-verifier',
+  'flow-verifier'
 ];
 
 /**

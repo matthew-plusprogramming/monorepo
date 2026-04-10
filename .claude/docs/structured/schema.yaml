@@ -16,6 +16,7 @@
 #   8. states/index.yaml   - State machine diagram source
 #   9. security.yaml       - Security boundary diagram source
 #  10. deployment.yaml     - Deployment topology diagram source
+#  11. flows/*flow-coverage*.yaml - Flow coverage reports from flow-verifier
 
 schema_version: 1
 
@@ -401,6 +402,61 @@ document_types:
           data:
             type: string
             description: Description of data being transferred
+
+  flow_coverage:
+    file: "flows/*flow-coverage*.yaml"
+    description: Flow coverage report produced by the flow-verifier at post-impl stage
+    required_fields:
+      schema_version:
+        type: integer
+        description: Schema version number
+      spec_group:
+        type: string
+        description: Spec group ID this coverage report is associated with
+      stage:
+        type: string
+        enum:
+          - prd-review
+          - spec-review
+          - impl-verify
+          - post-impl
+        description: Flow verifier stage that produced this report
+      timestamp:
+        type: string
+        description: "ISO 8601 timestamp of report generation"
+      integration_points:
+        type: list
+        description: List of integration point verification results
+        item_fields:
+          source:
+            type: string
+            required: true
+            description: Source module or component
+          target:
+            type: string
+            required: true
+            description: Target module or component
+          flow_type:
+            type: string
+            required: true
+            description: "Flow type (user, data, event, logical)"
+          verified:
+            type: boolean
+            required: true
+            description: Whether this integration point was verified
+      verified_count:
+        type: integer
+        description: Number of verified integration points
+      total_count:
+        type: integer
+        description: Total number of integration points checked
+      coverage_percentage:
+        type: number
+        description: Percentage of integration points verified (0-100)
+    optional_fields:
+      unverified_points:
+        type: list
+        description: List of integration points that could not be verified
 
   deployment:
     file: deployment.yaml

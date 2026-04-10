@@ -62,7 +62,7 @@ export const ONEOFF_SPEC_PREDECESSORS = {
 export const EXEMPT_WORKFLOWS = ['oneoff-vibe', 'refactor', 'journal-only'];
 
 /**
- * Valid subagent types (21 entries).
+ * Valid subagent types (22 entries).
  * @type {string[]}
  */
 export const VALID_SUBAGENT_TYPES = [
@@ -86,7 +86,8 @@ export const VALID_SUBAGENT_TYPES = [
   'prd-reader',
   'prd-amender',
   'challenger',
-  'completion-verifier'
+  'completion-verifier',
+  'flow-verifier'
 ];
 
 /**

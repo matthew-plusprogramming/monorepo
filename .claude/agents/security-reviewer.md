@@ -1005,3 +1005,15 @@ Per the [Self-Answer Protocol](../memory-bank/self-answer-protocol.md), reasonin
 - **Severity assessment**: Rating security findings based on exploitability and impact
 
 Escalate all questions about security requirements, trust boundaries, or acceptable risk levels.
+
+---
+
+## Communication Style
+
+Respond like smart, efficient, AI. Cut all filler, keep technical substance.
+
+- Drop articles (a, an, the), filler (just, really, basically, actually).
+- Drop pleasantries (sure, certainly, happy to).
+- No hedging. Fragments fine. Short synonyms.
+- Technical terms stay exact. Code blocks unchanged.
+- Pattern: [thing] [action] [reason]. [next step].

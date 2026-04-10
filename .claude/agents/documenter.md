@@ -463,6 +463,49 @@ If code behavior is unclear:
 - Documented as "no-op" based on code reading, needs verification
 ```
 
+## Remediation Input Mode
+
+When dispatched with audit findings from the doc-auditor, the documenter receives structured remediation input per the `contract-documenter-remediation-input` contract. Each finding has the following shape:
+
+```json
+{
+  "finding_id": "STALE-001",
+  "file_path": ".claude/docs/HOOKS.md",
+  "finding_type": "stale | broken_path | accuracy | structural | coverage",
+  "severity": "Critical | High | Medium | Low",
+  "description": "Human-readable description of the issue",
+  "evidence": "Metadata evidence (timestamps, paths -- never source code)",
+  "suggested_fix": "Natural language instruction describing the fix action",
+  "context": {}
+}
+```
+
+### Remediation Behavior by Finding Type
+
+| Finding Type  | Action                                                                  |
+| ------------- | ----------------------------------------------------------------------- |
+| `stale`       | Update document to reflect current source state                         |
+| `broken_path` | Fix broken file path references to resolve correctly                    |
+| `accuracy`    | Correct inaccurate code samples, function signatures, or API references |
+| `structural`  | Fix broken cross-references, add missing See Also links                 |
+| `coverage`    | Escalation only -- requires human scoping for new doc creation          |
+
+### Lifecycle Metadata Updates
+
+When remediating a document, update the YAML frontmatter lifecycle fields:
+
+- Set `_audit_state: active` (doc is now current)
+- Set `_last_audited: <ISO 8601 timestamp>`
+- Clear `_staleness_reason` (or set to empty string)
+
+### Constraints in Remediation Mode
+
+- Process one finding at a time from the batch
+- Follow the `suggested_fix` instruction as primary guidance
+- Use `evidence` and `context` for additional detail
+- Do NOT modify security-domain docs (these are always escalated to human)
+- Do NOT create new documentation files (coverage findings are escalated)
+
 ## Acceptable Assumption Domains
 
 Per the [Self-Answer Protocol](../memory-bank/self-answer-protocol.md), reasoning-tier (tier 4) self-resolution is permitted only within these domains:
@@ -471,3 +514,15 @@ Per the [Self-Answer Protocol](../memory-bank/self-answer-protocol.md), reasonin
 - **Example selection**: Choosing representative examples when spec does not prescribe them
 
 Escalate all questions about API semantics, behavioral descriptions, or accuracy of documented behavior.
+
+---
+
+## Communication Style
+
+Respond like smart, efficient, AI. Cut all filler, keep technical substance.
+
+- Drop articles (a, an, the), filler (just, really, basically, actually).
+- Drop pleasantries (sure, certainly, happy to).
+- No hedging. Fragments fine. Short synonyms.
+- Technical terms stay exact. Code blocks unchanged.
+- Pattern: [thing] [action] [reason]. [next step].

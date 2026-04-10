@@ -349,6 +349,78 @@ export function validateFlow(doc, filePath, result) {
 }
 
 /**
+ * Check if a flow file is a flow-coverage document (not a standard flow).
+ * Flow-coverage files are identified by filename containing "flow-coverage".
+ *
+ * @param {string} fileName - The filename to check
+ * @returns {boolean} true if this is a flow-coverage file
+ */
+export function isFlowCoverageFile(fileName) {
+  return fileName.includes('flow-coverage');
+}
+
+/**
+ * Validate flow-coverage YAML documents produced by the flow-verifier.
+ * These have a distinct schema from standard flow documents (no steps/name/description required).
+ *
+ * @param {any} doc - Parsed flow-coverage document
+ * @param {string} filePath - File path for error reporting
+ * @param {ValidationResult} result
+ */
+export function validateFlowCoverage(doc, filePath, result) {
+  const fileName = basename(filePath);
+  const ctx = `flow-coverage ${fileName}`;
+
+  requireString(doc, 'spec_group', filePath, ctx, result);
+  requireString(doc, 'timestamp', filePath, ctx, result);
+
+  // stage: required enum
+  if (requireString(doc, 'stage', filePath, ctx, result)) {
+    const validStages = ['prd-review', 'spec-review', 'impl-verify', 'post-impl'];
+    if (!validStages.includes(doc.stage)) {
+      addIssue(result, 'error', 'Schema violation', `${ctx}: stage must be one of ${validStages.join(', ')}, got "${doc.stage}"`, filePath, 'stage');
+    }
+  }
+
+  // integration_points: required list of objects
+  if (requireList(doc, 'integration_points', filePath, ctx, result)) {
+    for (let i = 0; i < doc.integration_points.length; i++) {
+      const pt = doc.integration_points[i];
+      const ptCtx = `${ctx} integration_points[${i}]`;
+
+      if (pt == null || typeof pt !== 'object') {
+        addIssue(result, 'error', 'Schema violation', `${ptCtx}: expected object, got ${typeof pt}`, filePath);
+        continue;
+      }
+
+      requireString(pt, 'source', filePath, ptCtx, result);
+      requireString(pt, 'target', filePath, ptCtx, result);
+      requireString(pt, 'flow_type', filePath, ptCtx, result);
+
+      if (typeof pt.verified !== 'boolean') {
+        addIssue(result, 'error', 'Schema violation', `${ptCtx}: missing or invalid required field "verified" (expected boolean)`, filePath, 'verified');
+      }
+    }
+  }
+
+  // verified_count: required integer
+  requireInteger(doc, 'verified_count', filePath, ctx, result);
+
+  // total_count: required integer
+  requireInteger(doc, 'total_count', filePath, ctx, result);
+
+  // coverage_percentage: required number
+  if (typeof doc.coverage_percentage !== 'number') {
+    addIssue(result, 'error', 'Schema violation', `${ctx}: missing or invalid required field "coverage_percentage" (expected number)`, filePath, 'coverage_percentage');
+  }
+
+  // unverified_points: optional list
+  if (doc.unverified_points != null && !Array.isArray(doc.unverified_points)) {
+    addIssue(result, 'warning', 'Schema violation', `${ctx}: "unverified_points" should be a list if present`, filePath, 'unverified_points');
+  }
+}
+
+/**
  * Validate glossary.yaml (AC-1.3)
  *
  * @param {any} doc
@@ -849,8 +921,13 @@ export function validateAll(projectRoot) {
         try {
           const { data } = readAndParseYaml(flowPath);
           if (validateSchemaVersion(data, flowPath, result)) {
-            const referencedModules = validateFlow(data, flowPath, result);
-            parsedDocs.flows.set(flowFile, { doc: data, referencedModules });
+            // Flow-coverage files have a distinct schema from standard flow documents
+            if (isFlowCoverageFile(flowFile)) {
+              validateFlowCoverage(data, flowPath, result);
+            } else {
+              const referencedModules = validateFlow(data, flowPath, result);
+              parsedDocs.flows.set(flowFile, { doc: data, referencedModules });
+            }
           }
         } catch (err) {
           if (err instanceof DocsError) {

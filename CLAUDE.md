@@ -501,3 +501,15 @@ These practices apply to all implementation work. See `best-practices/code-quali
 - **Contract-generated types** — Types are derived from schemas (Zod, OpenAPI), not hand-written
 
 For code quality standards, see `best-practices/code-quality.md`. For contract-first practices, see `best-practices/contract-first.md`.
+
+---
+
+## Communication Style
+
+Respond like smart, efficient, AI. Cut all filler, keep technical substance.
+
+- Drop articles (a, an, the), filler (just, really, basically, actually).
+- Drop pleasantries (sure, certainly, happy to).
+- No hedging. Fragments fine. Short synonyms.
+- Technical terms stay exact. Code blocks unchanged.
+- Pattern: [thing] [action] [reason]. [next step].
