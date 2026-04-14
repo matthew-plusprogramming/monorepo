@@ -62,7 +62,48 @@ export const ONEOFF_SPEC_PREDECESSORS = {
 export const EXEMPT_WORKFLOWS = ['oneoff-vibe', 'refactor', 'journal-only'];
 
 /**
- * Valid subagent types (22 entries).
+ * Valid workflow types (5 entries).
+ * Single source of truth — consumed by session-validate.mjs and verified
+ * against session.schema.json by enum-sync.test.mjs.
+ * @type {string[]}
+ */
+export const VALID_WORKFLOWS = [
+  'oneoff-vibe',
+  'oneoff-spec',
+  'orchestrator',
+  'refactor',
+  'journal-only'
+];
+
+/**
+ * Valid phase values (16 entries).
+ * Single source of truth — consumed by session-validate.mjs and verified
+ * against session.schema.json by enum-sync.test.mjs.
+ * @type {string[]}
+ */
+export const VALID_PHASES = [
+  'prd_gathering',
+  'spec_authoring',
+  'atomizing',
+  'enforcing',
+  'investigating',
+  'awaiting_approval',
+  'auto_approval',
+  'implementing',
+  'testing',
+  'verifying',
+  'reviewing',
+  'journaling',
+  'complete',
+  'challenging',
+  'completion_verifying',
+  'documenting'
+];
+
+/**
+ * Valid subagent types (23 entries).
+ * Single source of truth — consumed by session-validate.mjs and verified
+ * against session.schema.json by enum-sync.test.mjs.
  * @type {string[]}
  */
 export const VALID_SUBAGENT_TYPES = [
@@ -77,6 +118,7 @@ export const VALID_SUBAGENT_TYPES = [
   'unifier',
   'code-reviewer',
   'security-reviewer',
+  'doc-auditor',
   'documenter',
   'refactorer',
   'facilitator',
@@ -525,10 +567,19 @@ export function getPrerequisites(workflow, subagentType) {
     }
 
     case 'completion-verifier': {
+      // Requires BOTH review convergence gates — completion-verifier runs AFTER reviewing phase
+      // DAG: reviewing -> completion_verifying -> documenting
       prerequisites.push({
-        type: 'dispatch',
-        subagent_type: 'documenter',
-        gate_name: OVERRIDE_GATE_NAMES.documenter_dispatch,
+        type: 'convergence',
+        gate: 'code_review',
+        required_count: REQUIRED_CLEAN_PASSES,
+        gate_name: OVERRIDE_GATE_NAMES.code_review_convergence,
+      });
+      prerequisites.push({
+        type: 'convergence',
+        gate: 'security_review',
+        required_count: REQUIRED_CLEAN_PASSES,
+        gate_name: OVERRIDE_GATE_NAMES.security_review_convergence,
       });
       break;
     }

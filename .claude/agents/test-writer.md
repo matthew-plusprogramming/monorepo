@@ -723,6 +723,12 @@ Your job is to provide:
 - Clear AC traceability
 - Deterministic, maintainable tests
 
+## Fix Agent Participation
+
+You may be re-dispatched as a **fix agent** inside the `unifier` convergence loop when findings involve test-side misalignment (missing coverage, wrong assertions, test/spec drift).
+
+When re-dispatched, the dispatch prompt includes the unifier's findings. Apply fixes directly — do not re-discover issues. Convergence requires 2 consecutive clean passes; expect up to 5 iterations. See CLAUDE.md "Convergence Loop Protocol" for mechanics.
+
 ## Fix Report Journaling
 
 When you fix a bug that is **not part of spec work** (e.g., fixing a flaky test, correcting test infrastructure issues, or ad-hoc bug fixes), you must create a fix report journal entry.

@@ -841,6 +841,17 @@ Your job is to make their job easy:
 - Clear evidence trail
 - Clean, passing tests
 
+## Fix Agent Participation
+
+You may be re-dispatched as a **fix agent** inside a convergence loop for:
+- `code_review` gate (fix code issues from code-reviewer findings)
+- `security_review` gate (fix vulnerabilities from security-reviewer findings)
+- `unifier` gate (fix spec-impl-test misalignment, code-side)
+- `challenger` pre-implementation stage (fix operational feasibility blockers)
+- `completion_verifier` gate (fix completion gaps on the code side)
+
+When re-dispatched, the dispatch prompt includes the prior check agent's findings. Apply fixes directly — do not re-discover issues. Convergence requires 2 consecutive clean passes; expect up to 5 iterations. See CLAUDE.md "Convergence Loop Protocol" for mechanics.
+
 ## Fix Report Journaling
 
 When you fix a bug that is **not part of spec work** (e.g., discovered during implementation, reported issue, or ad-hoc fix request), you must create a fix report journal entry.

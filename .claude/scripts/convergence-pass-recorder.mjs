@@ -91,6 +91,21 @@ async function main() {
       process.exit(0);
     }
 
+    // Status validation: Only record a pass if the subagent completed successfully.
+    // Matches the pattern in convergence-gate-reminder.mjs (AC-1.2, AC-1.3):
+    // absent/undefined status is treated as success (backwards compatibility),
+    // but "partial" or "failed" statuses must not record a pass.
+    const status = input.status;
+    const isSuccessful = status === undefined || status === 'success';
+
+    if (!isSuccessful) {
+      process.stderr.write(
+        `[convergence-pass-recorder] WARNING: Skipping pass recording for ${agentType} -- subagent status is "${status}" (expected "success" or absent)\n`
+      );
+      console.log('{}');
+      process.exit(0);
+    }
+
     // AC-3.6: Parse agent_output (JSON string) to access the original agent return data
     let agentOutputData = null;
     if (input.agent_output) {

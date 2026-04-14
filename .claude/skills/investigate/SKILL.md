@@ -13,6 +13,17 @@ Investigate and surface connection points between different specs, systems, and 
 
 **Key insight**: This is NOT schema validation. This is intelligent investigation of where systems touch and whether their assumptions align.
 
+## Why Investigation Matters
+
+Cross-spec inconsistencies are cheap to fix at the spec stage and expensive after implementation. Common blockers investigation surfaces:
+
+- **Env var naming conflicts** — two specs reference the same variable with different names
+- **API contract divergence** — one spec's request shape mismatches another's expected response
+- **Deployment assumption drift** — specs assume different runtime, auth, or infrastructure
+- **Shared schema misalignment** — two specs own overlapping data shapes without a declared owner
+
+Without investigation, these surface as integration failures during implementation or (worse) in production.
+
 ## Usage
 
 ```

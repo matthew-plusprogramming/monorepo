@@ -140,7 +140,7 @@ describe('AC-1.1: Module exports all expected constants and functions', () => {
 
     // Assert
     expect(Array.isArray(VALID_SUBAGENT_TYPES)).toBe(true);
-    expect(VALID_SUBAGENT_TYPES.length).toBe(22);
+    expect(VALID_SUBAGENT_TYPES.length).toBe(23);
   });
 
   it('should export MANDATORY_DISPATCHES covering mandatory dispatch types', async () => {
@@ -439,7 +439,7 @@ describe('AC-1.4: getPrerequisites returns correct prerequisites per enforcement
     expect(hasPrereqForConvergence(prereqs, 'security_review')).toBe(true);
   });
 
-  it('should return prerequisites including documenter for completion-verifier', async () => {
+  it('should return review convergence prerequisites for completion-verifier', async () => {
     // Arrange
     const mod = await loadModule();
     expect(mod).not.toBeNull();
@@ -447,10 +447,11 @@ describe('AC-1.4: getPrerequisites returns correct prerequisites per enforcement
     // Act
     const prereqs = mod.getPrerequisites('oneoff-spec', 'completion-verifier');
 
-    // Assert
+    // Assert — requires BOTH review convergences (completion-verifier runs AFTER reviewing phase)
     expect(Array.isArray(prereqs)).toBe(true);
-    expect(prereqs.length).toBeGreaterThanOrEqual(1);
-    expect(hasPrereqForType(prereqs, 'documenter')).toBe(true);
+    expect(prereqs.length).toBe(2);
+    expect(hasPrereqForConvergence(prereqs, 'code_review')).toBe(true);
+    expect(hasPrereqForConvergence(prereqs, 'security_review')).toBe(true);
   });
 
   it('should return empty array for non-enforced subagent types', async () => {

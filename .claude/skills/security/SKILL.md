@@ -460,6 +460,33 @@ Update manifest.json with security review status:
 }
 ````
 
+## Security Override Notation
+
+When a human overrides a security-category finding, tag the override explicitly as a **"security-risk acknowledgment"** in the Decisions Log. This distinguishes it from routine operational overrides and makes security-related concessions auditable. Format:
+
+```
+Override type: security-risk-acknowledgment
+Finding: <id>
+Acknowledged by: <human>
+Rationale: <why the risk is accepted>
+```
+
+## Convergence Loop
+
+This gate runs under the Convergence Loop Protocol: **check → fix → recheck** until 2 consecutive clean passes or 5 iterations (escalate after 5).
+
+- **Check agent**: `security-reviewer`
+- **Fix agent**: `implementer`
+- **Gate name**: `security_review`
+
+After each clean pass, record via:
+
+```
+node .claude/scripts/session-checkpoint.mjs update-convergence security_review
+```
+
+Coercive enforcement: `workflow-gate-enforcement.mjs` blocks downstream dispatches when `clean_pass_count < 2`. See `/challenge` SKILL.md for full loop mechanics (state schema, fix agent input contract, escalation format).
+
 ## Common Vulnerabilities to Check
 
 ### OWASP Top 10

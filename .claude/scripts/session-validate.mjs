@@ -21,6 +21,7 @@
 
 import { existsSync, readFileSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
+import { VALID_SUBAGENT_TYPES, VALID_PHASES, VALID_WORKFLOWS } from './lib/workflow-dag.mjs';
 
 // Find the .claude directory by walking up from script location
 function findClaudeDir() {
@@ -49,66 +50,9 @@ const CLAUDE_DIR = findClaudeDir();
 const SESSION_PATH = process.argv[2] || join(CLAUDE_DIR, 'context', 'session.json');
 const SCHEMA_PATH = join(CLAUDE_DIR, 'specs', 'schema', 'session.schema.json');
 
-/**
- * Valid workflow values from schema
- */
-const VALID_WORKFLOWS = [
-  'oneoff-vibe',
-  'oneoff-spec',
-  'orchestrator',
-  'refactor',
-  'journal-only'
-];
-
-/**
- * Valid phase values from schema
- */
-const VALID_PHASES = [
-  'prd_gathering',
-  'spec_authoring',
-  'atomizing',
-  'enforcing',
-  'investigating',
-  'awaiting_approval',
-  'auto_approval',
-  'implementing',
-  'testing',
-  'verifying',
-  'reviewing',
-  'journaling',
-  'complete',
-  'challenging',
-  'completion_verifying',
-  'documenting'
-];
-
-/**
- * Valid subagent types from schema
- */
-const VALID_SUBAGENT_TYPES = [
-  'explore',
-  'spec-author',
-  'atomizer',
-  'atomicity-enforcer',
-  'interface-investigator',
-  'implementer',
-  'test-writer',
-  'e2e-test-writer',
-  'unifier',
-  'code-reviewer',
-  'security-reviewer',
-  'documenter',
-  'refactorer',
-  'facilitator',
-  'browser-tester',
-  'prd-writer',
-  'prd-critic',
-  'prd-reader',
-  'prd-amender',
-  'challenger',
-  'completion-verifier',
-  'flow-verifier'
-];
+// VALID_WORKFLOWS, VALID_PHASES, and VALID_SUBAGENT_TYPES are imported from
+// ./lib/workflow-dag.mjs (single source of truth). Enum sync with
+// session.schema.json is verified by __tests__/enum-sync.test.mjs.
 
 /**
  * Valid event types from schema

@@ -506,6 +506,12 @@ When remediating a document, update the YAML frontmatter lifecycle fields:
 - Do NOT modify security-domain docs (these are always escalated to human)
 - Do NOT create new documentation files (coverage findings are escalated)
 
+## Fix Agent Participation
+
+You may be re-dispatched as a **fix agent** inside the `completion_verifier` convergence loop when findings identify missing or incomplete documentation artifacts.
+
+When re-dispatched, the dispatch prompt includes the completion-verifier's findings. Apply documentation fixes directly — do not re-discover issues. Convergence requires 2 consecutive clean passes; expect up to 5 iterations. See CLAUDE.md "Convergence Loop Protocol" for mechanics.
+
 ## Acceptable Assumption Domains
 
 Per the [Self-Answer Protocol](../memory-bank/self-answer-protocol.md), reasoning-tier (tier 4) self-resolution is permitted only within these domains:

@@ -496,6 +496,22 @@ Issues found. Implementation iteration required.
 After fixes, re-run `/unify <spec-group-id>` to validate.
 ```
 
+## Convergence Loop
+
+This gate runs under the Convergence Loop Protocol: **check → fix → recheck** until 2 consecutive clean passes or 5 iterations (escalate after 5).
+
+- **Check agent**: `unifier`
+- **Fix agent**: `implementer` (code issues) or `test-writer` (test issues)
+- **Gate name**: `unifier`
+
+After each clean pass, record via:
+
+```
+node .claude/scripts/session-checkpoint.mjs update-convergence unifier
+```
+
+Coercive enforcement: `workflow-gate-enforcement.mjs` blocks downstream dispatches when `clean_pass_count < 2`. See `/challenge` SKILL.md for full loop mechanics (state schema, fix agent input contract, escalation format).
+
 ## Convergence Gates
 
 ### Spec Group Gates

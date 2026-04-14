@@ -12,17 +12,20 @@ Agents under throughput pressure skip mandatory stages (challenger dispatches, c
 
 ## Components
 
-| Component                         | File                                            | Role                                                          |
-| --------------------------------- | ----------------------------------------------- | ------------------------------------------------------------- |
-| Shared DAG module                 | `.claude/scripts/lib/workflow-dag.mjs`          | Single source of truth for predecessor graphs and enforcement |
-| Hook utilities                    | `.claude/scripts/lib/hook-utils.mjs`            | Shared I/O (loadSession, loadOverrides, findClaudeDir, etc.)  |
-| Phase transition enforcement      | `.claude/scripts/session-checkpoint.mjs`        | Cooperative DAG validation on `transition-phase` calls        |
-| PreToolUse gate enforcement       | `.claude/scripts/workflow-gate-enforcement.mjs` | Coercive blocking of subagent dispatch                        |
-| PreToolUse write protection       | `.claude/scripts/workflow-file-protection.mjs`  | Coercive blocking of agent writes to enforcement files        |
-| Stop enforcement                  | `.claude/scripts/workflow-stop-enforcement.mjs` | Coercive blocking of session completion                       |
-| SubagentStop convergence reminder | `.claude/scripts/convergence-gate-reminder.mjs` | Advisory reminder to update convergence gates                 |
-| Session schema                    | `.claude/specs/schema/session.schema.json`      | Schema validation for enforcement fields                      |
-| Session schema validator          | `.claude/scripts/session-validate.mjs`          | Runtime schema enforcement via PostToolUse hook               |
+| Component                              | File                                            | Role                                                          |
+| -------------------------------------- | ----------------------------------------------- | ------------------------------------------------------------- |
+| Shared DAG module                      | `.claude/scripts/lib/workflow-dag.mjs`          | Single source of truth for predecessor graphs and enforcement |
+| Hook utilities                         | `.claude/scripts/lib/hook-utils.mjs`            | Shared I/O (loadSession, loadOverrides, findClaudeDir, etc.)  |
+| Session lockfile                       | `.claude/scripts/lib/session-lock.mjs`          | Mutex-style locking for concurrent session.json writes        |
+| Findings hash                          | `.claude/scripts/lib/findings-hash.mjs`         | Canonical SHA-256 hash computation for finding IDs            |
+| Phase transition enforcement           | `.claude/scripts/session-checkpoint.mjs`        | Cooperative DAG validation on `transition-phase` calls        |
+| PreToolUse gate enforcement            | `.claude/scripts/workflow-gate-enforcement.mjs` | Coercive blocking of subagent dispatch                        |
+| PreToolUse write protection            | `.claude/scripts/workflow-file-protection.mjs`  | Coercive blocking of agent writes to enforcement files        |
+| Stop enforcement                       | `.claude/scripts/workflow-stop-enforcement.mjs` | Coercive blocking of session completion                       |
+| SubagentStop convergence reminder      | `.claude/scripts/convergence-gate-reminder.mjs` | Advisory reminder to update convergence gates                 |
+| SubagentStop convergence pass recorder | `.claude/scripts/convergence-pass-recorder.mjs` | Automated pass evidence recording for convergence gates       |
+| Session schema                         | `.claude/specs/schema/session.schema.json`      | Schema validation for enforcement fields                      |
+| Session schema validator               | `.claude/scripts/session-validate.mjs`          | Runtime schema enforcement via PostToolUse hook               |
 
 ---
 
@@ -32,7 +35,7 @@ The `workflow-dag.mjs` module is the single source of truth for workflow DAG def
 
 ### Exports
 
-**Constants**: `ORCHESTRATOR_PREDECESSORS` (14 entries), `ONEOFF_SPEC_PREDECESSORS` (12 entries), `EXEMPT_WORKFLOWS`, `VALID_SUBAGENT_TYPES` (20 entries), `MANDATORY_DISPATCHES`, `REQUIRED_CHALLENGER_STAGES`, `ENFORCED_SUBAGENT_TYPES` (6 entries), `STOP_MANDATORY_DISPATCHES` (4 entries), `OVERRIDE_GATE_NAMES`, `REQUIRED_CLEAN_PASSES`, `VALID_CONVERGENCE_GATES`.
+**Constants**: `ORCHESTRATOR_PREDECESSORS` (14 entries), `ONEOFF_SPEC_PREDECESSORS` (12 entries), `EXEMPT_WORKFLOWS`, `VALID_SUBAGENT_TYPES` (20 entries), `MANDATORY_DISPATCHES`, `REQUIRED_CHALLENGER_STAGES`, `ENFORCED_SUBAGENT_TYPES` (6 entries), `STOP_MANDATORY_DISPATCHES` (4 entries), `OVERRIDE_GATE_NAMES`, `REQUIRED_CLEAN_PASSES`, `VALID_CONVERGENCE_GATES` (6 entries: `code_review`, `security_review`, `investigation`, `challenger`, `unifier`, `completion_verifier`).
 
 **Query Functions**: `getWorkflowType(session)` (backward-compatible, defaults to orchestrator), `getWorkflowTypeStrict(session)` (returns null if missing, for fail-open), `isExemptWorkflow(workflow)`, `getPredecessorGraph(workflow)`, `wasPredecessorVisited(predecessorKey, session)`, `getAllTasks(session)`, `getPrerequisites(workflow, subagentType)`, `werePrerequisitesMet(session, prerequisites)`.
 
@@ -214,12 +217,15 @@ When prerequisites are not met, the hook writes a structured error to stderr and
 
 **Hook**: `workflow-file-protection.mjs` (PreToolUse, matcher: `Write`)
 
-Blocks agent writes to enforcement files. Only human terminal writes are permitted.
+Blocks agent writes to enforcement files and session state. Only human terminal writes (or trusted CLI scripts) are permitted.
 
 **Protected Files**:
 
 - `.claude/coordination/gate-override.json`
 - `.claude/coordination/gate-enforcement-disabled`
+- `.claude/context/session.json`
+
+The `session.json` write protection ensures all session state modifications go through `session-checkpoint.mjs` as the sole trusted writer. Agents must use CLI subcommands (`record-pass`, `update-convergence`, `transition-phase`, etc.) instead of direct file writes.
 
 **Key Property**: This hook does NOT check the kill switch. Write protection remains active even when `gate-enforcement-disabled` exists, preventing agents from self-bypassing enforcement.
 
@@ -292,6 +298,158 @@ All structural errors result in fail-open (exit 0):
 
 ---
 
+## Evidence-Based Convergence
+
+The convergence loop protocol requires 2 consecutive clean passes before agents can advance past investigation, challenger, and other convergence gates. Previously, the `clean_pass_count` value was self-reported by agents. The evidence-based system replaces this with verifiable pass evidence records and derived counting.
+
+### How It Works
+
+1. A convergence check agent (e.g., `interface-investigator`) completes and returns findings
+2. The `convergence-pass-recorder` SubagentStop hook fires, extracts findings metadata, and records structured pass evidence via `session-checkpoint.mjs record-pass`
+3. The orchestrating agent calls `session-checkpoint.mjs update-convergence <gate_name>` (no count argument)
+4. `update-convergence` reads the evidence array, counts consecutive clean hook-sourced passes from the tail, and sets `clean_pass_count` to the derived value
+5. The gate enforcement hook reads `clean_pass_count` and optionally verifies evidence integrity
+
+### Pass Evidence Records
+
+Each convergence pass is recorded as a structured evidence record in `session.convergence_evidence.<gate>.passes[]`:
+
+```json
+{
+  "pass_number": 1,
+  "timestamp": "2026-04-02T14:30:00.000Z",
+  "agent_type": "interface-investigator",
+  "findings_count": 3,
+  "findings_hash": "a1b2c3d4...",
+  "clean": false,
+  "record_source": "hook",
+  "auto_decision_batch_id": "batch-001",
+  "auto_decision_complete": true
+}
+```
+
+Records are append-only. No command may modify or delete existing entries. Duplicate `pass_number` values are rejected.
+
+### Trust-Tiered Recording
+
+| Record Source       | Stored in Evidence | Counts for `clean_pass_count` | Purpose                 |
+| ------------------- | ------------------ | ----------------------------- | ----------------------- |
+| `"hook"`            | Yes                | Yes                           | Trusted, automated      |
+| `"manual"`          | Yes                | No                            | Audit trail only        |
+| `"manual_fallback"` | Yes                | No                            | Hook extraction failure |
+
+Only hook-sourced clean passes count toward the coercive gate threshold. Manual passes provide an audit trail but do not unblock dispatch.
+
+### CLI Commands
+
+#### record-pass
+
+Appends a pass evidence record to the convergence evidence array.
+
+```bash
+node .claude/scripts/session-checkpoint.mjs record-pass <gate_name> \
+  --findings-count <N> \
+  --findings-hash <hex-string> \
+  --clean <true|false> \
+  --agent-type <agent-type-string> \
+  [--source <hook|manual>] \
+  [--auto-decision-batch-id <batch-id>] \
+  [--auto-decision-complete <true|false>]
+```
+
+**Arguments**:
+
+| Argument                   | Required | Description                                            |
+| -------------------------- | -------- | ------------------------------------------------------ |
+| `gate_name`                | Yes      | One of `VALID_CONVERGENCE_GATES` (6 gates)             |
+| `--findings-count`         | No       | Non-negative integer or `null`                         |
+| `--findings-hash`          | No       | 64-character hex SHA-256 string or `null`              |
+| `--clean`                  | Yes      | Boolean (`true` or `false`)                            |
+| `--agent-type`             | Yes      | Convergence agent type string                          |
+| `--source`                 | No       | `"hook"` (default), `"manual"`, or `"manual_fallback"` |
+| `--auto-decision-batch-id` | No       | Links to auto-decision engine invocation               |
+| `--auto-decision-complete` | No       | `false` marks the pass as dirty (incomplete batch)     |
+
+**Exit codes**: `0` on success, `1` on validation error or duplicate `pass_number`.
+
+#### update-convergence (modified API)
+
+Derives `clean_pass_count` from the evidence array. No longer accepts a count argument.
+
+```bash
+node .claude/scripts/session-checkpoint.mjs update-convergence <gate_name>
+```
+
+**Behavior**:
+
+- Reads `convergence_evidence.<gate>.passes[]`
+- Counts consecutive clean passes with `record_source: "hook"` from the tail
+- Sets `convergence.<gate>.clean_pass_count` to the derived value
+- Emits a warning if >50% of passes are manual-sourced
+
+**Breaking change**: Passing a numeric second argument (e.g., `update-convergence investigation 2`) is rejected with an error explaining the new evidence-based API.
+
+### Canonical Findings Hash
+
+Finding IDs are hashed deterministically: sort lexicographically, JSON.stringify the sorted array, then SHA-256 the UTF-8 encoding. This allows verification that two passes examined the same set of findings.
+
+```javascript
+import { computeFindingsHash } from '.claude/scripts/lib/findings-hash.mjs';
+
+const hash = computeFindingsHash(['f-002', 'f-001', 'f-003']);
+// SHA-256 of '["f-001","f-002","f-003"]'
+```
+
+### Session JSON Lockfile
+
+All writes to `session.json` are serialized through a lockfile at `.claude/context/session.json.lock`.
+
+**Lockfile format**:
+
+```json
+{
+  "pid": 12345,
+  "created_at": "2026-04-02T14:30:00.000Z"
+}
+```
+
+**Acquisition behavior**:
+
+| Scenario                       | Behavior                                               |
+| ------------------------------ | ------------------------------------------------------ |
+| Lock does not exist            | Create with PID + timestamp                            |
+| Lock exists, age < 30 seconds  | Wait 100ms, retry once                                 |
+| Lock exists, age >= 30 seconds | Force-acquire (stale lock), log warning with PID + age |
+| Retry fails (hook context)     | Skip write (fail-open)                                 |
+| Retry fails (CLI context)      | Abort with error (fail-closed)                         |
+
+All session.json writes use atomic rename (write to temp file, rename to target). If the rename fails, corruption recovery creates a fresh session with all convergence counts reset to 0.
+
+### Backward Compatibility
+
+```
+Is convergence_evidence present in session.json?
+  YES --> Use evidence-based counting (new behavior)
+  NO  --> Is clean_pass_count present?
+    YES --> Fall back to trust-based counting (legacy behavior)
+    NO  --> Default to 0 (fail-closed)
+```
+
+Sessions created before this change continue to work without modification. Evidence recording starts on the first new convergence loop after deployment.
+
+### Evidence Integrity Verification
+
+The gate enforcement hook (`workflow-gate-enforcement.mjs`) performs optional integrity verification when evidence arrays are present:
+
+- Sequential `pass_number` values with no gaps
+- Sequential timestamps (no time-travel)
+- Array length matches highest `pass_number`
+- Timing plausibility (minimum 10 seconds between passes)
+
+All integrity issues produce advisory warnings only. The hook never blocks dispatch based on integrity alone -- it falls back to count-only verification on any anomaly or script error (fail-open).
+
+---
+
 ## Session State Fields
 
 ### Cooperative Layer Fields
@@ -310,13 +468,14 @@ Enforcement adds these fields to `phase_checkpoint` in `session.json`:
 
 The coercive layer reads (but does not write) these session.json fields:
 
-| Field                                          | Purpose                                      |
-| ---------------------------------------------- | -------------------------------------------- |
-| `active_work.workflow`                         | Determines enforcement rules (workflow type) |
-| `subagent_tasks.in_flight`                     | Dispatch history (in-flight tasks)           |
-| `subagent_tasks.completed_this_session`        | Dispatch history (completed tasks)           |
-| `convergence.code_review.clean_pass_count`     | Code review convergence tracking             |
-| `convergence.security_review.clean_pass_count` | Security review convergence tracking         |
+| Field                                          | Purpose                                            |
+| ---------------------------------------------- | -------------------------------------------------- |
+| `active_work.workflow`                         | Determines enforcement rules (workflow type)       |
+| `subagent_tasks.in_flight`                     | Dispatch history (in-flight tasks)                 |
+| `subagent_tasks.completed_this_session`        | Dispatch history (completed tasks)                 |
+| `convergence.code_review.clean_pass_count`     | Code review convergence tracking                   |
+| `convergence.security_review.clean_pass_count` | Security review convergence tracking               |
+| `convergence_evidence.<gate>.passes[]`         | Pass evidence arrays (evidence-based verification) |
 
 ---
 
@@ -355,6 +514,30 @@ This occurs when the integrity check detects a mismatch between `enforcement_cou
 ### Override cap reached (cooperative layer)
 
 After 3 overrides, `override-skip` and `reset-enforcement` are blocked. Escalate to the human operator. The 3-override cap is a session-level limit and resets when new work is started via `start-work`.
+
+### Evidence integrity warnings
+
+Advisory warnings about pass_number gaps, non-sequential timestamps, or suspicious timing indicate potential issues with evidence recording but do not block dispatch. Common causes:
+
+- **Stale lockfile recovery**: A crashed process left a lockfile, resulting in a missed recording
+- **Manual fallback**: The SubagentStop hook could not extract findings metadata, so the pass was recorded as `manual_fallback` (does not count toward convergence)
+- **Rapid retries**: Two passes within 10 seconds trigger a timing plausibility warning
+
+If >50% of a gate's passes are manual-sourced, `update-convergence` emits a warning indicating the SubagentStop hook may not be functioning correctly.
+
+### update-convergence rejects count argument
+
+The `update-convergence` command no longer accepts a numeric count argument. The `clean_pass_count` is derived from the evidence array. Use the new API:
+
+```bash
+# Old API (rejected):
+node .claude/scripts/session-checkpoint.mjs update-convergence investigation 2
+
+# New API:
+node .claude/scripts/session-checkpoint.mjs update-convergence investigation
+```
+
+To record a pass, use `record-pass` first, then call `update-convergence` to derive the count.
 
 ---
 

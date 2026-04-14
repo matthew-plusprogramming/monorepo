@@ -19,6 +19,8 @@
  *   set-enforcement-level <level>                 - Change enforcement level (main-agent-only)
  *   complete-work                                 - Finalize completed work (with completion checklist)
  *   archive-incomplete                            - Archive incomplete work to history
+ *   record-deployment --target <t> --method <m>    - Record deployment activity (AC-1.1)
+ *   record-deployment-failure                      - Record deployment failure (AC-2.1)
  *   get-status                                    - Output current session state summary (JSON)
  *
  * Usage:
@@ -50,6 +52,7 @@ import {
   findMatchingOverride,
 } from './lib/hook-utils.mjs';
 import { acquireLock, releaseLock } from './lib/session-lock.mjs';
+import { atomicModifyJSON } from './lib/atomic-write.mjs';
 import { computeFindingsHash } from './lib/findings-hash.mjs';
 
 // Schema version for session.json
@@ -102,6 +105,9 @@ const VALID_STAGES = [
 
 // Per-session override cap shared between override-skip and reset-enforcement (REQ-008, REQ-009)
 const MAX_OVERRIDES_PER_SESSION = 3;
+
+// Maximum iterations per convergence gate before advisory cap warning
+const MAX_CONVERGENCE_ITERATIONS = 5;
 
 // Valid enforcement levels (REQ-010)
 const VALID_ENFORCEMENT_LEVELS = ['off', 'warn-only', 'graduated'];
@@ -1450,76 +1456,95 @@ function opRecordPass(args) {
     throw new Error(`Invalid findings-count '${findingsCount}'. Must be a non-negative integer or null.`);
   }
 
-  // Load session (fail-closed for record-pass)
-  let session = loadSession();
-  if (!session) {
-    // AC-1.9: Corrupt or missing -- create fresh session
-    session = createEmptySession();
-  }
+  // Atomic read-modify-write to prevent lost updates (lock held for entire cycle)
+  ensureContextDir();
+  let reportPassNumber = null;
+  let reportClean = null;
 
-  // AC-1.5: Initialize convergence_evidence schema if missing
-  if (!session.convergence_evidence) {
-    session.convergence_evidence = {};
-  }
-  if (!session.convergence_evidence[gateName]) {
-    session.convergence_evidence[gateName] = { passes: [] };
-  }
+  const written = atomicModifyJSON(SESSION_PATH, (currentData) => {
+    let session = currentData;
+    if (!session) {
+      // AC-1.9: Corrupt or missing -- create fresh session
+      session = createEmptySession();
+    }
 
-  const passes = session.convergence_evidence[gateName].passes;
+    // AC-1.5: Initialize convergence_evidence schema if missing
+    if (!session.convergence_evidence) {
+      session.convergence_evidence = {};
+    }
+    if (!session.convergence_evidence[gateName]) {
+      session.convergence_evidence[gateName] = { passes: [] };
+    }
 
-  // AC-1.3: Duplicate detection -- compute next pass_number
-  const nextPassNumber = passes.length > 0
-    ? passes[passes.length - 1].pass_number + 1
-    : 1;
+    const passes = session.convergence_evidence[gateName].passes;
 
-  // Check for duplicate pass_number
-  if (passes.some(p => p.pass_number === nextPassNumber)) {
-    console.error(`WARNING: Duplicate pass_number ${nextPassNumber} for gate '${gateName}' -- record rejected.`);
-    process.exit(1);
-  }
+    // AC-1.3: Duplicate detection -- compute next pass_number
+    const nextPassNumber = passes.length > 0
+      ? passes[passes.length - 1].pass_number + 1
+      : 1;
 
-  // AC-1.7: Incomplete auto-decision batch marks pass as dirty
-  let effectiveClean = clean;
-  let effectiveAutoDecisionComplete = autoDecisionComplete;
-  if (autoDecisionBatchId && autoDecisionComplete === false) {
-    effectiveClean = false;
-    effectiveAutoDecisionComplete = false;
-  }
+    // Check for duplicate pass_number
+    if (passes.some(p => p.pass_number === nextPassNumber)) {
+      console.error(`WARNING: Duplicate pass_number ${nextPassNumber} for gate '${gateName}' -- record rejected.`);
+      process.exit(1);
+    }
 
-  // Build pass evidence record (AC-1.1)
-  const record = {
-    pass_number: nextPassNumber,
-    timestamp: now(),
-    agent_type: agentType,
-    findings_count: findingsCount,
-    findings_hash: findingsHash,
-    clean: effectiveClean,
-    record_source: source,
-  };
+    // AC-1.7: Incomplete auto-decision batch marks pass as dirty
+    let effectiveClean = clean;
+    let effectiveAutoDecisionComplete = autoDecisionComplete;
+    if (autoDecisionBatchId && autoDecisionComplete === false) {
+      effectiveClean = false;
+      effectiveAutoDecisionComplete = false;
+    }
 
-  // AC-1.2: Include auto-decision fields if provided
-  if (autoDecisionBatchId !== null) {
-    record.auto_decision_batch_id = autoDecisionBatchId;
-    record.auto_decision_complete = effectiveAutoDecisionComplete !== null
-      ? effectiveAutoDecisionComplete
-      : true; // defaults to true if batch ID is present
-  }
+    // Build pass evidence record (AC-1.1)
+    const record = {
+      pass_number: nextPassNumber,
+      timestamp: now(),
+      agent_type: agentType,
+      findings_count: findingsCount,
+      findings_hash: findingsHash,
+      clean: effectiveClean,
+      record_source: source,
+    };
 
-  // AC-1.4: Append-only -- push new record without modifying existing ones
-  passes.push(record);
+    // AC-1.2: Include auto-decision fields if provided
+    if (autoDecisionBatchId !== null) {
+      record.auto_decision_batch_id = autoDecisionBatchId;
+      record.auto_decision_complete = effectiveAutoDecisionComplete !== null
+        ? effectiveAutoDecisionComplete
+        : true; // defaults to true if batch ID is present
+    }
 
-  // Add history entry
-  addHistoryEntry(session, 'convergence_pass_recorded', {
-    gate_name: gateName,
-    pass_number: nextPassNumber,
-    clean: effectiveClean,
-    record_source: source,
-    agent_type: agentType,
-    message: `Recorded pass ${nextPassNumber} for ${gateName}: clean=${effectiveClean}, source=${source}`,
-  });
+    // AC-1.4: Append-only -- push new record without modifying existing ones
+    passes.push(record);
 
-  saveSession(session);
-  console.error(`Recorded pass ${nextPassNumber} for ${gateName}: clean=${effectiveClean}, source=${source}`);
+    // Iteration tracking: increment iteration_count for this gate
+    if (!session.convergence) {
+      session.convergence = {};
+    }
+    if (!session.convergence[gateName]) {
+      session.convergence[gateName] = { clean_pass_count: 0 };
+    }
+    const currentIterations = session.convergence[gateName].iteration_count || 0;
+    session.convergence[gateName].iteration_count = currentIterations + 1;
+
+    // Add history entry
+    addHistoryEntry(session, 'convergence_pass_recorded', {
+      gate_name: gateName,
+      pass_number: nextPassNumber,
+      clean: effectiveClean,
+      record_source: source,
+      agent_type: agentType,
+      message: `Recorded pass ${nextPassNumber} for ${gateName}: clean=${effectiveClean}, source=${source}`,
+    });
+
+    session.updated_at = now();
+    reportPassNumber = nextPassNumber;
+    reportClean = effectiveClean;
+    return session;
+  }, { failOpen: false });
+  console.error(`Recorded pass ${reportPassNumber} for ${gateName}: clean=${reportClean}, source=${source}`);
 }
 
 /**
@@ -1582,48 +1607,252 @@ function opUpdateConvergence(gateName, countStr) {
     );
   }
 
-  // Atomic read-modify-write
-  const session = loadSession();
-  if (!session) {
-    throw new Error('No session.json exists. Run "init" first.');
-  }
+  // Atomic read-modify-write to prevent lost updates (lock held for entire cycle)
+  ensureContextDir();
+  let reportCleanPassCount = null;
+  let reportEvidenceCount = null;
 
-  // Create convergence object if it doesn't exist (backward compatibility)
-  if (!session.convergence) {
-    session.convergence = {};
-  }
-  if (!session.convergence[gateName]) {
-    session.convergence[gateName] = {};
-  }
+  const written = atomicModifyJSON(SESSION_PATH, (currentData) => {
+    const session = currentData;
+    if (!session) {
+      throw new Error('No session.json exists. Run "init" first.');
+    }
 
-  // AC-2.1, AC-2.5: Derive clean_pass_count from evidence
-  const evidence = session.convergence_evidence?.[gateName]?.passes || [];
-  const cleanPassCount = countConsecutiveCleanFromTail(evidence);
+    // Create convergence object if it doesn't exist (backward compatibility)
+    if (!session.convergence) {
+      session.convergence = {};
+    }
+    if (!session.convergence[gateName]) {
+      session.convergence[gateName] = {};
+    }
 
-  // AC-2.8: Warn if >50% of passes are manual-sourced
-  if (evidence.length > 0) {
-    const manualCount = evidence.filter(p => p.record_source !== 'hook').length;
-    if (manualCount / evidence.length > 0.5) {
-      const warningMsg = `WARNING: >50% of passes for '${gateName}' are manual-sourced (${manualCount}/${evidence.length}). ` +
-        `The SubagentStop hook may not be functioning correctly.`;
-      console.error(warningMsg);
-      // Also emit to stdout so callers using execFileSync can capture the warning
-      console.log(warningMsg);
+    // AC-2.1, AC-2.5: Derive clean_pass_count from evidence
+    const evidence = session.convergence_evidence?.[gateName]?.passes || [];
+    const cleanPassCount = countConsecutiveCleanFromTail(evidence);
+
+    // AC-2.8: Warn if >50% of passes are manual-sourced
+    if (evidence.length > 0) {
+      const manualCount = evidence.filter(p => p.record_source !== 'hook').length;
+      if (manualCount / evidence.length > 0.5) {
+        const warningMsg = `WARNING: >50% of passes for '${gateName}' are manual-sourced (${manualCount}/${evidence.length}). ` +
+          `The SubagentStop hook may not be functioning correctly.`;
+        console.error(warningMsg);
+        // Also emit to stdout so callers using execFileSync can capture the warning
+        console.log(warningMsg);
+      }
+    }
+
+    session.convergence[gateName].clean_pass_count = cleanPassCount;
+
+    // Iteration tracking: increment iteration_count for this gate
+    const currentIterations = session.convergence[gateName].iteration_count || 0;
+    const newIterations = currentIterations + 1;
+
+    // Required clean passes threshold (matches CLAUDE.md convergence loop protocol)
+    const REQUIRED_CLEAN_PASSES = 2;
+
+    if (cleanPassCount >= REQUIRED_CLEAN_PASSES) {
+      // Convergence achieved -- reset iteration count
+      session.convergence[gateName].iteration_count = 0;
+    } else {
+      session.convergence[gateName].iteration_count = newIterations;
+
+      // Advisory cap warning when iterations reach the limit
+      if (newIterations >= MAX_CONVERGENCE_ITERATIONS) {
+        console.error(
+          `CONVERGENCE CAP REACHED for gate '${gateName}' after ${newIterations} iterations. Escalate to human.`
+        );
+      }
+    }
+
+    addHistoryEntry(session, 'convergence_update', {
+      gate_name: gateName,
+      clean_pass_count: cleanPassCount,
+      iteration_count: session.convergence[gateName].iteration_count,
+      evidence_count: evidence.length,
+      spec_group_id: session.active_work?.spec_group_id,
+      message: `Updated convergence: ${gateName}.clean_pass_count = ${cleanPassCount}, iteration_count = ${session.convergence[gateName].iteration_count} (derived from ${evidence.length} evidence records)`
+    });
+
+    session.updated_at = now();
+    reportCleanPassCount = cleanPassCount;
+    reportEvidenceCount = evidence.length;
+    return session;
+  }, { failOpen: false });
+  console.error(`Updated convergence: ${gateName}.clean_pass_count = ${reportCleanPassCount} (derived from ${reportEvidenceCount} evidence records)`);
+}
+
+// =============================================================================
+// Deployment Verification (sg-deployment-verification-gaps)
+// =============================================================================
+
+/** Valid deployment method values (enum, not freeform). AC-1.2 */
+const VALID_DEPLOYMENT_METHODS = ['pipeline', 'manual'];
+
+/** Regex for deployment target validation: alphanumeric plus . - / : only */
+const DEPLOYMENT_TARGET_PATTERN = /^[a-zA-Z0-9.\-/:]+$/;
+
+/** Maximum length for deployment target string */
+const DEPLOYMENT_TARGET_MAX_LENGTH = 256;
+
+/**
+ * Validate deployment target string.
+ * Must be alphanumeric plus . - / : only, max 256 chars. (AC-1.2, REQ-007)
+ *
+ * @param {string} target - Deployment target identifier
+ * @returns {{ valid: boolean, error?: string }}
+ */
+function validateDeploymentTarget(target) {
+  if (!target || typeof target !== 'string') {
+    return { valid: false, error: 'Deployment target is required and must be a string' };
+  }
+  if (target.length > DEPLOYMENT_TARGET_MAX_LENGTH) {
+    return { valid: false, error: `Deployment target exceeds ${DEPLOYMENT_TARGET_MAX_LENGTH} characters (got ${target.length})` };
+  }
+  if (!DEPLOYMENT_TARGET_PATTERN.test(target)) {
+    return { valid: false, error: `Deployment target contains invalid characters. Allowed: alphanumeric, '.', '-', '/', ':'` };
+  }
+  return { valid: true };
+}
+
+/**
+ * Validate deployment method against enum.
+ * Must be one of: "pipeline", "manual". (AC-1.2, inv-7-a3f1c2d8)
+ *
+ * @param {string} method - Deployment method
+ * @returns {{ valid: boolean, error?: string }}
+ */
+function validateDeploymentMethod(method) {
+  if (!VALID_DEPLOYMENT_METHODS.includes(method)) {
+    return { valid: false, error: `Invalid deployment method '${method}'. Must be one of: ${VALID_DEPLOYMENT_METHODS.join(', ')}` };
+  }
+  return { valid: true };
+}
+
+/**
+ * record-deployment - Record deployment activity in session.json.
+ *
+ * Overwrites entire prior deployment object (clean slate per AC-1.3).
+ * Uses atomicModifyJSON for all writes (AC-7.1).
+ *
+ * Implements: AC-1.1, AC-1.2, AC-1.3, AC-1.4, AC-7.1
+ *
+ * @param {string[]} rawArgs - Arguments after 'record-deployment'
+ */
+function opRecordDeployment(rawArgs) {
+  // Parse flags: --target <target> --method <method> --manual
+  let target = null;
+  let method = 'pipeline'; // default
+  let isManual = false;
+
+  for (let i = 0; i < rawArgs.length; i++) {
+    if (rawArgs[i] === '--target' && i + 1 < rawArgs.length) {
+      target = rawArgs[i + 1];
+      i++;
+    } else if (rawArgs[i] === '--method' && i + 1 < rawArgs.length) {
+      method = rawArgs[i + 1];
+      i++;
+    } else if (rawArgs[i] === '--manual') {
+      isManual = true;
     }
   }
 
-  session.convergence[gateName].clean_pass_count = cleanPassCount;
+  // AC-1.4: --manual flag sets method to "manual"
+  if (isManual) {
+    method = 'manual';
+  }
 
-  addHistoryEntry(session, 'convergence_update', {
-    gate_name: gateName,
-    clean_pass_count: cleanPassCount,
-    evidence_count: evidence.length,
-    spec_group_id: session.active_work?.spec_group_id,
-    message: `Updated convergence: ${gateName}.clean_pass_count = ${cleanPassCount} (derived from ${evidence.length} evidence records)`
-  });
+  // Validate target (AC-1.2)
+  const targetValidation = validateDeploymentTarget(target);
+  if (!targetValidation.valid) {
+    throw new Error(targetValidation.error);
+  }
 
-  saveSession(session);
-  console.error(`Updated convergence: ${gateName}.clean_pass_count = ${cleanPassCount} (derived from ${evidence.length} evidence records)`);
+  // Validate method (AC-1.2, inv-7-a3f1c2d8: enum constraint)
+  const methodValidation = validateDeploymentMethod(method);
+  if (!methodValidation.valid) {
+    throw new Error(methodValidation.error);
+  }
+
+  // AC-1.1, AC-1.3: Write deployment object via atomicModifyJSON (AC-7.1)
+  // Overwrites entire prior deployment object (clean slate)
+  atomicModifyJSON(SESSION_PATH, (current) => {
+    const s = current || {};
+
+    // AC-1.1: Set deployment object with all 8 fields
+    s.deployment = {
+      detected: true,
+      timestamp: now(),
+      target,
+      method,
+      verified: false,
+      verify_build_passed: false,
+      verify_deploy_passed: false,
+      failed: false,
+    };
+
+    s.updated_at = now();
+    return s;
+  }, { failOpen: false });
+
+  // AC-8: Structured audit log to stderr
+  const auditEntry = {
+    event: 'deployment_recorded',
+    result: 'PASS',
+    timestamp: now(),
+    target,
+    method,
+  };
+  process.stderr.write(JSON.stringify(auditEntry) + '\n');
+  console.error(`Deployment recorded: target=${target}, method=${method}`);
+}
+
+/**
+ * record-deployment-failure - Record deployment failure in session.json.
+ *
+ * Sets deployment.failed=true via atomicModifyJSON. (AC-2.1, AC-7.1)
+ * When failed=true, stop hook skips verification requirement (AC-2.2).
+ *
+ * Precondition: deployment.detected should be true (warn if not).
+ *
+ * Implements: AC-2.1, AC-7.1
+ */
+function opRecordDeploymentFailure() {
+  atomicModifyJSON(SESSION_PATH, (current) => {
+    const s = current || {};
+
+    // Warn if no prior deployment detected (precondition)
+    if (!s.deployment || !s.deployment.detected) {
+      process.stderr.write(
+        '[session-checkpoint] WARNING: record-deployment-failure called without prior deployment detection\n'
+      );
+      // Still set the failed flag -- create a minimal deployment object
+      s.deployment = s.deployment || {
+        detected: false,
+        timestamp: now(),
+        target: 'unknown',
+        method: 'pipeline',
+        verified: false,
+        verify_build_passed: false,
+        verify_deploy_passed: false,
+        failed: false,
+      };
+    }
+
+    // AC-2.1: Set failed=true (absolute precedence per AC-2.2)
+    s.deployment.failed = true;
+    s.updated_at = now();
+    return s;
+  }, { failOpen: false });
+
+  // AC-8: Structured audit log to stderr
+  const auditEntry = {
+    event: 'deployment_failure_recorded',
+    result: 'FAIL',
+    timestamp: now(),
+  };
+  process.stderr.write(JSON.stringify(auditEntry) + '\n');
+  console.error('Deployment failure recorded: deployment.failed=true');
 }
 
 // =============================================================================
@@ -1651,6 +1880,9 @@ Operations:
   archive-incomplete                              Archive incomplete work
   record-pass <gate> --findings-count <N> ...      Record convergence pass evidence
   update-convergence <gate_name>                   Derive convergence count from evidence
+  record-deployment --target <t> --method <m>     Record deployment activity
+    Flags: --target (required), --method (pipeline|manual), --manual (shorthand)
+  record-deployment-failure                       Record deployment failure (sets failed=true)
   get-status                                      Output session state (JSON)
 
 Phases:
@@ -1789,6 +2021,15 @@ function main() {
 
       case 'get-status':
         opGetStatus();
+        break;
+
+      case 'record-deployment': {
+        opRecordDeployment(args.slice(1));
+        break;
+      }
+
+      case 'record-deployment-failure':
+        opRecordDeploymentFailure();
         break;
 
       case '--help':

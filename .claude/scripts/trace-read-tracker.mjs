@@ -153,7 +153,7 @@ export function writeTraceReads(filePath, data) {
   }
 
   // Write atomically: write to temp file then rename
-  const tmpPath = filePath + '.tmp';
+  const tmpPath = filePath + '.tmp.' + process.pid;
   writeFileSync(tmpPath, JSON.stringify(data, null, 2) + '\n', 'utf-8');
   renameSync(tmpPath, filePath);
 }

@@ -1,5 +1,5 @@
 ---
-last_reviewed: 2026-03-12
+last_reviewed: 2026-03-18
 ---
 
 # Technical Context
@@ -79,7 +79,7 @@ The system is organized around the `.claude/` directory structure:
 
 ```
 .claude/
-├── agents/              # Subagent specifications (20 specialized agents)
+├── agents/              # Subagent specifications (23 specialized agents)
 ├── skills/              # Skill definitions (workflow stages)
 ├── specs/
 │   ├── groups/          # Active spec groups
@@ -87,12 +87,14 @@ The system is organized around the `.claude/` directory structure:
 │   └── schema/          # JSON validation schemas
 ├── context/
 │   └── session.json     # Session state for cross-session recovery
+├── coordination/        # Ephemeral coordination files (not committed)
 ├── memory-bank/         # Persistent project knowledge
 │   ├── project.brief.md
 │   ├── tech.context.md
 │   ├── delegation.guidelines.md
 │   └── best-practices/
 ├── scripts/             # Validation scripts for hooks
+│   └── lib/             # Shared libraries (workflow-dag.mjs, hook-utils.mjs)
 ├── templates/           # Spec and artifact templates
 ├── docs/                # System documentation
 ├── journal/             # Fix reports and discoveries
@@ -101,30 +103,33 @@ The system is organized around the `.claude/` directory structure:
 
 ### Subagent Model
 
-20 specialized subagents, each with focused responsibilities:
+23 specialized subagents, each with focused responsibilities:
 
-| Subagent                 | Model | Purpose                                                                                    |
-| ------------------------ | ----- | ------------------------------------------------------------------------------------------ |
-| `atomicity-enforcer`     | opus  | Validate atomic specs meet atomicity criteria                                              |
-| `atomizer`               | opus  | Decompose specs into atomic specs with single responsibility                               |
+| Subagent                 | Model | Purpose                                                                                                                           |
+| ------------------------ | ----- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `atomicity-enforcer`     | opus  | Validate atomic specs meet atomicity criteria                                                                                     |
+| `atomizer`               | opus  | Decompose specs into atomic specs with single responsibility                                                                      |
 | `challenger`             | opus  | MANDATORY operational feasibility check for oneoff-spec and orchestrator workflows (pre-implementation/test/review/orchestration) |
-| `completion-verifier`    | opus  | Post-completion verification gates (docs, assumptions, registry, memory bank)              |
-| `explore`                | opus  | Investigate questions via web or codebase research; returns structured findings            |
-| `interface-investigator` | opus  | Surface cross-spec inconsistencies (env vars, APIs, data shapes, assumptions)              |
-| `spec-author`            | opus  | Author workstream specs (no code)                                                          |
-| `implementer`            | opus  | Implement from approved specs                                                              |
-| `test-writer`            | opus  | Write tests for acceptance criteria                                                        |
-| `unifier`                | opus  | Validate convergence                                                                       |
-| `code-reviewer`          | opus  | Code quality review (read-only, runs before security)                                      |
-| `security-reviewer`      | opus  | Security review - PRDs (shift-left) and implementation (read-only)                         |
-| `documenter`             | opus  | Generate docs from implementation                                                          |
-| `refactorer`             | opus  | Code quality improvements with behavior preservation                                       |
-| `facilitator`            | opus  | Orchestrate multi-workstream projects with git worktrees                                   |
-| `browser-tester`         | opus  | Browser-based UI testing                                                                   |
-| `prd-writer`             | opus  | Conduct discovery interviews and draft/amend PRDs (D-034 format)                           |
-| `prd-critic`             | opus  | Evaluate PRDs from one of four perspectives with severity ratings                          |
-| `prd-reader`             | opus  | Extract requirements from existing PRDs into EARS format                                   |
-| `prd-amender`            | opus  | Push implementation discoveries back to PRDs (D-028 amendment format)                      |
+| `completion-verifier`    | opus  | Post-completion verification gates (docs, assumptions, registry, memory bank)                                                     |
+| `explore`                | opus  | Investigate questions via web or codebase research; returns structured findings                                                   |
+| `interface-investigator` | opus  | Surface cross-spec inconsistencies (env vars, APIs, data shapes, assumptions)                                                     |
+| `spec-author`            | opus  | Author workstream specs (no code)                                                                                                 |
+| `implementer`            | opus  | Implement from approved specs                                                                                                     |
+| `test-writer`            | opus  | Write tests for acceptance criteria                                                                                               |
+| `e2e-test-writer`        | opus  | Black-box E2E testing: Playwright browser tests and HTTP API tests from spec contracts only                                       |
+| `unifier`                | opus  | Validate convergence                                                                                                              |
+| `code-reviewer`          | opus  | Code quality review (read-only, runs before security)                                                                             |
+| `security-reviewer`      | opus  | Security review - PRDs (shift-left) and implementation (read-only)                                                                |
+| `documenter`             | opus  | Generate docs from implementation                                                                                                 |
+| `refactorer`             | opus  | Code quality improvements with behavior preservation                                                                              |
+| `facilitator`            | opus  | Orchestrate multi-workstream projects with git worktrees                                                                          |
+| `browser-tester`         | opus  | Browser-based UI testing                                                                                                          |
+| `prd-writer`             | opus  | Conduct discovery interviews and draft/amend PRDs (D-034 format)                                                                  |
+| `prd-critic`             | opus  | Evaluate PRDs from one of four perspectives with severity ratings                                                                 |
+| `prd-reader`             | opus  | Extract requirements from existing PRDs into EARS format                                                                          |
+| `prd-amender`            | opus  | Push implementation discoveries back to PRDs (D-028 amendment format)                                                             |
+| `doc-auditor`            | opus  | Diagnose documentation health — staleness, coverage gaps, broken refs, orphaned docs                                              |
+| `flow-verifier`          | opus  | Verify cross-boundary wiring correctness — missing imports, unregistered routes, mismatched events, disconnected handlers         |
 
 ### Spec is Contract Principle
 
@@ -138,8 +143,8 @@ The system is organized around the `.claude/` directory structure:
 ### Spec System Workflow
 
 ```
-oneoff-spec:  TaskSpec → Investigate (MANDATORY, mode: single-spec) → Approve → Challenge (MANDATORY, stage: pre-implementation) → Implement + Test → Challenge (MANDATORY, stage: pre-test) → Integration Verify → Unify → Challenge (MANDATORY, stage: pre-review) → Code Review → Security → Completion Verify
-orchestrator: WorkstreamSpecs → Atomize → Enforce → Investigate (MANDATORY, mode: standard) → Approve → Challenge (MANDATORY, stage: pre-orchestration) → Implement + Test → Challenge (MANDATORY, stage: pre-test) → Integration Verify → Unify → Challenge (MANDATORY, stage: pre-review) → Code Review → Security → Completion Verify
+oneoff-spec:  TaskSpec → Investigation Convergence Loop (2 clean passes, auto-decision) → Challenger Convergence Loop (pre-implementation, auto-decision) → Auto-Approval → Implement + Test → Challenge (pre-test, single-pass) → Integration Verify → Unify → Challenge (pre-review, single-pass) → Code Review → Security → Completion Verify
+orchestrator: WorkstreamSpecs → Atomize → Enforce → Investigation Convergence Loop (2 clean passes, auto-decision) → Challenger Convergence Loop (pre-orchestration, auto-decision) → Auto-Approval → Implement + Test → Challenge (pre-test, single-pass) → Integration Verify → Unify → Challenge (pre-review, single-pass) → Code Review → Security → Completion Verify
 ```
 
 ### Spec Types
@@ -160,7 +165,9 @@ orchestrator: WorkstreamSpecs → Atomize → Enforce → Investigate (MANDATORY
 
 ### Validation Hooks
 
-PostToolUse hooks run automatically after Edit/Write operations to catch issues early. Key hooks include:
+Hooks run automatically at various tool lifecycle points to catch issues early and enforce workflow rules. The system uses two enforcement layers: **cooperative** (session-checkpoint.mjs DAG-based phase transitions, advisory SubagentStop reminders) and **coercive** (PreToolUse/Stop hooks that physically block tool execution). For full documentation, see `.claude/docs/HOOKS.md`.
+
+#### PostToolUse Hooks (Edit|Write)
 
 | Hook                         | Trigger                 | Purpose                                     |
 | ---------------------------- | ----------------------- | ------------------------------------------- |
@@ -176,7 +183,47 @@ PostToolUse hooks run automatically after Edit/Write operations to catch issues 
 | `spec-schema-validate`       | `.claude/specs/**/*.md` | JSON schema validation for specs            |
 | `spec-validate`              | `.claude/specs/**/*.md` | Spec markdown structure validation          |
 
-Hooks warn but don't block (graceful degradation). For full documentation, see `.claude/docs/HOOKS.md`.
+#### PreToolUse Hooks (Coercive Enforcement)
+
+| Hook                        | Trigger          | Purpose                                                                |
+| --------------------------- | ---------------- | ---------------------------------------------------------------------- |
+| `workflow-gate-enforcement` | PreToolUse Agent | Block dispatch of enforced subagent types when prerequisites not met   |
+| `workflow-file-protection`  | PreToolUse Write | Block agent writes to gate-override.json and gate-enforcement-disabled |
+| `trace-read-enforcement`    | PreToolUse Edit  | Block edits to files in traced modules unless trace was read           |
+
+#### Stop Hooks
+
+| Hook                        | Trigger | Purpose                                                        |
+| --------------------------- | ------- | -------------------------------------------------------------- |
+| `workflow-stop-enforcement` | Stop    | Block session completion when mandatory dispatches are missing |
+
+#### SubagentStop Hooks
+
+| Hook                        | Trigger      | Purpose                                                                 |
+| --------------------------- | ------------ | ----------------------------------------------------------------------- |
+| `convergence-gate-reminder` | SubagentStop | Remind main agent to update convergence gates after subagent completion |
+
+### Workflow Enforcement (Practice 4.3)
+
+Workflow enforcement operates in two layers:
+
+**Cooperative layer** (`session-checkpoint.mjs`): DAG-based phase transition validation with configurable enforcement levels (off, warn-only, graduated). Agents call `transition-phase` to advance through workflow stages. Violations are warned or blocked depending on level. Override via `override-skip` command with rationale.
+
+**Coercive layer** (PreToolUse/Stop hooks): Physically blocks tool execution when prerequisites are not met. No cooperative participation required -- reads session.json dispatch history as the source of truth.
+
+- `workflow-gate-enforcement.mjs` blocks dispatch of 7 enforced subagent types (implementer, test-writer, e2e-test-writer, code-reviewer, security-reviewer, documenter, completion-verifier) when workflow prerequisites are not recorded in session.json
+- `workflow-stop-enforcement.mjs` blocks session completion when mandatory dispatches (code-reviewer, security-reviewer, completion-verifier, documenter) have not occurred
+- `workflow-file-protection.mjs` blocks agent writes to enforcement override files (not disabled by kill switch)
+
+**Shared DAG module** (`scripts/lib/workflow-dag.mjs`): Single source of truth for predecessor graphs, enforcement tables, and query functions consumed by both layers.
+
+**Exempt workflows**: `oneoff-vibe`, `refactor`, and `journal-only` bypass all enforcement.
+
+**Kill switch**: `.claude/coordination/gate-enforcement-disabled` disables gate and stop enforcement. Write protection remains active.
+
+**Override**: `.claude/coordination/gate-override.json` with session-scoped entries allows bypassing specific gates (human terminal only).
+
+**Fail-open**: Structural errors (missing session.json, malformed JSON, script crashes) result in exit 0. Exception: missing convergence fields default to 0 (fail-closed).
 
 ### Workflow Types
 
@@ -193,15 +240,16 @@ Request → Route → Delegate to subagent → Synthesize → Commit
 #### oneoff-spec (Medium tasks)
 
 ```
-Request → Route → /prd (gather-criticize loop) → [Optional: PRD Draft] → Spec →
-  Investigate (MANDATORY, mode: single-spec) → Approve →
-  Challenge (MANDATORY, stage: pre-implementation) →
-  [Parallel: Implement + Test] →
-  Challenge (MANDATORY, stage: pre-test) → Integration Verify → Unify →
-  Challenge (MANDATORY, stage: pre-review) →
+Request → Route → /prd (gather-criticize loop, optional TAD) → [Optional: PRD Draft] → Spec →
+  Investigation Convergence Loop (2 clean passes, auto-decision) →
+  Challenger Convergence Loop (pre-implementation, auto-decision) →
+  Auto-Approval (passthrough logging) →
+  [Parallel: Implement + Test + E2E Test (E2E only for cross-boundary specs)] →
+  Challenge (pre-test, single-pass) → Integration Verify → Unify →
+  Challenge (pre-review, single-pass) →
   Code Review → Security →
   Completion Verification →
-  [If UI: Browser Test] → [If public API: Docs] → [If PRD: PRD Push] → Commit
+  [If UI: Browser Test] → Docs → [If PRD: PRD Push] → Commit
 ```
 
 - Requires formal specification
@@ -213,15 +261,16 @@ Request → Route → /prd (gather-criticize loop) → [Optional: PRD Draft] →
 #### orchestrator (Large tasks)
 
 ```
-Request → Route → /prd (gather-criticize loop) → [Optional: PRD Draft] → ProblemBrief →
+Request → Route → /prd (gather-criticize loop, optional TAD) → [Optional: PRD Draft] → ProblemBrief →
   [Parallel: WorkstreamSpecs] → MasterSpec →
-  Investigate (MANDATORY for multi-workstream) → Resolve Decisions →
-  Approve → Challenge (MANDATORY, stage: pre-orchestration) →
+  Investigation Convergence Loop (2 clean passes, auto-decision) →
+  Challenger Convergence Loop (pre-orchestration, auto-decision) →
+  Auto-Approval (passthrough logging) →
   /orchestrate (allocates worktrees, dispatches facilitator) →
-  [Parallel per workstream: Implement + Test] →
-  Challenge (MANDATORY, stage: pre-test) → Integration Verify →
+  [Parallel per workstream: Implement + Test + E2E Test (E2E only for cross-boundary specs)] →
+  Challenge (pre-test, single-pass) → Integration Verify →
   Unify →
-  Challenge (MANDATORY, stage: pre-review) →
+  Challenge (pre-review, single-pass) →
   Code Review → Security → Completion Verification →
   Browser Test → Docs → [If PRD: PRD Push] → Commit
 ```
@@ -232,7 +281,7 @@ Request → Route → /prd (gather-criticize loop) → [Optional: PRD Draft] →
 
 **Investigation Checkpoint**: `/investigate` is MANDATORY before implementation for both oneoff-spec (mode: `single-spec`) and orchestrator (mode: `standard`) workflows. It surfaces cross-boundary inconsistencies (env vars, API contracts, deployment assumptions) that would otherwise become runtime bugs.
 
-**Challenger Stages**: `/challenge` is MANDATORY at four workflow stages: `pre-implementation` (after approve, before impl), `pre-test` (after impl, before test verification), `pre-review` (after unify, before code review), and `pre-orchestration` (after approve, before /orchestrate -- orchestrator only). Each is a single-pass check, not a convergence gate.
+**Challenger Stages**: `/challenge` is MANDATORY at four workflow stages: `pre-implementation` (convergence loop after investigation convergence), `pre-test` (single-pass after impl), `pre-review` (single-pass after unify), and `pre-orchestration` (convergence loop after investigation convergence -- orchestrator only). The `pre-implementation` and `pre-orchestration` stages run as convergence loops (2 consecutive clean passes, auto-decision); `pre-test` and `pre-review` are single-pass checks.
 
 ### Branch Naming Convention
 
@@ -261,16 +310,27 @@ Cross-session recovery via `.claude/context/session.json`:
 }
 ```
 
+#### Valid Phases
+
+The session tracks workflow progress through 15 phases:
+
+`prd_gathering`, `spec_authoring`, `atomizing`, `enforcing`, `investigating`, `awaiting_approval` (backwards compat), `auto_approval`, `challenging`, `implementing`, `testing`, `verifying`, `reviewing`, `completion_verifying`, `documenting`, `journaling`, `complete`
+
+Phases added by workflow enforcement: `challenging` (mandatory feasibility checks), `completion_verifying` (post-completion gates), `documenting` (documentation generation), `auto_approval` (passthrough logging after convergence). Phase transitions are validated via DAG-based predecessor rules in `session-checkpoint.mjs`.
+
 ### Key File Locations
 
-| Artifact          | Location                                             |
-| ----------------- | ---------------------------------------------------- |
-| Active specs      | `.claude/specs/groups/<spec-group-id>/`              |
-| Atomic specs      | `.claude/specs/groups/<spec-group-id>/atomic/`       |
-| Manifest          | `.claude/specs/groups/<spec-group-id>/manifest.json` |
-| Session state     | `.claude/context/session.json`                       |
-| Agent definitions | `.claude/agents/<agent-name>.md`                     |
-| Skill definitions | `.claude/skills/<skill-name>/SKILL.md`               |
+| Artifact           | Location                                             |
+| ------------------ | ---------------------------------------------------- |
+| Active specs       | `.claude/specs/groups/<spec-group-id>/`              |
+| Atomic specs       | `.claude/specs/groups/<spec-group-id>/atomic/`       |
+| Manifest           | `.claude/specs/groups/<spec-group-id>/manifest.json` |
+| Session state      | `.claude/context/session.json`                       |
+| Agent definitions  | `.claude/agents/<agent-name>.md`                     |
+| Skill definitions  | `.claude/skills/<skill-name>/SKILL.md`               |
+| Shared DAG module  | `.claude/scripts/lib/workflow-dag.mjs`               |
+| Hook utilities     | `.claude/scripts/lib/hook-utils.mjs`                 |
+| Coordination files | `.claude/coordination/`                              |
 
 ### Progress Heartbeat Discipline (Practice 4.2)
 
@@ -285,7 +345,7 @@ Agents working on spec-based tasks should update progress in the manifest before
 
 ### Independent Verification (Practice 2.4)
 
-When `implementer` and `test-writer` run in parallel, the test-writer **must not see the implementation**. This is the spec-derived independent verification constraint:
+When `implementer`, `test-writer`, and `e2e-test-writer` run in parallel, neither the test-writer nor the e2e-test-writer **may see the implementation**. This is the spec-derived independent verification constraint:
 
 - The test-writer receives only the **spec** (acceptance criteria, task list, evidence table) — never implementation file paths or code
 - Tests are derived from the spec's acceptance criteria, not from reading implementation details
@@ -302,23 +362,27 @@ When multiple agents implement in parallel, each agent's `TODO(assumption)` comm
 For large tasks, the main agent orchestrates parallel execution:
 
 - Multiple `spec-author` subagents for workstreams
-- `implementer` and `test-writer` run in parallel
-- `code-reviewer` and `security-reviewer` run in parallel
+- `implementer`, `test-writer`, and `e2e-test-writer` run in parallel (no ordering constraint — test-writer and e2e-test-writer work from spec only; e2e-test-writer dispatched only for cross-boundary specs)
+- `code-reviewer` and `security-reviewer` run in parallel (same dispatch prerequisites: challenger pre-review + unifier)
+- Both reviewers converge independently; `documenter` waits for both convergences
 - Main agent handles integration and synthesis
 
 ### Convergence Gates
 
 Before merge, all gates must pass. Each gate marked with **(loop)** runs under the Convergence Loop Protocol — requiring 2 consecutive clean passes, not single-pass:
 
-- Spec complete and approved
+- Spec complete
+- Investigation convergence **(loop)** — auto-decision engine integration
+- Challenger convergence **(loop)** — pre-impl/pre-orch stages, auto-decision engine
 - All ACs implemented
 - All tests passing (100% AC coverage)
 - Unifier validation passed **(loop)**
 - Code review passed (no High/Critical issues) **(loop)**
 - Security review passed **(loop)**
 - Completion verification passed **(loop)**
+- E2E tests passed (if cross-boundary)
 - Browser tests passed (if UI)
-- Documentation generated (if public API)
+- Documentation generated
 
 ### Example Workflow: oneoff-spec (Logout Button)
 
@@ -366,6 +430,128 @@ User: "Build a deployment pipeline with build, deploy, and monitoring"
 14. `/challenge` → MANDATORY operational feasibility check (stage: pre-review)
 15. Continue with Code Review → Security → Docs → Commit
 ```
+
+### Trace System
+
+The trace system generates pre-computed architectural summaries of the codebase. Agents consume these summaries instead of performing expensive Explore dispatches.
+
+#### Architecture
+
+```
+trace.config.json          # Module definitions with fileGlobs
+    ↓
+trace-generate.mjs         # Main generation script
+    ├── analyzeFile()       # Parse exports (symbol, type, signature, lineNumber) and imports per file
+    ├── parseExports()      # Regex-based export extraction with signature capture
+    └── parseImports()      # Regex-based import extraction (static only)
+    ↓
+lib/trace-utils.mjs        # Shared utilities
+    ├── loadTraceConfig()   # Load and validate trace.config.json
+    ├── fileToModule()      # Map file path → module ID (first match)
+    ├── fileToModules()     # Map file path → all matching module IDs (for ambiguity detection)
+    ├── isTraceStale()      # Check trace freshness against staleness threshold
+    ├── matchesGlob()       # File glob matching
+    ├── findFilesMatchingGlobs()  # Find all files matching module globs
+    └── sanitizeMarkdown()  # Escape CommonMark special chars for .md output
+    ↓
+lib/high-level-trace.mjs   # High-level trace generation
+    ├── generateHighLevelTrace()          # Entry point: produces JSON + MD
+    ├── generateHighLevelTraceJSON()      # Build high-level JSON structure
+    ├── generateHighLevelTraceMarkdown()  # Render high-level MD summary
+    └── validateHighLevelTrace()          # Schema validation
+    ↓
+traces/                    # Output directory (not committed, not synced)
+    ├── high-level.json    # Module landscape with dependencies/dependents
+    ├── high-level.md      # Human-readable module summary
+    └── low-level/
+        ├── <module-id>.json  # Per-module detailed trace (exports, imports, files)
+        └── <module-id>.md    # Per-module human-readable summary
+```
+
+#### Trace Data Fields
+
+**Low-level trace exports** include:
+
+- `symbol`: Export name (e.g., `parseExports`)
+- `type`: Export type (e.g., `function`, `class`, `const`, `type`)
+- `signature`: Display-facing function signature, truncated at 200 chars (e.g., `(source: string): Array<{...}>`)
+- `signatureRaw`: Extended capture up to 500 chars, stores unparsed text when regex fails
+- `lineNumber`: 1-indexed source line number of the export declaration
+
+**High-level trace modules** include:
+
+- `dependencies[]`: String array of moduleIds this module imports from
+- `dependents[]`: String array of moduleIds that import from this module
+- `skippedFiles[]`: Files that matched multiple module globs (configuration error indicator)
+
+#### Consumption Patterns
+
+**Main agent** (before dispatch):
+
+- Read `traces/high-level.md` for module landscape and dependency graph
+- Use module information to inform routing and dispatch decisions
+- This is the Pre-Computed Summary Exception to delegation-first
+
+**Subagents** (implement, test, code-review, security, explore):
+
+- Receive relevant trace file paths in dispatch prompts
+- Read `traces/low-level/<module-id>.json` for module-specific structural detail
+- Match task file paths against `trace.config.json` module `fileGlobs` to find relevant traces
+- Check freshness via `isTraceStale(moduleId, config)` before trusting exact details
+
+**Graceful degradation**: When traces are unavailable (no traces directory, no config, no matching modules), all consumers proceed without trace context -- identical to pre-trace behavior. No error or warning produced.
+
+#### Trace Scripts (synced via registry)
+
+| Script                       | Purpose                                     |
+| ---------------------------- | ------------------------------------------- |
+| `trace-generate.mjs`         | Generate all trace files from config        |
+| `lib/trace-utils.mjs`        | Shared utilities (config, staleness, globs) |
+| `lib/high-level-trace.mjs`   | High-level trace JSON/MD generation         |
+| `trace-read-enforcement.mjs` | PreToolUse hook: enforce trace reads        |
+
+#### Key Constraints
+
+- Regex-based parsing only (no AST) for portability
+- Trace files contain structural metadata only -- never source code, env values, or credentials
+- Trace output files are NOT synced via registry (each project generates its own)
+- Only trace scripts sync to consumer projects
+- `isTraceStale()` checks file modification time against configurable staleness threshold
+
+### Structured Documentation System
+
+The structured documentation system provides machine-parseable YAML documentation that sits between low-level traces and high-level memory-bank content.
+
+#### Three-Layer Documentation Model
+
+```
+traces (file-level)  →  structured docs (module-level)  →  memory-bank (process-level)
+```
+
+#### Key Locations
+
+| Artifact   | Location                              |
+| ---------- | ------------------------------------- |
+| Schema     | `.claude/docs/structured/schema.yaml` |
+| Docs       | `.claude/docs/structured/`            |
+| Templates  | `.claude/templates/structured-docs/`  |
+| Validator  | `.claude/scripts/docs-validate.mjs`   |
+| Generator  | `.claude/scripts/docs-generate.mjs`   |
+| Scaffolder | `.claude/scripts/docs-scaffold.mjs`   |
+| Shared lib | `.claude/scripts/lib/yaml-utils.mjs`  |
+
+#### Document Types
+
+- `architecture.yaml` - Module dependency map
+- `flows/index.yaml` + `flows/*.yaml` - Flow definitions with steps
+- `glossary.yaml` - Term definitions
+- `decisions.yaml` - Architecture decision records (extension)
+- `runbooks.yaml` - Operational procedures (extension)
+
+#### Sync & Hooks
+
+- Registry category: `structured-docs-templates` (with `_sync_policy: "never-overwrite"` -- templates only sync if target file does not exist)
+- PostToolUse hook triggers on `.claude/docs/**/*.yaml` for automatic validation
 
 ### S-DLC Team Relationship
 

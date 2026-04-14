@@ -115,6 +115,8 @@ Prompt: |
    - If `iteration_count >= 5`: **Escalate** to human with iteration history.
    - Otherwise: Back to step 1.
 
+**Cross-stage resolution cap**: If a fix at one stage introduces a blocker at another stage (e.g., fixing a pre-implementation finding creates a pre-test conflict), increment a cross-stage counter. When the count reaches 3, escalate to the human with the full blocker chain. This prevents infinite oscillation between stages.
+
 #### For single-pass stages (pre-test, pre-review):
 
 Dispatch challenger once and process findings:

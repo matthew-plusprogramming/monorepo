@@ -12,8 +12,8 @@
 
 import { writeFileSync, readFileSync, unlinkSync, existsSync } from 'node:fs';
 
-/** Stale lockfile threshold in milliseconds (30 seconds per REQ-034). */
-const STALE_THRESHOLD_MS = 30_000;
+/** Default stale lockfile threshold in milliseconds (30 seconds per REQ-034). */
+const DEFAULT_STALE_THRESHOLD_MS = 30_000;
 
 /** Retry delay in milliseconds (per AC-1.13). */
 const RETRY_DELAY_MS = 100;
@@ -36,19 +36,21 @@ function syncSleep(ms) {
  * @param {string} lockPath - Absolute path to the lockfile
  * @param {object} [opts] - Options
  * @param {boolean} [opts.failOpen=true] - If true, return false on failure; if false, throw
+ * @param {number} [opts.staleThresholdMs=30000] - Stale lock detection threshold in milliseconds
  * @returns {boolean} true if lock was acquired, false if not (only when failOpen=true)
  * @throws {Error} When failOpen=false and lock cannot be acquired
  */
 export function acquireLock(lockPath, opts = {}) {
   const failOpen = opts.failOpen !== undefined ? opts.failOpen : true;
+  const staleThresholdMs = opts.staleThresholdMs !== undefined ? opts.staleThresholdMs : DEFAULT_STALE_THRESHOLD_MS;
 
   // Try to acquire, with stale detection
-  const acquired = tryAcquireLock(lockPath);
+  const acquired = tryAcquireLock(lockPath, staleThresholdMs);
   if (acquired) return true;
 
   // AC-1.13: Retry once after 100ms
   syncSleep(RETRY_DELAY_MS);
-  const retryAcquired = tryAcquireLock(lockPath);
+  const retryAcquired = tryAcquireLock(lockPath, staleThresholdMs);
   if (retryAcquired) return true;
 
   // Lock still held after retry
@@ -69,9 +71,10 @@ export function acquireLock(lockPath, opts = {}) {
  * Handles stale lock detection and force-acquisition.
  *
  * @param {string} lockPath - Absolute path to the lockfile
+ * @param {number} staleThresholdMs - Stale lock detection threshold in milliseconds
  * @returns {boolean} true if lock was acquired
  */
-function tryAcquireLock(lockPath) {
+function tryAcquireLock(lockPath, staleThresholdMs) {
   // Attempt atomic create-if-not-exists using 'wx' flag to avoid TOCTOU race
   try {
     const lockData = {
@@ -94,7 +97,7 @@ function tryAcquireLock(lockPath) {
     const createdAt = new Date(lockData.created_at).getTime();
     const ageMs = Date.now() - createdAt;
 
-    if (ageMs >= STALE_THRESHOLD_MS) {
+    if (ageMs >= staleThresholdMs) {
       // AC-1.12: Stale lock -- force-acquire with warning
       process.stderr.write(
         `[session-lock] WARNING: Force-acquiring stale lock (PID: ${lockData.pid}, age: ${Math.round(ageMs / 1000)}s)\n`

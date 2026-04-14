@@ -18,6 +18,12 @@
  *
  * Note: awaiting_approval is NOT in any mandatory check list (AC-1.13).
  *
+ * Additional gates:
+ *   6. Deployment verification (sg-deployment-verification-gaps):
+ *      Blocks when deployment.detected=true AND deployment.failed!=true
+ *      AND deployment.verify_deploy_passed!=true.
+ *      verify_build_passed is advisory only (not checked).
+ *
  * Invocation: Receives stdin JSON from Claude Code Stop hook system.
  *
  * Exit codes:
@@ -454,8 +460,85 @@ async function main() {
       // AC-2.5: Fail-open -- any PRD check error must not block session
     }
 
-    // If no dispatch violations and no obligation violations, allow completion
-    if (missingDispatches.length === 0 && obligationViolations.length === 0) {
+    // Step 7.8: Deployment verification gate (sg-deployment-verification-gaps)
+    // Implements: AC-5.1 through AC-5.4, AC-6.3, AC-6.4
+    // Check: deployment detected -> must have post-deploy verification
+    // verify_build_passed is NOT checked (advisory only, AC-5.4)
+    let deploymentBlocked = false;
+    let deploymentBlockReason = '';
+
+    try {
+      const deployment = session.deployment;
+
+      if (deployment !== undefined && deployment !== null) {
+        // AC-6.3: Validate deployment is an object (fail-open on non-object)
+        if (typeof deployment !== 'object' || Array.isArray(deployment)) {
+          process.stderr.write(
+            `[workflow-enforcement] WARNING: Malformed deployment object (type: ${typeof deployment}) -- fail-open\n`
+          );
+          // Structural error: fail-open, do not block
+        } else {
+          // AC-6.3: Validate field types are boolean independently (fail-open on non-boolean).
+          // Each field is checked separately so a malformed `detected` does not
+          // short-circuit validation of `failed` and `verify_deploy_passed` (chk-impl-c4d8a2e1).
+          const detected = deployment.detected;
+          const failed = deployment.failed;
+          const verifyDeployPassed = deployment.verify_deploy_passed;
+
+          let hasStructuralError = false;
+
+          if (detected !== undefined && typeof detected !== 'boolean') {
+            process.stderr.write(
+              `[workflow-enforcement] WARNING: deployment.detected is not boolean (${typeof detected}) -- fail-open\n`
+            );
+            hasStructuralError = true;
+          }
+          if (failed !== undefined && typeof failed !== 'boolean') {
+            process.stderr.write(
+              `[workflow-enforcement] WARNING: deployment.failed is not boolean (${typeof failed}) -- fail-open\n`
+            );
+            hasStructuralError = true;
+          }
+          if (verifyDeployPassed !== undefined && typeof verifyDeployPassed !== 'boolean') {
+            process.stderr.write(
+              `[workflow-enforcement] WARNING: deployment.verify_deploy_passed is not boolean (${typeof verifyDeployPassed}) -- fail-open\n`
+            );
+            hasStructuralError = true;
+          }
+
+          if (hasStructuralError) {
+            // Any non-boolean field is a structural error: fail-open, do not block
+          } else {
+            // AC-6.4: Missing/undefined deployment.detected treated as false (no deployment)
+            if (detected === true) {
+              // AC-5.3: deployment.failed=true takes absolute precedence
+              if (failed === true) {
+                // No artifact to verify -- skip verification gate
+                process.stderr.write(
+                  '[workflow-enforcement] Deployment failed -- verification gate skipped (no artifact to verify)\n'
+                );
+              } else if (verifyDeployPassed !== true) {
+                // AC-5.1: Block -- deployment detected without post-deploy verification
+                deploymentBlocked = true;
+                deploymentBlockReason =
+                  'Deployment detected without post-deploy verification. Run smoke test before completing session.';
+              }
+              // else: AC-5.2 -- verify_deploy_passed=true, gate passes
+            }
+            // else: No deployment detected (AC-6.4) -- gate passes
+          }
+        }
+      }
+      // deployment field absent -- no deployment detected (AC-6.4), gate passes
+    } catch (err) {
+      // AC-6.3: Fail-open on any structural error in deployment gate
+      process.stderr.write(
+        `[workflow-enforcement] WARNING: Deployment gate structural error: ${err.message} -- fail-open\n`
+      );
+    }
+
+    // If no dispatch violations, no obligation violations, and no deployment block, allow completion
+    if (missingDispatches.length === 0 && obligationViolations.length === 0 && !deploymentBlocked) {
       safeDelete(sentinelPath);
       // AC-2.1: Emit PRD warning via additionalContext if present
       if (prdWarning) {
@@ -497,8 +580,8 @@ async function main() {
       }
     }
 
-    // If both dispatch and obligation issues are overridden/resolved, allow
-    if (dispatchOverridden && obligationViolations.length === 0) {
+    // If both dispatch and obligation issues are overridden/resolved, and no deployment block, allow
+    if (dispatchOverridden && obligationViolations.length === 0 && !deploymentBlocked) {
       safeDelete(sentinelPath);
       if (prdWarning) {
         console.log(JSON.stringify({ additionalContext: prdWarning }));
@@ -546,8 +629,8 @@ async function main() {
         // Fail-open on session write errors
       }
 
-      // If no dispatch issues remain, allow completion
-      if (!hasDispatchIssues) {
+      // If no dispatch issues remain and no deployment block, allow completion
+      if (!hasDispatchIssues && !deploymentBlocked) {
         safeDelete(sentinelPath);
         if (prdWarning) {
           console.log(JSON.stringify({ additionalContext: prdWarning }));
@@ -599,6 +682,11 @@ async function main() {
       reasonParts.push(`Manifest status inconsistency:\n${violationLines}`);
     }
 
+    // Step 9.1: Deployment verification block (sg-deployment-verification-gaps)
+    if (deploymentBlocked) {
+      reasonParts.push(deploymentBlockReason);
+    }
+
     // If nothing to block (e.g., obligations were warn-only and dispatch had issues)
     if (reasonParts.length === 0) {
       safeDelete(sentinelPath);
@@ -630,9 +718,19 @@ async function main() {
       }).join('\n');
       remediationParts.push(`Update manifest fields:\n${obligationInstructions}`);
     }
-    reasonParts.push(
-      'How to unblock:\n' + remediationParts.join('\n')
-    );
+    if (deploymentBlocked) {
+      remediationParts.push(
+        'Run post-deploy verification:\n' +
+        '  - Execute: npm run verify:deploy <endpoint-url>\n' +
+        '  - Or use HTTP GET fallback with endpoint URL\n' +
+        '  - Or call: node .claude/scripts/session-checkpoint.mjs record-deployment-failure (if deployment failed)'
+      );
+    }
+    if (remediationParts.length > 0) {
+      reasonParts.push(
+        'How to unblock:\n' + remediationParts.join('\n')
+      );
+    }
 
     // Create sentinel BEFORE outputting block decision (AC-4.6)
     try {

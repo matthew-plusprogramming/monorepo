@@ -228,7 +228,29 @@ For each changed file:
 □ No dead code introduced
 □ No magic numbers/strings
 □ Tests exist for new public methods
+□ Supplementary feature error states degrade gracefully (muted/placeholder styling, not red/alert)
 ```
+
+#### Graceful Degradation for Supplementary Features (AC-1.3)
+
+Error states in **supplementary features** (non-critical, nice-to-have functionality) must degrade silently rather than display prominently. Specifically:
+
+- Error UI for supplementary features should use **muted or placeholder styling** (e.g., greyed-out text, hidden section, skeleton placeholder), NOT red/alert/error styling
+- A supplementary feature failure should not draw more attention than the primary feature it supports
+- Features with **no error state** pass this check automatically (no false positive)
+
+**Example finding**:
+
+```markdown
+**Quality: Prominent error display in supplementary feature** (Medium)
+
+- File: src/components/SnapshotPanel.tsx:45
+- Issue: "Failed to Load Snapshot" displayed in red alert box for a non-critical feature
+- Impact: Users perceive a minor feature failure as a system error
+- Suggestion: Replace red alert with greyed-out placeholder text or hide the panel silently
+```
+
+This check exists because prominent error displays for supplementary features (e.g., "Failed to Load Snapshot" in red) create false urgency and degrade user trust disproportionately to the feature's importance.
 
 ### 5. Generate Review Report
 

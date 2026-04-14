@@ -35,6 +35,17 @@
         ]
       },
       {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "_source": "metaclaude",
+            "_id": "workflow-file-protection-bash",
+            "type": "command",
+            "command": "cd \"$CLAUDE_PROJECT_DIR\" && node .claude/scripts/workflow-file-protection.mjs"
+          }
+        ]
+      },
+      {
         "matcher": "Agent",
         "hooks": [
           {

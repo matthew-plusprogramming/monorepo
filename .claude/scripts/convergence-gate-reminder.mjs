@@ -35,6 +35,7 @@
 import { existsSync, readFileSync, writeFileSync, renameSync } from 'node:fs';
 import { join } from 'node:path';
 import { findClaudeDir, loadSession } from './lib/hook-utils.mjs';
+import { acquireLock, releaseLock } from './lib/session-lock.mjs';
 
 const GATE_MAP = {
   implementer: {
@@ -125,10 +126,18 @@ async function readStdin() {
 /** SEC-001: Validate spec_group_id format before using in file paths. */
 const SPEC_GROUP_ID_PATTERN = /^sg-[a-z0-9-]+$/;
 
+/** Stale lock threshold for manifest writes (10s -- manifest updates are fast). */
+const MANIFEST_LOCK_STALE_THRESHOLD_MS = 10_000;
+
 /**
  * Attempt to auto-update the manifest convergence boolean for the given gate.
  * Returns true if the update succeeded, false otherwise.
  * Never throws -- all errors are caught and logged to stderr.
+ *
+ * Uses file locking (acquireLock/releaseLock) around the read-modify-write to
+ * prevent lost updates when concurrent SubagentStop hooks fire simultaneously
+ * (e.g., implementer + test-writer completing at the same time). The existing
+ * atomic rename pattern is kept as a defense-in-depth layer.
  *
  * AC-1.1: Locate manifest via session.json active_work.spec_group_id
  * AC-1.4: Append decision_log entry with convergence_auto_updated action
@@ -167,35 +176,53 @@ function tryUpdateManifest(gate, agentType) {
       return false;
     }
 
-    // Read and parse manifest
-    const manifestContent = readFileSync(manifestPath, 'utf-8');
-    const manifest = JSON.parse(manifestContent);
-
-    // AC-1.1: Set convergence boolean
-    if (!manifest.convergence) {
-      manifest.convergence = {};
-    }
-    manifest.convergence[gate.field] = true;
-
-    // AC-1.4: Append decision_log entry
-    if (!Array.isArray(manifest.decision_log)) {
-      manifest.decision_log = [];
-    }
-    manifest.decision_log.push({
-      timestamp: new Date().toISOString(),
-      actor: 'agent',
-      action: 'convergence_auto_updated',
-      details: `Auto-set convergence.${gate.field} = true after ${agentType} subagent completion.`,
+    // Acquire lock before read-modify-write (fail-open with short stale threshold)
+    const lockPath = manifestPath + '.lock';
+    const lockAcquired = acquireLock(lockPath, {
+      failOpen: true,
+      staleThresholdMs: MANIFEST_LOCK_STALE_THRESHOLD_MS,
     });
+    if (!lockAcquired) {
+      process.stderr.write(
+        '[convergence-gate-reminder] WARNING: Could not acquire manifest lock -- manifest update skipped (fail-open)\n'
+      );
+      return false;
+    }
 
-    manifest.updated_at = new Date().toISOString();
+    try {
+      // Read and parse manifest (inside lock)
+      const manifestContent = readFileSync(manifestPath, 'utf-8');
+      const manifest = JSON.parse(manifestContent);
 
-    // Atomic write: write to temp file then rename over original
-    const tmpPath = manifestPath + '.tmp.' + process.pid;
-    writeFileSync(tmpPath, JSON.stringify(manifest, null, 2) + '\n');
-    renameSync(tmpPath, manifestPath);
+      // AC-1.1: Set convergence boolean
+      if (!manifest.convergence) {
+        manifest.convergence = {};
+      }
+      manifest.convergence[gate.field] = true;
 
-    return true;
+      // AC-1.4: Append decision_log entry
+      if (!Array.isArray(manifest.decision_log)) {
+        manifest.decision_log = [];
+      }
+      manifest.decision_log.push({
+        timestamp: new Date().toISOString(),
+        actor: 'agent',
+        action: 'convergence_auto_updated',
+        details: `Auto-set convergence.${gate.field} = true after ${agentType} subagent completion.`,
+      });
+
+      manifest.updated_at = new Date().toISOString();
+
+      // Atomic write: write to temp file then rename over original (defense-in-depth)
+      const tmpPath = manifestPath + '.tmp.' + process.pid;
+      writeFileSync(tmpPath, JSON.stringify(manifest, null, 2) + '\n');
+      renameSync(tmpPath, manifestPath);
+
+      return true;
+    } finally {
+      // Always release lock
+      releaseLock(lockPath);
+    }
   } catch (err) {
     // AC-1.6: Fail-open on any error -- fall back to text-only reminder
     process.stderr.write(

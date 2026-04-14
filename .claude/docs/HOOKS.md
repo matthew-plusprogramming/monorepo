@@ -53,14 +53,14 @@ The key field is `tool_input.file_path` which contains the absolute path to the 
 
 ### Trigger Points
 
-| Hook Event     | When Triggered                | Matchers      | Use Case                                                         |
-| -------------- | ----------------------------- | ------------- | ---------------------------------------------------------------- |
-| `PreToolUse`   | Before Edit or Write executes | `Edit\|Write` | Trace read enforcement                                           |
-| `PostToolUse`  | After Edit or Write completes | `Edit\|Write` | File validation                                                  |
-| `PostToolUse`  | After Read completes          | `Read`        | Superseded artifact warnings, trace read tracking                |
-| `PostToolUse`  | After Bash completes          | `Bash`        | Commit policy enforcement, trace staleness checks                |
-| `SubagentStop` | When a subagent completes     | (none)        | Convergence gate reminders, workflow enforcement advisory checks |
-| `Stop`         | When session ends             | (none)        | Session logging and finalization                                 |
+| Hook Event     | When Triggered                | Matchers      | Use Case                                                                       |
+| -------------- | ----------------------------- | ------------- | ------------------------------------------------------------------------------ |
+| `PreToolUse`   | Before Edit or Write executes | `Edit\|Write` | Trace read enforcement                                                         |
+| `PostToolUse`  | After Edit or Write completes | `Edit\|Write` | File validation                                                                |
+| `PostToolUse`  | After Read completes          | `Read`        | Superseded artifact warnings, trace read tracking                              |
+| `PostToolUse`  | After Bash completes          | `Bash`        | Commit policy enforcement, trace staleness checks                              |
+| `SubagentStop` | When a subagent completes     | (none)        | Convergence gate reminders, automated pass evidence recording, advisory checks |
+| `Stop`         | When session ends             | (none)        | Session logging and finalization                                               |
 
 ### Configuration Location
 
@@ -157,33 +157,33 @@ The wrapper:
 
 ### PreToolUse Hooks (Write - Enforcement File Protection)
 
-| Hook ID                    | Trigger Pattern | Script                         | Purpose                                                  |
-| -------------------------- | --------------- | ------------------------------ | -------------------------------------------------------- |
-| `workflow-file-protection` | `Write`         | `workflow-file-protection.mjs` | Block agent writes to gate-override.json and kill switch |
+| Hook ID                    | Trigger Pattern | Script                         | Purpose                                                                 |
+| -------------------------- | --------------- | ------------------------------ | ----------------------------------------------------------------------- |
+| `workflow-file-protection` | `Write`         | `workflow-file-protection.mjs` | Block agent writes to gate-override.json, kill switch, and session.json |
 
 ### PostToolUse Hooks (Edit|Write)
 
-| Hook ID                      | Trigger Pattern         | Script                            | Purpose                                                |
-| ---------------------------- | ----------------------- | --------------------------------- | ------------------------------------------------------ |
-| `typescript-typecheck`       | `*.ts,*.tsx`            | `workspace-tsc.mjs`               | TypeScript type checking via workspace-aware tsc       |
-| `eslint-check`               | `*.ts,*.tsx,*.js,*.jsx` | `workspace-eslint.mjs`            | Linting via workspace-aware ESLint                     |
-| `json-validate`              | `*.json`                | inline JSON.parse                 | JSON syntax validation                                 |
-| `claude-md-drift`            | `*CLAUDE.md`            | `verify-claude-md-base.mjs`       | Detect CLAUDE.md drift from canonical base             |
-| `manifest-validate`          | `*manifest.json`        | `validate-manifest.mjs`           | Validate manifest against spec-group schema            |
-| `template-validate`          | `.claude/templates/*`   | `template-validate.mjs`           | Validate template structure and placeholders           |
-| `agent-frontmatter-validate` | `.claude/agents/*.md`   | `validate-agent-frontmatter.mjs`  | Agent frontmatter schema validation                    |
-| `skill-frontmatter-validate` | `*SKILL.md`             | `validate-skill-frontmatter.mjs`  | Skill frontmatter schema validation                    |
-| `spec-schema-validate`       | `.claude/specs/**/*.md` | `spec-schema-validate.mjs`        | JSON schema validation for specs (incl. e2e_skip)      |
-| `spec-validate`              | `.claude/specs/**/*.md` | `spec-validate.mjs`               | Spec markdown structure and e2e opt-out validation     |
-| `progress-heartbeat-check`   | `.claude/specs/**`      | `progress-heartbeat-check.mjs`    | Enforce progress logging (warn 15min, block 3x)        |
-| `registry-artifact-validate` | `*artifacts.json`       | `registry-artifact-validate.mjs`  | Validate artifact registry schema and semantics        |
-| `convergence-field-validate` | `*manifest.json`        | `validate-convergence-fields.mjs` | Validate convergence field names against canonical set |
-| `spec-manifest-sync`         | `*manifest.json`        | `validate-spec-manifest-sync.mjs` | Detect drift between manifest state and spec tasks     |
-| `structured-error-validate`  | `*.ts,*.tsx`            | `structured-error-validator.mjs`  | Warn on raw `throw new Error()` in non-test files      |
-| `evidence-table-check`       | `.claude/specs/**/*.md` | `evidence-table-check.mjs`        | Warn when implementing spec lacks evidence table       |
-| `spec-approval-hash`         | `.claude/specs/**/*.md` | `spec-approval-hash.mjs`          | Detect content drift in approved specs                 |
-| `session-state-validate`     | (no pattern)            | `session-validate.mjs`            | Validate session.json schema compliance                |
-| `prettier-format`            | (no pattern)            | inline `npx prettier`             | Auto-format edited files with Prettier                 |
+| Hook ID                      | Trigger Pattern         | Script                            | Purpose                                                                |
+| ---------------------------- | ----------------------- | --------------------------------- | ---------------------------------------------------------------------- |
+| `typescript-typecheck`       | `*.ts,*.tsx`            | `workspace-tsc.mjs`               | TypeScript type checking via workspace-aware tsc                       |
+| `eslint-check`               | `*.ts,*.tsx,*.js,*.jsx` | `workspace-eslint.mjs`            | Linting via workspace-aware ESLint                                     |
+| `json-validate`              | `*.json`                | inline JSON.parse                 | JSON syntax validation                                                 |
+| `claude-md-drift`            | `*CLAUDE.md`            | `verify-claude-md-base.mjs`       | Detect CLAUDE.md drift from canonical base                             |
+| `manifest-validate`          | `*manifest.json`        | `validate-manifest.mjs`           | Validate manifest against spec-group schema                            |
+| `template-validate`          | `.claude/templates/*`   | `template-validate.mjs`           | Validate template structure and placeholders                           |
+| `agent-frontmatter-validate` | `.claude/agents/*.md`   | `validate-agent-frontmatter.mjs`  | Agent frontmatter schema validation                                    |
+| `skill-frontmatter-validate` | `*SKILL.md`             | `validate-skill-frontmatter.mjs`  | Skill frontmatter schema validation                                    |
+| `spec-schema-validate`       | `.claude/specs/**/*.md` | `spec-schema-validate.mjs`        | JSON schema validation for specs (incl. e2e_skip)                      |
+| `spec-validate`              | `.claude/specs/**/*.md` | `spec-validate.mjs`               | Spec markdown structure, e2e opt-out, and env-dependent AC enforcement |
+| `progress-heartbeat-check`   | `.claude/specs/**`      | `progress-heartbeat-check.mjs`    | Enforce progress logging (warn 15min, block 3x)                        |
+| `registry-artifact-validate` | `*artifacts.json`       | `registry-artifact-validate.mjs`  | Validate artifact registry schema and semantics                        |
+| `convergence-field-validate` | `*manifest.json`        | `validate-convergence-fields.mjs` | Validate convergence field names against canonical set                 |
+| `spec-manifest-sync`         | `*manifest.json`        | `validate-spec-manifest-sync.mjs` | Detect drift between manifest state and spec tasks                     |
+| `structured-error-validate`  | `*.ts,*.tsx`            | `structured-error-validator.mjs`  | Warn on raw `throw new Error()` in non-test files                      |
+| `evidence-table-check`       | `.claude/specs/**/*.md` | `evidence-table-check.mjs`        | Warn when implementing spec lacks evidence table                       |
+| `spec-approval-hash`         | `.claude/specs/**/*.md` | `spec-approval-hash.mjs`          | Detect content drift in approved specs                                 |
+| `session-state-validate`     | (no pattern)            | `session-validate.mjs`            | Validate session.json schema compliance                                |
+| `prettier-format`            | (no pattern)            | inline `npx prettier`             | Auto-format edited files with Prettier                                 |
 
 ### PostToolUse Hooks (Read)
 
@@ -202,11 +202,10 @@ The wrapper:
 
 ### SubagentStop Hooks
 
-| Hook ID                     | Script                          | Purpose                                                                 |
-| --------------------------- | ------------------------------- | ----------------------------------------------------------------------- |
-| `convergence-gate-reminder` | `convergence-gate-reminder.mjs` | Remind main agent to update convergence gates after subagent completion |
-
-> **Note**: `workflow-enforcement-check` (advisory SubagentStop hook) has been deprecated and removed from settings.json. Its functionality is superseded by the coercive `workflow-gate-enforcement` (PreToolUse Agent) and `workflow-stop-enforcement` (Stop) hooks.
+| Hook ID                     | Script                          | Purpose                                                                   |
+| --------------------------- | ------------------------------- | ------------------------------------------------------------------------- |
+| `convergence-gate-reminder` | `convergence-gate-reminder.mjs` | Remind main agent to update convergence gates after subagent completion   |
+| `convergence-pass-recorder` | `convergence-pass-recorder.mjs` | Automatically record pass evidence when convergence check agents complete |
 
 ### Stop Hooks
 
@@ -317,7 +316,7 @@ All validation scripts are located in `.claude/scripts/`.
 
 ### spec-validate.mjs
 
-**Purpose**: Validate spec markdown structure, required sections, and E2E opt-out field consistency.
+**Purpose**: Validate spec markdown structure, required sections, E2E opt-out field consistency, and env-dependent AC coverage.
 
 **Behavior**:
 
@@ -327,6 +326,98 @@ All validation scripts are located in `.claude/scripts/`.
 4. When `e2e_skip: true`: validates that `e2e_skip_rationale` is present and contains a valid enum value (imports `VALID_E2E_SKIP_RATIONALES` from `workflow-dag.mjs`)
 5. When `e2e_skip_rationale` is present but `e2e_skip` is false or absent: emits a warning (not rejection)
 6. Reports structural issues (missing sections, malformed content)
+7. Runs env-dependent AC enforcement check (advisory, never affects exit code):
+   a. Extracts file paths from the spec's task list and evidence table (backtick-quoted paths and pipe-delimited table rows)
+   b. Scans referenced files for env-access patterns (`process.env`, `NODE_ENV`, `import.meta.env`)
+   c. If env-dependent code is found, scans the spec's Acceptance Criteria section for default/unset keywords (`unset`, `default`, `not set`, `absent`, `missing`, `clean environment`, `undefined`)
+   d. If env-dependent code exists but no default-env AC is found, emits advisory: "Spec references env-dependent code but has no AC for default/unset environment"
+   e. If referenced files do not yet exist (spec authored before implementation), the check is silently skipped
+
+**Env-Dependent AC Enforcement Details**:
+
+- Always advisory -- never blocks save or affects the exit code
+- Runs after main validation to avoid polluting the error/warning counts
+- Silently catches all errors in the env check path (missing files, unreadable files, extraction failures)
+- Resolves file paths relative to both `cwd` and the spec's directory
+
+### import-graph-check.mjs
+
+**Purpose**: Trace static imports from entry point(s) and check whether specified files are reachable through the import chain. Also supports wiring-task detection mode for specs.
+
+**Location**: `.claude/scripts/import-graph-check.mjs`
+
+**Not a hook** -- this script is invoked directly by the completion verifier (Gate 7) and can be run manually from the command line. It is registered in `metaclaude-registry.json` for sync to consumer projects.
+
+**Modes**:
+
+#### Standard Mode (boot-path reachability)
+
+```bash
+node .claude/scripts/import-graph-check.mjs --entry <path> [--entry <path2>] --check <file1> <file2> ...
+```
+
+Traces the static import graph from entry point(s) and classifies each `--check` file as reachable or unreachable.
+
+**Output** (JSON to stdout):
+
+```json
+{
+  "reachable": ["src/services/auth.ts"],
+  "unreachable": ["src/resolvers/context.ts"],
+  "warnings": ["Circular import detected: src/a.ts -> src/b.ts -> src/a.ts"]
+}
+```
+
+#### Wiring-Task Detection Mode
+
+```bash
+node .claude/scripts/import-graph-check.mjs --spec <spec-path>
+```
+
+Parses the spec's task list and evidence table for file paths, scans those files for initialization method definitions, and checks whether the spec includes a wiring task.
+
+**Output** (JSON to stdout):
+
+```json
+{
+  "init_methods_found": [
+    {
+      "file": "src/engine/context-pipeline.ts",
+      "methods": ["init()", "setResolverRegistry()"]
+    }
+  ],
+  "wiring_task_found": false,
+  "advisory": "Spec creates files with init/register methods but no wiring task references the entry point",
+  "warnings": []
+}
+```
+
+**Key Behaviors**:
+
+- **Exit code**: Always 0 (advisory, never blocking)
+- **tsconfig path resolution**: Reads `tsconfig.json` `compilerOptions.paths` with `baseUrl` support. Falls back to Node.js resolution when tsconfig is missing or has no paths
+- **Barrel re-exports**: Resolves directory imports to `index.ts`/`index.js`
+- **Extension resolution**: Tries `.ts`, `.tsx`, `.js`, `.jsx`, `/index.ts`, `/index.js` in order
+- **Non-JS imports**: CSS, JSON, images, fonts treated as leaf nodes (not traversed)
+- **node_modules imports**: Treated as leaf nodes (not traversed)
+- **Dynamic imports**: `import()` expressions flagged as warnings ("dynamic import boundary") and not traversed
+- **Circular imports**: Detected and reported as warnings; graph traversal continues past circular references
+- **Path validation**: All input paths validated against project root before traversal; paths outside the project boundary are rejected
+- **Symlink handling**: Uses `realpathSync` to normalize paths, handles macOS `/var` to `/private/var` resolution
+
+**Init Method Detection** (wiring-task mode):
+
+- Matches `init()`, `initialize()`, `configure()`, `setup()`, `register()` unconditionally
+- Matches `set*()` only when the name suggests subsystem wiring (contains keywords like Pipeline, Registry, Logger, Config, Provider, Factory, Handler, Manager, Service, Client, Connection, Store, Cache, Queue, Router, Resolver)
+- Excludes simple property setters like `setWidth()`, `setColor()`
+
+**Wiring Task Detection** (wiring-task mode):
+
+- Scans the spec's Task List section for keywords: `wire`, `wiring`, `register`, `connect`, `bootstrap`, `entry point`, `index.ts`, `index.js`, `main.ts`, `main.js`
+
+**Integration**: The completion verifier's Gate 7 invokes this script in both modes. See the [completion-verifier agent definition](../.claude/agents/completion-verifier.md) for the full Gate 7 specification.
+
+**See Also**: [Trace System](TRACES.md) -- when trace data is fresh, the completion verifier uses trace `imports` arrays for reachability checks instead of invoking this script
 
 ### progress-heartbeat-check.mjs
 
@@ -480,15 +571,43 @@ All validation scripts are located in `.claude/scripts/`.
 | `browser-tester`    | `browser_tests_passed`   |
 | `documenter`        | `docs_generated`         |
 
-### workflow-enforcement-check.mjs (DEPRECATED)
+### convergence-pass-recorder.mjs
 
-> **Deprecated**: Replaced by coercive hooks `workflow-gate-enforcement.mjs` and `workflow-stop-enforcement.mjs`. Removed from settings.json. See REQ-036.
+**Purpose**: Automatically record pass evidence when convergence check agents complete. Provides the trust anchor for evidence-based convergence counting.
 
-**Purpose**: Previously verified that mandatory subagent dispatches occurred for the current workflow phase. Advisory-only (SubagentStop hooks cannot block).
+**Hook Type**: SubagentStop (fires after agent completion)
+
+**Behavior**:
+
+1. Reads SubagentStop event data from stdin (JSON with `agent_type` and `agent_output` fields)
+2. Checks agent type against the convergence agent allowlist (see Gate Mapping below)
+3. If agent is not on the allowlist: exits 0 with empty JSON `{}` (no recording)
+4. Parses `agent_output` to extract findings metadata (`findings_count`, `findings_ids`, `clean`)
+5. Computes canonical findings hash from finding IDs (sorted, SHA-256)
+6. Invokes `session-checkpoint.mjs record-pass` with extracted metadata and `--source hook`
+7. On extraction failure: records with null findings and `manual_fallback` source (never blocks)
+8. On any error: fail-open (exit 0, empty JSON)
+
+**Gate Mapping** (agent type to gate name):
+
+| Agent Type               | Gate Name             |
+| ------------------------ | --------------------- |
+| `interface-investigator` | `investigation`       |
+| `challenger`             | `challenger`          |
+| `code-reviewer`          | `code_review`         |
+| `security-reviewer`      | `security_review`     |
+| `unifier`                | `unifier`             |
+| `completion-verifier`    | `completion_verifier` |
+
+**Ordering**: This hook is registered in `settings.json` AFTER `convergence-gate-reminder`, ensuring both hooks receive the original agent output independently (no chained/modified copies).
+
+**Exit Codes**:
+
+- `0`: Always (fail-open on all errors)
 
 ### workflow-gate-enforcement.mjs
 
-**Purpose**: Coercively block dispatch of enforced subagent types when workflow prerequisites are not met.
+**Purpose**: Coercively block dispatch of enforced subagent types when workflow prerequisites are not met. Includes optional evidence integrity verification for convergence gates.
 
 **Hook Type**: PreToolUse (runs before Agent tool dispatch)
 
@@ -503,10 +622,13 @@ All validation scripts are located in `.claude/scripts/`.
 5. If non-enforced subagent type: exits 0
 6. Looks up prerequisites from enforcement table
 7. Checks dispatch history and convergence state against prerequisites
-8. If prerequisites met: exits 0
-9. If not met: checks `gate-override.json` for human override
-10. If override found: exits 0
-11. If no override: outputs BLOCKED message to stderr and exits 2
+8. For convergence-type prerequisites: checks `clean_pass_count` from `session.convergence`
+9. If `convergence_evidence` arrays are present: runs optional evidence integrity verification (advisory warnings only, never blocks)
+10. If `convergence_evidence` arrays are absent: falls back to trust-based `clean_pass_count` (legacy compatibility)
+11. If prerequisites met: exits 0
+12. If not met: checks `gate-override.json` for human override
+13. If override found: exits 0
+14. If no override: outputs BLOCKED message to stderr and exits 2
 
 **Enforcement Table**:
 
@@ -519,6 +641,19 @@ All validation scripts are located in `.claude/scripts/`.
 | `documenter`          | `convergence.security_review.clean_pass_count >= 2`                               |
 | `completion-verifier` | `documenter` dispatched                                                           |
 
+**Evidence Integrity Verification** (defense-in-depth, advisory only):
+
+When convergence evidence arrays are present, the hook verifies:
+
+- Sequential `pass_number` values with no gaps
+- Sequential timestamps (no time-travel)
+- Array length matches highest `pass_number`
+- Timing plausibility (minimum 10 seconds between passes; faster passes flagged as suspicious)
+
+All integrity issues produce advisory warnings to stderr. The hook never blocks dispatch based on evidence integrity alone -- it falls back to count-only verification.
+
+**Skill Map**: Maps gate names to recommended skill commands for the help message shown when dispatch is blocked. Contains entries for all 6 convergence gates: `investigation`, `challenger`, `code_review`, `security_review`, `unifier`, `completion_verifier`.
+
 **Fail-Open**: Missing session.json, malformed JSON, missing `active_work` -- all exit 0.
 **Fail-Closed Exception**: Missing convergence fields default to 0 (blocks downstream dispatch).
 
@@ -529,7 +664,7 @@ All validation scripts are located in `.claude/scripts/`.
 
 ### workflow-file-protection.mjs
 
-**Purpose**: Block agent writes to enforcement files. Only human terminal writes are permitted.
+**Purpose**: Block agent writes to enforcement files and session state. Only human terminal writes (or trusted CLI scripts) are permitted.
 
 **Hook Type**: PreToolUse (runs before Write tool)
 
@@ -539,6 +674,9 @@ All validation scripts are located in `.claude/scripts/`.
 
 - `.claude/coordination/gate-override.json`
 - `.claude/coordination/gate-enforcement-disabled`
+- `.claude/context/session.json`
+
+The `session.json` write protection ensures all session state modifications go through `session-checkpoint.mjs` as the sole trusted writer. Agents must use CLI subcommands (`record-pass`, `update-convergence`, `transition-phase`, etc.) instead of direct file writes.
 
 **Key Property**: This hook does NOT check the kill switch. Write protection remains active even when `gate-enforcement-disabled` exists, preventing agents from self-bypassing enforcement.
 
@@ -549,7 +687,7 @@ All validation scripts are located in `.claude/scripts/`.
 
 ### workflow-stop-enforcement.mjs
 
-**Purpose**: Block session completion when mandatory dispatches have not occurred or manifest status obligations are unsatisfied for spec-based workflows.
+**Purpose**: Block session completion when mandatory dispatches have not occurred, manifest status obligations are unsatisfied, or deployment verification is incomplete for spec-based workflows.
 
 **Hook Type**: Stop (runs on session completion)
 
@@ -564,11 +702,12 @@ All validation scripts are located in `.claude/scripts/`.
 5. Checks phase-aware mandatory dispatch records in `subagent_tasks`
 6. If `e2e-test-writer` is missing from dispatch records, checks spec frontmatter for opt-out (see [E2E Opt-Out Enforcement](#e2e-opt-out-enforcement) below)
 7. If `currentPhase === 'complete'`: checks manifest status obligations (see [Status Obligation Enforcement](#status-obligation-enforcement) below). For all other phases (active or unrecognized), obligation validation is skipped entirely.
-8. If all dispatch and obligation checks pass: exits 0
-9. If dispatch violations: checks `gate-override.json` for stop-gate override
-10. If obligation violations: checks for phase-scoped override (`status_obligations:<phase>`)
-11. Builds combined block message distinguishing "Missing mandatory dispatches" from "Manifest status inconsistency"
-12. Creates `stop-hook-active` sentinel, then outputs `{"decision": "block", "reason": "..."}` via stdout
+8. Evaluates deployment verification gate (see [Deployment Verification Gate](#deployment-verification-gate) below): reads `session.deployment` object and blocks if deployment detected without passing post-deploy verification
+9. If all dispatch, obligation, and deployment checks pass: exits 0
+10. If dispatch violations: checks `gate-override.json` for stop-gate override
+11. If obligation violations: checks for phase-scoped override (`status_obligations:<phase>`)
+12. Builds combined block message distinguishing "Missing mandatory dispatches", "Manifest status inconsistency", and "Deployment detected without post-deploy verification"
+13. Creates `stop-hook-active` sentinel, then outputs `{"decision": "block", "reason": "..."}` via stdout
 
 **Active-Phase Guard**: Obligation validation in the stop hook only runs when `currentPhase === 'complete'`. During active phases (`implementing`, `reviewing`, `documenting`, etc.), the entire obligation validation block is skipped -- including the `specGroupId` lookup, SEC-001 format validation, and `validateObligations()` call. This prevents false blocks during normal workflow execution. Phase transition obligation enforcement is handled by `session-checkpoint.mjs` instead. Unrecognized phase strings are treated as non-complete (fail-open).
 
@@ -632,6 +771,77 @@ session.json -> active_work.spec_group_id
 - `STOP_MANDATORY_DISPATCHES`: 5-element array including `e2e-test-writer`
 - `STOP_PHASE_REQUIREMENTS`: `e2e-test-writer` appears in all four phase arrays (`reviewing`, `completion_verifying`, `documenting`, `complete`)
 - `VALID_E2E_SKIP_RATIONALES`: `['pure-refactor', 'test-infra', 'type-only', 'docs-only']`
+
+#### Deployment Verification Gate
+
+The stop hook enforces post-deploy verification when a deployment has been recorded in the session (Step 7.8 in the hook's execution flow). This gate is independent of mandatory dispatch checks and obligation checks.
+
+**Data-Flow Path**:
+
+```
+session.json -> deployment object
+  -> check deployment.detected (boolean)
+  -> check deployment.failed (boolean, absolute precedence)
+  -> check deployment.verify_deploy_passed (boolean)
+```
+
+**Decision Logic**:
+
+| `deployment.detected` | `deployment.failed` | `deployment.verify_deploy_passed` | Result                                       |
+| --------------------- | ------------------- | --------------------------------- | -------------------------------------------- |
+| `true`                | `true`              | (any)                             | Gate passes (no artifact to verify)          |
+| `true`                | `false`/absent      | `true`                            | Gate passes (verification complete)          |
+| `true`                | `false`/absent      | `false`/absent                    | Gate BLOCKS (unverified deployment)          |
+| `false`/absent        | (any)               | (any)                             | Gate passes (no deployment detected)         |
+| absent entirely       | -                   | -                                 | Gate passes (no deployment field in session) |
+
+**What is NOT enforced**: `deployment.verify_build_passed` is advisory only. The stop hook does not check or block on build verification status.
+
+**Block Message**: "Deployment detected without post-deploy verification. Run smoke test before completing session."
+
+**Remediation Guidance** (shown when blocked):
+
+```
+Run post-deploy verification:
+  - Execute: npm run verify:deploy <endpoint-url>
+  - Or use HTTP GET fallback with endpoint URL
+  - Or call: node .claude/scripts/session-checkpoint.mjs record-deployment-failure (if deployment failed)
+```
+
+**Error Behavior (Fail-Open)**:
+
+| Scenario                                         | Behavior                                     |
+| ------------------------------------------------ | -------------------------------------------- |
+| `deployment` field absent from session.json      | Gate passes (no deployment detected)         |
+| `deployment` is not an object (e.g., string/int) | Fail-open with warning to stderr             |
+| `deployment.detected` is non-boolean type        | Fail-open with warning to stderr             |
+| `deployment.failed` is non-boolean type          | Fail-open with warning to stderr             |
+| `deployment.verify_deploy_passed` is non-boolean | Fail-open with warning to stderr             |
+| Any structural error in deployment gate logic    | Fail-open with warning (caught by try/catch) |
+| `deployment.detected` is `undefined`             | Treated as `false` (no deployment detected)  |
+
+Each field is validated independently. A malformed `detected` field does not short-circuit validation of `failed` or `verify_deploy_passed`.
+
+**Recording Deployment State** (via `session-checkpoint.mjs`):
+
+```bash
+# Record a pipeline deployment
+node .claude/scripts/session-checkpoint.mjs record-deployment --target staging --method pipeline
+
+# Record a manual deployment
+node .claude/scripts/session-checkpoint.mjs record-deployment --target production --manual
+
+# Record deployment failure (clears verification requirement)
+node .claude/scripts/session-checkpoint.mjs record-deployment-failure
+```
+
+**Target Validation**: Alphanumeric plus `.`, `-`, `/`, `:` only, max 256 characters.
+
+**Method Validation**: Must be `"pipeline"` or `"manual"`. The `--manual` flag is shorthand for `--method manual`.
+
+**Overwrite Behavior**: Calling `record-deployment` again overwrites the entire prior deployment object (clean slate -- no stale verification state carries forward).
+
+**See Also**: [Deployment Verification Contracts](deployment-verification-contracts.md) for consumer contract interfaces (`verify:build`, `verify:deploy`) and the HTTP GET fallback behavior.
 
 ### journal-promotion-check.mjs
 
@@ -1055,4 +1265,7 @@ mv .claude/settings.json.bak .claude/settings.json
 
 ## Related Documentation
 
-- [Workflow Enforcement Architecture](.claude/docs/WORKFLOW-ENFORCEMENT.md) - DAG enforcement, operator overrides, completion checklist
+- [Workflow Enforcement Architecture](WORKFLOW-ENFORCEMENT.md) - DAG enforcement, operator overrides, completion checklist, evidence-based convergence
+- [Trace System](TRACES.md) - Trace generation, staleness, and the import-graph-check.mjs fallback for boot-path reachability
+- [Completion Verifier Agent](../agents/completion-verifier.md) - Gate 7 (boot-path reachability) uses import-graph-check.mjs as trace fallback and wiring-task detector
+- [Deployment Verification Contracts](deployment-verification-contracts.md) - Consumer contract interfaces (verify:build, verify:deploy), HTTP GET fallback, session state schema, CLI commands

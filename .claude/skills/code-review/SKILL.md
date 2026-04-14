@@ -366,6 +366,22 @@ Update manifest.json with code review status:
 }
 ```
 
+## Convergence Loop
+
+This gate runs under the Convergence Loop Protocol: **check → fix → recheck** until 2 consecutive clean passes or 5 iterations (escalate after 5).
+
+- **Check agent**: `code-reviewer`
+- **Fix agent**: `implementer`
+- **Gate name**: `code_review`
+
+After each clean pass, record via:
+
+```
+node .claude/scripts/session-checkpoint.mjs update-convergence code_review
+```
+
+Coercive enforcement: `workflow-gate-enforcement.mjs` blocks downstream dispatches when `clean_pass_count < 2`. See `/challenge` SKILL.md for full loop mechanics (state schema, fix agent input contract, escalation format).
+
 ## Review Guidelines
 
 ### Be Specific and Actionable

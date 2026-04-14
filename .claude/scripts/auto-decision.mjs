@@ -162,6 +162,45 @@ export function generateFindingId(agentType, category, summary) {
 }
 
 // =============================================================================
+// Batch Deduplication
+// =============================================================================
+
+/**
+ * Deduplicate findings by finding_id, keeping the last occurrence of each.
+ *
+ * When the same finding_id appears multiple times in a single batch, processing
+ * all of them inflates audit trail entry counts and corrupts circuit breaker
+ * accuracy calculations. This function ensures each finding_id is processed
+ * exactly once per batch.
+ *
+ * Findings without a finding_id (or with a falsy finding_id) are always kept,
+ * since they cannot be meaningfully deduplicated.
+ *
+ * @param {Array} findings - Array of FindingOutput objects
+ * @returns {Array} Deduplicated array with last occurrence of each finding_id preserved
+ */
+function deduplicateByFindingId(findings) {
+  if (!Array.isArray(findings) || findings.length === 0) return findings || [];
+
+  // Build a map of finding_id -> last index. Findings without an ID are always kept.
+  const lastIndexById = new Map();
+  const noIdIndices = [];
+
+  for (let i = 0; i < findings.length; i++) {
+    const id = findings[i].finding_id;
+    if (id) {
+      lastIndexById.set(id, i);
+    } else {
+      noIdIndices.push(i);
+    }
+  }
+
+  // Collect kept indices and sort to preserve original ordering
+  const keptIndices = [...lastIndexById.values(), ...noIdIndices].sort((a, b) => a - b);
+  return keptIndices.map(i => findings[i]);
+}
+
+// =============================================================================
 // Oscillation Detection (REQ-015)
 // =============================================================================
 
@@ -280,6 +319,9 @@ export function evaluateCircuitBreaker(state) {
  * @returns {{ entries: Array, override_events: Array, next_entry_id: number, circuit_breaker: { enabled: boolean, total_auto_accepts: number } }}
  */
 function loadAuditTrail(auditPath) {
+  if (typeof auditPath !== 'string') {
+    throw new Error(`auditPath must be a string, got ${typeof auditPath}: ${JSON.stringify(auditPath)}`);
+  }
   if (!existsSync(auditPath)) {
     return {
       entries: [],
@@ -318,6 +360,9 @@ function loadAuditTrail(auditPath) {
  * @param {object} auditData - Audit trail data
  */
 function saveAuditTrail(auditPath, auditData) {
+  if (typeof auditPath !== 'string') {
+    throw new Error(`auditPath must be a string, got ${typeof auditPath}: ${JSON.stringify(auditPath)}`);
+  }
   const tmpPath = auditPath + '.tmp.' + process.pid;
   writeFileSync(tmpPath, JSON.stringify(auditData, null, 2) + '\n');
   renameSync(tmpPath, auditPath);
@@ -471,6 +516,12 @@ export function evaluateFinding(finding, findingsHistory = [], circuitBreakerEna
  * @returns {{ decisions: Array<{ finding_id: string, action: string, reason: string|null }>, escalations: Array, oscillations: Array }}
  */
 export function processBatch(findings, auditPath, findingsHistory = []) {
+  // Deduplicate findings by finding_id before processing. If the same finding_id
+  // appears multiple times in one batch, only the last occurrence is kept. This
+  // prevents inflated audit counts and corrupted circuit breaker accuracy when
+  // duplicate findings slip into a single batch.
+  const deduplicatedFindings = deduplicateByFindingId(findings);
+
   // Load audit trail for circuit breaker state and entry IDs
   const audit = loadAuditTrail(auditPath);
   const cbState = evaluateCircuitBreaker({
@@ -488,7 +539,7 @@ export function processBatch(findings, auditPath, findingsHistory = []) {
   let entryId = audit.next_entry_id;
   let newAutoAccepts = 0;
 
-  for (const finding of findings) {
+  for (const finding of deduplicatedFindings) {
     const result = evaluateFinding(finding, findingsHistory, cbState.enabled);
 
     const entry = {

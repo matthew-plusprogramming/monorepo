@@ -19,8 +19,9 @@
  */
 
 import { readFileSync, existsSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, join, resolve, isAbsolute } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { extractSpecFilePaths } from './lib/spec-utils.mjs';
 
 const REQUIRED_FRONTMATTER_FIELDS = ['id', 'title', 'date', 'status'];
 
@@ -102,6 +103,16 @@ const SKIP_PATTERNS = [
 const NON_SPEC_TYPES = ['enforcement-report', 'requirements', 'investigation-report'];
 
 /**
+ * Check if a file path is under the .claude/specs/ directory.
+ * Used to determine validation strictness -- files outside spec directories
+ * get lighter validation (frontmatter + env check only).
+ */
+function isUnderSpecsDirectory(filePath) {
+  const normalized = resolve(filePath);
+  return normalized.includes('.claude/specs/') || normalized.includes('.claude' + '/specs/');
+}
+
+/**
  * Validate a single spec file.
  * Returns object with errors and warnings arrays.
  */
@@ -129,9 +140,16 @@ function validateSpecFile(filePath) {
     return { errors, warnings };
   }
 
-  for (const field of REQUIRED_FRONTMATTER_FIELDS) {
-    if (frontmatter[field] === undefined) {
-      errors.push(`missing required frontmatter field '${field}'`);
+  // Full structural validation only for files under .claude/specs/
+  // Files outside (e.g., direct CLI invocation on arbitrary spec files)
+  // get frontmatter + env check only
+  const fullValidation = isUnderSpecsDirectory(filePath);
+
+  if (fullValidation) {
+    for (const field of REQUIRED_FRONTMATTER_FIELDS) {
+      if (frontmatter[field] === undefined) {
+        errors.push(`missing required frontmatter field '${field}'`);
+      }
     }
   }
 
@@ -183,25 +201,117 @@ function validateSpecFile(filePath) {
     }
   }
 
-  // Validate required sections
-  for (const section of REQUIRED_SECTIONS) {
-    if (!section.pattern.test(content)) {
-      errors.push(`missing required section '${section.name}'`);
-    }
-  }
-
-  // Check optional sections and warn if missing (only for atomic specs, not master/workstream specs)
-  // Master specs and workstream specs don't need Acceptance Criteria - they have workstreams instead
-  const isAtomicSpec = filePath.includes('/atomic/') || frontmatter.id?.startsWith('as-');
-  if (isAtomicSpec) {
-    for (const section of OPTIONAL_SECTIONS) {
+  // Validate required sections (only for files under .claude/specs/)
+  if (fullValidation) {
+    for (const section of REQUIRED_SECTIONS) {
       if (!section.pattern.test(content)) {
-        warnings.push(`missing optional section '${section.name}'`);
+        errors.push(`missing required section '${section.name}'`);
+      }
+    }
+
+    // Check optional sections and warn if missing (only for atomic specs, not master/workstream specs)
+    // Master specs and workstream specs don't need Acceptance Criteria - they have workstreams instead
+    const isAtomicSpec = filePath.includes('/atomic/') || frontmatter.id?.startsWith('as-');
+    if (isAtomicSpec) {
+      for (const section of OPTIONAL_SECTIONS) {
+        if (!section.pattern.test(content)) {
+          warnings.push(`missing optional section '${section.name}'`);
+        }
       }
     }
   }
 
   return { errors, warnings };
+}
+
+// ---------------------------------------------------------------------------
+// Env-dependent AC enforcement (AC-1.6, sg-pipeline-integration-gaps)
+// ---------------------------------------------------------------------------
+
+/** Patterns that indicate environment-dependent code */
+const ENV_ACCESS_PATTERNS = [
+  /process\.env\b/,
+  /NODE_ENV/,
+  /import\.meta\.env\b/,
+];
+
+/** Keywords in ACs that indicate coverage of default/unset env case */
+const DEFAULT_ENV_KEYWORDS = [
+  /\bunset\b/i,
+  /\bdefault\b/i,
+  /\bnot\s+set\b/i,
+  /\babsent\b/i,
+  /\bmissing\b/i,
+  /\bclean\s+environment\b/i,
+  /\bundefined\b/i,
+];
+
+// extractSpecFilePaths imported from ./lib/spec-utils.mjs (was extractFilePathsFromSpec)
+
+/**
+ * Check if a file contains env-dependent code patterns.
+ */
+function fileHasEnvAccess(filePath) {
+  try {
+    if (!existsSync(filePath)) return false; // EC-14: silently skip missing files
+    const content = readFileSync(filePath, 'utf-8');
+    return ENV_ACCESS_PATTERNS.some(pattern => pattern.test(content));
+  } catch {
+    return false; // Silently skip unreadable files
+  }
+}
+
+/**
+ * Check if any acceptance criterion covers the default/unset env case.
+ */
+function hasDefaultEnvAC(content) {
+  // Extract acceptance criteria section only -- scope keyword search to AC section
+  const acMatch = content.match(/## Acceptance Criteria([\s\S]*?)(?=\n## |$)/i);
+  const acSection = acMatch ? acMatch[1] : content; // fallback to full content if no AC section
+  return DEFAULT_ENV_KEYWORDS.some(keyword => keyword.test(acSection));
+}
+
+/**
+ * Run env-dependent AC enforcement check (AC-1.6).
+ * Returns advisory warnings (never errors).
+ *
+ * @param {string} filePath - Path to the spec file
+ * @param {string} content - Spec file content
+ * @returns {string[]} Advisory warnings
+ */
+function checkEnvDependentACs(filePath, content) {
+  const advisories = [];
+
+  // Extract referenced file paths from spec
+  const specFilePaths = extractSpecFilePaths(content);
+  if (specFilePaths.length === 0) return advisories;
+
+  // Resolve file paths relative to spec directory or cwd
+  const specDir = dirname(filePath);
+  let hasEnvDependentCode = false;
+
+  for (const relPath of specFilePaths) {
+    // Try resolving relative to cwd (most common for spec file paths like src/...)
+    const cwdResolved = resolve(process.cwd(), relPath);
+    // Also try relative to spec directory
+    const specDirResolved = resolve(specDir, relPath);
+
+    if (fileHasEnvAccess(cwdResolved) || fileHasEnvAccess(specDirResolved)) {
+      hasEnvDependentCode = true;
+      break;
+    }
+  }
+
+  if (!hasEnvDependentCode) return advisories;
+
+  // Check if any AC covers the default/unset env case
+  if (!hasDefaultEnvAC(content)) {
+    advisories.push(
+      'Spec references env-dependent code but has no AC for default/unset environment'
+    );
+  }
+
+  return advisories;
 }
 
 function main() {
@@ -237,6 +347,18 @@ function main() {
       for (const warning of warnings) {
         console.error(`Warning in ${filePath}: ${warning}`);
       }
+    }
+
+    // Env-dependent AC enforcement (AC-1.6) -- advisory only, never blocking
+    // Runs after main validation to avoid affecting exit code
+    try {
+      const content = existsSync(filePath) ? readFileSync(filePath, 'utf-8') : '';
+      const envAdvisories = checkEnvDependentACs(filePath, content);
+      for (const advisory of envAdvisories) {
+        console.error(`Advisory in ${filePath}: ${advisory}`);
+      }
+    } catch {
+      // Env check failure is silently ignored -- advisory only
     }
   }
 

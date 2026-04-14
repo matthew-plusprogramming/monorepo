@@ -163,6 +163,54 @@ In all other cases — including 2+ modified files, any new files created, any p
 
 **Fix action**: Trigger regeneration via `node .claude/scripts/docs-generate.mjs`. After regeneration, re-verify that all hashes now match.
 
+### Gate 7: boot-path-reachability (advisory, universal) [AC-2.1, AC-2.2, AC-2.8, AC-2.9, AC-1.5]
+
+**Purpose**: Verify that new source files introduced by a spec are reachable from the project's entry point(s) through the static import chain. Also detects specs that create files with initialization methods but lack a wiring task. Catches dead code and missing wiring before commit.
+
+**Applicability**: Applicable when the spec introduced new source files (`.ts`, `.tsx`, `.js`, `.jsx`, `.mjs`). Marked N/A when no new source files were introduced. Always runs for all workflow types.
+
+**Entry point discovery** (priority order):
+
+1. `trace.config.json` `entryPoints` field (override, highest priority)
+2. `package.json` `main` field
+3. Convention fallback: `src/index.ts`, `src/index.js`
+
+**Evaluation** (two-part check):
+
+#### Part A: Boot-path reachability (AC-2.1, AC-2.2)
+
+1. Identify new source files from the spec's evidence table and task list
+2. Discover entry point(s) using the priority order above (AC-2.8: check from each entry point)
+3. Check trace freshness via `isTraceStale()` from `.claude/scripts/lib/trace-utils.mjs`
+4. **If traces are fresh** (AC-2.1):
+   - Load `traces/low-level/*.json` for each module
+   - Build a reachability set by recursively walking per-file `imports` arrays (`{source, symbols}` tuples) starting from the entry point(s)
+   - A file reachable from ANY entry point is considered reachable (AC-2.8)
+5. **If traces are stale, missing, or invalid** (AC-2.2):
+   - Invoke: `node .claude/scripts/import-graph-check.mjs --entry <path1> [--entry <path2>] --check <newfile1> <newfile2> ...`
+   - Parse JSON output: `{reachable: string[], unreachable: string[], warnings: string[]}`
+   - Script always exits 0 (advisory)
+6. **Lazy-load exemption** (AC-2.9): If a module is annotated as lazy-loaded by the spec-author (check spec for `lazy-load` annotation), exempt it from the reachability check
+7. Compare new files against reachability set
+8. If all new files reachable: **PASSED**
+9. If unreachable files found: **WARNING** -- surface as Low severity advisory findings listing unreachable files
+10. **Performance**: Must complete within 30 seconds additional per pass (AC-2.10)
+
+#### Part B: Wiring-task detection (AC-1.5)
+
+1. Invoke: `node .claude/scripts/import-graph-check.mjs --spec <spec-path>`
+2. Parse JSON output: `{init_methods_found: Array<{file, methods}>, wiring_task_found: boolean, advisory?: string, warnings: string[]}`
+3. If `init_methods_found` is empty: no action needed (no false positive)
+4. If `init_methods_found` is non-empty AND `wiring_task_found` is `true`: **PASSED**
+5. If `init_methods_found` is non-empty AND `wiring_task_found` is `false`: **WARNING** -- surface advisory: "Spec creates files with init/register methods but no wiring task references the entry point"
+6. The advisory lists the specific files and methods detected
+
+**This gate does NOT block commit** (advisory category). It surfaces findings for human review.
+
+**Init methods detected**: `init()`, `set*()` (subsystem wiring only, not property setters), `register()`, `initialize()`, `configure()`, `setup()`
+
+**Fix action**: Add a wiring task to the spec that names the entry-point file and the specific initialization call. Then re-implement the wiring.
+
 ## Project-Specific Gates
 
 Project-specific gates are loaded from `.claude/completion-gates.md` at the project root's `.claude/` directory. [traces: REQ-011]

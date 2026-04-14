@@ -60,7 +60,7 @@ describe('AC-12.1: VALID_SUBAGENT_TYPES includes e2e-test-writer', () => {
     const { VALID_SUBAGENT_TYPES } = mod;
 
     // Assert
-    expect(VALID_SUBAGENT_TYPES.length).toBe(22);
+    expect(VALID_SUBAGENT_TYPES.length).toBe(23);
   });
 });
 

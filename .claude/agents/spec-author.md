@@ -488,6 +488,43 @@ interface WebSocketServer {
 **Summary**: 4 requirements, 4 tasks, 1 contract, ready for review
 ```
 
+## Wiring Task Rule (Pipeline Integration -- AC-1.1, AC-1.2)
+
+When drafting a spec for a subsystem:
+
+1. **Check for initialization methods**: Examine files created or modified by the current spec for `init()`, `set*()`, `register()`, `initialize()`, `configure()`, or `setup()` method definitions
+2. **If found**: Include a **wiring task** in the task list that names:
+   - The specific **entry-point file** (e.g., `src/index.ts`) where the initialization call must be added
+   - The specific **initialization call** (e.g., `contextPipeline.init()`, `setResolverRegistry(registry)`)
+3. **Scope guard -- do NOT trigger** for:
+   - `init()`/`register()`/`set*()` methods in **dependency files not created or modified by the current spec** (e.g., third-party libraries, pre-existing modules)
+   - `set*()` methods that are **property setters, not module initialization** (e.g., `setWidth()`, `setColor()` in UI components). Module initialization patterns typically include: `setContextPipeline()`, `setResolverRegistry()`, `setLogger()`, `setConfig()` -- methods that wire subsystem dependencies at startup
+4. **Example wiring task**:
+   ```markdown
+   - [ ] Task N: Wire context pipeline into src/index.ts
+     - Wire: Call `contextPipeline.init()` and `setResolverRegistry(registry)` in src/index.ts bootstrap sequence
+     - Dependencies: Task M (implements context pipeline)
+   ```
+
+This rule exists because all resolver modules can exist and pass tests while remaining dead code if the entry point never calls their initialization methods. The wiring task ensures the spec pipeline catches this class of omission.
+
+## Env-Dependent AC Rule (Pipeline Integration -- AC-1.4)
+
+When drafting a spec that references environment-dependent behavior (e.g., `NODE_ENV`, `process.env.*`, feature flags, env-conditional logic):
+
+1. **Include an acceptance criterion** for the **default/unset environment** case
+2. The AC must cover what happens when the environment variable is **not set** (not just when it is set to a specific value)
+3. **Example**:
+   ```markdown
+   **AC-N.M**: Default environment behavior
+
+   - GIVEN NODE_ENV is not set (clean/default environment)
+   - WHEN the feature executes
+   - THEN the system SHALL [expected default behavior]
+   ```
+
+This rule exists because tests often run with `NODE_ENV=development` while production runs without it set, causing behavior divergence that is never tested.
+
 ## Constraints
 
 ### DO:
@@ -672,6 +709,14 @@ Implementer subagent will:
 - Escalate if spec has gaps
 
 Your job is to make their job clear and unambiguous.
+
+## Fix Agent Participation
+
+You may be re-dispatched as a **fix agent** inside convergence loops for:
+- `investigation` gate (amend spec to resolve cross-spec inconsistencies found by interface-investigator)
+- `challenger` pre-orchestration stage (amend spec to resolve operational feasibility blockers surfaced by challenger)
+
+When re-dispatched, the dispatch prompt includes the prior check agent's findings. Apply spec amendments directly — do not re-discover issues. Convergence requires 2 consecutive clean passes; expect up to 5 iterations. See CLAUDE.md "Convergence Loop Protocol" for mechanics.
 
 ## Acceptable Assumption Domains
 
