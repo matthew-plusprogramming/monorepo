@@ -268,6 +268,11 @@
           "type": "boolean",
           "default": false,
           "description": "Whether the deployment itself failed. When true, clears all verification requirements."
+        },
+        "expected_env_hash": {
+          "type": ["string", "null"],
+          "default": null,
+          "description": "SHA-256 (hex, 64 chars lowercase) of canonical-serialized env-var map filtered to deployment_env_allowlist at record-deployment time, per AC-14.1 canonicalization rules. null indicates no env hash captured (pre-first-deploy or no manifest/allowlist)."
         }
       },
       "required": ["detected"]

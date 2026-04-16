@@ -577,12 +577,26 @@ Parses the spec's task list and evidence table for file paths, scans those files
 
 **Hook Type**: SubagentStop (fires after agent completion)
 
+**Input Fields** (Claude Code SubagentStop event envelope):
+
+| Field                          | Type   | Purpose                           |
+| ------------------------------ | ------ | --------------------------------- |
+| `input.agent_type`             | string | Agent name from `.claude/agents/` |
+| `input.last_assistant_message` | string | Agent's final text response       |
+| `input.agent_transcript_path`  | string | JSONL transcript path             |
+| `input.agent_id`               | string | Unique subagent instance ID       |
+
+Note: `input.agent_output` and `input.status` are NOT documented SubagentStop fields. The hook uses `last_assistant_message` as the primary response source. If `agent_output` is present (future compat), it is preferred.
+
 **Behavior**:
 
-1. Reads SubagentStop event data from stdin (JSON with `agent_type` and `agent_output` fields)
+1. Reads SubagentStop event data from stdin (JSON with `agent_type` and `last_assistant_message` fields)
 2. Checks agent type against the convergence agent allowlist (see Gate Mapping below)
-3. If agent is not on the allowlist: exits 0 with empty JSON `{}` (no recording)
-4. Parses `agent_output` to extract findings metadata (`findings_count`, `findings_ids`, `clean`)
+3. If agent is not on the allowlist or `agent_type` is missing/empty: exits 0 with empty JSON `{}` (no recording)
+4. Extracts findings metadata from `last_assistant_message` text:
+   - Tries JSON block extraction first (fenced `json` or `json:findings-summary` blocks)
+   - Falls back to regex parsing of severity/count patterns in text
+   - Determines `clean` status: 0 Medium+ findings for most gates, 0 High+ for `code_review`
 5. Computes canonical findings hash from finding IDs (sorted, SHA-256)
 6. Invokes `session-checkpoint.mjs record-pass` with extracted metadata and `--source hook`
 7. On extraction failure: records with null findings and `manual_fallback` source (never blocks)

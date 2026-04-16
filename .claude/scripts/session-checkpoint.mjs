@@ -21,6 +21,7 @@
  *   archive-incomplete                            - Archive incomplete work to history
  *   record-deployment --target <t> --method <m>    - Record deployment activity (AC-1.1)
  *   record-deployment-failure                      - Record deployment failure (AC-2.1)
+ *   record-deployment-clear-failure --service <s>  - Clear failure after env reconciliation (AC-14.3)
  *   get-status                                    - Output current session state summary (JSON)
  *
  * Usage:
@@ -33,7 +34,7 @@
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync, renameSync, unlinkSync } from 'node:fs';
 import { randomUUID, createHash } from 'node:crypto';
-import { basename, dirname, join, resolve } from 'node:path';
+import { basename, dirname, join, resolve, sep } from 'node:path';
 import {
   ORCHESTRATOR_PREDECESSORS,
   ONEOFF_SPEC_PREDECESSORS,
@@ -1584,6 +1585,9 @@ function countConsecutiveCleanFromTail(passes) {
  * Spec: sg-convergence-audit-enforcement
  */
 function opUpdateConvergence(gateName, countStr) {
+  // Required clean passes threshold (matches CLAUDE.md convergence loop protocol)
+  const REQUIRED_CLEAN_PASSES = 2;
+
   // AC-2.2: Reject old API with numeric second argument
   if (countStr !== undefined && countStr !== null && countStr !== '') {
     throw new Error(
@@ -1626,8 +1630,20 @@ function opUpdateConvergence(gateName, countStr) {
       session.convergence[gateName] = {};
     }
 
+    // AC-4 (sg-convergence-recording-silent-failure): Legacy session detection.
+    // Check BEFORE the || [] fallback -- the fallback collapses "key missing" (legacy)
+    // and "key present, empty array" (new session) into the same value.
+    // Legacy sessions must fail-closed with a distinct error message.
+    const evidenceForGate = session.convergence_evidence?.[gateName]?.passes;
+    if (evidenceForGate == null) {
+      throw new Error(
+        `CONVERGENCE_VERIFY_FAILED: cannot verify convergence: no evidence records found for gate ${gateName}. ` +
+        `Record passes via record-pass before calling update-convergence.`
+      );
+    }
+
     // AC-2.1, AC-2.5: Derive clean_pass_count from evidence
-    const evidence = session.convergence_evidence?.[gateName]?.passes || [];
+    const evidence = evidenceForGate;
     const cleanPassCount = countConsecutiveCleanFromTail(evidence);
 
     // AC-2.8: Warn if >50% of passes are manual-sourced
@@ -1647,9 +1663,6 @@ function opUpdateConvergence(gateName, countStr) {
     // Iteration tracking: increment iteration_count for this gate
     const currentIterations = session.convergence[gateName].iteration_count || 0;
     const newIterations = currentIterations + 1;
-
-    // Required clean passes threshold (matches CLAUDE.md convergence loop protocol)
-    const REQUIRED_CLEAN_PASSES = 2;
 
     if (cleanPassCount >= REQUIRED_CLEAN_PASSES) {
       // Convergence achieved -- reset iteration count
@@ -1679,7 +1692,31 @@ function opUpdateConvergence(gateName, countStr) {
     reportEvidenceCount = evidence.length;
     return session;
   }, { failOpen: false });
-  console.error(`Updated convergence: ${gateName}.clean_pass_count = ${reportCleanPassCount} (derived from ${reportEvidenceCount} evidence records)`);
+
+  // Task 4 (AC-6): Handle atomicModifyJSON returning false (write failure)
+  if (!written) {
+    throw new Error(
+      `CONVERGENCE_WRITE_FAILED: atomic write to session.json failed for gate ${gateName}`
+    );
+  }
+
+  // Task 2 (AC-1, AC-2, AC-3, AC-7): Post-write verification.
+  // Re-read session.json from disk (fresh read, not cached reportCleanPassCount)
+  // to verify the write actually persisted.
+  const verifyData = JSON.parse(readFileSync(SESSION_PATH, 'utf8'));
+  const verifiedCount = verifyData?.convergence?.[gateName]?.clean_pass_count ?? 0;
+
+  if (verifiedCount >= REQUIRED_CLEAN_PASSES) {
+    // AC-2: Verification succeeded -- emit to both stderr and stdout
+    // (stdout needed for callers using execFileSync which only captures stdout on exit 0)
+    console.error(`convergence recorded and verified: ${gateName}.clean_pass_count = ${verifiedCount}`);
+    console.log(`convergence recorded and verified: ${gateName}.clean_pass_count = ${verifiedCount}`);
+  } else {
+    // AC-1, AC-3: Verification failed -- throw structured error (caught by main handler -> exit 1)
+    throw new Error(
+      `CONVERGENCE_VERIFY_FAILED: session.json clean_pass_count=${verifiedCount}, expected>=2, gate=${gateName}`
+    );
+  }
 }
 
 // =============================================================================
@@ -1739,7 +1776,7 @@ function validateDeploymentMethod(method) {
  *
  * @param {string[]} rawArgs - Arguments after 'record-deployment'
  */
-function opRecordDeployment(rawArgs) {
+async function opRecordDeployment(rawArgs) {
   // Parse flags: --target <target> --method <method> --manual
   let target = null;
   let method = 'pipeline'; // default
@@ -1774,12 +1811,43 @@ function opRecordDeployment(rawArgs) {
     throw new Error(methodValidation.error);
   }
 
+  // AC-14.1, AC-14.2: Compute env hash from manifest allowlist if available
+  let expectedEnvHash = null;
+  let serviceName = null;
+  try {
+    // Parse --service flag from rawArgs for manifest lookup
+    for (let j = 0; j < rawArgs.length; j++) {
+      if (rawArgs[j] === '--service' && j + 1 < rawArgs.length) {
+        serviceName = rawArgs[j + 1];
+        break;
+      }
+    }
+
+    if (serviceName) {
+      const { loadDeploymentManifest, envHashCanonicalize } = await import('./lib/deployment-verify.mjs');
+      const manifestResult = loadDeploymentManifest(serviceName);
+      if (manifestResult.success && manifestResult.data.deployment_env_allowlist?.length > 0) {
+        expectedEnvHash = envHashCanonicalize(manifestResult.data.deployment_env_allowlist, process.env);
+      } else if (!manifestResult.success || !manifestResult.data.deployment_env_allowlist?.length) {
+        process.stderr.write(JSON.stringify({
+          event: 'env_hash_skipped',
+          warning: 'No env allowlist declared -- env state reconciliation skipped',
+          timestamp: now(),
+          service: serviceName,
+        }) + '\n');
+      }
+    }
+  } catch {
+    // AC-14.2: Fail-open -- set null and warn
+    process.stderr.write('[session-checkpoint] WARNING: Failed to compute env hash -- setting to null\n');
+  }
+
   // AC-1.1, AC-1.3: Write deployment object via atomicModifyJSON (AC-7.1)
   // Overwrites entire prior deployment object (clean slate)
   atomicModifyJSON(SESSION_PATH, (current) => {
     const s = current || {};
 
-    // AC-1.1: Set deployment object with all 8 fields
+    // AC-1.1: Set deployment object with all fields
     s.deployment = {
       detected: true,
       timestamp: now(),
@@ -1789,6 +1857,7 @@ function opRecordDeployment(rawArgs) {
       verify_build_passed: false,
       verify_deploy_passed: false,
       failed: false,
+      expected_env_hash: expectedEnvHash,
     };
 
     s.updated_at = now();
@@ -1802,6 +1871,7 @@ function opRecordDeployment(rawArgs) {
     timestamp: now(),
     target,
     method,
+    expected_env_hash: expectedEnvHash,
   };
   process.stderr.write(JSON.stringify(auditEntry) + '\n');
   console.error(`Deployment recorded: target=${target}, method=${method}`);
@@ -1855,6 +1925,226 @@ function opRecordDeploymentFailure() {
   console.error('Deployment failure recorded: deployment.failed=true');
 }
 
+/**
+ * record-deployment-clear-failure - Clear deployment.failed after env state reconciliation.
+ *
+ * Compares current env hash against deployment.expected_env_hash.
+ * On match: clears deployment.failed, appends PASS entry to audit log.
+ * On divergence: blocks unless --signed-record provided.
+ *
+ * Implements: AC-14.3, AC-14.4, AC-14.5, AC-14.6, AC-14.8
+ *
+ * @param {string[]} rawArgs - Arguments after 'record-deployment-clear-failure'
+ */
+async function opRecordDeploymentClearFailure(rawArgs) {
+  // Parse flags
+  let serviceName = null;
+  let signedRecordPath = null;
+
+  for (let i = 0; i < rawArgs.length; i++) {
+    if (rawArgs[i] === '--service' && i + 1 < rawArgs.length) {
+      serviceName = rawArgs[i + 1];
+      i++;
+    } else if (rawArgs[i] === '--signed-record' && i + 1 < rawArgs.length) {
+      signedRecordPath = rawArgs[i + 1];
+      i++;
+    }
+  }
+
+  if (!serviceName) {
+    throw new Error('--service <name> is required for record-deployment-clear-failure');
+  }
+
+  // Load current session state
+  const session = loadSession();
+  if (!session?.deployment) {
+    throw new Error('No deployment object in session.json');
+  }
+
+  const expectedHash = session.deployment.expected_env_hash;
+
+  // AC-14.2: No hash captured -- cannot reconcile
+  if (expectedHash === null || expectedHash === undefined) {
+    process.stderr.write(JSON.stringify({
+      event: 'clear_failure_skipped',
+      warning: 'No expected_env_hash in session -- clearing failed without reconciliation',
+      timestamp: now(),
+      service: serviceName,
+    }) + '\n');
+
+    atomicModifyJSON(SESSION_PATH, (current) => {
+      const s = current || {};
+      if (s.deployment) {
+        s.deployment.failed = false;
+      }
+      s.updated_at = now();
+      return s;
+    }, { failOpen: false });
+
+    console.error('deployment.failed cleared (no env hash to reconcile)');
+    return;
+  }
+
+  // AC-14.3: Re-read current env and re-compute hash
+  // M1 fix: computeDivergentKeys removed -- not usable without deploy-time env snapshot.
+  const { loadDeploymentManifest, envHashCanonicalize } = await import('./lib/deployment-verify.mjs');
+  const manifestResult = loadDeploymentManifest(serviceName);
+
+  if (!manifestResult.success) {
+    throw new Error(`Cannot load manifest for service '${serviceName}': ${manifestResult.error?.message || 'unknown'}`);
+  }
+
+  const allowlist = manifestResult.data.deployment_env_allowlist || [];
+  const actualHash = envHashCanonicalize(allowlist, process.env);
+
+  // Compute divergent keys for structured reporting
+  // Build expected env snapshot from the hash -- we only have the hash, not the snapshot
+  // AC-14.5: divergent-key reporting requires env snapshot at deploy-time (not just hash).
+  // Deferred -- hash-only comparison is sufficient for v1. See spec D-016.
+  const hashesMatch = expectedHash === actualHash;
+
+  if (hashesMatch) {
+    // AC-14.4: Match => PASS, clear deployment.failed
+    atomicModifyJSON(SESSION_PATH, (current) => {
+      const s = current || {};
+      if (s.deployment) {
+        s.deployment.failed = false;
+      }
+      s.updated_at = now();
+      return s;
+    }, { failOpen: false });
+
+    // Append PASS entry to audit log
+    const { appendAuditLogEntry } = await import('./lib/deployment-audit.mjs');
+    await appendAuditLogEntry({
+      operator: process.env.USER || 'unknown',
+      correlation_id: session.deployment?.timestamp || now(),
+      payload: {
+        kind: 'clear-failure-pass',
+        service: serviceName,
+        expected_env_hash: expectedHash,
+        actual_env_hash: actualHash,
+        divergent_keys: [],
+        maintainer_rationale: '',
+      },
+    });
+
+    process.stderr.write(JSON.stringify({
+      event: 'clear_failure_pass',
+      result: 'PASS',
+      timestamp: now(),
+      service: serviceName,
+      expected_hash: expectedHash,
+      actual_hash: actualHash,
+    }) + '\n');
+    console.error('deployment.failed cleared -- env hash matches');
+    return;
+  }
+
+  // AC-14.5: Divergence detected
+  // We cannot reconstruct the original env values from just the hash,
+  // so divergent keys are reported as empty unless we add env snapshot tracking (future)
+  const divergentKeys = [];
+
+  if (!signedRecordPath) {
+    // AC-14.5: Block without signed record
+    const { appendAuditLogEntry } = await import('./lib/deployment-audit.mjs');
+    await appendAuditLogEntry({
+      operator: process.env.USER || 'unknown',
+      correlation_id: session.deployment?.timestamp || now(),
+      payload: {
+        kind: 'clear-failure-divergence-blocked',
+        service: serviceName,
+        expected_env_hash: expectedHash,
+        actual_env_hash: actualHash,
+        divergent_keys: divergentKeys,
+        maintainer_rationale: '',
+      },
+    });
+
+    process.stderr.write(JSON.stringify({
+      event: 'clear_failure_blocked',
+      result: 'BLOCKED',
+      timestamp: now(),
+      service: serviceName,
+      payload: {
+        expected_hash: expectedHash,
+        actual_hash: actualHash,
+        divergent_keys: divergentKeys,
+        timestamp: now(),
+        service: serviceName,
+      },
+    }) + '\n');
+
+    throw new Error(
+      `Env hash divergence detected. Expected: ${expectedHash}, Actual: ${actualHash}. ` +
+      'Commit a signed record to `.claude/audit/deployment-interventions.log` acknowledging the divergence.'
+    );
+  }
+
+  // AC-14.6: Signed record provided -- validate and clear
+  // F-4 fix: Validate signed record path is within .claude/ project boundary
+  // to prevent arbitrary file reads via --signed-record flag.
+  const resolvedRecordPath = resolve(signedRecordPath);
+  const claudeAuditPrefix = resolve('.claude') + sep;
+  if (!resolvedRecordPath.startsWith(claudeAuditPrefix)) {
+    throw new Error(
+      `Signed record path must be within .claude/ directory. Got: ${signedRecordPath}`
+    );
+  }
+
+  // Read the signed record for maintainer_rationale
+  let rationale = '';
+  try {
+    const recordContent = readFileSync(resolvedRecordPath, 'utf-8');
+    // Extract maintainer_rationale from the record
+    const rationaleMatch = recordContent.match(/maintainer_rationale:\s*(.+)/);
+    rationale = rationaleMatch ? rationaleMatch[1].trim() : '';
+  } catch {
+    throw new Error(`Cannot read signed record at '${signedRecordPath}'`);
+  }
+
+  if (rationale.length < 50) {
+    throw new Error(`maintainer_rationale must be >= 50 characters (got ${rationale.length})`);
+  }
+
+  // Clear deployment.failed
+  atomicModifyJSON(SESSION_PATH, (current) => {
+    const s = current || {};
+    if (s.deployment) {
+      s.deployment.failed = false;
+    }
+    s.updated_at = now();
+    return s;
+  }, { failOpen: false });
+
+  // Append signed-intervention entry to audit log
+  const { appendAuditLogEntry } = await import('./lib/deployment-audit.mjs');
+  await appendAuditLogEntry({
+    operator: process.env.USER || 'unknown',
+    correlation_id: session.deployment?.timestamp || now(),
+    payload: {
+      kind: 'signed-intervention',
+      service: serviceName,
+      expected_env_hash: expectedHash,
+      actual_env_hash: actualHash,
+      divergent_keys: divergentKeys,
+      maintainer_rationale: rationale,
+    },
+  });
+
+  process.stderr.write(JSON.stringify({
+    event: 'clear_failure_signed_intervention',
+    result: 'PASS',
+    timestamp: now(),
+    service: serviceName,
+    expected_hash: expectedHash,
+    actual_hash: actualHash,
+    maintainer_rationale_length: rationale.length,
+  }) + '\n');
+  console.error('deployment.failed cleared via signed intervention');
+}
+
 // =============================================================================
 // Main
 // =============================================================================
@@ -1882,7 +2172,10 @@ Operations:
   update-convergence <gate_name>                   Derive convergence count from evidence
   record-deployment --target <t> --method <m>     Record deployment activity
     Flags: --target (required), --method (pipeline|manual), --manual (shorthand)
+    Optional: --service <name>                     Look up manifest for env hash
   record-deployment-failure                       Record deployment failure (sets failed=true)
+  record-deployment-clear-failure                 Clear deployment.failed after intervention
+    Flags: --service <name> (required), --signed-record <path>
   get-status                                      Output session state (JSON)
 
 Phases:
@@ -1902,7 +2195,7 @@ Enforcement Levels:
 `);
 }
 
-function main() {
+async function main() {
   const args = process.argv.slice(2);
 
   if (args.length === 0) {
@@ -2024,13 +2317,18 @@ function main() {
         break;
 
       case 'record-deployment': {
-        opRecordDeployment(args.slice(1));
+        await opRecordDeployment(args.slice(1));
         break;
       }
 
       case 'record-deployment-failure':
         opRecordDeploymentFailure();
         break;
+
+      case 'record-deployment-clear-failure': {
+        await opRecordDeploymentClearFailure(args.slice(1));
+        break;
+      }
 
       case '--help':
       case '-h':
@@ -2049,4 +2347,7 @@ function main() {
   }
 }
 
-main();
+main().catch((err) => {
+  console.error(`Error: ${err.message}`);
+  process.exit(1);
+});

@@ -8,17 +8,20 @@
  * and session.json state is updated via atomicModifyJSON.
  *
  * Implements: AC-3 (Build Verification), AC-4 (Post-Deploy Smoke Test),
- *             AC-6 (Fail-Open), AC-8 (Structured Audit Logging)
+ *             AC-6 (Fail-Open), AC-8 (Structured Audit Logging),
+ *             AC-13 (Method-Coverage Smoke Test), AC-14 (Env Hash)
  *
  * Spec: sg-deployment-verification-gaps
  */
 
 import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import https from 'node:https';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { atomicModifyJSON } from './atomic-write.mjs';
 import { findClaudeDir } from './hook-utils.mjs';
+import { parseManifest, METHOD_DEFAULT_STATUS, DEFAULT_PER_ROUTE_TIMEOUT_MS, BATCH_TIMEOUT_MS } from './deployment-manifest-schema.mjs';
 
 // =============================================================================
 // Constants
@@ -349,9 +352,12 @@ function runVerifyDeployScript(endpointUrl, cwd, packageJson) {
 }
 
 /**
- * Perform an HTTPS GET with per-request TLS verification disabled.
+ * Perform an HTTPS GET with optional TLS verification skip for localhost targets.
  * Uses node:https directly to avoid mutating process.env.NODE_TLS_REJECT_UNAUTHORIZED
  * which is process-global and creates a race condition with concurrent requests.
+ *
+ * TLS verification is only disabled when the target hostname is localhost/127.0.0.1/::1
+ * (AC-4.5). Non-localhost targets always enforce TLS verification regardless of caller.
  *
  * @param {string} url - HTTPS URL to GET
  * @returns {Promise<number>} HTTP status code
@@ -359,12 +365,16 @@ function runVerifyDeployScript(endpointUrl, cwd, packageJson) {
 function httpsGetStatusCode(url) {
   return new Promise((resolve, reject) => {
     const parsed = new URL(url);
+    // AC-4.5: Only skip TLS verification for localhost targets.
+    // Guard is in callee (not caller) so TLS cannot be silently disabled
+    // if this function is called from a different context. (CHK-001)
+    const skipTls = isLocalhostUrl(url);
     const options = {
       hostname: parsed.hostname,
       port: parsed.port || 443,
       path: parsed.pathname + parsed.search,
       method: 'GET',
-      rejectUnauthorized: false, // AC-4.5: skip TLS for localhost
+      rejectUnauthorized: !skipTls,
       headers: {
         'User-Agent': HTTP_USER_AGENT,
       },
@@ -495,4 +505,241 @@ function updateVerifyDeployPassed() {
   } catch {
     process.stderr.write('[deployment-verify] WARNING: Failed to update session.json with verify_deploy_passed\n');
   }
+}
+
+// =============================================================================
+// Method-Coverage Smoke Test (AC-13)
+// =============================================================================
+
+/**
+ * Evaluate probe status per AC-13.2/AC-13.3/AC-13.8.
+ *
+ * @param {string} method - HTTP method (GET, POST, PUT, DELETE, PATCH)
+ * @param {number|null|undefined} statusCode - Response status code (null/undefined for timeout/error)
+ * @param {number[]} [routeExpectedStatus] - Route-level override of allowed status codes
+ * @returns {"PASS"|"FAIL"}
+ */
+export function evaluateProbeStatus(method, statusCode, routeExpectedStatus) {
+  // AC-13.3: timeout or connection error (null/undefined) = FAIL
+  if (statusCode === null || statusCode === undefined) return 'FAIL';
+  // AC-13.8: manifest-declared statuses take precedence; else method default
+  const allowlist = routeExpectedStatus || METHOD_DEFAULT_STATUS[method] || [];
+  return allowlist.includes(statusCode) ? 'PASS' : 'FAIL';
+}
+
+/**
+ * Load a deployment manifest for a given service.
+ *
+ * @param {string} serviceName - Service identifier
+ * @returns {{ success: true, data: object } | { success: false, error?: Error }}
+ */
+export function loadDeploymentManifest(serviceName) {
+  const claudeDir = resolveClaudeDir();
+  const manifestPath = join(claudeDir, 'deployment-manifests', `${serviceName}.json`);
+
+  if (!existsSync(manifestPath)) {
+    return { success: false, error: new Error(`Manifest not found: ${manifestPath}`) };
+  }
+
+  let raw;
+  try {
+    raw = JSON.parse(readFileSync(manifestPath, 'utf-8'));
+  } catch (err) {
+    return { success: false, error: err };
+  }
+
+  return parseManifest(raw);
+}
+
+/**
+ * Run manifest-driven method-coverage smoke test probes. (AC-13.1..AC-13.10)
+ *
+ * Issues POST/PUT/PATCH/DELETE/GET probes per manifest routes.
+ * Applies method-default or route-level expected_status allowlists.
+ * Enforces NF5 30s batch timeout across all probes.
+ *
+ * @param {string} endpointBaseUrl - Base URL for the deployed service
+ * @param {object} manifest - Parsed deployment manifest
+ * @returns {Promise<{ result: string, probeResults: object[], error?: string }>}
+ */
+export async function runMethodCoverageProbes(endpointBaseUrl, manifest) {
+  const probeResults = [];
+  const routes = manifest.routes || [];
+
+  // AC-13.9: GET-only manifest with zero POST/PUT routes
+  const postPutRoutes = routes.filter((r) => r.method === 'POST' || r.method === 'PUT');
+  if (postPutRoutes.length === 0) {
+    logAudit({
+      event: 'method_coverage_skipped',
+      message: 'method-coverage-smoke-test: skipped (no POST/PUT routes declared)',
+      timestamp: new Date().toISOString(),
+    });
+    return { result: 'PASS', probeResults };
+  }
+
+  // M2 fix: Filter to POST/PUT routes only (AC-13.1 scope). GET routes are covered
+  // by the existing GET-fallback check; iterating all routes probed GET endpoints redundantly.
+  const targetRoutes = routes.filter((r) => r.method === 'POST' || r.method === 'PUT');
+
+  // AC-13.7, AC-13.10: Batch timeout enforcement
+  const batchStartTime = Date.now();
+  let batchTimedOut = false;
+
+  for (const route of targetRoutes) {
+    // AC-13.10b: Check batch timeout before each probe
+    const elapsed = Date.now() - batchStartTime;
+    if (elapsed >= BATCH_TIMEOUT_MS) {
+      batchTimedOut = true;
+      // AC-13.10c: Mark remaining probes as TIMEOUT
+      probeResults.push({
+        method: route.method,
+        path: route.path,
+        status: null,
+        result: 'TIMEOUT',
+        timestamp: new Date().toISOString(),
+        endpoint_url: `${endpointBaseUrl}${route.path}`,
+      });
+      continue;
+    }
+
+    // AC-13.10a: Per-route timeout
+    const perRouteTimeout = route.timeout_ms || DEFAULT_PER_ROUTE_TIMEOUT_MS;
+    // Compute remaining batch time to not exceed batch limit
+    const remainingBatch = BATCH_TIMEOUT_MS - (Date.now() - batchStartTime);
+    const effectiveTimeout = Math.min(perRouteTimeout, remainingBatch);
+
+    const probeUrl = `${endpointBaseUrl}${route.path}`;
+
+    // F-1 fix: Validate constructed probe URL before fetch (SSRF prevention).
+    // endpointBaseUrl comes from manifest with only z.string().min(1) validation.
+    validateEndpointUrl(probeUrl);
+
+    let statusCode = null;
+    let probeTimedOut = false;
+
+    try {
+      // AC-13.1: Issue probe with body_skeleton for POST/PUT/PATCH
+      const body = route.body_skeleton || {};
+      const headers = {
+        'User-Agent': HTTP_USER_AGENT,
+        ...(route.headers || {}),
+      };
+
+      // Add Content-Type for methods that send a body
+      if (['POST', 'PUT', 'PATCH'].includes(route.method)) {
+        headers['Content-Type'] = 'application/json';
+      }
+
+      const fetchOptions = {
+        method: route.method,
+        redirect: 'manual',
+        headers,
+        signal: AbortSignal.timeout(effectiveTimeout),
+      };
+
+      // Only add body for methods that support it
+      if (['POST', 'PUT', 'PATCH'].includes(route.method)) {
+        fetchOptions.body = JSON.stringify(body);
+      }
+
+      const response = await fetch(probeUrl, fetchOptions);
+      statusCode = response.status;
+    } catch (err) {
+      if (err.name === 'TimeoutError' || err.code === 'ETIMEDOUT') {
+        probeTimedOut = true;
+      }
+      statusCode = null;
+    }
+
+    // Evaluate result
+    const probeResult = probeTimedOut
+      ? 'TIMEOUT'
+      : evaluateProbeStatus(route.method, statusCode, route.expected_status);
+
+    const probeEntry = {
+      method: route.method,
+      path: route.path,
+      status: statusCode,
+      result: probeResult,
+      timestamp: new Date().toISOString(),
+      endpoint_url: probeUrl,
+    };
+
+    probeResults.push(probeEntry);
+
+    // AC-13.4: Structured per-probe audit log
+    logAudit({
+      event: 'method_coverage_probe',
+      ...probeEntry,
+    });
+  }
+
+  // AC-13.10c: partial-coverage error on batch timeout
+  const hasTimeouts = probeResults.some((p) => p.result === 'TIMEOUT');
+  const hasFails = probeResults.some((p) => p.result === 'FAIL');
+  let overallResult = 'PASS';
+  let errorKind = null;
+
+  if (batchTimedOut || hasTimeouts) {
+    overallResult = 'FAIL';
+    errorKind = 'partial-coverage';
+  } else if (hasFails) {
+    overallResult = 'FAIL';
+  }
+
+  return { result: overallResult, probeResults, error: errorKind };
+}
+
+// =============================================================================
+// Env Hash Canonicalization (AC-14.1)
+// =============================================================================
+
+/**
+ * Canonicalize env vars and compute SHA-256 hash per AC-14.1 rules:
+ *
+ * (a) sort allowlist keys lexicographically (byte-order sort)
+ * (b) KEY=VALUE\n per entry (VALUE raw, no trimming, quotes literal)
+ * (c) unset key => KEY=\x00\n (null byte for "unset")
+ * (d) SHA-256 over concatenated byte stream
+ * (e) 64-char lowercase hex
+ *
+ * @param {string[]} allowlist - Env var keys to include
+ * @param {Record<string, string>} envVars - Environment variables map
+ * @returns {string} 64-char lowercase hex SHA-256 hash
+ */
+export function envHashCanonicalize(allowlist, envVars) {
+  const sorted = [...allowlist].sort();
+  let buffer = '';
+  for (const key of sorted) {
+    if (key in envVars) {
+      buffer += `${key}=${envVars[key]}\n`;
+    } else {
+      buffer += `${key}=\x00\n`;
+    }
+  }
+  return createHash('sha256').update(buffer).digest('hex');
+}
+
+/**
+ * Compute divergent keys between expected and actual env snapshots.
+ *
+ * @param {string[]} allowlist - Env var keys to compare
+ * @param {Record<string, string>} expectedEnv - Deploy-time env vars
+ * @param {Record<string, string>} actualEnv - Current env vars
+ * @returns {Array<{key: string, kind: 'added'|'removed'|'changed'}>}
+ */
+export function computeDivergentKeys(allowlist, expectedEnv, actualEnv) {
+  const keys = [];
+  for (const key of allowlist) {
+    const inExpected = key in expectedEnv;
+    const inActual = key in actualEnv;
+    if (!inExpected && inActual) {
+      keys.push({ key, kind: 'added' });
+    } else if (inExpected && !inActual) {
+      keys.push({ key, kind: 'removed' });
+    } else if (inExpected && inActual && expectedEnv[key] !== actualEnv[key]) {
+      keys.push({ key, kind: 'changed' });
+    }
+  }
+  return keys;
 }

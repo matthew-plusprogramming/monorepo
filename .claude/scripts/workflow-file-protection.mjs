@@ -23,11 +23,12 @@
  *   0 - Allow (not a protected file / no write to protected file detected)
  *   2 - Block (write to protected enforcement file detected)
  *
- * Implements: REQ-012
- * Spec: sg-coercive-gate-enforcement
+ * Implements: REQ-012, AC-14.9 (deployment trust root protection)
+ * Spec: sg-coercive-gate-enforcement, sg-deployment-verification-gaps
  */
 
 import { resolve, basename, sep } from 'node:path';
+import { realpathSync } from 'node:fs';
 import { readStdin } from './lib/hook-utils.mjs';
 
 /**
@@ -38,6 +39,20 @@ const PROTECTED_FILENAMES = [
   'gate-override.json',
   'gate-enforcement-disabled',
   'session.json',
+  // AC-14.9.a: Deployment intervention audit log (trust root)
+  'deployment-interventions.log',
+  // AC-14.9.b: Chain verifier script (trust root)
+  'verify-deployment-audit-chain.mjs',
+];
+
+/**
+ * Protected path prefixes for directory-level protection.
+ * Files whose .claude/-relative path starts with any prefix are protected.
+ * AC-14.9.c: deployment-manifests/ prefix match (~5 lines, no glob dependency).
+ * @type {string[]}
+ */
+const PROTECTED_PATH_PREFIXES = [
+  'deployment-manifests/',
 ];
 
 /**
@@ -76,7 +91,7 @@ const BASH_WRITE_PATTERNS = [
  * @returns {string|null} The protected filename found, or null if safe
  */
 function detectBashWriteToProtectedFile(command) {
-  // Check if command references any protected filename
+  // Check if command references any protected filename (exact match)
   for (const protectedName of PROTECTED_FILENAMES) {
     if (!command.includes(protectedName)) {
       continue;
@@ -86,6 +101,18 @@ function detectBashWriteToProtectedFile(command) {
     for (const pattern of BASH_WRITE_PATTERNS) {
       if (pattern.test(command)) {
         return protectedName;
+      }
+    }
+  }
+
+  // AC-14.9.c: Check prefix-based directory protection for Bash commands
+  for (const prefix of PROTECTED_PATH_PREFIXES) {
+    if (!command.includes(prefix)) {
+      continue;
+    }
+    for (const pattern of BASH_WRITE_PATTERNS) {
+      if (pattern.test(command)) {
+        return `.claude/${prefix}*`;
       }
     }
   }
@@ -162,18 +189,51 @@ async function main() {
 
     // Check if the target file is a protected enforcement file
     // Security fix H1: normalize path to prevent traversal bypasses
-    const normalizedPath = resolve(filePath);
+    // M3 fix: resolve symlinks before prefix comparison to prevent symlink-based bypass.
+    // Falls back to resolve() if file doesn't exist yet (realpathSync requires existing path).
+    let normalizedPath;
+    try {
+      normalizedPath = realpathSync(resolve(filePath));
+    } catch {
+      normalizedPath = resolve(filePath);
+    }
     const fileName = basename(normalizedPath);
 
     for (const protectedName of PROTECTED_FILENAMES) {
       // Check directory context: coordination/ for enforcement files, context/ for session.json
+      // AC-14.9.a: audit/ for deployment-interventions.log
+      // AC-14.9.b: scripts/ for verify-deployment-audit-chain.mjs
       const isCoordinationFile = normalizedPath.includes(sep + 'coordination' + sep);
       const isContextFile = normalizedPath.includes(sep + 'context' + sep);
-      const isProtectedPath = protectedName === 'session.json' ? isContextFile : isCoordinationFile;
+      const isAuditFile = normalizedPath.includes(sep + 'audit' + sep);
+      const isScriptsFile = normalizedPath.includes(sep + 'scripts' + sep);
+
+      let isProtectedPath = false;
+      if (protectedName === 'session.json') {
+        isProtectedPath = isContextFile;
+      } else if (protectedName === 'deployment-interventions.log') {
+        isProtectedPath = isAuditFile;
+      } else if (protectedName === 'verify-deployment-audit-chain.mjs') {
+        isProtectedPath = isScriptsFile;
+      } else {
+        isProtectedPath = isCoordinationFile;
+      }
 
       if (fileName === protectedName && isProtectedPath) {
-        // AC-3.1, AC-3.2: Block the write
+        // AC-3.1, AC-3.2, AC-14.9: Block the write
         blockProtectedFileWrite(protectedName, 'Write');
+      }
+    }
+
+    // AC-14.9.c: Prefix-based directory protection for deployment-manifests/
+    for (const prefix of PROTECTED_PATH_PREFIXES) {
+      // Extract .claude/-relative path from normalized absolute path
+      const claudeIdx = normalizedPath.indexOf(sep + '.claude' + sep);
+      if (claudeIdx >= 0) {
+        const relativePath = normalizedPath.substring(claudeIdx + sep.length + '.claude'.length + sep.length);
+        if (relativePath.startsWith(prefix)) {
+          blockProtectedFileWrite(`.claude/${prefix}*`, 'Write');
+        }
       }
     }
 

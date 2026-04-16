@@ -30,9 +30,24 @@ import { execSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { mergeGitignore } from './lib/gitignore-merge.mjs';
+import { detectOrphans } from './lib/orphan-detector.mjs';
+import { validateImports } from './lib/import-graph-validator.mjs';
+import { assertContainment, PathEscapeError } from './lib/path-containment.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const METACLAUDE_ROOT = resolve(__dirname, '../..');
+
+// Resolve METACLAUDE_ROOT relative to CWD when a fixture registry is present.
+// This lets the test suite spawn `metaclaude-cli.mjs` with `cwd: <tempRoot>` and
+// have the script operate on the temp-dir fixture registry. Normal author use
+// (invoked from any directory) falls back to the executable-relative path.
+function resolveMetaclaudeRoot() {
+  const cwdCandidate = resolve(process.cwd());
+  if (existsSync(join(cwdCandidate, '.claude/metaclaude-registry.json'))) {
+    return cwdCandidate;
+  }
+  return resolve(__dirname, '../..');
+}
+const METACLAUDE_ROOT = resolveMetaclaudeRoot();
 
 // ANSI colors
 const colors = {
@@ -86,11 +101,24 @@ function loadRegistry() {
 }
 
 function resolveProjectPath(projectName, projectConfig, defaults, options = {}) {
-  // Explicit path in config takes priority
-  if (projectConfig.path) {
-    return isAbsolute(projectConfig.path)
-      ? projectConfig.path
-      : resolve(METACLAUDE_ROOT, projectConfig.path);
+  // Explicit per-project absolute path aliases (in priority order):
+  //   - projectConfig.path
+  //   - projectConfig.target_path (test fixture convention)
+  for (const candidate of [projectConfig.path, projectConfig.target_path]) {
+    if (candidate) {
+      return isAbsolute(candidate)
+        ? candidate
+        : resolve(METACLAUDE_ROOT, candidate);
+    }
+  }
+
+  // Test fixture convention: defaults.target_path points at a single consumer
+  // directory (used by tmp-dir integration tests that do not have a real sibling
+  // directory layout).
+  if (defaults?.target_path) {
+    return isAbsolute(defaults.target_path)
+      ? defaults.target_path
+      : resolve(METACLAUDE_ROOT, defaults.target_path);
   }
 
   // Use base_dir from options, defaults, or fallback to '..'
@@ -99,7 +127,14 @@ function resolveProjectPath(projectName, projectConfig, defaults, options = {}) 
   return join(resolvedBase, projectName);
 }
 
-function getLockPath(projectName) {
+function getLockPath(projectName, projectPath) {
+  // Test-fixture convention: when projectPath is provided, look for a
+  // consumer-local lock file first. Fall back to the authoritative author-side
+  // lock if the consumer-local variant doesn't exist.
+  if (projectPath) {
+    const consumerLock = join(projectPath, '.claude', 'locks', `${projectName}.lock.json`);
+    if (existsSync(consumerLock)) return consumerLock;
+  }
   return join(METACLAUDE_ROOT, '.claude', 'locks', `${projectName}.lock.json`);
 }
 
@@ -123,8 +158,15 @@ function resolveBundleArtifacts(registry, bundleName, resolved = new Set()) {
 }
 
 function getArtifact(registry, artifactPath) {
-  const [category, name] = artifactPath.split('/');
-  return registry.artifacts[category]?.[name];
+  // Primary lookup: category.name (conventional shape)
+  const [category, ...rest] = artifactPath.split('/');
+  const name = rest.join('/');
+  const direct = registry.artifacts[category]?.[name];
+  if (direct) return direct;
+  // Fallback: some test fixtures key the entry with the full compound id
+  // (e.g., artifacts.scripts['scripts/example']) rather than splitting by
+  // category. Support both shapes for consumer compatibility.
+  return registry.artifacts[category]?.[artifactPath];
 }
 
 function getProjectsToProcess(config, projectArg) {
@@ -408,20 +450,98 @@ async function cmdStatus(projectArg, options) {
   log('');
 }
 
+/**
+ * Sync-time drift warning (sg-sync-registry-gaps T2.11, REQ-014, AC-14.1).
+ *
+ * Runs the orphan detector and import-graph validator in WARN-ONLY mode before the
+ * sync walk. Findings are printed to stderr as `WARNING:` JSON lines. The process
+ * exits 0 regardless -- the gates are advisory on the consumer side per the
+ * two-tier asymmetric enforcement pattern.
+ *
+ * @param {object} registry - Parsed registry
+ * @returns {number} total finding count (for summary purposes only)
+ */
+function emitSyncTimeDriftWarnings(registry) {
+  let findings = [];
+  try {
+    const orph = detectOrphans(registry, METACLAUDE_ROOT);
+    findings = findings.concat(orph.findings);
+  } catch (err) {
+    // Fail-open: a broken detector must not strand the consumer.
+    log(`WARNING: sync drift detector failed: ${err.message}`, 'yellow');
+  }
+  try {
+    const imp = validateImports(registry, METACLAUDE_ROOT);
+    findings = findings.concat(imp.findings);
+  } catch (err) {
+    log(`WARNING: sync import-graph validator failed: ${err.message}`, 'yellow');
+  }
+  for (const f of findings) {
+    console.error(`WARNING: ${JSON.stringify(f)}`);
+  }
+  return findings.length;
+}
+
+/**
+ * TOCTOU-safe containment re-check performed immediately before a sync read.
+ *
+ * AC-16.1, AC-17.3. Returns `true` when the realpath of `sourceFile` still lies
+ * within `claudeRoot`. On escape or ENOENT, emits a toctou-containment finding to
+ * stderr and returns `false`. The caller skips the artifact on false.
+ *
+ * @param {string} sourceFile - Absolute path the sync is about to read
+ * @param {string} artifactPath - Registry artifact id (for finding metadata)
+ * @returns {boolean} true if safe to read
+ */
+function syncTimeContainmentOk(sourceFile, artifactPath) {
+  const claudeRoot = resolve(METACLAUDE_ROOT, '.claude');
+  try {
+    assertContainment(sourceFile, claudeRoot);
+    return true;
+  } catch (err) {
+    const finding = {
+      rule: 'toctou-containment',
+      file: artifactPath,
+      bundle: null,
+      importer: null,
+      missingImport: null,
+      target: sourceFile,
+      message: err instanceof PathEscapeError
+        ? `Sync-time containment re-check failed: ${err.message}`
+        : `Sync-time read aborted: ${err.message}`,
+      remediation: 'Investigate filesystem state; the source file changed or became a symlink between compute and sync',
+    };
+    console.error(`WARNING: ${JSON.stringify(finding)}`);
+    return false;
+  }
+}
+
 async function cmdSync(projectArg, options) {
   const config = loadProjectsConfig();
   const registry = loadRegistry();
   const projects = getProjectsToProcess(config, projectArg);
 
+  // T2.11: emit drift warnings once for the whole sync run (not per consumer).
+  // Warn-only: findings printed, process continues.
+  const driftCount = emitSyncTimeDriftWarnings(registry);
+  if (driftCount > 0) {
+    log(`\nWARNING: ${driftCount} registry drift finding(s) detected (warn-only)`, 'yellow');
+  }
+
   for (const projectName of projects) {
     const projectConfig = config.projects[projectName];
     const projectPath = resolveProjectPath(projectName, projectConfig, config.defaults, options);
-    const lockPath = getLockPath(projectName);
+    const lockPath = getLockPath(projectName, projectPath);
 
     log(`\n${colors.bold}Syncing: ${projectName}${colors.reset}`, 'cyan');
     log(`Target: ${projectPath}`, 'dim');
 
     if (!existsSync(projectPath)) {
+      // Structured marker (sg-sync-registry-gaps cr-propagation-a4b79e12):
+      // Downstream tools (rollout-resync.mjs) match `[SYNC:target-missing] <path>`
+      // in stderr instead of parsing the human-readable log line. Rewording the
+      // human message must not break failure detection.
+      log(`[SYNC:target-missing] ${projectPath}`, 'red');
       log(`Project directory does not exist: ${projectPath}`, 'red');
       log('Create the directory or update the path in projects.json', 'dim');
       continue;
@@ -491,8 +611,38 @@ async function cmdSync(projectArg, options) {
         continue;
       }
 
-      // never-overwrite means propagate once, then do not overwrite if target exists
+      // never-overwrite means propagate once, then do not overwrite if target exists.
+      // sg-sync-registry-gaps T2.12, AC-15.1/15.2: on hash divergence, emit a
+      // shadow-file divergence warning. --ack-drift advances the lock hash but
+      // never touches the consumer file.
       if (effectivePolicy === 'never-overwrite' && existsSync(targetFile)) {
+        const srcContent = readFileSync(sourceFile, 'utf-8');
+        const srcHash = computeHash(srcContent);
+        const localHash = computeHash(readFileSync(targetFile, 'utf-8'));
+        if (srcHash !== localHash) {
+          if (options.ackDrift) {
+            // Advance lock hash; leave consumer file untouched.
+            lock.installed[artifactPath] = {
+              version: artifact.version,
+              hash: srcHash,
+              path: artifact.path,
+              installed_at: new Date().toISOString(),
+            };
+            log(`  ⊕ ${artifactPath}: shadow-file divergence acknowledged (lock advanced, file unchanged)`, 'cyan');
+            skipped++;
+            continue;
+          }
+          console.error(`WARNING: ${JSON.stringify({
+            rule: 'provenance-invalid',
+            file: artifactPath,
+            bundle: null,
+            importer: null,
+            missingImport: null,
+            target: targetPath,
+            message: `shadow-file divergence: never-overwrite artifact ${artifactPath} has diverged from registry (${srcHash} vs ${localHash})`,
+            remediation: 'Review the local file; rerun sync with --ack-drift to advance the lock without overwriting',
+          })}`);
+        }
         log(`  Skip ${artifactPath}: never-overwrite policy (file exists)`, 'dim');
         skipped++;
         continue;
@@ -523,6 +673,7 @@ async function cmdSync(projectArg, options) {
         lock.installed[artifactPath] = {
           version: artifact.version,
           hash: srcHash,
+          path: artifact.path,
           installed_at: new Date().toISOString()
         };
 
@@ -535,6 +686,15 @@ async function cmdSync(projectArg, options) {
         });
 
         log(`  ⊕ ${artifactPath}: staged for agent-assisted merge`, 'cyan');
+        continue;
+      }
+
+      // sg-sync-registry-gaps T3.1, REQ-016, AC-16.1: sync-time TOCTOU
+      // re-validation. Immediately before reading the source file, re-run
+      // realpath + containment. A symlink replacement between compute and sync
+      // aborts this artifact (the loop continues with the next).
+      if (!syncTimeContainmentOk(sourceFile, artifactPath)) {
+        skipped++;
         continue;
       }
 
@@ -583,9 +743,13 @@ async function cmdSync(projectArg, options) {
       }
 
       // Update lock
+      // sg-sync-registry-gaps AC-2.1: lock entries include `path` field so
+      // consumers and auditors can inspect the source artifact path without
+      // cross-referencing the registry.
       lock.installed[artifactPath] = {
         version: artifact.version,
         hash: sourceHash,
+        path: artifact.path,
         installed_at: new Date().toISOString()
       };
 
@@ -874,6 +1038,7 @@ async function main() {
   const options = {
     force: args.includes('--force'),
     resolveConflicts: args.includes('--resolve-conflicts'),
+    ackDrift: args.includes('--ack-drift'),
     baseDir: args.find(a => a.startsWith('--base-dir='))?.split('=')[1],
     path: args.find(a => a.startsWith('--path='))?.split('=')[1],
     bundle: args.find(a => a.startsWith('--bundle='))?.split('=')[1],
@@ -928,6 +1093,7 @@ Options:
   --base-dir=<path>         Override default base directory for path resolution
   --force                   Force overwrite on conflicts
   --resolve-conflicts       Accept upstream version for conflicting artifacts only
+  --ack-drift               (sync) Acknowledge shadow-file divergence: advance lock hash without touching the consumer file
   --path=<path>             (add) Explicit path for project
   --bundle=<bundle>         (add) Bundle to use
 

@@ -151,6 +151,7 @@ Both are required. Adding an artifact to the registry without adding it to a bun
 
 - The `facilitator` and `refactorer` agents were in the registry but missing from the `full-workflow` bundle includes, so they never synced to consumer projects despite being registered.
 - Convergence-related scripts were registered but not added to any bundle, silently missing from all targets.
+- `scripts/spec-utils` (a shared library imported by `spec-validate.mjs`) was missing from the registry entirely -- consumers crashed with `ERR_MODULE_NOT_FOUND` at runtime. This class of "half-wired artifact" is now caught by the preventive gates (see Sync Validation Gates below).
 
 The fix is always the same: add the artifact's path (`category/name`) to the appropriate bundle's `includes` array.
 
@@ -214,13 +215,15 @@ Choose the right bundle level:
 
 Remember: child bundles inherit from parents. If you add to `core-workflow`, it is automatically in `full-workflow` and `orchestrator`.
 
+**Cross-bundle closure rule**: An importer at bundle level `X` may only import files registered at bundle level `X` or any ancestor of `X`. A `minimal`-tier script cannot import a `full-workflow`-tier module, because consumers running `minimal` would not receive the importee. This rule is enforced by the import-graph gate at `compute-hashes --update` (see Sync Validation Gates).
+
 ### 4. Compute the hash
 
 ```bash
 node .claude/scripts/compute-hashes.mjs --update
 ```
 
-This replaces the `"placeholder"` hash with the real SHA-256 prefix.
+This replaces the `"placeholder"` hash with the real SHA-256 prefix. It also runs the sync validation gates -- see Sync Validation Gates below.
 
 ### 5. Test the sync
 
@@ -280,23 +283,30 @@ diff .claude/agents/my-agent.md ../target-project/.claude/agents/my-agent.md
 
 **Fix**: Ensure project-specific hooks do NOT have `"_source": "metaclaude"`. Only metaclaude-managed hooks should have this field.
 
+### `ERR_MODULE_NOT_FOUND` on consumer after sync
+
+**Symptom**: Running a synced `.mjs` script on a consumer throws `ERR_MODULE_NOT_FOUND` for a relative import.
+
+**Cause**: The script imports a shared library (e.g., `./lib/helper.mjs`) that exists in metaclaude-assistant but was never added to the registry. The script ships, the helper does not, and the consumer crashes at runtime.
+
+**Fix**: Register the helper in `metaclaude-registry.json`, add it to a bundle with the same-or-lower tier as the importer, and re-sync. To prevent this from happening again, the import-graph gate at `compute-hashes --update` now hard-blocks this class of drift at the author.
+
 ---
 
 ## What Is NOT Synced
 
 These files stay in metaclaude-assistant and are never copied to consumer projects:
 
-| File/Directory                       | Reason                                                                 |
-| ------------------------------------ | ---------------------------------------------------------------------- |
-| `metaclaude-registry.json`           | Canonical registry, not a target artifact                              |
-| `projects.json`                      | Internal config for the sync system                                    |
-| `.claude/locks/`                     | Per-project lock files, stored in metaclaude-assistant                 |
-| `.claude/scripts/compute-hashes.mjs` | Sync infrastructure (not in any bundle, despite being in the registry) |
-| `.claude/scripts/metaclaude-cli.mjs` | The sync CLI itself (not in any bundle)                                |
-| `test-hooks.mjs`, `__fixtures__/`    | Testing infrastructure                                                 |
-| Repo-specific agents                 | e.g., `deployer.md` that only exists in ai-eng-dashboard               |
+| File/Directory                       | Reason                                                              |
+| ------------------------------------ | ------------------------------------------------------------------- |
+| `metaclaude-registry.json`           | Canonical registry, not a target artifact                           |
+| `projects.json`                      | Internal config for the sync system                                 |
+| `.claude/locks/`                     | Per-project lock files, stored in metaclaude-assistant              |
+| `.claude/scripts/compute-hashes.mjs` | Sync infrastructure (`_sync: false` in registry, not in any bundle) |
+| `test-hooks.mjs`, `__fixtures__/`    | Testing infrastructure                                              |
+| Repo-specific agents                 | e.g., `deployer.md` that only exists in ai-eng-dashboard            |
 
-Note: `compute-hashes.mjs` and `metaclaude-cli.mjs` ARE in the registry (for hash tracking) but are NOT in any bundle's includes, so they never sync. This is intentional -- they are metaclaude-internal tools.
+Note: `compute-hashes.mjs` is in the registry (for hash tracking, with `_sync: false`) but not in any bundle. `metaclaude-cli.mjs` IS in the `minimal` bundle and syncs to consumers -- they need it to run `metaclaude-cli sync` themselves.
 
 ---
 
@@ -433,7 +443,7 @@ node .claude/scripts/compute-hashes.mjs
 # Verify all registry hashes match file content (exits 1 on failure)
 node .claude/scripts/compute-hashes.mjs --verify
 
-# Update registry with current file hashes
+# Update registry with current file hashes (runs sync validation gates)
 node .claude/scripts/compute-hashes.mjs --update
 ```
 
@@ -446,3 +456,197 @@ Run `compute-hashes.mjs --update` after:
 - Any change to a file tracked in the registry
 
 The `--verify` flag is useful in CI or pre-sync checks to ensure the registry is consistent.
+
+---
+
+## Sync Validation Gates
+
+`compute-hashes --update` runs three validation gates before touching the registry. These gates catch registry drift (files on disk that are not registered, imports that point at nothing) at the author, not at the consumer's runtime.
+
+### Why Gates Exist
+
+A half-wired artifact -- a registered `.mjs` that imports a relative module that is not itself registered -- ships successfully from metaclaude-assistant but crashes at the consumer with `ERR_MODULE_NOT_FOUND` when the script runs. The gates make this impossible to commit.
+
+### The Three Gates
+
+| Gate                           | What it checks                                                                                                                                                 | Failure rule           |
+| ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------- |
+| **Orphan detector**            | Every file under the sync-scoped roots (`scripts/`, `agents/`, `skills/`, `templates/`, `docs/`, `memory-bank/`, `hooks/`, `specs/schema/`) must be registered | `orphan`               |
+| **Import-graph validator**     | Every relative import (`./foo.mjs`, `../lib/bar.mjs`) in a registered `.mjs` must resolve to a registered file                                                 | `import-unregistered`  |
+| **Cross-bundle closure check** | An importer at bundle `X` may only import files at bundle `X` or any ancestor                                                                                  | `cross-bundle-closure` |
+
+Additional rules emitted by these gates: `parse-error`, `import-target-missing`, `import-target-unresolvable`, `legacy-orphans-inventory-missing`, `provenance-invalid`, `path-escape`, `toctou-containment`, `test-leaf-violation`.
+
+### Sync-Scoped Roots
+
+The orphan detector walks these roots exhaustively:
+
+```
+.claude/scripts/     .claude/agents/     .claude/skills/
+.claude/templates/   .claude/docs/       .claude/memory-bank/
+.claude/hooks/       .claude/specs/schema/
+```
+
+And excludes these (they are not sync destinations):
+
+```
+.claude/journal/       .claude/locks/        .claude/coordination/
+.claude/specs/groups/  .claude/specs/archive/ .claude/prds/
+.claude/context/       .claude/audit/        .claude/traces/
+.claude/scripts/archive/
+```
+
+A file under a sync-scoped root that is neither registered in `artifacts.*` nor listed in `orphans[]` and not matched by the global whitelist is flagged as an orphan.
+
+### Whitelist
+
+Three globs are whitelisted globally (hard-coded in `scripts/lib/sync-constants.mjs`):
+
+```
+**/__tests__/**       # Per-consumer tests, not shipped
+**/__fixtures__/**    # Test fixtures, not shipped
+**/.gitkeep           # Directory placeholders
+```
+
+Tests and fixtures are **leaves** -- a registered non-test script that imports `./__tests__/helpers.mjs` triggers `test-leaf-violation`.
+
+### Two-Tier Enforcement
+
+| Surface                            | Mode      | On violation                                             |
+| ---------------------------------- | --------- | -------------------------------------------------------- |
+| `compute-hashes --update` (author) | **block** | Exit non-zero, stderr structured JSON, no registry write |
+| `metaclaude-cli sync` (consumer)   | **warn**  | Print `WARNING:` line to stderr, exit 0, sync continues  |
+
+The author-side surface hard-blocks because the developer is keyboard-active and can fix immediately. The consumer-side surface warns because stranding consumers on briefly-drifted upstreams is worse than printing a warning. Both surfaces share the same three gates and same violation shape.
+
+### Structured Violations
+
+Every violation is a JSON line with this shape:
+
+```json
+{
+  "file": ".claude/scripts/foo.mjs",
+  "bundle": "minimal",
+  "importer": ".claude/scripts/spec-validate.mjs",
+  "missingImport": "./lib/helper.mjs",
+  "rule": "import-unregistered",
+  "remediation": "node .claude/scripts/compute-hashes.mjs --add .claude/scripts/lib/helper.mjs"
+}
+```
+
+At the author, these are written to stderr and the process exits non-zero. At the consumer, the same JSON is prefixed with `WARNING:` and the sync continues.
+
+### Performance Budgets
+
+- **Orphan detector**: ≤ 2 seconds wall-clock. Pure `fs.readdirSync` walk, no child processes.
+- **Import-graph validator**: ≤ 5 seconds wall-clock. Serial `acorn` AST parse of ~150 registered `.mjs` files. No worker pool, no AST cache. If the budget is exceeded on a larger repo, add a worker pool before adding caching.
+
+`--verbose` prints per-phase wall-clock to stderr.
+
+### Escape Hatch: `--skip-gates`
+
+If a gate blocks a commit and you need to bypass it (e.g., mid-refactor, fix in next commit), use:
+
+```bash
+node .claude/scripts/compute-hashes.mjs --update --skip-gates="refactor: moving helper to lib, fix in next commit"
+```
+
+**Rules**:
+
+- Reason must be **≥ 10 chars of substantive text** (whitespace-only is rejected).
+- No environment variable bypass. The only accepted bypass is the `--skip-gates` flag.
+- Every use appends one line to `.claude/audit/skip-gates.jsonl` with `{timestamp, reason, author, command}`.
+- The `skip-gates.jsonl` file is append-only. The pre-commit hook rejects any diff that modifies an existing line (only appends permitted).
+- **Overuse warning**: 5 or more uses within a rolling 7-day window emits a non-blocking WARNING listing the recent entries. Threshold is a code constant, not a registry field -- a compromised registry cannot raise the threshold to hide abuse.
+
+### Atomicity
+
+`compute-hashes --update` never leaves the registry in a half-written state:
+
+1. Parse `--skip-gates` flag if present, validate reason.
+2. Read registry, validate via Zod.
+3. Run orphan detector, import-graph validator, cross-bundle closure check.
+4. If any gate fails (and `--skip-gates` is not set), write findings to stderr and **exit without touching the registry** (file mtime unchanged).
+5. Otherwise, write to `.claude/metaclaude-registry.json.<pid>.tmp` then `rename()` atomically.
+6. Clean up any `.tmp` siblings older than 1 hour at script start.
+
+### Sync-Time Drift Warning
+
+When `metaclaude-cli sync <project>` runs and detects registry drift (an unregistered sync-scoped file, or a dangling relative import in a registered `.mjs`), it prints a `WARNING:` line per finding to stderr but still exits 0. The sync continues and the consumer is not stranded. The author sees the drift immediately at their next `compute-hashes --update`.
+
+---
+
+## TOCTOU Protection
+
+All path resolution under `.claude/` uses `fs.realpathSync()` followed by sep-suffixed prefix containment:
+
+```javascript
+const real = fs.realpathSync(target);
+if (real === claudeRoot) return real;
+if (real.startsWith(claudeRoot + path.sep)) return real;
+throw new PathEscapeError({ target, real });
+```
+
+**The trailing-separator requirement is load-bearing**. Without it, `/foo/.claude-evil/x.mjs` would pass `startsWith('/foo/.claude')` and escape containment. The helper lives at `.claude/scripts/lib/path-containment.mjs` and is used by both `compute-hashes` and `metaclaude-cli sync`.
+
+**Sync-time re-validation**: `metaclaude-cli sync` re-runs `realpathSync` + containment immediately before every `readFileSync` on an artifact source. This shrinks (but does not eliminate) the time-of-check/time-of-use window between the validator's canonicalization and the actual read. The residual microsecond window is accepted under the sole-developer trust model.
+
+Naive `target.startsWith(claudeRoot)` without the trailing separator is prohibited in source code and would trip the containment check at test time.
+
+---
+
+## Legacy Orphans Backlog
+
+During the M1 migration (spec group `sg-sync-registry-gaps`), the `orphans[]` array was migrated from legacy `string[]` form to object form `{path, reason, added_by, added_date}`. Entries that existed before the migration were backfilled with `reason: "legacy"` because their original rationale was not recorded.
+
+Legacy entries are tracked in `.claude/audit/legacy-orphans-backlog.md` with a deadline of **2026-09-30**. Before that date, each legacy entry must be either:
+
+- **Resolved**: file is archived, deleted, or registered with a real rationale string (≥ 20 chars)
+- **Acknowledged**: entry's `reason` is rewritten with a real rationale and `added_by`/`added_date` are updated
+
+After 2026-09-30, `compute-hashes --update` emits a non-blocking WARNING for every remaining `reason: "legacy"` entry. See `.claude/audit/legacy-orphans-backlog.md` for the current list.
+
+---
+
+## Pre-Commit Hook
+
+A composite Husky v9 pre-commit hook at `.husky/pre-commit` runs before every commit. It short-circuits on first failure:
+
+1. **`validate-orphans.mjs`** -- Zod-validates every `orphans[]` entry against the object schema.
+2. **`skip-gates-append-only-check.mjs`** -- Rejects any diff that modifies an existing line in `.claude/audit/skip-gates.jsonl`. Appends are permitted. Intentional rotation (archiving the full file) is detected via an archive-detection exception.
+3. **`import-graph-validator.mjs`** (invoked via `compute-hashes`) -- Runs the three sync validation gates.
+
+If step 1 fails, steps 2 and 3 do not run. The hook exits with the first failing step's exit code.
+
+Husky v9 uses a simplified hook format -- hooks are plain shell scripts with a shebang. The legacy `. "$(dirname -- "$0")/_/husky.sh"` loader is not used.
+
+### Bypassing the hook
+
+The client-side pre-commit hook can be bypassed via `git commit --no-verify`. This is accepted under the sole-developer trust model. Future hardening (CI-enforced append-only check, signed commits, CODEOWNERS, branch protection) is documented in `org-context.md` under "Multi-developer hardening" and activates when a second committer joins, external consumers appear, or the project acquires remote CI.
+
+### Bootstrap on fresh clone
+
+Husky installs via the `prepare` script in `package.json`. On a fresh clone:
+
+```bash
+npm install               # Runs `prepare: husky` and installs hooks
+```
+
+If you need to install dependencies without running the prepare script (e.g., CI builds that do not commit):
+
+```bash
+npm install --ignore-scripts
+```
+
+### Rollback
+
+If the sync validation gates produce unexpected false positives, roll back by reverting the `.husky/pre-commit` file (or flipping `GATE_MODE = 'block'` back to `'warn'` in `compute-hashes.mjs`) and committing. The gates themselves are not hot-pluggable -- rollback requires a source edit, visible in review.
+
+---
+
+## See Also
+
+- `.claude/docs/SYNC-SYSTEM-INTERNALS.md` -- Developer reference for the validation pipeline, Zod schemas, trust root, and extension points
+- `.claude/docs/HOOKS.md` -- Full documentation of the validation hooks system
+- `.claude/audit/legacy-orphans-backlog.md` -- Current legacy orphan entries with remediation deadline
+- `.claude/memory-bank/org-context.md` -- Sole-developer trust model and multi-developer hardening triggers

@@ -181,6 +181,12 @@ Check for:
 - Test quality (meaningful assertions)
 - Test isolation (no shared state)
 
+#### Category G: Advisory Configuration (Info severity)
+
+Check for:
+
+- **manifest-missing**: If a PR touches a service that performs deployments and the service has no `.claude/deployment-manifests/<service>.json`, emit an advisory finding with category `advisory-config`, severity `info`. Recommendation: "Create a deployment manifest to enable method-coverage smoke testing. See `.claude/docs/deployment-verification-contracts.md` > Authoring a Deployment Manifest." This is informational only -- does not block merge. Existing services without manifests fall back to GET-only smoke testing (AC-4.2..AC-4.7).
+
 **Example Finding**:
 
 ```markdown

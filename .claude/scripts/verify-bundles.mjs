@@ -121,6 +121,11 @@ function main() {
     process.exit(0);
   }
 
+  // Build orphans path set for fast lookup (CVG-005: respect "don't ship" conventions)
+  const orphanPaths = new Set(
+    (registry.orphans || []).map((o) => o && o.path).filter(Boolean)
+  );
+
   const issues = [];
 
   for (const filePath of trackedFiles) {
@@ -131,11 +136,20 @@ function main() {
     // Check 1: Is the artifact registered?
     const found = findArtifactInRegistry(registry, normalized);
     if (!found) {
+      // CVG-005: skip not-registered finding if path is in orphans[]
+      if (orphanPaths.has(normalized)) {
+        continue;
+      }
       issues.push({
         file: normalized,
         type: 'not-registered',
         message: `Artifact "${normalized}" is not registered in metaclaude-registry.json`,
       });
+      continue;
+    }
+
+    // CVG-005: skip not-in-bundle check for artifacts opted out of sync
+    if (found.artifact._sync === false || found.artifact._sync_policy === 'never-sync') {
       continue;
     }
 
