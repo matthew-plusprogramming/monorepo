@@ -105,44 +105,17 @@ At recursive depth > 1, the intermediate conductor must surface sub-subagent fai
 
 ### Convergence Loop Protocol
 
-Quality gates are not single-pass. Each gate runs in an iterative loop: **check -> fix -> recheck** until the gate converges or the iteration cap is reached.
+Quality gates run iteratively: **check → fix → recheck** until 2 consecutive clean passes or 5 iterations (escalate after 5 with `CONVERGENCE FAILURE` report).
 
-**Loop mechanics:**
+**Applicable gates**: `investigation`, `challenger`, `unifier`, `code_review`, `security_review`, `completion_verifier`.
 
-1. Dispatch the check agent (e.g., `code-reviewer`)
-2. If clean: increment `clean_pass_count`. If issues found: reset `clean_pass_count` to 0, dispatch fix agent with findings as input
-3. After fix, re-dispatch check agent (back to step 1)
-4. **Converge** when `clean_pass_count >= 2` (two consecutive clean passes)
-5. **Escalate** to user when `iteration_count >= 5`
-
-**Applicable gates:**
-
-| Gate                    | Check Agent              | Fix Agent                                                              | Convergence         |
-| ----------------------- | ------------------------ | ---------------------------------------------------------------------- | ------------------- |
-| Interface Investigation | `interface-investigator` | `spec-author` (spec amendment)                                         | 2 consecutive clean |
-| Challenger              | `challenger`             | `implementer` (pre-implementation) / `spec-author` (pre-orchestration) | 2 consecutive clean |
-| Unifier Validation      | `unifier`                | `implementer` or `test-writer`                                         | 2 consecutive clean |
-| Code Review             | `code-reviewer`          | `implementer`                                                          | 2 consecutive clean |
-| Security Review         | `security-reviewer`      | `implementer`                                                          | 2 consecutive clean |
-| Completion Verification | `completion-verifier`    | `implementer` or `documenter`                                          | 2 consecutive clean |
-
-**Note on skill wrappers:** Most check agents in the table above have corresponding skill files (e.g., `code-reviewer` has `/code-review`, `security-reviewer` has `/security`). The `completion-verifier` is an exception — it is dispatched directly as an agent without a skill wrapper, since its gate logic is self-contained in the agent definition.
-
-**Why 2 consecutive passes:** A single clean pass may be coincidental — the fix addressed issue X but introduced issue Y. Two consecutive clean passes confirm stability.
-
-**Fix agent input contract:** The fix agent receives the prior check's findings directly — it does not re-discover issues.
-
-**Escalation** (when `iteration_count >= 5`): Report `CONVERGENCE FAILURE` with gate name, recurring issues, last fix attempted, and recommendation (manual intervention / scope reduction / spec amendment).
-
-**Loop state** (owned by orchestrating agent, not subagents): `{ gate, iteration_count, clean_pass_count, max_iterations: 5, required_clean_passes: 2, findings_history: [] }`
-
-**Recording convergence**: After a gate converges (2 consecutive clean passes), record it for enforcement. The `clean_pass_count` is derived from the evidence array -- you do not pass a count:
+**Recording convergence**: After each clean pass, record via:
 
 ```
 node .claude/scripts/session-checkpoint.mjs update-convergence <gate_name>
 ```
 
-Gate names: `code_review`, `security_review`, `investigation`, `challenger`, `unifier`, `completion_verifier`. This derives `session.convergence.<gate>.clean_pass_count` from the evidence array, which the coercive hooks read. Do NOT write to session.json manually -- always use this command.
+Do NOT write to `session.json` manually. Each gate skill (`/investigate`, `/challenge`, `/unify`, `/code-review`, `/security`) and the `completion-verifier` agent document their own check agent, fix agent, and loop mechanics. Coercive enforcement (`workflow-gate-enforcement.mjs`) blocks downstream dispatches when `clean_pass_count < 2`.
 
 ### Autonomous Convergence
 
@@ -204,10 +177,6 @@ Mandatory workflow stages (challenger dispatches, completion verification, docum
 - **Write protection** (`workflow-file-protection.mjs`): Blocks agent writes to `gate-override.json` and `gate-enforcement-disabled`. Not disabled by the kill switch.
 
 **Obligation enforcement** validates that manifest status fields match expected values when leaving a phase. The `PHASE_OBLIGATIONS` constant in `workflow-dag.mjs` maps 9 phases to 14 field obligations (e.g., leaving `implementing` requires `convergence.all_acs_implemented === true`, leaving `investigating` requires `convergence.investigation_converged === true`, leaving `challenging` requires `convergence.challenger_converged === true`). Both `session-checkpoint.mjs` and `workflow-stop-enforcement.mjs` call `validateObligations()` from `workflow-dag.mjs`. Phase-scoped overrides use gate name `status_obligations:<phase>`. See `.claude/docs/HOOKS.md` for the full obligation mapping table.
-
-**Kill switch**: Creating `.claude/coordination/gate-enforcement-disabled` (human terminal only) disables gate enforcement and stop enforcement. Write protection remains active.
-
-**Human override**: Creating `.claude/coordination/gate-override.json` with session-scoped entries allows bypassing specific gates. Override entries require gate name, session_id, timestamp, and rationale.
 
 **Exempt workflows**: `oneoff-vibe`, `refactor`, and `journal-only` workflows bypass all enforcement.
 
@@ -377,53 +346,7 @@ PostToolUse hooks enforce type checking, linting, JSON/spec validation automatic
 
 ### Iteration Cycles
 
-#### Small Task (oneoff-vibe)
-
-```
-Request -> Route -> Delegate to subagent -> Synthesize -> Commit
-```
-
-#### Medium Task (oneoff-spec)
-
-```
-Request -> Route -> /prd (gather-criticize loop, optional TAD) -> Spec ->
-  Investigation Convergence Loop (2 clean passes, auto-decision) ->
-  Challenger Convergence Loop (2 clean passes, auto-decision, stage: pre-implementation) ->
-  Auto-Approval (passthrough logging) ->
-  [Pre-flight challenge in each skill] ->
-  [Parallel: Implement + Test + E2E Test (E2E only for cross-boundary specs)] ->
-  /challenge (MANDATORY, stage: pre-test, single-pass) -> Integration Verify -> Unify (loop) ->
-  /challenge (MANDATORY, stage: pre-review, single-pass) ->
-  Code Review (loop) -> Security (loop) ->
-  Completion Verification (loop) ->
-  [If UI: Browser Test] -> Docs -> [If PRD: /prd amend] -> Commit
-```
-
-#### Large Task (orchestrator)
-
-```
-Request -> Route -> /prd (gather-criticize loop, optional TAD) -> ProblemBrief ->
-  [Parallel: WorkstreamSpecs] -> MasterSpec ->
-  Investigation Convergence Loop (2 clean passes, auto-decision) ->
-  Challenger Convergence Loop (2 clean passes, auto-decision, stage: pre-orchestration) ->
-  Auto-Approval (passthrough logging) ->
-  /orchestrate (allocates worktrees, dispatches facilitator) ->
-  [Pre-flight challenge in each skill] ->
-  [Parallel per workstream: Implement + Test + E2E Test (E2E only for cross-boundary specs)] ->
-  /challenge (MANDATORY, stage: pre-test, single-pass) -> Integration Verify ->
-  Unify (loop) ->
-  /challenge (MANDATORY, stage: pre-review, single-pass) ->
-  Code Review (loop) -> Security (loop) -> Completion Verification (loop) ->
-  Browser Test -> Docs -> [If PRD: /prd amend] -> Commit
-```
-
-**Investigation Checkpoint**: `/investigate` is MANDATORY before implementation for both oneoff-spec (mode: `single-spec`) and orchestrator (mode: `standard`) workflows. It runs as a convergence loop (2 consecutive clean passes) with auto-decision engine integration.
-
-**Pre-Flight Challenge**: Each skill (implement, test, code-review, security, orchestrate, spec) includes a `## Pre-Flight Challenge` section with stage-appropriate operational feasibility questions. These are addressed as part of normal skill execution -- no additional agent dispatch required. Additionally, dedicated `/challenge` dispatches are MANDATORY at four workflow stages: `pre-implementation` (convergence loop after investigation convergence), `pre-test` (single-pass after impl), `pre-review` (single-pass after unify), and `pre-orchestration` (convergence loop after investigation convergence -- orchestrator only). The `pre-implementation` and `pre-orchestration` stages run as convergence loops; `pre-test` and `pre-review` are single-pass checks.
-
-**Cross-Stage Resolution Cap**: When resolving a blocker at one stage introduces a new blocker at another stage (circular cross-stage dependency), resolution attempts are capped at 3. After 3 attempts, escalate to the human with the full blocker chain.
-
-**Security Override Notation**: When a human overrides a security-category blocker, the override is explicitly tagged as a "security-risk acknowledgment" in the Decisions Log, distinguishable from routine operational overrides.
+Full workflow sequences (oneoff-vibe, oneoff-spec, orchestrator) are documented in `/route` SKILL.md § Integration with Other Skills. Convergence mechanics (2 consecutive clean passes, cross-stage resolution cap of 3) live in `/challenge` and `/investigate` SKILL.md. Pre-flight challenge sections exist in each skill; dedicated `/challenge` dispatches are MANDATORY at four stages: `pre-implementation` (convergence loop), `pre-test` (single-pass), `pre-review` (single-pass), and `pre-orchestration` (convergence loop — orchestrator only). Investigation is MANDATORY before implementation for oneoff-spec and orchestrator workflows. Security-category overrides must be tagged as "security-risk acknowledgment" in the Decisions Log — see `/security` SKILL.md.
 
 ### Parallel Execution
 
