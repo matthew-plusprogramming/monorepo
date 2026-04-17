@@ -5,27 +5,30 @@
  *
  * Automatically records pass evidence when convergence check agents complete.
  * Extracts findings metadata from the agent's last_assistant_message text via
- * a 4-tier deterministic first-match-wins pipeline, then invokes
+ * a deterministic first-match-wins pipeline, then invokes
  * session-checkpoint.mjs's exported recordPass() function via direct module
  * import.
  *
- * Spec: sg-convergence-recorder-tolerance (v1.2) + v1.3 follow-up
+ * Spec: sg-convergence-recorder-tolerance (v1.3) -- Path 0 structured block
  *
  * Extraction pipeline (first-match-wins):
+ *   Path 0 -- structured convergence-result fenced block (highest priority)
+ *               status: clean | dirty (+ optional findings_count / findings list)
+ *               malformed block -> recorded as tried-and-failed, fall through
  *   Path 1 -- severity regex (existing, unchanged on happy path)
  *               non-zero counts -> DIRTY
  *               all-zero counts -> fall through (EDGE-004)
  *   Path 5 -- zero-count severity breakdown (>=2 distinct labels, all 0,
  *               within a 10-line window) -> CLEAN
- *   Path D -- DIRTY-phrase short-circuit ("issues detected", "not ready",
- *               "Status: FAIL" and related) -> DIRTY
+ *   Path 4 -- widened success-marker on up to last 3 non-empty lines, or
+ *               Status:/Result:/Verdict:/Outcome:/Assessment: prefixed marker
+ *               -> CLEAN  (reordered: now runs before Path 2)
  *   Path 2 -- structured finding-list regex (3 alternates + generic cues)
  *               -> DIRTY with finding-count
  *   Path 3 -- severity-word-prose detection (line-anchored, negation-safe,
  *               fenced-code & blockquote stripped) -> DIRTY
- *   Path 4 -- widened success-marker on up to last 3 non-empty lines, or
- *               Status:/Result:/Verdict:/Outcome:/Assessment: prefixed marker
- *               -> CLEAN
+ *   Path D -- DIRTY-phrase short-circuit ("issues detected", "not ready",
+ *               "Status: FAIL" and related) -> DIRTY (tail-scoped)
  *
  *   No path matches -> source='parse_failed', append metadata-only diagnostic
  *   entry to .claude/context/session.log (no raw bytes), enforce mode 0600.
@@ -99,16 +102,20 @@ const CIRCUIT_BREAKER_DEGRADED_THRESHOLD = 3;
 const SESSION_LOG_MODE = 0o600;
 
 // AC-8: extraction paths reported in diagnostic log. Order reflects
-// precedence after the v1.3 follow-up expansion (zero-severity-breakdown
-// and dirty-phrase short-circuit inserted between path 1 and path 2).
+// precedence after the v1.3 Path 0 addition and path-4-before-path-2 reorder.
 const EXTRACTION_PATHS = [
+  'structured_block',
   'severity',
   'zero_severity_breakdown',
-  'dirty_phrase',
+  'success_marker',
   'finding_list',
   'severity_prose',
-  'success_marker',
+  'dirty_phrase',
 ];
+
+// Path 0: structured convergence-result fenced block. Language tag is
+// case-sensitive per spec -- agents must emit the exact tag.
+const STRUCTURED_BLOCK_LANG = 'convergence-result';
 
 // SC-3 authoritative finding-ID prefix inventory (Investigation Findings (b))
 // plus seed-list prefixes (AC, NFR, FLOW) commonly used in spec authoring
@@ -336,6 +343,151 @@ function stripBlockquotes(text) {
     .split('\n')
     .filter((line) => !/^\s*>\s/.test(line))
     .join('\n');
+}
+
+// =============================================================================
+// Path 0: structured convergence-result fenced block (highest priority)
+// =============================================================================
+
+/**
+ * Parse a structured `convergence-result` fenced block from an agent response.
+ *
+ * Format:
+ *   ```convergence-result
+ *   status: clean|dirty                (required, value case-insensitive)
+ *   findings_count: N                  (optional, non-negative integer)
+ *   findings:                          (optional, YAML-style list)
+ *     - ID-1
+ *     - ID-2
+ *   ```
+ *
+ * Parse rules:
+ *   - Language tag is case-sensitive: `convergence-result` (matches STRUCTURED_BLOCK_LANG)
+ *   - If multiple blocks are present, the LAST one wins
+ *   - `status` is required; missing or invalid value -> parse failure (return null)
+ *   - `findings_count` defaults: 0 for clean; 1 for dirty (if no count and no list)
+ *   - `findings` list, if present, overrides `findings_count` with list length
+ *     and populates `finding_ids` for hash computation
+ *
+ * Returns:
+ *   { status: 'clean'|'dirty', count: number, findingIds: string[] } on success
+ *   null on any parse failure (malformed block, missing status, invalid value)
+ *
+ * Exported for test consumption.
+ */
+export function parseStructuredConvergenceBlock(text) {
+  if (!text || typeof text !== 'string') return null;
+
+  // Locate every fenced block with language tag `convergence-result`.
+  // The opening fence is `\`\`\`convergence-result` (optionally followed by
+  // whitespace / trailing content on the same line). The closing fence is a
+  // standalone `\`\`\`` line. Case-sensitive language-tag match.
+  const blockRegex = new RegExp(
+    '```' + STRUCTURED_BLOCK_LANG + '[^\\n]*\\n([\\s\\S]*?)\\n```',
+    'g'
+  );
+  const matches = [];
+  for (const m of text.matchAll(blockRegex)) {
+    matches.push(m[1]);
+  }
+  if (matches.length === 0) return null;
+
+  // Last block wins.
+  const body = matches[matches.length - 1];
+  const lines = body.split('\n');
+
+  // Parse status (required).
+  let status = null;
+  let explicitCount = null;
+  const findingIds = [];
+  let inFindingsList = false;
+
+  for (const rawLine of lines) {
+    const line = rawLine.replace(/\r$/, '');
+
+    // Findings list items: `  - ID-1` or `- ID-1`. Must follow a `findings:` key.
+    if (inFindingsList) {
+      const listItemMatch = line.match(/^\s*-\s+(\S.*?)\s*$/);
+      if (listItemMatch) {
+        findingIds.push(listItemMatch[1]);
+        continue;
+      }
+      // Non-list non-empty line ends the list
+      if (line.trim() !== '') {
+        inFindingsList = false;
+      } else {
+        continue;
+      }
+    }
+
+    const keyMatch = line.match(/^\s*([A-Za-z_][A-Za-z0-9_]*)\s*:\s*(.*?)\s*$/);
+    if (!keyMatch) continue;
+    const key = keyMatch[1].toLowerCase();
+    const value = keyMatch[2];
+
+    if (key === 'status') {
+      const normalized = value.trim().toLowerCase();
+      if (normalized === 'clean' || normalized === 'dirty') {
+        status = normalized;
+      } else {
+        // Invalid status value -> parse failure
+        return null;
+      }
+    } else if (key === 'findings_count') {
+      const n = Number.parseInt(value.trim(), 10);
+      if (Number.isFinite(n) && n >= 0 && String(n) === value.trim()) {
+        explicitCount = n;
+      } else {
+        // Invalid count -> parse failure
+        return null;
+      }
+    } else if (key === 'findings') {
+      inFindingsList = true;
+    }
+  }
+
+  if (status === null) return null;
+
+  // Resolve final count. Findings list wins over explicit count.
+  let count;
+  if (findingIds.length > 0) {
+    count = findingIds.length;
+  } else if (explicitCount !== null) {
+    count = explicitCount;
+  } else {
+    count = status === 'clean' ? 0 : 1;
+  }
+
+  return { status, count, findingIds };
+}
+
+/**
+ * Path 0 dispatcher.
+ *
+ * Returns:
+ *   { matched: true, clean, finding_count, finding_ids } on valid block
+ *   { matched: false, tried: true }  when a block was present but failed to parse
+ *   { matched: false, tried: false } when no block is present at all
+ *
+ * `tried` is surfaced to the diagnostic log so operators can distinguish
+ * "no block emitted" from "block emitted but malformed".
+ */
+function tryPath0StructuredBlock(text) {
+  if (!text || typeof text !== 'string') return { matched: false, tried: false };
+  // Quick presence check (avoid full regex run when tag absent)
+  if (!text.includes('```' + STRUCTURED_BLOCK_LANG)) {
+    return { matched: false, tried: false };
+  }
+  const parsed = parseStructuredConvergenceBlock(text);
+  if (!parsed) {
+    return { matched: false, tried: true };
+  }
+  return {
+    matched: true,
+    clean: parsed.status === 'clean',
+    finding_count: parsed.count,
+    finding_ids: parsed.findingIds.length > 0 ? parsed.findingIds : null,
+  };
 }
 
 // =============================================================================
@@ -654,41 +806,56 @@ function tryDirtyPhrase(text) {
 
 /**
  * Run the extraction pipeline. Returns:
- *   { source: 'hook', clean: boolean, finding_count: number|null } -- one of
- *     paths 1-5 matched
- *   { source: 'parse_failed', clean: false, normalized_length } -- all paths missed
+ *   { source: 'hook', clean, finding_count, finding_ids? } -- one of paths matched
+ *   { source: 'parse_failed', clean: false, normalized_length, structured_block_tried }
+ *     -- all paths missed; structured_block_tried indicates whether Path 0
+ *     encountered a malformed block
  *
  * Precedence (first-match-wins):
+ *   0. structured convergence-result block -> CLEAN/DIRTY per block
  *   1. severity regex (non-zero counts) -> DIRTY
- *   2. zero-count severity breakdown (>=2 distinct labels, all zero) -> CLEAN
- *   3. DIRTY-phrase short-circuit ("issues detected", "Status: FAIL", ...) -> DIRTY
- *   4. finding-list -> DIRTY
- *   5. severity-word prose -> DIRTY
- *   6. success marker on tail (up to 3 lines) -> CLEAN
+ *   5. zero-count severity breakdown (>=2 distinct labels, all zero) -> CLEAN
+ *   4. success marker on tail (up to 3 non-empty lines) -> CLEAN (moved up)
+ *   2. structured finding-list -> DIRTY
+ *   3. severity-word prose -> DIRTY
+ *   D. DIRTY-phrase short-circuit ("issues detected", "Status: FAIL", ...) -> DIRTY
  */
 function classify(text, gateName) {
+  // Path 0: structured convergence-result block (highest priority)
+  const p0 = tryPath0StructuredBlock(text);
+  if (p0.matched) {
+    return {
+      source: 'hook',
+      clean: p0.clean,
+      finding_count: p0.finding_count,
+      finding_ids: p0.finding_ids,
+      path: 'structured_block',
+    };
+  }
+  // Record whether a malformed block was encountered so the diagnostic log
+  // can surface "tried and failed".
+  const structuredBlockTried = p0.tried === true;
+
   // Path 1: severity regex (non-zero counts)
   const p1 = tryPath1Severity(text, gateName);
   if (p1.matched) {
     return { source: 'hook', clean: p1.clean, finding_count: p1.finding_count, path: 'severity' };
   }
 
-  // Path 5 (precedence-wise between old path 1 and old path 2): all-zero
-  // severity breakdown -> CLEAN. Path 1 already short-circuited on non-zero
-  // counts, so reaching here means either no severity-regex match or all
-  // severity counts were zero (EDGE-004 fall-through).
+  // Path 5: all-zero severity breakdown -> CLEAN. Path 1 already short-
+  // circuited on non-zero counts, so reaching here means either no severity-
+  // regex match or all severity counts were zero (EDGE-004 fall-through).
   const p5 = tryPath5ZeroSeverityBreakdown(text);
   if (p5.matched) {
     return { source: 'hook', clean: true, finding_count: 0, path: 'zero_severity_breakdown' };
   }
 
-  // DIRTY symmetric-expansion short-circuit. Catches "issues detected",
-  // "Status: FAIL", etc. Runs before finding-list / prose / success-marker
-  // so that an unambiguous dirty signal anywhere in the response classifies
-  // DIRTY without false CLEAN from a trailing marker.
-  const dirty = tryDirtyPhrase(text);
-  if (dirty.matched) {
-    return { source: 'hook', clean: false, finding_count: dirty.finding_count, path: 'dirty_phrase' };
+  // Path 4 (moved up per v1.3 reorder): success marker on tail. Runs before
+  // Path 2 so that a response with a trailing marker + incidental finding-list
+  // citations (e.g., a summary that mentions prior AC-IDs) classifies CLEAN.
+  const p4 = tryPath4SuccessMarker(text);
+  if (p4.matched) {
+    return { source: 'hook', clean: true, finding_count: 0, path: 'success_marker' };
   }
 
   // Path 2: structured finding-list
@@ -703,10 +870,12 @@ function classify(text, gateName) {
     return { source: 'hook', clean: false, finding_count: p3.finding_count, path: 'severity_prose' };
   }
 
-  // Path 4: success marker on tail (up to 3 non-empty lines)
-  const p4 = tryPath4SuccessMarker(text);
-  if (p4.matched) {
-    return { source: 'hook', clean: true, finding_count: 0, path: 'success_marker' };
+  // DIRTY symmetric-expansion short-circuit. Catches tail-scoped dirty
+  // vocabulary ("issues detected", "Status: FAIL", etc.). Runs last since
+  // Paths 0/4 already disposed of CLEAN cases.
+  const dirty = tryDirtyPhrase(text);
+  if (dirty.matched) {
+    return { source: 'hook', clean: false, finding_count: dirty.finding_count, path: 'dirty_phrase' };
   }
 
   // All paths missed -> parse_failed
@@ -716,6 +885,7 @@ function classify(text, gateName) {
     finding_count: null,
     path: null,
     normalized_length: p4.normalized_length ?? 0,
+    structured_block_tried: structuredBlockTried,
   };
 }
 
@@ -791,9 +961,14 @@ function writeSessionLogEntry(entry) {
 
 /**
  * Build the diagnostic log entry from the parse_failed result.
+ *
+ * When Path 0 encountered a malformed structured block (present but failed
+ * to parse), `structured_block_tried: true` is recorded so operators can
+ * distinguish "no block emitted" from "block emitted but malformed". The
+ * raw block body is never logged.
  */
 function buildDiagnosticEntry(opts) {
-  const { gateName, agentType, agentId, responseText, normalizedLength } = opts;
+  const { gateName, agentType, agentId, responseText, normalizedLength, structuredBlockTried } = opts;
   const sha = createHash('sha256').update(responseText, 'utf8').digest('hex').slice(0, 16);
   const entry = {
     timestamp: new Date().toISOString(),
@@ -807,6 +982,9 @@ function buildDiagnosticEntry(opts) {
   // EC-13: include response_length_normalized only when normalization-to-empty
   if (normalizedLength === 0) {
     entry.response_length_normalized = 0;
+  }
+  if (structuredBlockTried) {
+    entry.structured_block_tried = true;
   }
   return entry;
 }
@@ -896,6 +1074,7 @@ export async function extractAndRecord(opts) {
     agentId,
     responseText,
     normalizedLength: result.normalized_length,
+    structuredBlockTried: result.structured_block_tried === true,
   });
 
   if (inDegradedMode) {

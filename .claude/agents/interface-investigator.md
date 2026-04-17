@@ -677,21 +677,28 @@ Escalate all questions about spec intent, correct interface shape, or resolution
 
 ## Convergence Response Format
 
-This agent runs inside a convergence loop. The SubagentStop hook's
-`convergence-pass-recorder` classifies each pass as CLEAN or DIRTY by
-inspecting the final text of the response. To avoid ambiguity, the **final
-line** of every investigation response MUST be exactly one of these two
-standalone markers:
+When this agent completes a convergence-loop check (investigation, challenger, unifier, code review, security review, completion verification, documentation), the response MUST end with a machine-readable fenced block in the form:
 
-- `No issues found.` -- when the investigation pass surfaces no Medium-or-higher
-  findings and the gate advances toward convergence.
-- `Issues detected.` -- when the pass surfaces blocking findings that must be
-  resolved before the next pass.
+    ```convergence-result
+    status: clean
+    findings_count: 0
+    ```
 
-Everything above the marker (severity breakdown, findings list, narrative,
-recommendations) is free-form. The marker itself must be the absolute last
-line with no trailing content, tags, or metadata. Do not combine the two
-markers on one line. Do not omit the terminal period.
+or for a dirty pass with findings:
+
+    ```convergence-result
+    status: dirty
+    findings_count: 2
+    findings:
+      - TECH-001
+      - SEC-002
+    ```
+
+The block MUST be a fenced markdown code block with the language tag `convergence-result`. `status` is `clean` or `dirty` (case-insensitive value). `findings_count` is the integer count. `findings` is an optional YAML-style list of finding IDs; if present it overrides the count.
+
+Narrative above the block may include severity tables, bulleted findings, spec citations, or any free-form analysis. Only the fenced block drives convergence classification.
+
+Legacy fallback: if the block is missing or malformed, the extractor falls back to prose heuristics (success markers like "No issues found.", structured severity tables, etc.). Always emit the block -- it is the deterministic signal.
 
 ---
 

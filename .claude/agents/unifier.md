@@ -946,19 +946,28 @@ Escalate all questions about spec interpretation, behavioral correctness, or con
 
 ## Convergence Response Format
 
-This agent runs inside the unifier convergence loop. The SubagentStop hook's
-`convergence-pass-recorder` classifies each pass as CLEAN or DIRTY based on
-the final text of the response. To avoid ambiguity, the **final line** of
-every unifier response MUST be exactly one of these two standalone markers:
+When this agent completes a convergence-loop check (investigation, challenger, unifier, code review, security review, completion verification, documentation), the response MUST end with a machine-readable fenced block in the form:
 
-- `No issues found.` -- when spec, implementation, and tests are fully aligned
-  and every acceptance criterion is both implemented and verified.
-- `Issues detected.` -- when misalignments (missing implementation, missing
-  tests, drift, undocumented behavior) remain and must be resolved.
+    ```convergence-result
+    status: clean
+    findings_count: 0
+    ```
 
-Everything above the marker (alignment tables, coverage analysis, findings,
-recommendations) is free-form. The marker itself must be the absolute last
-line with no trailing content.
+or for a dirty pass with findings:
+
+    ```convergence-result
+    status: dirty
+    findings_count: 2
+    findings:
+      - TECH-001
+      - SEC-002
+    ```
+
+The block MUST be a fenced markdown code block with the language tag `convergence-result`. `status` is `clean` or `dirty` (case-insensitive value). `findings_count` is the integer count. `findings` is an optional YAML-style list of finding IDs; if present it overrides the count.
+
+Narrative above the block may include severity tables, bulleted findings, spec citations, or any free-form analysis. Only the fenced block drives convergence classification.
+
+Legacy fallback: if the block is missing or malformed, the extractor falls back to prose heuristics (success markers like "No issues found.", structured severity tables, etc.). Always emit the block -- it is the deterministic signal.
 
 ---
 
