@@ -43,6 +43,12 @@ const PROTECTED_FILENAMES = [
   'deployment-interventions.log',
   // AC-14.9.b: Chain verifier script (trust root)
   'verify-deployment-audit-chain.mjs',
+  // sg-convergence-recorder-tolerance T-10 / AC-17 / AC-23:
+  // Diagnostic log for convergence-pass-recorder. Treated as FULL_BLOCK so
+  // Claude agent Write/Edit tool calls cannot tamper with it. Direct
+  // fs.appendFileSync from in-repo Node scripts is intentionally outside
+  // this hook's vantage (it observes only Claude tool-call stdin JSON).
+  'session.log',
 ];
 
 /**
@@ -135,6 +141,10 @@ function blockProtectedFileWrite(protectedName, toolName) {
   if (protectedName === 'session.json') {
     process.stderr.write(`Cannot write to '${protectedName}' via ${toolName} -- this file is protected.\n`);
     process.stderr.write('All session.json writes must go through session-checkpoint.mjs CLI.\n');
+  } else if (protectedName === 'session.log') {
+    // sg-convergence-recorder-tolerance T-10 / AC-17
+    process.stderr.write(`Cannot write to '${protectedName}' via ${toolName} -- this file is protected.\n`);
+    process.stderr.write('session.log is the diagnostic log for convergence-pass-recorder.mjs (FULL_BLOCK).\n');
   } else {
     process.stderr.write(`Cannot write to '${protectedName}' via ${toolName} -- this file is protected.\n`);
     process.stderr.write('Only human terminal writes are permitted for enforcement files.\n');
@@ -210,6 +220,10 @@ async function main() {
 
       let isProtectedPath = false;
       if (protectedName === 'session.json') {
+        isProtectedPath = isContextFile;
+      } else if (protectedName === 'session.log') {
+        // sg-convergence-recorder-tolerance T-10 / AC-17:
+        // session.log lives alongside session.json under .claude/context/
         isProtectedPath = isContextFile;
       } else if (protectedName === 'deployment-interventions.log') {
         isProtectedPath = isAuditFile;

@@ -157,9 +157,9 @@ The wrapper:
 
 ### PreToolUse Hooks (Write - Enforcement File Protection)
 
-| Hook ID                    | Trigger Pattern | Script                         | Purpose                                                                 |
-| -------------------------- | --------------- | ------------------------------ | ----------------------------------------------------------------------- |
-| `workflow-file-protection` | `Write`         | `workflow-file-protection.mjs` | Block agent writes to gate-override.json, kill switch, and session.json |
+| Hook ID                    | Trigger Pattern | Script                         | Purpose                                                                              |
+| -------------------------- | --------------- | ------------------------------ | ------------------------------------------------------------------------------------ |
+| `workflow-file-protection` | `Write`         | `workflow-file-protection.mjs` | Block agent writes to gate-override.json, kill switch, session.json, and session.log |
 
 ### PostToolUse Hooks (Edit|Write)
 
@@ -593,14 +593,43 @@ Note: `input.agent_output` and `input.status` are NOT documented SubagentStop fi
 1. Reads SubagentStop event data from stdin (JSON with `agent_type` and `last_assistant_message` fields)
 2. Checks agent type against the convergence agent allowlist (see Gate Mapping below)
 3. If agent is not on the allowlist or `agent_type` is missing/empty: exits 0 with empty JSON `{}` (no recording)
-4. Extracts findings metadata from `last_assistant_message` text:
-   - Tries JSON block extraction first (fenced `json` or `json:findings-summary` blocks)
-   - Falls back to regex parsing of severity/count patterns in text
-   - Determines `clean` status: 0 Medium+ findings for most gates, 0 High+ for `code_review`
-5. Computes canonical findings hash from finding IDs (sorted, SHA-256)
-6. Invokes `session-checkpoint.mjs record-pass` with extracted metadata and `--source hook`
-7. On extraction failure: records with null findings and `manual_fallback` source (never blocks)
-8. On any error: fail-open (exit 0, empty JSON)
+4. Runs the 4-tier first-match-wins extraction pipeline against `last_assistant_message` (see [4-Tier Extraction Pipeline](#4-tier-extraction-pipeline) below)
+5. On any tier match: invokes the exported `recordPass()` function in `session-checkpoint.mjs` via direct module import with `source: 'hook'` (no CLI subprocess)
+6. On all tiers missing: appends a metadata-only diagnostic entry to `.claude/context/session.log` and records the pass with `source: 'parse_failed'`
+7. On session.log write failure after one retry: records the pass with `source: 'manual_fallback'` and increments the per-gate circuit-breaker `failure` event
+8. On any top-level error: fail-open (exit 0, empty JSON)
+
+**4-Tier Extraction Pipeline**:
+
+Each tier classifies the agent response as CLEAN or DIRTY. First match wins.
+
+| Tier | Path name        | Detection                                                                                  | Result on match                        |
+| ---- | ---------------- | ------------------------------------------------------------------------------------------ | -------------------------------------- |
+| 1    | `severity`       | Severity regex (`critical:`, `high:`, etc.) or JSON `findings-summary` block               | CLEAN or DIRTY based on gate threshold |
+| 2    | `finding_list`   | Bulleted / numbered / bare-indent finding-ID lists (prefix allow-list) or heading cues     | DIRTY                                  |
+| 3    | `severity_prose` | Line-anchored severity-word prose with negation guard (fenced code + blockquotes stripped) | DIRTY                                  |
+| 4    | `success_marker` | Normalized last non-empty line matches `no issues found`, `all checks passed`, etc.        | CLEAN                                  |
+
+All-zero severity counts in tier 1 fall through to tier 2 (do not short-circuit as CLEAN). Gate threshold determines CLEAN boundary: `code_review` clears on 0 High+; all other gates clear on 0 Medium+.
+
+**Diagnostic Log** (`.claude/context/session.log`):
+
+When all four tiers miss, the hook appends one JSON line with metadata only -- no raw response bytes. Fields: `timestamp`, `gate`, `agent_type`, `agent_id` (optional), `response_length`, `response_sha256_prefix16`, `extraction_paths_tried`, and `response_length_normalized` (only when normalization reduced the response to empty). Log is created with mode `0600` and re-chmoded on every invocation if drift is detected (emits `SESSION_LOG_CHMOD_CORRECTED` to stderr). Write is retried once with 100ms backoff; retry failure triggers the `manual_fallback` path. Direct agent writes to `session.log` are blocked by `workflow-file-protection.mjs` (FULL_BLOCK).
+
+**Circuit Breaker** (degraded mode):
+
+Per-gate failure state is tracked in `session.json.convergence_log_failures.<gate>`:
+
+```json
+{
+  "consecutive_count": 2,
+  "last_failure_at": "2026-04-17T04:30:00.000Z",
+  "degraded_mode": false,
+  "entered_degraded_at": null
+}
+```
+
+State updates go through `session-checkpoint.mjs update-circuit-breaker --gate <gate> --event <failure|success>` (subprocess call; origin-insensitive). At `consecutive_count >= 3`, `degraded_mode` flips to `true` and the recorder stops writing session.log entries for that gate (stderr-only diagnostics), still recording the pass as `parse_failed`. Any successful log write issues a `success` event to reset the state. On invalid arguments the CLI exits 2; on atomic-write failure it exits 1.
 
 **Gate Mapping** (agent type to gate name):
 
@@ -613,11 +642,84 @@ Note: `input.agent_output` and `input.status` are NOT documented SubagentStop fi
 | `unifier`                | `unifier`             |
 | `completion-verifier`    | `completion_verifier` |
 
+**Record Source Enum** (`session.convergence_evidence.<gate>.passes[].record_source`):
+
+| Source            | Writer             | Counts for `clean_pass_count` | Purpose                                         |
+| ----------------- | ------------------ | ----------------------------- | ----------------------------------------------- |
+| `hook`            | Module-import only | Yes (when `clean: true`)      | Trusted, automated SubagentStop path            |
+| `manual`          | CLI                | No                            | Operator audit entry                            |
+| `manual_fallback` | Module or CLI      | No                            | Fail-closed after session.log write failure     |
+| `parse_failed`    | Module or CLI      | No (streak-breaking)          | All 4 extractor paths missed                    |
+| `hook_manual`     | CLI only           | No (streak-breaking)          | Operator emergency remediation for hook sources |
+
+Only `source: 'hook'` with `clean: true` counts toward consecutive clean passes. Any other entry breaks the tail-walk streak (see [session-checkpoint.mjs](#session-checkpointmjs) below).
+
+**`--source hook` CLI Rejection**: The CLI `record-pass` command rejects `--source hook` unconditionally and exits with code 2. Hook-sourced passes may only be written via the exported `recordPass()` function imported directly from `session-checkpoint.mjs`. Operators performing emergency remediation for a hook-scoped entry must use `--source hook_manual` instead.
+
 **Ordering**: This hook is registered in `settings.json` AFTER `convergence-gate-reminder`, ensuring both hooks receive the original agent output independently (no chained/modified copies).
 
 **Exit Codes**:
 
 - `0`: Always (fail-open on all errors)
+
+### session-checkpoint.mjs
+
+**Purpose**: Sole trusted writer for `.claude/context/session.json`. Provides both CLI subcommands and exported module-import functions for convergence and phase state.
+
+**Relevant CLI ops**:
+
+```bash
+# Record a pass evidence entry (CLI path; --source hook rejected)
+node .claude/scripts/session-checkpoint.mjs record-pass <gate> \
+  --clean <true|false> --agent-type <type> \
+  [--source manual|manual_fallback|parse_failed|hook_manual] \
+  [--findings-count N] [--findings-hash <hex>]
+
+# Update per-gate circuit-breaker state for session.log write failures
+node .claude/scripts/session-checkpoint.mjs update-circuit-breaker \
+  --gate <gate> --event <failure|success>
+
+# Derive clean_pass_count from the evidence array (walks last 200 entries)
+node .claude/scripts/session-checkpoint.mjs update-convergence <gate>
+```
+
+**Tail-walk streak-reset semantics** (`countConsecutiveCleanFromTail`):
+
+- Walks `session.convergence_evidence.<gate>.passes[]` from the tail forward
+- Counts consecutive entries where `record_source === 'hook'` AND `clean === true`
+- Any other entry -- `parse_failed`, `manual`, `manual_fallback`, `hook_manual`, or `hook` with `clean: false` -- resets the streak
+- Walk is bounded to the last 200 entries (legacy-pollution defense)
+- On bound-hit without a streak-starting hook-clean entry, emits `CONVERGENCE_TAIL_WALK_BOUNDED` to stderr (gate name in message)
+
+**`update-circuit-breaker` CLI op**:
+
+Atomically mutates `session.convergence_log_failures.<gate>`:
+
+- `--event failure`: increments `consecutive_count`, stamps `last_failure_at`; at `consecutive_count >= 3` sets `degraded_mode: true` and stamps `entered_degraded_at`
+- `--event success`: resets `consecutive_count` to 0, clears `degraded_mode` and `entered_degraded_at`
+- Exit 0 on success; exit 1 on atomic-write failure; exit 2 on invalid `--gate` or `--event`
+
+**`record-pass --source hook` rejection**:
+
+The CLI rejects `--source hook` before any state mutation, writing `SOURCE_HOOK_FORBIDDEN_VIA_CLI` to stderr and exiting 2. This makes the `source: 'hook'` invariant counterfeit-proof: any such entry in the evidence array must have come from the in-process module-import `recordPass()` call by `convergence-pass-recorder.mjs`. Rejection is unconditional (no `CLAUDE_HOOK_EVENT` env bypass).
+
+**Exported module-import API**:
+
+```js
+import { recordPass } from '.claude/scripts/session-checkpoint.mjs';
+
+await recordPass({
+  source: 'hook', // or manual | manual_fallback | parse_failed | hook_manual
+  gate: 'investigation', // one of VALID_CONVERGENCE_GATES
+  clean: true, // boolean (required)
+  findingCount: 0, // optional
+  findingsHash: '<64-hex>', // optional
+  agentType: 'interface-investigator',
+  agentId: '<uuid>', // optional
+});
+```
+
+`recordPass()` is the sole permitted writer for `source: 'hook'` entries. It performs the same enum + gate + atomic-write validation as the CLI and throws on invalid input or write failure.
 
 ### workflow-gate-enforcement.mjs
 
@@ -678,19 +780,22 @@ All integrity issues produce advisory warnings to stderr. The hook never blocks 
 
 ### workflow-file-protection.mjs
 
-**Purpose**: Block agent writes to enforcement files and session state. Only human terminal writes (or trusted CLI scripts) are permitted.
+**Purpose**: Block agent writes to enforcement files, session state, and the convergence diagnostic log. Only human terminal writes (or trusted CLI scripts) are permitted.
 
 **Hook Type**: PreToolUse (runs before Write tool)
 
 **Matcher**: `Write`
 
-**Protected Files**:
+**Protected Files** (FULL_BLOCK):
 
 - `.claude/coordination/gate-override.json`
 - `.claude/coordination/gate-enforcement-disabled`
 - `.claude/context/session.json`
+- `.claude/context/session.log`
 
-The `session.json` write protection ensures all session state modifications go through `session-checkpoint.mjs` as the sole trusted writer. Agents must use CLI subcommands (`record-pass`, `update-convergence`, `transition-phase`, etc.) instead of direct file writes.
+The `session.json` write protection ensures all session state modifications go through `session-checkpoint.mjs` as the sole trusted writer. Agents must use CLI subcommands (`record-pass`, `update-convergence`, `update-circuit-breaker`, `transition-phase`, etc.) instead of direct file writes.
+
+The `session.log` entry is the diagnostic log for `convergence-pass-recorder.mjs`. Direct writes via the Edit/Write tools are blocked unconditionally; writes from in-repo Node scripts (via `fs.appendFileSync`) are intentionally outside this hook's vantage, which observes only tool-call stdin JSON.
 
 **Key Property**: This hook does NOT check the kill switch. Write protection remains active even when `gate-enforcement-disabled` exists, preventing agents from self-bypassing enforcement.
 
@@ -1279,7 +1384,7 @@ mv .claude/settings.json.bak .claude/settings.json
 
 ## Related Documentation
 
-- [Workflow Enforcement Architecture](WORKFLOW-ENFORCEMENT.md) - DAG enforcement, operator overrides, completion checklist, evidence-based convergence
+- [Workflow Enforcement Architecture](WORKFLOW-ENFORCEMENT.md) - DAG enforcement, operator overrides, completion checklist, evidence-based convergence (4-tier extraction pipeline, streak-reset tail-walk, circuit-breaker degraded mode)
 - [Trace System](TRACES.md) - Trace generation, staleness, and the import-graph-check.mjs fallback for boot-path reachability
 - [Completion Verifier Agent](../agents/completion-verifier.md) - Gate 7 (boot-path reachability) uses import-graph-check.mjs as trace fallback and wiring-task detector
 - [Deployment Verification Contracts](deployment-verification-contracts.md) - Consumer contract interfaces (verify:build, verify:deploy), HTTP GET fallback, session state schema, CLI commands

@@ -1,5 +1,5 @@
 ---
-last_reviewed: 2026-03-18
+last_reviewed: 2026-04-17
 ---
 
 # Technical Context
@@ -185,11 +185,11 @@ Hooks run automatically at various tool lifecycle points to catch issues early a
 
 #### PreToolUse Hooks (Coercive Enforcement)
 
-| Hook                        | Trigger          | Purpose                                                                |
-| --------------------------- | ---------------- | ---------------------------------------------------------------------- |
-| `workflow-gate-enforcement` | PreToolUse Agent | Block dispatch of enforced subagent types when prerequisites not met   |
-| `workflow-file-protection`  | PreToolUse Write | Block agent writes to gate-override.json and gate-enforcement-disabled |
-| `trace-read-enforcement`    | PreToolUse Edit  | Block edits to files in traced modules unless trace was read           |
+| Hook                        | Trigger          | Purpose                                                                              |
+| --------------------------- | ---------------- | ------------------------------------------------------------------------------------ |
+| `workflow-gate-enforcement` | PreToolUse Agent | Block dispatch of enforced subagent types when prerequisites not met                 |
+| `workflow-file-protection`  | PreToolUse Write | Block agent writes to gate-override.json, kill switch, session.json, and session.log |
+| `trace-read-enforcement`    | PreToolUse Edit  | Block edits to files in traced modules unless trace was read                         |
 
 #### Stop Hooks
 
@@ -199,9 +199,10 @@ Hooks run automatically at various tool lifecycle points to catch issues early a
 
 #### SubagentStop Hooks
 
-| Hook                        | Trigger      | Purpose                                                                 |
-| --------------------------- | ------------ | ----------------------------------------------------------------------- |
-| `convergence-gate-reminder` | SubagentStop | Remind main agent to update convergence gates after subagent completion |
+| Hook                        | Trigger      | Purpose                                                                  |
+| --------------------------- | ------------ | ------------------------------------------------------------------------ |
+| `convergence-gate-reminder` | SubagentStop | Remind main agent to update convergence gates after subagent completion  |
+| `convergence-pass-recorder` | SubagentStop | Record pass evidence via 4-tier extractor + module-import `recordPass()` |
 
 ### Workflow Enforcement (Practice 4.3)
 
@@ -213,7 +214,7 @@ Workflow enforcement operates in two layers:
 
 - `workflow-gate-enforcement.mjs` blocks dispatch of 7 enforced subagent types (implementer, test-writer, e2e-test-writer, code-reviewer, security-reviewer, documenter, completion-verifier) when workflow prerequisites are not recorded in session.json
 - `workflow-stop-enforcement.mjs` blocks session completion when mandatory dispatches (code-reviewer, security-reviewer, completion-verifier, documenter) have not occurred
-- `workflow-file-protection.mjs` blocks agent writes to enforcement override files (not disabled by kill switch)
+- `workflow-file-protection.mjs` blocks agent writes to enforcement override files and session state files (session.json, session.log); not disabled by kill switch
 
 **Shared DAG module** (`scripts/lib/workflow-dag.mjs`): Single source of truth for predecessor graphs, enforcement tables, and query functions consumed by both layers.
 
@@ -224,6 +225,37 @@ Workflow enforcement operates in two layers:
 **Override**: `.claude/coordination/gate-override.json` with session-scoped entries allows bypassing specific gates (human terminal only).
 
 **Fail-open**: Structural errors (missing session.json, malformed JSON, script crashes) result in exit 0. Exception: missing convergence fields default to 0 (fail-closed).
+
+#### session-checkpoint.mjs API Surface
+
+`session-checkpoint.mjs` is the sole trusted writer for `.claude/context/session.json`. It exposes both a CLI and a module-import API.
+
+**Module-import** (new; used exclusively by `convergence-pass-recorder.mjs` for `source: 'hook'` writes):
+
+```javascript
+import { recordPass } from '.claude/scripts/session-checkpoint.mjs';
+
+await recordPass({
+  source: 'hook', // or manual | manual_fallback | parse_failed | hook_manual
+  gate: 'investigation', // one of VALID_CONVERGENCE_GATES
+  clean: true, // boolean (required)
+  findingCount: 0, // optional
+  findingsHash: '<64-hex>', // optional
+  agentType: 'interface-investigator',
+  agentId: '<uuid>', // optional
+});
+```
+
+The CLI rejects `--source hook` unconditionally (exit 2, `SOURCE_HOOK_FORBIDDEN_VIA_CLI`), making `recordPass()` the sole permitted writer for hook-sourced entries.
+
+**Relevant CLI ops**:
+
+- `record-pass <gate> --clean <bool> --agent-type <type> [--source manual|manual_fallback|parse_failed|hook_manual]` -- append a pass evidence record (hook source forbidden)
+- `update-convergence <gate>` -- derive `clean_pass_count` via tail-walk with streak-reset semantics (bound: last 200 entries)
+- `update-circuit-breaker --gate <gate> --event <failure|success>` -- atomically mutate per-gate circuit-breaker state in `session.convergence_log_failures.<gate>` (degraded mode threshold: 3 consecutive failures)
+- `transition-phase <phase>`, `override-skip <phase> <rationale>`, `reset-enforcement`
+
+For the full convergence architecture (4-tier extraction pipeline, streak-reset tail-walk, circuit-breaker degraded mode, source enum), see `.claude/docs/WORKFLOW-ENFORCEMENT.md` § Evidence-Based Convergence.
 
 ### Workflow Types
 

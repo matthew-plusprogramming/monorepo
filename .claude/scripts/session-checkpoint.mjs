@@ -35,6 +35,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync, renameSync, unlinkSync } from 'node:fs';
 import { randomUUID, createHash } from 'node:crypto';
 import { basename, dirname, join, resolve, sep } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import {
   ORCHESTRATOR_PREDECESSORS,
   ONEOFF_SPEC_PREDECESSORS,
@@ -1433,18 +1434,43 @@ function opRecordPass(args) {
     }
   }
 
+  // SEC-014 (sg-convergence-recorder-tolerance T-02, AC-10, AC-20a):
+  // Reject --source hook architecturally at CLI entry point.
+  // Hook-sourced passes may only be recorded via in-process module import
+  // by convergence-pass-recorder.mjs. This makes counterfeiting the
+  // 2-consecutive-clean invariant impossible via CLI. Rejection is
+  // unconditional on env state (no CLAUDE_HOOK_EVENT bypass).
+  // MUST occur before any state mutation.
+  if (source === 'hook') {
+    process.stderr.write(
+      `SOURCE_HOOK_FORBIDDEN_VIA_CLI: hook-sourced passes may only be recorded ` +
+      `via in-process module import by convergence-pass-recorder.mjs. ` +
+      `Use --source hook_manual for operator remediation.\n`
+    );
+    process.exit(2);
+  }
+
   // Validate required fields
   if (clean === null) {
     throw new Error('Missing required argument: --clean <true|false>');
   }
   if (!agentType) {
-    throw new Error('Missing required argument: --agent-type <type>');
+    // T-03 / AC-11: For operator remediation paths (hook_manual, parse_failed,
+    // manual_fallback), agent_type is informational; supply a placeholder so
+    // the CLI remains usable. Existing hook (rejected above) and manual paths
+    // preserve their required-arg contract via the throw.
+    if (source === 'hook_manual' || source === 'parse_failed' || source === 'manual_fallback') {
+      agentType = 'cli-operator';
+    } else {
+      throw new Error('Missing required argument: --agent-type <type>');
+    }
   }
 
-  // Validate source
-  const validSources = ['hook', 'manual', 'manual_fallback'];
+  // Validate source (sg-convergence-recorder-tolerance T-03, AC-11)
+  // Expanded enum: parse_failed (extractor missed) and hook_manual (operator remediation)
+  const validSources = ['hook', 'manual', 'manual_fallback', 'parse_failed', 'hook_manual'];
   if (!validSources.includes(source)) {
-    throw new Error(`Invalid source '${source}'. Valid sources: ${validSources.join(', ')}`);
+    throw new Error(`INVALID_SOURCE: '${source}'. Valid sources: ${validSources.join(', ')}`);
   }
 
   // Validate findings-hash format (64-char hex or null)
@@ -1552,17 +1578,48 @@ function opRecordPass(args) {
  * Count consecutive clean, hook-sourced passes from the tail of the evidence array.
  * Only passes with record_source === "hook" and clean === true count.
  *
+ * sg-convergence-recorder-tolerance T-04 / AC-7 / REQ-5:
+ *   - Streak-reset semantics: any non-`hook-clean` entry breaks the walk
+ *     (parse_failed, manual, manual_fallback, hook_manual, or hook && !clean).
+ *   - Walk bounded to last 200 entries (legacy-pollution defense).
+ *   - On bound-hit without finding a streak-starting hook-clean entry,
+ *     emit stderr CONVERGENCE_TAIL_WALK_BOUNDED warning.
+ *
  * @param {Array} passes - Array of pass evidence records
+ * @param {string} [gateName] - Optional gate name for the bound-hit stderr warning
  * @returns {number} Number of consecutive clean hook-sourced passes from tail
  */
-function countConsecutiveCleanFromTail(passes) {
+function countConsecutiveCleanFromTail(passes, gateName) {
+  const TAIL_WALK_BOUND = 200;
+
+  // Step 1: count consecutive hook-clean from the tail (streak-reset semantics).
+  // Any non-hook-clean entry breaks the walk -- includes parse_failed, manual,
+  // manual_fallback, hook_manual, and hook with clean=false.
   let count = 0;
   for (let i = passes.length - 1; i >= 0; i--) {
     const pass = passes[i];
-    if (pass.record_source === 'hook' && pass.clean === true) {
+    if (pass && pass.record_source === 'hook' && pass.clean === true) {
       count++;
     } else {
       break;
+    }
+  }
+
+  // Step 2: bound-hit detection (legacy-pollution defense).
+  // If at least 200 entries exist AND none of the last 200 are hook-clean,
+  // emit the CONVERGENCE_TAIL_WALK_BOUNDED stderr warning. This signals
+  // probable legacy pollution from before the streak-reset fix (2026-04-16).
+  if (passes.length >= TAIL_WALK_BOUND) {
+    const window = passes.slice(passes.length - TAIL_WALK_BOUND);
+    const hasHookClean = window.some(
+      (p) => p && p.record_source === 'hook' && p.clean === true
+    );
+    if (!hasHookClean) {
+      const gateLabel = gateName || 'unknown';
+      process.stderr.write(
+        `CONVERGENCE_TAIL_WALK_BOUNDED: gate=${gateLabel} walked ${TAIL_WALK_BOUND} ` +
+        `entries without streak start, possible legacy pollution from before 2026-04-16\n`
+      );
     }
   }
   return count;
@@ -1643,8 +1700,9 @@ function opUpdateConvergence(gateName, countStr) {
     }
 
     // AC-2.1, AC-2.5: Derive clean_pass_count from evidence
+    // sg-convergence-recorder-tolerance AC-7: pass gateName for bound-hit stderr label
     const evidence = evidenceForGate;
-    const cleanPassCount = countConsecutiveCleanFromTail(evidence);
+    const cleanPassCount = countConsecutiveCleanFromTail(evidence, gateName);
 
     // AC-2.8: Warn if >50% of passes are manual-sourced
     if (evidence.length > 0) {
@@ -1716,6 +1774,235 @@ function opUpdateConvergence(gateName, countStr) {
     throw new Error(
       `CONVERGENCE_VERIFY_FAILED: session.json clean_pass_count=${verifiedCount}, expected>=2, gate=${gateName}`
     );
+  }
+}
+
+// =============================================================================
+// Convergence Circuit Breaker (sg-convergence-recorder-tolerance T-05, AC-13, AC-14)
+// =============================================================================
+
+/**
+ * Per-gate circuit-breaker threshold: at this consecutive_count, degraded_mode
+ * is set to true. Recorder then skips manual_fallback writes and records
+ * source='parse_failed' instead (prevents compounding contamination).
+ */
+const CIRCUIT_BREAKER_DEGRADED_THRESHOLD = 3;
+
+/**
+ * update-circuit-breaker - Atomically update per-gate circuit-breaker state in
+ * session.json.convergence_log_failures.
+ *
+ * Usage:
+ *   update-circuit-breaker --gate <gate> --event <failure|success>
+ *
+ * On --event failure:
+ *   - Increments consecutive_count
+ *   - Stamps last_failure_at (ISO-8601)
+ *   - At consecutive_count === 3, sets degraded_mode=true and stamps entered_degraded_at
+ *
+ * On --event success:
+ *   - Resets consecutive_count to 0
+ *   - Clears degraded_mode (false)
+ *   - Clears entered_degraded_at (null)
+ *
+ * Exit codes:
+ *   0 - state updated successfully
+ *   1 - filesystem error (atomic write failure)
+ *   2 - invalid argument (unknown gate or event)
+ *
+ * Implements: AC-14 / TECH-020 / REQ-NFR-9
+ * Spec: sg-convergence-recorder-tolerance
+ */
+function opUpdateCircuitBreaker(args) {
+  // Parse flags
+  let gateName = null;
+  let event = null;
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] === '--gate' && i + 1 < args.length) {
+      gateName = args[i + 1];
+      i++;
+    } else if (args[i] === '--event' && i + 1 < args.length) {
+      event = args[i + 1];
+      i++;
+    }
+  }
+
+  // Validate arguments (exit 2 on invalid)
+  if (!gateName || !VALID_CONVERGENCE_GATES.includes(gateName)) {
+    process.stderr.write(
+      `update-circuit-breaker: invalid --gate '${gateName}'. ` +
+      `Valid gates: ${VALID_CONVERGENCE_GATES.join(', ')}\n`
+    );
+    process.exit(2);
+  }
+  if (event !== 'failure' && event !== 'success') {
+    process.stderr.write(
+      `update-circuit-breaker: invalid --event '${event}'. Must be 'failure' or 'success'.\n`
+    );
+    process.exit(2);
+  }
+
+  ensureContextDir();
+
+  const written = atomicModifyJSON(SESSION_PATH, (currentData) => {
+    let session = currentData;
+    if (!session) {
+      session = createEmptySession();
+    }
+
+    if (!session.convergence_log_failures) {
+      session.convergence_log_failures = {};
+    }
+    if (!session.convergence_log_failures[gateName]) {
+      session.convergence_log_failures[gateName] = {
+        consecutive_count: 0,
+        last_failure_at: null,
+        degraded_mode: false,
+        entered_degraded_at: null,
+      };
+    }
+
+    const state = session.convergence_log_failures[gateName];
+
+    if (event === 'failure') {
+      state.consecutive_count = (state.consecutive_count || 0) + 1;
+      state.last_failure_at = now();
+      // Set degraded_mode at exactly the threshold so the entered_degraded_at
+      // timestamp captures the boundary crossing.
+      if (state.consecutive_count >= CIRCUIT_BREAKER_DEGRADED_THRESHOLD && !state.degraded_mode) {
+        state.degraded_mode = true;
+        state.entered_degraded_at = now();
+      }
+    } else {
+      // event === 'success': atomic reset
+      state.consecutive_count = 0;
+      state.degraded_mode = false;
+      state.entered_degraded_at = null;
+    }
+
+    session.updated_at = now();
+    return session;
+  }, { failOpen: false });
+
+  if (!written) {
+    process.stderr.write(
+      `update-circuit-breaker: atomic write to session.json failed for gate ${gateName}\n`
+    );
+    process.exit(1);
+  }
+}
+
+// =============================================================================
+// recordPass: exported module-import API (sg-convergence-recorder-tolerance T-01, AC-9, AC-24)
+// =============================================================================
+
+/**
+ * Record a convergence pass via direct module import.
+ *
+ * Sole module-import-only entry point for source='hook' writes. The CLI handler
+ * for `record-pass` rejects --source hook (AC-10), so any source='hook' entry
+ * in session.json must have come from this function call.
+ *
+ * @param {Object} opts
+ * @param {('hook'|'manual'|'manual_fallback'|'parse_failed'|'hook_manual')} opts.source
+ *   Source of the pass.
+ * @param {string} opts.gate
+ *   Convergence gate name (one of VALID_CONVERGENCE_GATES).
+ * @param {boolean} opts.clean
+ *   Whether the pass is clean.
+ * @param {number} [opts.findingCount] - Optional finding count.
+ * @param {string} [opts.findingsHash] - Optional 64-char hex hash of finding IDs.
+ * @param {string} [opts.agentType] - Optional agent type (e.g. 'code-reviewer').
+ * @param {string} [opts.agentId] - Optional agent instance id.
+ * @param {Object} [opts.meta] - Optional additional metadata (currently ignored
+ *   by the persistence layer; reserved for future audit fields).
+ *
+ * @returns {Promise<void>}
+ * @throws {Error} On invalid source / gate / atomic-write failure.
+ *
+ * Spec: sg-convergence-recorder-tolerance
+ */
+export async function recordPass(opts) {
+  const {
+    source,
+    gate,
+    clean,
+    findingCount = null,
+    findingsHash = null,
+    agentType = 'unknown',
+    agentId = undefined,
+    meta = undefined,
+  } = opts || {};
+
+  // Validate source via the same enum as the CLI validator (byte-sync via constant)
+  const validSources = ['hook', 'manual', 'manual_fallback', 'parse_failed', 'hook_manual'];
+  if (!validSources.includes(source)) {
+    throw new Error(`INVALID_SOURCE: '${source}'. Valid sources: ${validSources.join(', ')}`);
+  }
+
+  // Validate gate
+  if (!VALID_CONVERGENCE_GATES.includes(gate)) {
+    throw new Error(
+      `Invalid gate_name '${gate}'. Valid gate names: ${VALID_CONVERGENCE_GATES.join(', ')}`
+    );
+  }
+
+  if (typeof clean !== 'boolean') {
+    throw new Error('recordPass: opts.clean must be a boolean');
+  }
+
+  ensureContextDir();
+  const written = atomicModifyJSON(SESSION_PATH, (currentData) => {
+    let session = currentData;
+    if (!session) {
+      session = createEmptySession();
+    }
+    if (!session.convergence_evidence) {
+      session.convergence_evidence = {};
+    }
+    if (!session.convergence_evidence[gate]) {
+      session.convergence_evidence[gate] = { passes: [] };
+    }
+    const passes = session.convergence_evidence[gate].passes;
+
+    const nextPassNumber = passes.length > 0
+      ? passes[passes.length - 1].pass_number + 1
+      : 1;
+
+    const record = {
+      pass_number: nextPassNumber,
+      timestamp: now(),
+      agent_type: agentType,
+      findings_count: findingCount,
+      findings_hash: findingsHash,
+      clean,
+      record_source: source,
+    };
+    if (agentId !== undefined) record.agent_id = agentId;
+    if (meta !== undefined) record.meta = meta;
+
+    passes.push(record);
+
+    if (!session.convergence) session.convergence = {};
+    if (!session.convergence[gate]) session.convergence[gate] = { clean_pass_count: 0 };
+    const currentIterations = session.convergence[gate].iteration_count || 0;
+    session.convergence[gate].iteration_count = currentIterations + 1;
+
+    addHistoryEntry(session, 'convergence_pass_recorded', {
+      gate_name: gate,
+      pass_number: nextPassNumber,
+      clean,
+      record_source: source,
+      agent_type: agentType,
+      message: `Recorded pass ${nextPassNumber} for ${gate}: clean=${clean}, source=${source}`,
+    });
+
+    session.updated_at = now();
+    return session;
+  }, { failOpen: false });
+
+  if (!written) {
+    throw new Error(`recordPass: atomic write to session.json failed for gate ${gate}`);
   }
 }
 
@@ -2149,8 +2436,12 @@ async function opRecordDeploymentClearFailure(rawArgs) {
 // Main
 // =============================================================================
 
-function printUsage() {
-  console.error(`
+function printUsage(toStdout = false) {
+  // sg-convergence-recorder-tolerance T-01 / AC-24:
+  // Allow callers to route to stdout (Unix convention for explicit --help).
+  // Default remains stderr to preserve unknown-operation error stream behavior.
+  const sink = toStdout ? console.log : console.error;
+  sink(`
 Session Checkpoint Utility
 
 Usage: node session-checkpoint.mjs <operation> [args...]
@@ -2312,6 +2603,11 @@ async function main() {
         opUpdateConvergence(args[1], args[2]);
         break;
 
+      case 'update-circuit-breaker':
+        // sg-convergence-recorder-tolerance T-05, AC-14
+        opUpdateCircuitBreaker(args.slice(1));
+        break;
+
       case 'get-status':
         opGetStatus();
         break;
@@ -2333,7 +2629,8 @@ async function main() {
       case '--help':
       case '-h':
       case 'help':
-        printUsage();
+        // Explicit help request -> stdout (Unix convention)
+        printUsage(true);
         break;
 
       default:
@@ -2347,7 +2644,21 @@ async function main() {
   }
 }
 
-main().catch((err) => {
-  console.error(`Error: ${err.message}`);
-  process.exit(1);
-});
+// sg-convergence-recorder-tolerance T-01 / AC-24:
+// Dual-mode guard. Run CLI dispatch only when this file is the entry point.
+// When imported as a module (e.g., from convergence-pass-recorder.mjs), the
+// import must NOT trigger argv parsing, dispatch, process.exit, or stdio output.
+//
+// Use pathToFileURL to handle symlink-resolved paths and special characters
+// correctly. Naive `file://${process.argv[1]}` concatenation can fail when
+// argv[1] is a symlinked path (e.g., /tmp -> /private/tmp on macOS) because
+// import.meta.url is realpath-resolved while argv[1] is not.
+const __isCliEntry = process.argv[1]
+  ? import.meta.url === pathToFileURL(process.argv[1]).href
+  : false;
+if (__isCliEntry) {
+  main().catch((err) => {
+    console.error(`Error: ${err.message}`);
+    process.exit(1);
+  });
+}

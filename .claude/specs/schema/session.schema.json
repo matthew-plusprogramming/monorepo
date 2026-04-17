@@ -217,6 +217,33 @@
         "required": ["passes"]
       }
     },
+    "convergence_log_failures": {
+      "type": "object",
+      "description": "Per-gate circuit-breaker state for session.log write failures (sg-convergence-recorder-tolerance REQ-NFR-9, AC-13)",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "consecutive_count": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Consecutive log-write failures for this gate"
+          },
+          "last_failure_at": {
+            "type": ["string", "null"],
+            "description": "ISO-8601 timestamp of the most recent failure, null if never failed"
+          },
+          "degraded_mode": {
+            "type": "boolean",
+            "description": "True when consecutive_count has reached the degraded threshold (3)"
+          },
+          "entered_degraded_at": {
+            "type": ["string", "null"],
+            "description": "ISO-8601 timestamp when degraded_mode was entered, null when not degraded"
+          }
+        },
+        "required": ["consecutive_count", "degraded_mode"]
+      }
+    },
     "history": {
       "type": "array",
       "items": {
@@ -406,8 +433,14 @@
         },
         "record_source": {
           "type": "string",
-          "enum": ["hook", "manual", "manual_fallback"],
-          "description": "How this record was created: hook (automated), manual (agent CLI), manual_fallback (hook extraction failure)"
+          "enum": [
+            "hook",
+            "manual",
+            "manual_fallback",
+            "parse_failed",
+            "hook_manual"
+          ],
+          "description": "How this record was created: hook (automated SubagentStop), manual (CLI operator write), manual_fallback (EC-7 fail-closed after log-write failure), parse_failed (extractor missed all 4 paths -- streak-breaking diagnostic), hook_manual (operator emergency remediation -- streak-breaking)"
         },
         "auto_decision_batch_id": {
           "type": ["string", "null"],

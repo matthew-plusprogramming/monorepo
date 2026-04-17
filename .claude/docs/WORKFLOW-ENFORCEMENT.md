@@ -1,199 +1,129 @@
+---
+title: Workflow Enforcement Architecture
+last_reviewed: 2026-04-17
+---
+
 # Workflow Enforcement Architecture
 
-This document describes the programmatic enforcement of mandatory workflow stages. The system operates in two layers: a **cooperative layer** (DAG-based phase transitions with configurable enforcement levels) and a **coercive layer** (PreToolUse/Stop hooks that physically block tool execution). Together they reduce the mandatory gate skip rate from ~60% to 0%.
+Workflow enforcement operates in two layers. The **cooperative layer** (DAG-based phase transitions via `session-checkpoint.mjs`) enables agents to self-advance through workflow stages with warnings for violations. The **coercive layer** (PreToolUse/Stop hooks) physically blocks tool execution when prerequisites are not met, bypassing cooperative participation.
+
+This document describes the full enforcement architecture including predecessor graphs, override mechanisms, evidence-based convergence, and failure modes.
 
 ---
 
-## Purpose
+## Enforcement Layers
 
-Agents under throughput pressure skip mandatory stages (challenger dispatches, completion verification, documentation). During a 5-workstream orchestration session, 3 of 4 mandatory challenge stages were skipped and documentation was skipped entirely. The cooperative layer addresses this with warnings and graduated blocking on phase transitions. The coercive layer closes the remaining gap by physically preventing tool execution when prerequisites are unmet, with no cooperative participation required.
+### Cooperative Layer
 
----
+Handled by `session-checkpoint.mjs`. DAG-based phase transitions validate predecessors and emit warnings/blocks based on enforcement level.
 
-## Components
-
-| Component                              | File                                            | Role                                                          |
-| -------------------------------------- | ----------------------------------------------- | ------------------------------------------------------------- |
-| Shared DAG module                      | `.claude/scripts/lib/workflow-dag.mjs`          | Single source of truth for predecessor graphs and enforcement |
-| Hook utilities                         | `.claude/scripts/lib/hook-utils.mjs`            | Shared I/O (loadSession, loadOverrides, findClaudeDir, etc.)  |
-| Session lockfile                       | `.claude/scripts/lib/session-lock.mjs`          | Mutex-style locking for concurrent session.json writes        |
-| Findings hash                          | `.claude/scripts/lib/findings-hash.mjs`         | Canonical SHA-256 hash computation for finding IDs            |
-| Phase transition enforcement           | `.claude/scripts/session-checkpoint.mjs`        | Cooperative DAG validation on `transition-phase` calls        |
-| PreToolUse gate enforcement            | `.claude/scripts/workflow-gate-enforcement.mjs` | Coercive blocking of subagent dispatch                        |
-| PreToolUse write protection            | `.claude/scripts/workflow-file-protection.mjs`  | Coercive blocking of agent writes to enforcement files        |
-| Stop enforcement                       | `.claude/scripts/workflow-stop-enforcement.mjs` | Coercive blocking of session completion                       |
-| SubagentStop convergence reminder      | `.claude/scripts/convergence-gate-reminder.mjs` | Advisory reminder to update convergence gates                 |
-| SubagentStop convergence pass recorder | `.claude/scripts/convergence-pass-recorder.mjs` | Automated pass evidence recording for convergence gates       |
-| Session schema                         | `.claude/specs/schema/session.schema.json`      | Schema validation for enforcement fields                      |
-| Session schema validator               | `.claude/scripts/session-validate.mjs`          | Runtime schema enforcement via PostToolUse hook               |
-
----
-
-## Shared DAG Module
-
-The `workflow-dag.mjs` module is the single source of truth for workflow DAG definitions, consumed by both the cooperative layer (`session-checkpoint.mjs`) and the coercive layer (enforcement hooks).
-
-### Exports
-
-**Constants**: `ORCHESTRATOR_PREDECESSORS` (14 entries), `ONEOFF_SPEC_PREDECESSORS` (12 entries), `EXEMPT_WORKFLOWS`, `VALID_SUBAGENT_TYPES` (20 entries), `MANDATORY_DISPATCHES`, `REQUIRED_CHALLENGER_STAGES`, `ENFORCED_SUBAGENT_TYPES` (6 entries), `STOP_MANDATORY_DISPATCHES` (4 entries), `OVERRIDE_GATE_NAMES`, `REQUIRED_CLEAN_PASSES`, `VALID_CONVERGENCE_GATES` (6 entries: `code_review`, `security_review`, `investigation`, `challenger`, `unifier`, `completion_verifier`).
-
-**Query Functions**: `getWorkflowType(session)` (backward-compatible, defaults to orchestrator), `getWorkflowTypeStrict(session)` (returns null if missing, for fail-open), `isExemptWorkflow(workflow)`, `getPredecessorGraph(workflow)`, `wasPredecessorVisited(predecessorKey, session)`, `getAllTasks(session)`, `getPrerequisites(workflow, subagentType)`, `werePrerequisitesMet(session, prerequisites)`.
-
----
-
-## Phase Transition DAG
-
-Phase transitions are validated against a directed acyclic graph (DAG) of mandatory predecessors. Each phase declares which phases (or parameterized challenger stages) must be visited before entry is allowed.
-
-### Orchestrator Workflow
-
-```
-prd_gathering -> spec_authoring -> atomizing -> enforcing -> investigating
-  -> awaiting_approval -> challenging:pre-orchestration -> implementing
-  -> challenging:pre-test -> testing -> verifying
-  -> challenging:pre-review -> reviewing -> completion_verifying -> documenting
-```
-
-### Oneoff-Spec Workflow
-
-```
-prd_gathering -> spec_authoring -> investigating -> awaiting_approval
-  -> challenging:pre-implementation -> implementing
-  -> challenging:pre-test -> testing -> verifying
-  -> challenging:pre-review -> reviewing -> completion_verifying -> documenting
-```
-
-### Exempt Workflows
-
-`oneoff-vibe`, `refactor`, and `journal-only` workflows skip all enforcement. All transitions are allowed unconditionally.
-
-### Parameterized Predecessors
-
-Entries like `challenging:pre-test` are not literal phase names. They are checked by looking for a `challenger` subagent dispatch with `stage: "pre-test"` in the session's dispatch history. This decouples challenge verification from the phase enum.
-
----
-
-## Cooperative Layer
-
-### Enforcement Levels
-
-The enforcement level controls how strictly skipped predecessors are handled. Set via `set-enforcement-level`.
-
-| Level       | First Skip Behavior    | Repeated Skip Behavior | Completion Checklist       |
-| ----------- | ---------------------- | ---------------------- | -------------------------- |
-| `graduated` | Warn, allow transition | Block transition       | Full (missing items shown) |
-| `warn-only` | Warn, allow transition | Warn, allow transition | Full (missing items shown) |
-| `off`       | No check               | No check               | Informational only         |
-
-Default enforcement level is `graduated`. The level persists in `session.json` at `phase_checkpoint.enforcement_level`.
-
-### Graduated Enforcement Behavior
-
-On first attempt to skip a mandatory predecessor, the system emits a warning and allows the transition. On a second attempt to skip the same predecessor, the transition is blocked with exit code 1. The agent must then either:
-
-1. Complete the skipped phase
-2. Use `override-skip` to bypass (with rationale)
-3. Use `reset-enforcement` to clear all skip counters
-
-### Operator Commands
-
-All enforcement operations are invoked through `session-checkpoint.mjs`. Override operations (`override-skip`, `reset-enforcement`) are restricted to the main agent (no subagents in-flight). `set-enforcement-level` is also main-agent-only but does not count toward the override cap.
-
-#### override-skip
-
-Clears the skip counter for a specific phase, allowing a blocked transition to proceed.
+**Transition commands**:
 
 ```bash
-node .claude/scripts/session-checkpoint.mjs override-skip \
-  --phase "challenging:pre-test" \
-  --rationale "Tests already validated manually"
+node .claude/scripts/session-checkpoint.mjs transition-phase <phase>
+node .claude/scripts/session-checkpoint.mjs override-skip <phase> <rationale>
+node .claude/scripts/session-checkpoint.mjs reset-enforcement
 ```
 
-- Requires `--phase` and `--rationale` flags
-- Counts toward the per-session override cap (3 total, shared with `reset-enforcement`)
-- Recorded in session history as `override_skip` event
-- Appears as `[OVERRIDE]` in the completion checklist
+**Enforcement levels**:
 
-#### reset-enforcement
+- `off`: No enforcement; all transitions allowed (informational checklist only)
+- `warn-only`: Log warnings for skipped mandatory stages but allow transitions
+- `graduated`: Block transitions that skip mandatory predecessors; require explicit override
 
-Clears all accumulated skip counters, resetting enforcement to its initial state.
+### Coercive Layer
 
-```bash
-node .claude/scripts/session-checkpoint.mjs reset-enforcement \
-  --rationale "Resuming from interrupted session with stale counters"
-```
+Handled by PreToolUse and Stop hooks. Blocks execution regardless of cooperative state.
 
-- Requires `--rationale` flag
-- Counts toward the per-session override cap (3 total, shared with `override-skip`)
-- Recorded in session history as `reset_enforcement` event
+| Hook                                            | Trigger                                         | Purpose                                                                          |
+| ----------------------------------------------- | ----------------------------------------------- | -------------------------------------------------------------------------------- |
+| `.claude/scripts/workflow-gate-enforcement.mjs` | PreToolUse Agent                                | Block dispatch of enforced subagent types when prerequisites not met             |
+| `.claude/scripts/workflow-file-protection.mjs`  | PreToolUse Write                                | Block agent writes to gate-override.json, kill switch, session.json, session.log |
+| `.claude/scripts/workflow-stop-enforcement.mjs` | Stop                                            | Block session completion when mandatory dispatches missing                       |
+| SubagentStop convergence reminder               | `.claude/scripts/convergence-gate-reminder.mjs` | Advisory reminder to update convergence gates                                    |
+| SubagentStop convergence pass recorder          | `.claude/scripts/convergence-pass-recorder.mjs` | Automated pass evidence recording for convergence gates                          |
 
-#### set-enforcement-level
+### Shared DAG Module
 
-Changes the enforcement level for the current session.
-
-```bash
-node .claude/scripts/session-checkpoint.mjs set-enforcement-level warn-only
-```
-
-- Valid values: `off`, `warn-only`, `graduated`
-- Does NOT count toward the override cap
-- Does NOT reset skip counters (accumulated warnings persist)
-- Recorded in session history as `enforcement_level_change` event
-
-#### Override Cap
-
-A maximum of 3 overrides per session is enforced (shared between `override-skip` and `reset-enforcement`). After 3 overrides, both commands exit with code 1 and the message instructs the agent to escalate to the human.
-
-### Integrity Protection
-
-The enforcement counter uses a XOR-based checksum (`_counter_checksum` field in session.json) to detect out-of-band edits to the counter value. If the checksum does not match:
-
-1. A warning is emitted to stderr
-2. Enforcement degrades to `warn-only` mode
-3. The checksum is re-synced to the current counter value
-
-This prevents agents from manually editing `session.json` to reset enforcement counters without using the audited `reset-enforcement` command.
-
-### Completion Checklist
-
-When `complete-work` is called on a non-exempt workflow, a completion checklist is generated and printed to stderr. The checklist verifies that all mandatory dispatches occurred during the session.
-
-#### Checked Items
-
-For each workflow type, the checklist verifies:
-
-- **Challenger dispatches**: One per required stage (workflow-specific)
-- **Code reviewer**: At least one `code-reviewer` dispatch
-- **Security reviewer**: At least one `security-reviewer` dispatch
-- **Completion verifier**: At least one `completion-verifier` dispatch
-- **Documenter**: At least one `documenter` dispatch
-
-#### Status Values
-
-| Status          | Symbol       | Meaning                                       |
-| --------------- | ------------ | --------------------------------------------- |
-| `completed`     | `[x]`        | Dispatch found in session history             |
-| `missing`       | `[ ]`        | No dispatch found (graduated/warn-only modes) |
-| `overridden`    | `[OVERRIDE]` | Phase was overridden via `override-skip`      |
-| `informational` | `[i]`        | Not dispatched, but enforcement is `off`      |
-
-The checklist is advisory -- it does not block `complete-work`. It is recorded in session history as a `completion_checklist` event with full item details, enforcement level, override count, and enforcement counter values. This provides a permanent audit trail.
+Single source of truth for predecessor graphs, enforcement tables, and query functions: `.claude/scripts/lib/workflow-dag.mjs`. Consumed by both cooperative and coercive layers.
 
 ---
 
-## Coercive Layer
+## DAG Predecessor Graph
 
-The coercive layer operates via Claude Code hooks (PreToolUse and Stop) that physically block tool execution. Unlike the cooperative layer, no agent participation is required -- the hooks read session.json dispatch history as the source of truth.
+The DAG defines valid phase transitions. Each phase declares its valid predecessors and mandatory prerequisites.
 
-### PreToolUse Gate Enforcement
+### Phase List (16)
 
-**Hook**: `workflow-gate-enforcement.mjs` (PreToolUse, matcher: `Agent`)
+`prd_gathering`, `spec_authoring`, `atomizing`, `enforcing`, `investigating`, `awaiting_approval` (backwards compat), `auto_approval`, `challenging`, `implementing`, `testing`, `verifying`, `reviewing`, `completion_verifying`, `documenting`, `journaling`, `complete`
 
-Blocks dispatch of enforced subagent types when workflow prerequisites are not recorded in session.json.
+### Mandatory Predecessors (by phase)
 
-#### Enforcement Table
+| Phase                  | Mandatory Predecessor                                       |
+| ---------------------- | ----------------------------------------------------------- |
+| `implementing`         | `challenging` (pre-implementation) + `investigating`        |
+| `reviewing`            | `unifier` dispatch + `challenging` (pre-review)             |
+| `security_reviewing`   | `convergence.code_review.clean_pass_count >= 2`             |
+| `documenting`          | `convergence.security_review.clean_pass_count >= 2`         |
+| `completion_verifying` | `documenter` dispatch                                       |
+| `complete`             | `completion_verifier` dispatched + all mandatory dispatches |
 
-| Blocked Subagent      | Prerequisites                                                                     |
+Phases not listed have no mandatory predecessors beyond the standard DAG edges (they always pass predecessor validation).
+
+### Enforcement Levels at Transition
+
+| Level       | On violation                                 | Override allowed |
+| ----------- | -------------------------------------------- | ---------------- |
+| `off`       | Transition succeeds silently                 | N/A              |
+| `warn-only` | Transition succeeds with stderr warning      | N/A              |
+| `graduated` | Transition blocked with stderr BLOCK message | Yes              |
+
+---
+
+## Override Mechanism
+
+When graduated enforcement blocks a transition or dispatch, agents may bypass specific phases or gates.
+
+### Cooperative Override
+
+```bash
+node .claude/scripts/session-checkpoint.mjs override-skip <phase> "<rationale>"
+```
+
+Records an `override` event in session history with rationale and phase. Cap: 3 overrides per session (resets on `start-work`).
+
+### Coercive Override
+
+Write to `.claude/coordination/gate-override.json`:
+
+```json
+{
+  "gate": "implementer",
+  "session_id": "<session-id>",
+  "timestamp": "<ISO 8601>",
+  "rationale": "Override rationale (min 10 chars)"
+}
+```
+
+Per-gate rationales. Once written, the gate enforcement hook exits 0 on match. The override file itself is FULL_BLOCK-protected -- only human terminal writes or trusted CLI scripts can create it.
+
+### Kill Switch
+
+```bash
+touch .claude/coordination/gate-enforcement-disabled
+```
+
+Disables gate enforcement and stop enforcement entirely. Write protection remains active (agents cannot self-bypass enforcement by creating overrides).
+
+---
+
+## Coercive Enforcement: Subagent Dispatch
+
+### Enforcement Table
+
+`.claude/scripts/workflow-gate-enforcement.mjs` blocks the following subagent dispatches when prerequisites are not met:
+
+| Blocked Subagent      | Prerequisite                                                                      |
 | --------------------- | --------------------------------------------------------------------------------- |
 | `implementer`         | `interface-investigator` + `challenger` (pre-implementation or pre-orchestration) |
 | `test-writer`         | `implementer` dispatched                                                          |
@@ -202,86 +132,43 @@ Blocks dispatch of enforced subagent types when workflow prerequisites are not r
 | `documenter`          | `convergence.security_review.clean_pass_count >= 2`                               |
 | `completion-verifier` | `documenter` dispatched                                                           |
 
-Non-enforced subagent types (explore, spec-author, atomizer, etc.) pass through without prerequisite checks.
+### Block Message Format
 
-#### Blocking Mechanism
+When dispatch is blocked, the hook writes to stderr and exits 2:
 
-When prerequisites are not met, the hook writes a structured error to stderr and exits with code 2. The error message identifies:
+```
+BLOCKED: <subagent-type> dispatch requires:
+  - Missing prerequisites (dispatch or convergence)
 
-- The blocked subagent type
-- Missing prerequisites (dispatch or convergence)
-- Override instructions (create `gate-override.json` with session-scoped entry)
-- Current session ID
+Override: create .claude/coordination/gate-override.json with:
+  { "gate": "<subagent-type>", "session_id": "<current-session>", "timestamp": "<ISO>", "rationale": "<rationale>" }
 
-### PreToolUse Write Protection
-
-**Hook**: `workflow-file-protection.mjs` (PreToolUse, matcher: `Write`)
-
-Blocks agent writes to enforcement files and session state. Only human terminal writes (or trusted CLI scripts) are permitted.
-
-**Protected Files**:
-
-- `.claude/coordination/gate-override.json`
-- `.claude/coordination/gate-enforcement-disabled`
-- `.claude/context/session.json`
-
-The `session.json` write protection ensures all session state modifications go through `session-checkpoint.mjs` as the sole trusted writer. Agents must use CLI subcommands (`record-pass`, `update-convergence`, `transition-phase`, etc.) instead of direct file writes.
-
-**Key Property**: This hook does NOT check the kill switch. Write protection remains active even when `gate-enforcement-disabled` exists, preventing agents from self-bypassing enforcement.
-
-### Stop Enforcement
-
-**Hook**: `workflow-stop-enforcement.mjs` (Stop)
-
-Blocks session completion when mandatory dispatches have not occurred for spec-based workflows.
-
-**Mandatory Dispatches**: `code-reviewer`, `security-reviewer`, `completion-verifier`, `documenter` (any status satisfies -- presence check only).
-
-**Blocking Mechanism**: stdout JSON `{"decision": "block", "reason": "..."}` -- NOT stderr + exit 2 (Stop hooks use a different protocol than PreToolUse hooks).
-
-**Re-Entry Prevention**: Creates `.claude/coordination/stop-hook-active` sentinel BEFORE blocking. On next fire, if sentinel exists, exits 0 and deletes sentinel. This prevents infinite block loops.
-
-### Kill Switch
-
-Creating `.claude/coordination/gate-enforcement-disabled` (human terminal only) disables gate enforcement and stop enforcement. Write protection remains active.
-
-The kill switch is checked FIRST in both gate enforcement and stop enforcement hooks, before any other logic. When active, the hook exits 0 immediately with a warning message to stderr.
-
-### Human Override
-
-Creating `.claude/coordination/gate-override.json` with session-scoped entries allows bypassing specific gates.
-
-#### Override Format
-
-```json
-{
-  "overrides": [
-    {
-      "gate": "investigation",
-      "session_id": "<current-session-id>",
-      "timestamp": "2026-03-18T12:00:00.000Z",
-      "rationale": "Investigation completed in prior session"
-    }
-  ]
-}
+Or run recommended convergence check first:
+  - <skill-command-from-skill-map>
 ```
 
-#### Valid Gate Names
+### Skill Map
 
-| Gate Name                     | Blocks                    |
-| ----------------------------- | ------------------------- |
-| `investigation`               | `implementer`             |
-| `challenge_pre_impl`          | `implementer` (oneoff)    |
-| `challenge_pre_orchestration` | `implementer` (orch.)     |
-| `implementer_dispatch`        | `test-writer`             |
-| `challenge_pre_review`        | `code-reviewer`           |
-| `unifier_dispatch`            | `code-reviewer`           |
-| `code_review_convergence`     | `security-reviewer`       |
-| `security_review_convergence` | `documenter`              |
-| `documenter_dispatch`         | `completion-verifier`     |
-| `stop_mandatory_dispatches`   | Session completion (Stop) |
+Maps gate names to recommended skill commands in the help message:
 
-Overrides are session-scoped (must match the current stdin-provided `session_id`). If multiple overrides match, the most recent by timestamp is used. Malformed override files are retried once (50ms delay), then fail-open for the override check.
+| Gate Name                         | Recommended Skill   |
+| --------------------------------- | ------------------- |
+| `investigation_convergence`       | `/investigate`      |
+| `challenger_convergence`          | `/challenge`        |
+| `unifier_convergence`             | `/unify`            |
+| `code_review_convergence`         | `security-reviewer` |
+| `security_review_convergence`     | `documenter`        |
+| `completion_verifier_convergence` | `documenter`        |
+
+---
+
+## Coercive Enforcement: Session Completion
+
+`.claude/scripts/workflow-stop-enforcement.mjs` blocks session completion when:
+
+- Mandatory dispatches are missing (`code-reviewer`, `security-reviewer`, `completion-verifier`, `documenter`, `e2e-test-writer`)
+- Manifest status obligations are unsatisfied (when `currentPhase === 'complete'`)
+- Deployment detected without post-deploy verification
 
 ### Fail-Open Policy
 
@@ -305,10 +192,27 @@ The convergence loop protocol requires 2 consecutive clean passes before agents 
 ### How It Works
 
 1. A convergence check agent (e.g., `interface-investigator`) completes and returns findings
-2. The `convergence-pass-recorder` SubagentStop hook fires, extracts findings metadata, and records structured pass evidence via `session-checkpoint.mjs record-pass`
+2. The `convergence-pass-recorder` SubagentStop hook fires, runs the 4-tier extraction pipeline over `last_assistant_message`, and records structured pass evidence by calling the exported `recordPass()` function in `session-checkpoint.mjs` via module import (CLI `--source hook` is rejected -- see [--source hook Rejection](#--source-hook-cli-rejection) below)
 3. The orchestrating agent calls `session-checkpoint.mjs update-convergence <gate_name>` (no count argument)
-4. `update-convergence` reads the evidence array, counts consecutive clean hook-sourced passes from the tail, and sets `clean_pass_count` to the derived value
+4. `update-convergence` reads the evidence array, counts consecutive clean hook-sourced passes from the tail with streak-reset semantics, and sets `clean_pass_count` to the derived value
 5. The gate enforcement hook reads `clean_pass_count` and optionally verifies evidence integrity
+
+### 4-Tier Extraction Pipeline
+
+The recorder runs four extractors against the agent response, first-match-wins. The tier that matched is reported in the diagnostic log's `extraction_paths_tried` field.
+
+| Tier | Path name        | Detection                                                                                  | Classification                         |
+| ---- | ---------------- | ------------------------------------------------------------------------------------------ | -------------------------------------- |
+| 1    | `severity`       | Severity regex (`critical:`, `high:`, etc.) or JSON `findings-summary` code block          | CLEAN or DIRTY based on gate threshold |
+| 2    | `finding_list`   | Bulleted / numbered / bare-indent finding-ID lists (prefix allow-list) or heading cues     | DIRTY with finding-count               |
+| 3    | `severity_prose` | Line-anchored severity-word prose with negation guard (fenced code + blockquotes stripped) | DIRTY                                  |
+| 4    | `success_marker` | Normalized last non-empty line matches `no issues found`, `all checks passed`, etc.        | CLEAN                                  |
+
+**Tier 1 fall-through**: If tier 1 finds severity patterns but all counts are zero, the recorder falls through to tier 2 (does not short-circuit as CLEAN). This prevents "Critical: 0, High: 0" from looking like a clean pass when follow-on prose or lists describe actual findings.
+
+**Gate threshold**: `code_review` clears on 0 High+ findings; all other gates clear on 0 Medium+ findings.
+
+**No match** (all 4 tiers miss): recorded as `source: 'parse_failed'`, streak-breaking. See [Source Enum](#source-enum) and [Circuit Breaker](#circuit-breaker-degraded-mode) below.
 
 ### Pass Evidence Records
 
@@ -330,15 +234,43 @@ Each convergence pass is recorded as a structured evidence record in `session.co
 
 Records are append-only. No command may modify or delete existing entries. Duplicate `pass_number` values are rejected.
 
-### Trust-Tiered Recording
+### Source Enum
 
-| Record Source       | Stored in Evidence | Counts for `clean_pass_count` | Purpose                 |
-| ------------------- | ------------------ | ----------------------------- | ----------------------- |
-| `"hook"`            | Yes                | Yes                           | Trusted, automated      |
-| `"manual"`          | Yes                | No                            | Audit trail only        |
-| `"manual_fallback"` | Yes                | No                            | Hook extraction failure |
+`record_source` takes one of five values. Only `hook` + `clean: true` contributes to `clean_pass_count`.
 
-Only hook-sourced clean passes count toward the coercive gate threshold. Manual passes provide an audit trail but do not unblock dispatch.
+| Record Source     | Writer             | Counts for `clean_pass_count` | Streak behavior | Purpose                                         |
+| ----------------- | ------------------ | ----------------------------- | --------------- | ----------------------------------------------- |
+| `hook`            | Module-import only | Yes (when `clean: true`)      | Extends streak  | Trusted, automated SubagentStop path            |
+| `manual`          | CLI                | No                            | Streak-breaking | Operator audit entry                            |
+| `manual_fallback` | Module or CLI      | No                            | Streak-breaking | Fail-closed after session.log write failure     |
+| `parse_failed`    | Module or CLI      | No                            | Streak-breaking | All 4 extractor paths missed                    |
+| `hook_manual`     | CLI only           | No                            | Streak-breaking | Operator emergency remediation for a hook entry |
+
+Any non-`hook-clean` entry -- including `hook` with `clean: false` -- resets the streak during tail-walk.
+
+### Tail-Walk Streak-Reset Semantics
+
+`session-checkpoint.mjs countConsecutiveCleanFromTail()` derives `clean_pass_count` from the evidence array:
+
+1. Walk `session.convergence_evidence.<gate>.passes[]` from the tail forward
+2. Count consecutive entries where `record_source === 'hook'` AND `clean === true`
+3. Any other entry resets the count (streak-break)
+4. Walk bounded to the **last 200 entries** (legacy-pollution defense)
+5. On bound-hit without a streak-starting hook-clean entry, emit `CONVERGENCE_TAIL_WALK_BOUNDED` to stderr with the gate name
+
+The 200-entry bound prevents unbounded scans on sessions with large evidence arrays (legacy pollution from before streak-reset). When a bounded walk cannot find a streak start, operators are signalled to inspect the gate's evidence history.
+
+### --source hook CLI Rejection
+
+The CLI `record-pass` command rejects `--source hook` unconditionally and exits with code 2 before any state mutation:
+
+```
+SOURCE_HOOK_FORBIDDEN_VIA_CLI: hook-sourced passes may only be recorded
+via in-process module import by convergence-pass-recorder.mjs.
+Use --source hook_manual for operator remediation.
+```
+
+This makes the `source: 'hook'` invariant counterfeit-proof: any such entry in the evidence array must have come from the in-process `recordPass()` module call by `convergence-pass-recorder.mjs`. Rejection is unconditional (no env-var bypass). Operators performing emergency remediation must use `--source hook_manual` instead, which records the pass but does not count toward convergence.
 
 ### CLI Commands
 
@@ -352,25 +284,27 @@ node .claude/scripts/session-checkpoint.mjs record-pass <gate_name> \
   --findings-hash <hex-string> \
   --clean <true|false> \
   --agent-type <agent-type-string> \
-  [--source <hook|manual>] \
+  [--source <manual|manual_fallback|parse_failed|hook_manual>] \
   [--auto-decision-batch-id <batch-id>] \
   [--auto-decision-complete <true|false>]
 ```
 
 **Arguments**:
 
-| Argument                   | Required | Description                                            |
-| -------------------------- | -------- | ------------------------------------------------------ |
-| `gate_name`                | Yes      | One of `VALID_CONVERGENCE_GATES` (6 gates)             |
-| `--findings-count`         | No       | Non-negative integer or `null`                         |
-| `--findings-hash`          | No       | 64-character hex SHA-256 string or `null`              |
-| `--clean`                  | Yes      | Boolean (`true` or `false`)                            |
-| `--agent-type`             | Yes      | Convergence agent type string                          |
-| `--source`                 | No       | `"hook"` (default), `"manual"`, or `"manual_fallback"` |
-| `--auto-decision-batch-id` | No       | Links to auto-decision engine invocation               |
-| `--auto-decision-complete` | No       | `false` marks the pass as dirty (incomplete batch)     |
+| Argument                   | Required | Description                                                                     |
+| -------------------------- | -------- | ------------------------------------------------------------------------------- |
+| `gate_name`                | Yes      | One of `VALID_CONVERGENCE_GATES` (6 gates)                                      |
+| `--findings-count`         | No       | Non-negative integer or `null`                                                  |
+| `--findings-hash`          | No       | 64-character hex SHA-256 string or `null`                                       |
+| `--clean`                  | Yes      | Boolean (`true` or `false`)                                                     |
+| `--agent-type`             | Yes      | Agent type string (defaults to `cli-operator` for operator-remediation sources) |
+| `--source`                 | No       | `manual` (default), `manual_fallback`, `parse_failed`, or `hook_manual`         |
+| `--auto-decision-batch-id` | No       | Links to auto-decision engine invocation                                        |
+| `--auto-decision-complete` | No       | `false` marks the pass as dirty (incomplete batch)                              |
 
-**Exit codes**: `0` on success, `1` on validation error or duplicate `pass_number`.
+**Source restriction**: `--source hook` is rejected with exit code 2. Use the exported `recordPass()` function via module import for hook-sourced writes.
+
+**Exit codes**: `0` on success; `1` on validation error, duplicate `pass_number`, or atomic-write failure; `2` on `--source hook` (forbidden via CLI).
 
 #### update-convergence (modified API)
 
@@ -383,11 +317,74 @@ node .claude/scripts/session-checkpoint.mjs update-convergence <gate_name>
 **Behavior**:
 
 - Reads `convergence_evidence.<gate>.passes[]`
-- Counts consecutive clean passes with `record_source: "hook"` from the tail
+- Counts consecutive `hook`+`clean:true` passes from the tail with streak-reset semantics (any other source breaks the streak)
+- Walk bounded to last 200 entries; emits `CONVERGENCE_TAIL_WALK_BOUNDED` on bound-hit without a streak start
 - Sets `convergence.<gate>.clean_pass_count` to the derived value
 - Emits a warning if >50% of passes are manual-sourced
 
 **Breaking change**: Passing a numeric second argument (e.g., `update-convergence investigation 2`) is rejected with an error explaining the new evidence-based API.
+
+#### update-circuit-breaker
+
+Atomically updates per-gate circuit-breaker state in `session.json.convergence_log_failures.<gate>`. Called by `convergence-pass-recorder.mjs` when session.log writes fail or succeed.
+
+```bash
+node .claude/scripts/session-checkpoint.mjs update-circuit-breaker \
+  --gate <gate_name> --event <failure|success>
+```
+
+**Arguments**:
+
+| Argument  | Required | Description                                |
+| --------- | -------- | ------------------------------------------ |
+| `--gate`  | Yes      | One of `VALID_CONVERGENCE_GATES`           |
+| `--event` | Yes      | `failure` (increment) or `success` (reset) |
+
+**Behavior on `--event failure`**:
+
+- Increments `consecutive_count`
+- Stamps `last_failure_at` with current ISO 8601 timestamp
+- At `consecutive_count >= 3`, sets `degraded_mode: true` and stamps `entered_degraded_at`
+
+**Behavior on `--event success`**:
+
+- Resets `consecutive_count` to 0
+- Clears `degraded_mode` (sets to `false`)
+- Clears `entered_degraded_at` (sets to `null`)
+
+**Exit codes**: `0` on success; `1` on atomic-write failure; `2` on invalid `--gate` or `--event`.
+
+### Circuit Breaker (Degraded Mode)
+
+The recorder uses a per-gate circuit breaker to prevent runaway writes to `.claude/context/session.log` when filesystem writes repeatedly fail.
+
+**State shape** (`session.convergence_log_failures.<gate>`):
+
+```json
+{
+  "consecutive_count": 2,
+  "last_failure_at": "2026-04-17T04:30:00.000Z",
+  "degraded_mode": false,
+  "entered_degraded_at": null
+}
+```
+
+**Threshold**: `consecutive_count >= 3` flips `degraded_mode` to `true`.
+
+**Normal mode** (`degraded_mode: false`):
+
+- parse_failed cases append a metadata-only entry to session.log and record `source: 'parse_failed'`
+- Log-write retry fails (after one 100ms backoff): emit `SESSION_LOG_WRITE_FAIL` stderr, record `source: 'manual_fallback'`, invoke `update-circuit-breaker --event failure`
+- Successful log write issues `update-circuit-breaker --event success` (resets state)
+
+**Degraded mode** (`degraded_mode: true`):
+
+- parse_failed cases skip the session.log write entirely
+- Emit diagnostic to stderr only (`[convergence-pass-recorder] DEGRADED_MODE: gate=<name> ...`)
+- Still record `source: 'parse_failed'` (convergence counts remain safe -- source is streak-breaking either way)
+- Exits degraded mode when the next successful session.log write issues `update-circuit-breaker --event success`
+
+**Security boundary**: The session.log diagnostic file is FULL_BLOCK-protected. Direct writes via the Edit/Write tools are blocked by `workflow-file-protection.mjs`. Writes from the in-repo `convergence-pass-recorder.mjs` use `fs.appendFileSync` directly, which is intentionally outside the hook's vantage (it observes only Claude tool-call stdin JSON). Log files are created with mode `0600` and re-chmoded on invocation if drift is detected.
 
 ### Canonical Findings Hash
 
@@ -399,6 +396,26 @@ import { computeFindingsHash } from '.claude/scripts/lib/findings-hash.mjs';
 const hash = computeFindingsHash(['f-002', 'f-001', 'f-003']);
 // SHA-256 of '["f-001","f-002","f-003"]'
 ```
+
+### Module-Import API
+
+`session-checkpoint.mjs` exports `recordPass()` for in-process writes:
+
+```javascript
+import { recordPass } from '.claude/scripts/session-checkpoint.mjs';
+
+await recordPass({
+  source: 'hook', // or manual | manual_fallback | parse_failed | hook_manual
+  gate: 'investigation', // one of VALID_CONVERGENCE_GATES
+  clean: true, // boolean (required)
+  findingCount: 0, // optional
+  findingsHash: '<64-hex>', // optional
+  agentType: 'interface-investigator',
+  agentId: '<uuid>', // optional
+});
+```
+
+`recordPass()` is the sole permitted writer for `source: 'hook'` entries. It performs the same enum + gate + atomic-write validation as the CLI and throws on invalid input or write failure.
 
 ### Session JSON Lockfile
 
@@ -468,14 +485,15 @@ Enforcement adds these fields to `phase_checkpoint` in `session.json`:
 
 The coercive layer reads (but does not write) these session.json fields:
 
-| Field                                          | Purpose                                            |
-| ---------------------------------------------- | -------------------------------------------------- |
-| `active_work.workflow`                         | Determines enforcement rules (workflow type)       |
-| `subagent_tasks.in_flight`                     | Dispatch history (in-flight tasks)                 |
-| `subagent_tasks.completed_this_session`        | Dispatch history (completed tasks)                 |
-| `convergence.code_review.clean_pass_count`     | Code review convergence tracking                   |
-| `convergence.security_review.clean_pass_count` | Security review convergence tracking               |
-| `convergence_evidence.<gate>.passes[]`         | Pass evidence arrays (evidence-based verification) |
+| Field                                          | Purpose                                                 |
+| ---------------------------------------------- | ------------------------------------------------------- |
+| `active_work.workflow`                         | Determines enforcement rules (workflow type)            |
+| `subagent_tasks.in_flight`                     | Dispatch history (in-flight tasks)                      |
+| `subagent_tasks.completed_this_session`        | Dispatch history (completed tasks)                      |
+| `convergence.code_review.clean_pass_count`     | Code review convergence tracking                        |
+| `convergence.security_review.clean_pass_count` | Security review convergence tracking                    |
+| `convergence_evidence.<gate>.passes[]`         | Pass evidence arrays (evidence-based verification)      |
+| `convergence_log_failures.<gate>`              | Per-gate circuit-breaker state for session.log failures |
 
 ---
 
@@ -525,6 +543,18 @@ Advisory warnings about pass_number gaps, non-sequential timestamps, or suspicio
 
 If >50% of a gate's passes are manual-sourced, `update-convergence` emits a warning indicating the SubagentStop hook may not be functioning correctly.
 
+### CONVERGENCE_TAIL_WALK_BOUNDED warning
+
+Emitted by `countConsecutiveCleanFromTail()` when the evidence array has >= 200 entries and none of the last 200 are hook-clean. Indicates probable legacy pollution from before the streak-reset fix (2026-04-16) or extended parse-failure streaks. Inspect the gate's evidence history:
+
+```bash
+node -e "console.log(JSON.stringify(JSON.parse(require('fs').readFileSync('.claude/context/session.json')).convergence_evidence['<gate>'].passes.slice(-10), null, 2))"
+```
+
+### Circuit breaker in degraded mode
+
+When `session.convergence_log_failures.<gate>.degraded_mode` is `true`, the recorder suppresses session.log writes for that gate and emits diagnostics to stderr only. Convergence counts remain safe (parse_failed is streak-breaking in either mode). To exit degraded mode, investigate the underlying session.log write failure (commonly permissions or disk space) and reset by recording a successful pass, which invokes `update-circuit-breaker --event success`.
+
 ### update-convergence rejects count argument
 
 The `update-convergence` command no longer accepts a numeric count argument. The `clean_pass_count` is derived from the evidence array. Use the new API:
@@ -538,6 +568,10 @@ node .claude/scripts/session-checkpoint.mjs update-convergence investigation
 ```
 
 To record a pass, use `record-pass` first, then call `update-convergence` to derive the count.
+
+### record-pass --source hook rejected
+
+`--source hook` is forbidden via the CLI (exit code 2, `SOURCE_HOOK_FORBIDDEN_VIA_CLI` stderr message). Only the in-process `convergence-pass-recorder.mjs` hook may record `source: 'hook'` entries via the exported `recordPass()` module function. For operator remediation of a hook entry, use `--source hook_manual` instead (audit-only, does not count toward convergence).
 
 ---
 
