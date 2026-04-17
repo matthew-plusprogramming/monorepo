@@ -170,21 +170,37 @@ const STATUS_PREFIX_SUCCESS =
 const SUCCESS_MARKER_LOOKBACK_LINES = 3;
 
 // Symmetric DIRTY expansion: natural-language dirty-state phrases and
-// Status:/Verdict: FAIL-style markers. Non-anchored -- matched anywhere in the
-// normalized response. If any pattern hits, classify DIRTY with count=1.
+// Status:/Verdict: FAIL-style markers.
+//
+// Line-anchored: each pattern requires the phrase to occupy a standalone line
+// (optional leading whitespace, optional bullet prefix `-` or `*`, optional
+// trailing punctuation). This prevents false-positives from agent responses
+// that legitimately quote dirty vocabulary in prose or reference the contract
+// (e.g., "any investigator response that echoes `Issues detected.` will...").
+// Multiline flag enables `^`/`$` anchors per line.
 //
 // Negation-safe: each natural-language phrase rejects an immediately preceding
-// "no"/"zero"/"0"/"without" qualifier via lookbehind. This preserves the
-// symmetry with path 3's negation guard and avoids false DIRTY on responses
-// that explicitly negate the dirty vocabulary (e.g. "no issues detected").
+// "no"/"zero"/"0"/"without" qualifier via lookbehind on the anchored prefix.
+// This preserves the symmetry with path 3's negation guard and avoids false
+// DIRTY on responses that explicitly negate (e.g. "no issues detected").
+//
+// Scoped to tail: these patterns are matched only within the last N non-empty
+// lines (post-normalization) to further reduce mid-response narrative
+// false-positives. See DIRTY_PHRASE_LOOKBACK_LINES.
 const DIRTY_PHRASE_PATTERNS = [
-  /(?<!\b(?:no|zero|0|without)\s)\bissues\s+detected\b/i,
-  /(?<!\b(?:no|zero|0|without)\s)\bproblems\s+found\b/i,
-  /(?<!\b(?:no|zero|0|without)\s)\bblockers\s+detected\b/i,
-  /(?<!\b(?:no|zero|0|without)\s)\bfailures\s+detected\b/i,
-  /\bnot\s+ready\b/i,
+  /^\s*(?:[-*]\s+)?(?<!\b(?:no|zero|0|without)\s)\bissues\s+detected\b[\.!,\u2026]*\s*$/im,
+  /^\s*(?:[-*]\s+)?(?<!\b(?:no|zero|0|without)\s)\bproblems\s+found\b[\.!,\u2026]*\s*$/im,
+  /^\s*(?:[-*]\s+)?(?<!\b(?:no|zero|0|without)\s)\bblockers\s+detected\b[\.!,\u2026]*\s*$/im,
+  /^\s*(?:[-*]\s+)?(?<!\b(?:no|zero|0|without)\s)\bfailures\s+detected\b[\.!,\u2026]*\s*$/im,
+  /^\s*(?:[-*]\s+)?\bnot\s+ready\b[\.!,\u2026]*\s*$/im,
   /^\s*(status|verdict|result|outcome|assessment)\s*[:=]\s*(fail|failed|blocked|red|error)\s*[\.!,\u2026]*\s*$/im,
 ];
+
+// Mirror path-4 success-marker lookback. Only scan dirty phrases within the
+// last N non-empty lines (post-normalization). Set slightly larger than the
+// success-marker lookback to tolerate the typical "marker + short rationale"
+// response pattern.
+const DIRTY_PHRASE_LOOKBACK_LINES = 5;
 
 // Path 5 zero-count severity-breakdown line. Matches list-prefix `- ` or `* `
 // (optional), optional `**` emphasis (where the colon may sit inside or
@@ -590,15 +606,42 @@ function tryPath5ZeroSeverityBreakdown(text) {
 }
 
 /**
- * DIRTY symmetric-expansion short-circuit. Scans the full response for any
- * phrase from DIRTY_PHRASE_PATTERNS. If found, returns DIRTY with count=1.
+ * DIRTY symmetric-expansion short-circuit.
+ *
+ * Preprocesses input identically to path 3 (severity prose):
+ *   1. TECH-011 normalize (strip trailing fences / HTML comments / metadata)
+ *   2. Strip ALL fenced code blocks (defeats regression where agent markdown
+ *      files quoting `Issues detected.` inside ``` fences false-positive)
+ *   3. Strip blockquotes (`> ` prefix lines)
+ *
+ * Then scopes matching to the last DIRTY_PHRASE_LOOKBACK_LINES non-empty
+ * lines, mirroring path-4 success-marker behavior. Finally, each pattern is
+ * line-anchored so mid-response narrative does not fire.
+ *
  * Runs after path 1 (severity) so that a response carrying both explicit
  * severity counts and a "not ready" phrase is handled by path 1 per spec.
+ * Runs before path 4 (success marker) so an unambiguous dirty declaration
+ * overrides a trailing CLEAN marker.
  */
 function tryDirtyPhrase(text) {
   if (!text) return { matched: false };
+  // Preprocess: same normalization as path 3 so fenced code & blockquotes
+  // don't trigger DIRTY classification on agent markdown that quotes the
+  // dirty vocabulary.
+  let working = normalizeForLastLine(text);
+  working = stripFencedCode(working);
+  working = stripBlockquotes(working);
+  if (!working.trim()) return { matched: false };
+
+  // Scope to last N non-empty lines (post-normalization). This matches the
+  // path-4 success-marker lookback strategy so that only declarative tail
+  // statements trigger the short-circuit.
+  const tailLines = lastNNonEmptyLines(working, DIRTY_PHRASE_LOOKBACK_LINES);
+  if (tailLines.length === 0) return { matched: false };
+  const scoped = tailLines.join('\n');
+
   for (const re of DIRTY_PHRASE_PATTERNS) {
-    if (re.test(text)) {
+    if (re.test(scoped)) {
       return { matched: true, finding_count: 1 };
     }
   }

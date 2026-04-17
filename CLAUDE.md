@@ -15,7 +15,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 There is no "just one quick look." There is no "let me just check." These thoughts are dispatch triggers — they tell you what to ask a subagent to do, not what to do yourself.
 
-If you are the main agent talking directly with the user, it is imperative you read `delegation.guidelines.md`.
+If you are the main agent talking directly with the user, it is imperative you read `.claude/memory-bank/delegation.guidelines.md`.
 
 ### Default Vocabulary
 
@@ -31,7 +31,7 @@ These three actions are your entire vocabulary. Everything else flows through de
 
 The main agent's context is a non-renewable resource. Subagents return summaries (< 200 words hard budget), not raw data. Delegation is 10-50x more context-efficient than direct reading.
 
-For dispatch triggers, detailed examples, context economics, and word budgets, see `delegation.guidelines.md`.
+For dispatch triggers, detailed examples, context economics, and word budgets, see `.claude/memory-bank/delegation.guidelines.md`.
 
 ### Trace-First Dispatch Planning (MANDATORY)
 
@@ -340,7 +340,7 @@ Every response must include:
 | `/orchestrate`  | Coordinate multi-workstream projects                                                                           | For large tasks with 3+ workstreams                                                |
 | `/browser-test` | Browser-based UI testing                                                                                       | For UI features, after security review                                             |
 
-See `tech.context.md` for the full subagent list, directory structure, branch naming convention, and spec-is-contract principle.
+See `.claude/memory-bank/tech.context.md` for the full subagent list, directory structure, branch naming convention, and spec-is-contract principle.
 
 PostToolUse hooks enforce type checking, linting, JSON/spec validation automatically. See `.claude/docs/HOOKS.md`.
 
@@ -393,7 +393,7 @@ Agents must prove symbols exist before referencing them (Evidence-Before-Edit). 
 
 ### Wire Protocol Contracts (Practice 1.8)
 
-Every cross-boundary integration point must have an explicit wire protocol contract defining: HTTP method, path, request/response shapes, error codes, and authentication requirements. See `best-practices/contract-first.md` for full details.
+Every cross-boundary integration point must have an explicit wire protocol contract defining: HTTP method, path, request/response shapes, error codes, and authentication requirements. See `.claude/memory-bank/best-practices/contract-first.md` for full details.
 
 ### Boundary Ownership Assignment (Practice 1.9)
 
@@ -408,13 +408,13 @@ Contracts exist at four layers — each must be explicitly verified:
 3. **Wire protocol contracts** — HTTP/SSE/WS request/response shapes
 4. **Behavioral contracts** — expected side effects, ordering guarantees, error semantics
 
-For full practices, see `best-practices/contract-first.md`.
+For full practices, see `.claude/memory-bank/best-practices/contract-first.md`.
 
 ---
 
 ## Code Quality Foundations
 
-These practices apply to all implementation work. See `best-practices/code-quality.md` for full details.
+These practices apply to all implementation work. See `.claude/memory-bank/best-practices/code-quality.md` for full details.
 
 - **Structured error handling** — Use typed error classes with error codes, not string messages
 - **Dependency injection** — Pass dependencies explicitly; no hidden singletons or global state
@@ -423,7 +423,7 @@ These practices apply to all implementation work. See `best-practices/code-quali
 - **Named constants over magic values** — No unexplained literals in logic; use descriptive constant names
 - **Contract-generated types** — Types are derived from schemas (Zod, OpenAPI), not hand-written
 
-For code quality standards, see `best-practices/code-quality.md`. For contract-first practices, see `best-practices/contract-first.md`.
+For code quality standards, see `.claude/memory-bank/best-practices/code-quality.md`. For contract-first practices, see `.claude/memory-bank/best-practices/contract-first.md`.
 
 ---
 
