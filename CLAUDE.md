@@ -51,6 +51,20 @@ If `traces/high-level.md` does not exist, proceed without trace context -- no er
 
 **Rationale**: Trace files contain pre-computed architectural summaries (~3K tokens, ~5s to read) that eliminate the need for expensive Explore dispatches (~50K tokens, ~90s) when the main agent needs structural context for dispatch planning.
 
+### Trace Context for Subagents
+
+All subagents working with code (implementers, test-writers, code-reviewers, security-reviewers, explorers) must read trace files for the modules relevant to their task. Treat trace data as advisory — verify critical assumptions (file existence, export availability) against source before irreversible decisions.
+
+**How to resolve relevant traces:**
+
+1. Identify the relevant file paths from the task context (spec evidence table, git diff, acceptance criteria, or dispatcher prompt)
+2. Load `.claude/traces/trace.config.json` and match each file path against module `fileGlobs` to find the owning module ID
+3. For each matched module, read `.claude/traces/low-level/<module-id>.json`
+4. Check freshness: compare the trace file's `mtime` against the staleness threshold (use `isTraceStale(moduleId, config)` from `.claude/scripts/lib/trace-utils.mjs` if available). Stale traces are still useful but verify critical assumptions against source
+5. If no `.claude/traces/` directory, `trace.config.json`, or matching modules exist, skip this section entirely and proceed without traces — no error or warning needed
+
+**Token budget**: Keep trace consumption under 5K tokens per module. Read only the sections relevant to your task (exports, dependencies, calls).
+
 ---
 
 ## Core Operating Constraints
@@ -176,11 +190,11 @@ Mandatory workflow stages (challenger dispatches, completion verification, docum
 - **Stop hook** (`workflow-stop-enforcement.mjs`): Blocks session completion when mandatory dispatches (code-reviewer, security-reviewer, completion-verifier, documenter) have not occurred. Uses stdout JSON `{"decision": "block"}` for blocking.
 - **Write protection** (`workflow-file-protection.mjs`): Blocks agent writes to `gate-override.json` and `gate-enforcement-disabled`. Not disabled by the kill switch.
 
-**Obligation enforcement** validates that manifest status fields match expected values when leaving a phase. The `PHASE_OBLIGATIONS` constant in `workflow-dag.mjs` maps 9 phases to 14 field obligations (e.g., leaving `implementing` requires `convergence.all_acs_implemented === true`, leaving `investigating` requires `convergence.investigation_converged === true`, leaving `challenging` requires `convergence.challenger_converged === true`). Both `session-checkpoint.mjs` and `workflow-stop-enforcement.mjs` call `validateObligations()` from `workflow-dag.mjs`. Phase-scoped overrides use gate name `status_obligations:<phase>`. See `.claude/docs/HOOKS.md` for the full obligation mapping table.
+**Obligation enforcement**: Phase transitions validate manifest status fields via `validateObligations()` in `workflow-dag.mjs`. See HOOKS.md § Status Obligation Enforcement for the full mapping (9 phases → 14 obligations) and phase-scoped override syntax.
 
 **Exempt workflows**: `oneoff-vibe`, `refactor`, and `journal-only` workflows bypass all enforcement.
 
-**Fail-open**: All structural errors (missing session.json, malformed JSON, script crashes) result in fail-open (exit 0). Exception: missing convergence fields default to 0 (fail-closed).
+**Fail-open**: Structural errors exit 0. Exception: missing convergence fields default to 0 (fail-closed). See HOOKS.md § Fail-Open Behavior.
 
 ---
 
@@ -258,7 +272,7 @@ Load memory-bank files based on task context:
 | `best-practices/software-principles.md` | Implementation routed                                                             | Implementer, Code-reviewer                                              |
 | `best-practices/typescript.md`          | TypeScript work dispatched                                                        | Implementer                                                             |
 | `best-practices/subagent-design.md`     | Subagent dispatch                                                                 | route/SKILL.md, implement/SKILL.md, orchestrate/SKILL.md, spec/SKILL.md |
-| `self-answer-protocol.md`               | All agent dispatches                                                              | All 21 agents                                                           |
+| `self-answer-protocol.md`               | All agent dispatches                                                              | All 23 agents                                                           |
 | `traces/low-level/*.json`               | Implementation routed, Test dispatched, Review dispatched, Exploration dispatched | Implementer, Test-writer, Code-reviewer, Security-reviewer, Explore     |
 | `traces/high-level.json`                | Dispatch planning (main agent)                                                    | Main agent                                                              |
 | `traces/high-level.md`                  | Routing, dispatch planning                                                        | Main agent, Route                                                       |
@@ -320,25 +334,27 @@ Every response must include:
 
 ### Core Skills
 
-| Skill           | Purpose                                                                                                        | When to Use                                                                        |
-| --------------- | -------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
-| `/route`        | Analyze task complexity and route to workflow                                                                  | Start of any new task                                                              |
-| `/prd`          | Create PRDs through gather-criticize loop, sync existing PRDs, push amendments                                 | Before spec authoring                                                              |
-| `/spec`         | Author specifications (TaskSpec, WorkstreamSpec, MasterSpec)                                                   | After requirements gathering                                                       |
-| `/atomize`      | Decompose high-level specs into atomic specs                                                                   | Orchestrator workflows only (after spec authoring)                                 |
-| `/enforce`      | Validate atomic specs meet atomicity criteria                                                                  | Orchestrator workflows only (after atomization)                                    |
-| `/investigate`  | Surface cross-spec inconsistencies                                                                             | MANDATORY for oneoff-spec and orchestrator before implementation                   |
-| `/challenge`    | Operational feasibility scrutiny (convergence loop for pre-impl/pre-orch, single-pass for pre-test/pre-review) | MANDATORY at 4 stages: pre-implementation, pre-test, pre-review, pre-orchestration |
-| `/implement`    | Implement from approved specs                                                                                  | After spec approval                                                                |
-| `/test`         | Write tests for acceptance criteria                                                                            | Parallel with implementation or after                                              |
-| `/e2e-test`     | Generate E2E tests from spec contracts                                                                         | Parallel with implementation for cross-boundary specs                              |
-| `/unify`        | Validate spec-impl-test alignment                                                                              | After implementation and tests complete                                            |
-| `/code-review`  | Code quality and best practices review                                                                         | After convergence, before security                                                 |
-| `/security`     | Security review of implementation                                                                              | After code review, before merge                                                    |
-| `/docs`         | Generate documentation from implementation                                                                     | After security review                                                              |
-| `/refactor`     | Code quality improvements                                                                                      | Tech debt sprints, post-merge cleanup                                              |
-| `/orchestrate`  | Coordinate multi-workstream projects                                                                           | For large tasks with 3+ workstreams                                                |
-| `/browser-test` | Browser-based UI testing                                                                                       | For UI features, after security review                                             |
+| Skill           | Purpose                                                                                                        | When to Use                                                                                                         |
+| --------------- | -------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `/route`        | Analyze task complexity and route to workflow                                                                  | Start of any new task                                                                                               |
+| `/prd`          | Create PRDs through gather-criticize loop, sync existing PRDs, push amendments                                 | Before spec authoring                                                                                               |
+| `/spec`         | Author specifications (TaskSpec, WorkstreamSpec, MasterSpec)                                                   | After requirements gathering                                                                                        |
+| `/atomize`      | Decompose high-level specs into atomic specs                                                                   | Orchestrator workflows only (after spec authoring)                                                                  |
+| `/enforce`      | Validate atomic specs meet atomicity criteria                                                                  | Orchestrator workflows only (after atomization)                                                                     |
+| `/investigate`  | Surface cross-spec inconsistencies                                                                             | MANDATORY for oneoff-spec and orchestrator before implementation                                                    |
+| `/challenge`    | Operational feasibility scrutiny (convergence loop for pre-impl/pre-orch, single-pass for pre-test/pre-review) | MANDATORY at 4 stages: pre-implementation, pre-test, pre-review, pre-orchestration                                  |
+| `/implement`    | Implement from approved specs                                                                                  | After spec approval                                                                                                 |
+| `/test`         | Write tests for acceptance criteria                                                                            | Parallel with implementation or after                                                                               |
+| `/e2e-test`     | Generate E2E tests from spec contracts                                                                         | Parallel with implementation (opt-out via e2e_skip)                                                                 |
+| `/unify`        | Validate spec-impl-test alignment                                                                              | After implementation and tests complete                                                                             |
+| `/code-review`  | Code quality and best practices review                                                                         | After convergence, before security                                                                                  |
+| `/security`     | Security review of implementation                                                                              | After code review, before merge                                                                                     |
+| `/docs`         | Generate documentation from implementation                                                                     | After security review                                                                                               |
+| `/doc-audit`    | Diagnose documentation health (staleness, coverage gaps, broken refs)                                          | On-demand, post-documenter, or PRD-time                                                                             |
+| `/refactor`     | Code quality improvements                                                                                      | Tech debt sprints, post-merge cleanup                                                                               |
+| `/orchestrate`  | Coordinate multi-workstream projects                                                                           | For large tasks with 3+ workstreams                                                                                 |
+| `/flow-verify`  | Verify wiring correctness across systems                                                                       | MANDATORY at 4 stages: prd-review (parallel), spec-review (parallel), impl-verify (serial gate), post-impl (serial) |
+| `/browser-test` | Browser-based UI testing                                                                                       | For UI features, after security review                                                                              |
 
 See `.claude/memory-bank/tech.context.md` for the full subagent list, directory structure, branch naming convention, and spec-is-contract principle.
 
@@ -351,14 +367,14 @@ Full workflow sequences (oneoff-vibe, oneoff-spec, orchestrator) are documented 
 ### Parallel Execution
 
 - Multiple `spec-author` subagents for workstreams
-- `implementer`, `test-writer`, and `e2e-test-writer` run in parallel (no ordering constraint — test-writer and e2e-test-writer work from spec only; e2e-test-writer dispatched only for cross-boundary specs)
+- `implementer`, `test-writer`, and `e2e-test-writer` run in parallel (no ordering constraint — test-writer and e2e-test-writer work from spec only; e2e-test-writer dispatched by default with opt-out via `e2e_skip: true` in spec frontmatter)
 - `code-reviewer` and `security-reviewer` run in parallel (same dispatch prerequisites: challenger pre-review + unifier)
 - Both reviewers converge independently; `documenter` waits for both convergences
 - Main agent handles integration and synthesis
 
 ### Independent Verification (Practice 2.4)
 
-When `implementer`, `test-writer`, and `e2e-test-writer` run in parallel, neither the test-writer nor the e2e-test-writer **may see the implementation**. Both receive only the **spec** (acceptance criteria, task list, evidence table, contract definitions) — never implementation file paths or code. This ensures tests verify the _contract_, not the _implementation_. The e2e-test-writer's isolation is additionally enforced by a PreToolUse hook that blocks all reads outside spec/contract/template/test/docs directories and all writes outside `tests/e2e/`. If either agent needs interface/type information, provide it from the spec's evidence table or contract definitions.
+When `implementer`, `test-writer`, and `e2e-test-writer` run in parallel, neither the test-writer nor the e2e-test-writer **may see the implementation**. Both receive only the **spec** (acceptance criteria, task list, evidence table, contract definitions) — never implementation file paths or code. This ensures tests verify the _contract_, not the _implementation_. The e2e-test-writer is dispatched by default for all spec-based workflows (opt-out via `e2e_skip: true` with rationale in spec frontmatter). Its isolation is additionally enforced by a PreToolUse hook that blocks all reads outside spec/contract/template/test/docs directories and all writes outside `tests/e2e/`. If either agent needs interface/type information, provide it from the spec's evidence table or contract definitions.
 
 ### Assumption Tracking (Practice 1.10)
 
@@ -377,13 +393,13 @@ Before merge, all gates must pass. Each gate marked with **(loop)** runs under t
 - Code review passed (no High/Critical issues) **(loop)**
 - Security review passed **(loop)**
 - Completion verification passed **(loop)**
-- E2E tests passed (if cross-boundary)
+- E2E tests passed (unless e2e_skip)
 - Browser tests passed (if UI)
 - Documentation generated
 
 ### Integration Verification Gate (Practice 4.5)
 
-After parallel implementation and before code review, an integration verification gate checks cross-boundary wiring: (1) route registration — frontend-referenced endpoints exist in backend, (2) event name alignment — SSE/WebSocket names match between publisher and consumer, (3) config function consistency — all references to the same service use the same config function, (4) assumption conflict detection — no two agents made contradictory assumptions (Practice 1.10). This gate sits between implementation and code review in the workflow.
+**Subsumed by flow-verifier.** The flow-verifier agent (`/flow-verify`) performs comprehensive wiring verification at 4 stages (prd-review, spec-review, impl-verify, post-impl), covering all checks previously described here plus additional flow types (user, data, event, control) and carry-forward findings across stages. See `.claude/agents/flow-verifier.md` and `.claude/skills/flow-verify/SKILL.md`.
 
 ---
 
