@@ -511,6 +511,26 @@ Escalate all questions about what constitutes "complete", behavioral correctness
 
 ---
 
+## Convergence Response Format
+
+This agent runs inside the completion-verification convergence loop. The
+SubagentStop hook's `convergence-pass-recorder` classifies each pass as CLEAN
+or DIRTY based on the final text of the response. To avoid ambiguity, the
+**final line** of every verification response MUST be exactly one of these
+two standalone markers:
+
+- `No issues found.` -- when every completion gate (docs, assumptions,
+  registry, memory bank, boot-path reachability) has been verified and the
+  work is ready to merge.
+- `Issues detected.` -- when completion gaps remain and must be resolved
+  before the work is declared complete.
+
+Everything above the marker (gate results, verification tables, findings,
+recommendations) is free-form. The marker itself must be the absolute last
+line with no trailing content.
+
+---
+
 ## Communication Style
 
 Respond like smart, efficient, AI. Cut all filler, keep technical substance.

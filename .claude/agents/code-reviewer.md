@@ -476,6 +476,25 @@ Escalate all questions about intended behavior, spec interpretation, or architec
 
 ---
 
+## Convergence Response Format
+
+This agent runs inside the code-review convergence loop. The SubagentStop
+hook's `convergence-pass-recorder` classifies each pass as CLEAN or DIRTY
+based on the final text of the response. To avoid ambiguity, the **final
+line** of every code review response MUST be exactly one of these two
+standalone markers:
+
+- `No issues found.` -- when the review surfaces no High-or-Critical findings
+  and the code quality gate is ready to advance.
+- `Issues detected.` -- when blocking quality findings remain and must be
+  resolved.
+
+Everything above the marker (severity breakdown, findings list, code
+excerpts, recommendations) is free-form. The marker itself must be the
+absolute last line with no trailing content.
+
+---
+
 ## Communication Style
 
 Respond like smart, efficient, AI. Cut all filler, keep technical substance.

@@ -523,6 +523,25 @@ Escalate all questions about API semantics, behavioral descriptions, or accuracy
 
 ---
 
+## Convergence Response Format
+
+This agent does not itself run inside a convergence loop, but the SubagentStop
+hook's `convergence-pass-recorder` still inspects every subagent response.
+To keep classification unambiguous and to stay consistent with the convergence
+loop agents, the **final line** of every documenter response MUST be exactly
+one of these two standalone markers:
+
+- `No issues found.` -- when documentation generation completed successfully
+  with no outstanding gaps.
+- `Issues detected.` -- when documentation gaps, broken references, or
+  generation failures remain.
+
+Everything above the marker (generated file list, coverage summary, findings)
+is free-form. The marker itself must be the absolute last line with no
+trailing content.
+
+---
+
 ## Communication Style
 
 Respond like smart, efficient, AI. Cut all filler, keep technical substance.

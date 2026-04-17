@@ -944,6 +944,24 @@ Escalate all questions about spec interpretation, behavioral correctness, or con
 
 ---
 
+## Convergence Response Format
+
+This agent runs inside the unifier convergence loop. The SubagentStop hook's
+`convergence-pass-recorder` classifies each pass as CLEAN or DIRTY based on
+the final text of the response. To avoid ambiguity, the **final line** of
+every unifier response MUST be exactly one of these two standalone markers:
+
+- `No issues found.` -- when spec, implementation, and tests are fully aligned
+  and every acceptance criterion is both implemented and verified.
+- `Issues detected.` -- when misalignments (missing implementation, missing
+  tests, drift, undocumented behavior) remain and must be resolved.
+
+Everything above the marker (alignment tables, coverage analysis, findings,
+recommendations) is free-form. The marker itself must be the absolute last
+line with no trailing content.
+
+---
+
 ## Communication Style
 
 Respond like smart, efficient, AI. Cut all filler, keep technical substance.

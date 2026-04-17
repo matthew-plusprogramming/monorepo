@@ -9,17 +9,23 @@
  * session-checkpoint.mjs's exported recordPass() function via direct module
  * import.
  *
- * Spec: sg-convergence-recorder-tolerance (v1.2)
+ * Spec: sg-convergence-recorder-tolerance (v1.2) + v1.3 follow-up
  *
- * 4-tier extraction pipeline (REQ-NFR-2a, AC-5):
+ * Extraction pipeline (first-match-wins):
  *   Path 1 -- severity regex (existing, unchanged on happy path)
  *               non-zero counts -> DIRTY
  *               all-zero counts -> fall through (EDGE-004)
+ *   Path 5 -- zero-count severity breakdown (>=2 distinct labels, all 0,
+ *               within a 10-line window) -> CLEAN
+ *   Path D -- DIRTY-phrase short-circuit ("issues detected", "not ready",
+ *               "Status: FAIL" and related) -> DIRTY
  *   Path 2 -- structured finding-list regex (3 alternates + generic cues)
  *               -> DIRTY with finding-count
  *   Path 3 -- severity-word-prose detection (line-anchored, negation-safe,
  *               fenced-code & blockquote stripped) -> DIRTY
- *   Path 4 -- success-marker on normalized last non-empty line -> CLEAN
+ *   Path 4 -- widened success-marker on up to last 3 non-empty lines, or
+ *               Status:/Result:/Verdict:/Outcome:/Assessment: prefixed marker
+ *               -> CLEAN
  *
  *   No path matches -> source='parse_failed', append metadata-only diagnostic
  *   entry to .claude/context/session.log (no raw bytes), enforce mode 0600.
@@ -92,8 +98,17 @@ const CIRCUIT_BREAKER_DEGRADED_THRESHOLD = 3;
 // T-08 / AC-16: file mode for session.log (rw-------)
 const SESSION_LOG_MODE = 0o600;
 
-// AC-8: extraction paths reported in diagnostic log
-const EXTRACTION_PATHS = ['severity', 'finding_list', 'severity_prose', 'success_marker'];
+// AC-8: extraction paths reported in diagnostic log. Order reflects
+// precedence after the v1.3 follow-up expansion (zero-severity-breakdown
+// and dirty-phrase short-circuit inserted between path 1 and path 2).
+const EXTRACTION_PATHS = [
+  'severity',
+  'zero_severity_breakdown',
+  'dirty_phrase',
+  'finding_list',
+  'severity_prose',
+  'success_marker',
+];
 
 // SC-3 authoritative finding-ID prefix inventory (Investigation Findings (b))
 // plus seed-list prefixes (AC, NFR, FLOW) commonly used in spec authoring
@@ -138,8 +153,58 @@ const SEVERITY_WORD_PROSE =
   /(?<!\b(?:no|zero|0|without)\s)\b(critical|high|medium|low)\b[^\n]{0,40}\b(issue|issues|finding|findings|found|problem|problems|concern|concerns)\b/gim;
 
 // SC-2 / EDGE-016 / EDGE-019 success-marker (matches normalized last non-empty line)
+// Widened per sg-convergence-recorder-tolerance v1.3 follow-up to accept a
+// broader natural-language vocabulary. Standalone-line anchor and terminator
+// constraints preserved: `^\s*<marker>\s*[\.!,\u2026]*\s*$`.
 const SUCCESS_MARKER =
-  /^\s*(no issues found|all checks passed|no findings|clean pass|no blockers)\s*[\.!,\u2026]*\s*$/im;
+  /^\s*(no issues found|no issues detected|no issues|no concerns found|no concerns|no problems found|no problems|no blockers found|no blocking issues|no blocking findings|no findings|no blockers|all checks passed|all clear|all good|all systems go|everything passes|everything looks good|nothing to flag|nothing blocking|verified clean|clean pass|clean|passed|pass|ok|approved|approval granted|looks good|lgtm|ready to ship|ready to merge|ready for merge)\s*[\.!,\u2026]*\s*$/im;
+
+// Status:/Result:/Verdict:/Outcome:/Assessment: prefixed success markers. Accepts
+// `:` or `=` as the separator and a constrained positive-outcome vocabulary.
+const STATUS_PREFIX_SUCCESS =
+  /^\s*(status|result|verdict|outcome|assessment)\s*[:=]\s*(clean|pass|passed|ok|approved|green|ready|clear|good)\s*[\.!,\u2026]*\s*$/im;
+
+// Number of trailing non-empty lines inspected when looking for a success
+// marker (path 4). Supports responses that append a closing sentence such as
+// "Spec group ready for implementation." after a valid marker line.
+const SUCCESS_MARKER_LOOKBACK_LINES = 3;
+
+// Symmetric DIRTY expansion: natural-language dirty-state phrases and
+// Status:/Verdict: FAIL-style markers. Non-anchored -- matched anywhere in the
+// normalized response. If any pattern hits, classify DIRTY with count=1.
+//
+// Negation-safe: each natural-language phrase rejects an immediately preceding
+// "no"/"zero"/"0"/"without" qualifier via lookbehind. This preserves the
+// symmetry with path 3's negation guard and avoids false DIRTY on responses
+// that explicitly negate the dirty vocabulary (e.g. "no issues detected").
+const DIRTY_PHRASE_PATTERNS = [
+  /(?<!\b(?:no|zero|0|without)\s)\bissues\s+detected\b/i,
+  /(?<!\b(?:no|zero|0|without)\s)\bproblems\s+found\b/i,
+  /(?<!\b(?:no|zero|0|without)\s)\bblockers\s+detected\b/i,
+  /(?<!\b(?:no|zero|0|without)\s)\bfailures\s+detected\b/i,
+  /\bnot\s+ready\b/i,
+  /^\s*(status|verdict|result|outcome|assessment)\s*[:=]\s*(fail|failed|blocked|red|error)\s*[\.!,\u2026]*\s*$/im,
+];
+
+// Path 5 zero-count severity-breakdown line. Matches list-prefix `- ` or `* `
+// (optional), optional `**` emphasis (where the colon may sit inside or
+// outside the bold delimiters), severity label, `:` or `=`, zero count,
+// optional `finding`/`findings` trailing word.
+//
+// Accepted bold forms:
+//   - Critical: 0                 (no emphasis)
+//   - **Critical**: 0             (colon outside bold)
+//   - **Critical:** 0             (colon inside bold)
+//   - **Critical: 0**             (colon and count inside bold)
+const ZERO_COUNT_SEVERITY_LINE =
+  /^\s*[-*]?\s*\*{0,2}(critical|high|medium|low|blocker|minor|notable|info)(?:\s*[:=]\s*\*{0,2}|\s*\*{0,2}\s*[:=]\s*)\s*\*{0,2}0\*{0,2}\s*(finding|findings)?\s*\*{0,2}\s*$/im;
+const ZERO_COUNT_SEVERITY_LINE_GLOBAL = new RegExp(
+  ZERO_COUNT_SEVERITY_LINE.source,
+  'gim'
+);
+// Path 5 sliding window: scan any 10-line segment for >=2 distinct labels.
+const ZERO_COUNT_WINDOW_SIZE = 10;
+const ZERO_COUNT_MIN_DISTINCT_LABELS = 2;
 
 // TECH-011 trailing metadata-suffix line pattern
 const METADATA_SUFFIX_LINE = /^(agentId|<usage>|<\/?\w+>|\w+:\s*\S)/;
@@ -198,7 +263,11 @@ function normalizeForLastLine(text) {
     // Step 3: remove trailing HTML comment(s)
     working = working.replace(/\s*<!--[\s\S]*?-->\s*$/u, '');
 
-    // Step 4: remove trailing metadata-suffix lines until non-matching line
+    // Step 4: remove trailing metadata-suffix lines until non-matching line.
+    // Exception: preserve Status:/Result:/Verdict:/Outcome:/Assessment: success
+    // marker lines (and the symmetric DIRTY form), since those look
+    // like "metadata" per the generic `\w+:\s*\S` pattern but carry real
+    // convergence-classification payload.
     const lines = working.split('\n');
     while (lines.length > 0) {
       const last = lines[lines.length - 1];
@@ -206,6 +275,11 @@ function normalizeForLastLine(text) {
       if (last.trim() === '') {
         lines.pop();
         continue;
+      }
+      // Preserve success-prefixed markers ("Status: CLEAN", "Result: APPROVED")
+      // and their DIRTY counterparts ("Status: FAIL").
+      if (STATUS_PREFIX_SUCCESS.test(last) || /^\s*(status|verdict|result|outcome|assessment)\s*[:=]\s*(fail|failed|blocked|red|error)\b/i.test(last)) {
+        break;
       }
       if (METADATA_SUFFIX_LINE.test(last)) {
         lines.pop();
@@ -431,23 +505,104 @@ function tryPath3SeverityProse(text) {
 // Path 4: success-marker on normalized last non-empty line
 // =============================================================================
 
+/** Resolve the last N non-empty lines from normalized text (path 4 input). */
+function lastNNonEmptyLines(normalized, n) {
+  if (!normalized) return [];
+  const lines = normalized.split('\n');
+  const out = [];
+  for (let i = lines.length - 1; i >= 0 && out.length < n; i--) {
+    if (/\S/.test(lines[i])) {
+      out.push(lines[i]);
+    }
+  }
+  return out; // ordered tail-first: idx 0 is the last non-empty line
+}
+
 /**
  * Returns:
  *   { matched: true } -- CLEAN
  *   { matched: false, normalized_length } -- no marker (normalized_length used
  *     for EC-13 "normalize-to-empty" diagnostic)
+ *
+ * Walks the last SUCCESS_MARKER_LOOKBACK_LINES non-empty lines, tail-first.
+ * Accepts either the widened SUCCESS_MARKER vocabulary or a Status:/Result:/
+ * Verdict:/Outcome:/Assessment: prefixed success marker.
  */
 function tryPath4SuccessMarker(text) {
   const normalized = normalizeForLastLine(text);
-  const last = lastNonEmptyLine(normalized);
-  if (!last) {
+  const tailLines = lastNNonEmptyLines(normalized, SUCCESS_MARKER_LOOKBACK_LINES);
+  if (tailLines.length === 0) {
     // EC-13: normalization reduced response to empty / no non-empty lines
     return { matched: false, normalized_length: normalized.length };
   }
-  if (SUCCESS_MARKER.test(last)) {
-    return { matched: true };
+  for (const line of tailLines) {
+    if (SUCCESS_MARKER.test(line) || STATUS_PREFIX_SUCCESS.test(line)) {
+      return { matched: true };
+    }
   }
   return { matched: false, normalized_length: normalized.length };
+}
+
+// =============================================================================
+// Path 5: all-zero severity breakdown (CLEAN)
+// =============================================================================
+
+/**
+ * Scan the response for zero-count severity-breakdown lines. Labels drawn from
+ * {critical, high, medium, low, blocker, minor, notable, info}.
+ *
+ * Match semantics:
+ *   1. Locate every zero-count severity-label line in the response.
+ *   2. All zero-count hits must fit within a single ZERO_COUNT_WINDOW_SIZE
+ *      (10) line window -- i.e., last.idx - first.idx < window. This ensures
+ *      that a single compact breakdown matches while scattered mentions
+ *      across the response do not.
+ *   3. Match requires >= 2 distinct labels among the hits.
+ *
+ * Returns:
+ *   { matched: true }  -- CLEAN (compact zero-count breakdown found)
+ *   { matched: false } -- no breakdown, or hits spread beyond window
+ */
+function tryPath5ZeroSeverityBreakdown(text) {
+  if (!text) return { matched: false };
+  const lines = text.split('\n');
+
+  // Collect every zero-count severity-label line with its line index.
+  const hits = [];
+  for (let i = 0; i < lines.length; i++) {
+    const m = lines[i].match(ZERO_COUNT_SEVERITY_LINE);
+    if (m) {
+      hits.push({ idx: i, label: m[1].toLowerCase() });
+    }
+  }
+  if (hits.length < ZERO_COUNT_MIN_DISTINCT_LABELS) return { matched: false };
+
+  // All hits must fit within one window; otherwise the signal is scattered
+  // and we do not treat it as a structured breakdown.
+  const span = hits[hits.length - 1].idx - hits[0].idx;
+  if (span >= ZERO_COUNT_WINDOW_SIZE) return { matched: false };
+
+  const distinct = new Set(hits.map((h) => h.label));
+  if (distinct.size >= ZERO_COUNT_MIN_DISTINCT_LABELS) {
+    return { matched: true };
+  }
+  return { matched: false };
+}
+
+/**
+ * DIRTY symmetric-expansion short-circuit. Scans the full response for any
+ * phrase from DIRTY_PHRASE_PATTERNS. If found, returns DIRTY with count=1.
+ * Runs after path 1 (severity) so that a response carrying both explicit
+ * severity counts and a "not ready" phrase is handled by path 1 per spec.
+ */
+function tryDirtyPhrase(text) {
+  if (!text) return { matched: false };
+  for (const re of DIRTY_PHRASE_PATTERNS) {
+    if (re.test(text)) {
+      return { matched: true, finding_count: 1 };
+    }
+  }
+  return { matched: false };
 }
 
 // =============================================================================
@@ -455,31 +610,57 @@ function tryPath4SuccessMarker(text) {
 // =============================================================================
 
 /**
- * Run the 4-tier pipeline. Returns:
+ * Run the extraction pipeline. Returns:
  *   { source: 'hook', clean: boolean, finding_count: number|null } -- one of
- *     paths 1-4 matched
+ *     paths 1-5 matched
  *   { source: 'parse_failed', clean: false, normalized_length } -- all paths missed
+ *
+ * Precedence (first-match-wins):
+ *   1. severity regex (non-zero counts) -> DIRTY
+ *   2. zero-count severity breakdown (>=2 distinct labels, all zero) -> CLEAN
+ *   3. DIRTY-phrase short-circuit ("issues detected", "Status: FAIL", ...) -> DIRTY
+ *   4. finding-list -> DIRTY
+ *   5. severity-word prose -> DIRTY
+ *   6. success marker on tail (up to 3 lines) -> CLEAN
  */
 function classify(text, gateName) {
-  // Path 1
+  // Path 1: severity regex (non-zero counts)
   const p1 = tryPath1Severity(text, gateName);
   if (p1.matched) {
     return { source: 'hook', clean: p1.clean, finding_count: p1.finding_count, path: 'severity' };
   }
 
-  // Path 2
+  // Path 5 (precedence-wise between old path 1 and old path 2): all-zero
+  // severity breakdown -> CLEAN. Path 1 already short-circuited on non-zero
+  // counts, so reaching here means either no severity-regex match or all
+  // severity counts were zero (EDGE-004 fall-through).
+  const p5 = tryPath5ZeroSeverityBreakdown(text);
+  if (p5.matched) {
+    return { source: 'hook', clean: true, finding_count: 0, path: 'zero_severity_breakdown' };
+  }
+
+  // DIRTY symmetric-expansion short-circuit. Catches "issues detected",
+  // "Status: FAIL", etc. Runs before finding-list / prose / success-marker
+  // so that an unambiguous dirty signal anywhere in the response classifies
+  // DIRTY without false CLEAN from a trailing marker.
+  const dirty = tryDirtyPhrase(text);
+  if (dirty.matched) {
+    return { source: 'hook', clean: false, finding_count: dirty.finding_count, path: 'dirty_phrase' };
+  }
+
+  // Path 2: structured finding-list
   const p2 = tryPath2FindingList(text);
   if (p2.matched) {
     return { source: 'hook', clean: false, finding_count: p2.finding_count, path: 'finding_list', finding_ids: p2.finding_ids };
   }
 
-  // Path 3
+  // Path 3: severity-word prose
   const p3 = tryPath3SeverityProse(text);
   if (p3.matched) {
     return { source: 'hook', clean: false, finding_count: p3.finding_count, path: 'severity_prose' };
   }
 
-  // Path 4
+  // Path 4: success marker on tail (up to 3 non-empty lines)
   const p4 = tryPath4SuccessMarker(text);
   if (p4.matched) {
     return { source: 'hook', clean: true, finding_count: 0, path: 'success_marker' };

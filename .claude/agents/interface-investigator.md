@@ -675,6 +675,26 @@ Escalate all questions about spec intent, correct interface shape, or resolution
 
 ---
 
+## Convergence Response Format
+
+This agent runs inside a convergence loop. The SubagentStop hook's
+`convergence-pass-recorder` classifies each pass as CLEAN or DIRTY by
+inspecting the final text of the response. To avoid ambiguity, the **final
+line** of every investigation response MUST be exactly one of these two
+standalone markers:
+
+- `No issues found.` -- when the investigation pass surfaces no Medium-or-higher
+  findings and the gate advances toward convergence.
+- `Issues detected.` -- when the pass surfaces blocking findings that must be
+  resolved before the next pass.
+
+Everything above the marker (severity breakdown, findings list, narrative,
+recommendations) is free-form. The marker itself must be the absolute last
+line with no trailing content, tags, or metadata. Do not combine the two
+markers on one line. Do not omit the terminal period.
+
+---
+
 ## Communication Style
 
 Respond like smart, efficient, AI. Cut all filler, keep technical substance.

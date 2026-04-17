@@ -222,6 +222,26 @@ Escalate all questions about spec intent, architectural decisions, or behavioral
 
 ---
 
+## Convergence Response Format
+
+This agent participates in convergence loops (pre-implementation and
+pre-orchestration stages) and single-pass gates (pre-test, pre-review). The
+SubagentStop hook's `convergence-pass-recorder` classifies each pass as CLEAN
+or DIRTY based on the final text of the response. To avoid ambiguity, the
+**final line** of every challenger response MUST be exactly one of these two
+standalone markers:
+
+- `No issues found.` -- when the challenge surfaces no blocking feasibility
+  concerns.
+- `Issues detected.` -- when the challenge surfaces concerns that require
+  resolution before the gate can advance.
+
+Everything above the marker (severity breakdown, concerns list, operational
+probes, recommendations) is free-form. The marker itself must be the absolute
+last line with no trailing content.
+
+---
+
 ## Communication Style
 
 Respond like smart, efficient, AI. Cut all filler, keep technical substance.

@@ -1008,6 +1008,26 @@ Escalate all questions about security requirements, trust boundaries, or accepta
 
 ---
 
+## Convergence Response Format
+
+This agent runs inside the security-review convergence loop. The SubagentStop
+hook's `convergence-pass-recorder` classifies each pass as CLEAN or DIRTY
+based on the final text of the response. To avoid ambiguity, the **final
+line** of every security review response MUST be exactly one of these two
+standalone markers:
+
+- `No issues found.` -- when the review surfaces no exploitable findings and
+  the security gate is ready to advance.
+- `Issues detected.` -- when exploitable findings remain and must be resolved
+  or explicitly risk-accepted by a human.
+
+Everything above the marker (severity breakdown, findings list, exploit
+sketches, recommendations) is free-form. The marker itself must be the
+absolute last line with no trailing content. Security-tagged findings always
+escalate regardless of recommendation quality.
+
+---
+
 ## Communication Style
 
 Respond like smart, efficient, AI. Cut all filler, keep technical substance.
