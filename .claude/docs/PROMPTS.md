@@ -28,9 +28,7 @@ Prompts are synced to consumer projects via the metaclaude registry and bundle s
 
 ## Current Prompt Inventory
 
-| Prompt           | File                  | Description                                                                                                                                                                |
-| ---------------- | --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Divergence Audit | `divergence-audit.md` | Dispatches 5 parallel Explore agents to audit cross-repo alignment across sync freshness, agent compliance, hook integrity, manifesto alignment, and documentation health. |
+No current prompt templates are maintained in this repo.
 
 ## How to Add a New Prompt
 
