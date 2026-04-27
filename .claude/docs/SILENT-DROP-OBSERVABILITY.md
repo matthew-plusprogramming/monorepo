@@ -1,197 +1,148 @@
 ---
-title: Silent-Drop Observability — System Reference
-last_reviewed: 2026-04-19
+title: Silent-Drop Observability
+last_reviewed: 2026-04-27
 ---
 
-# Silent-Drop Observability — System Reference
+# Silent-Drop Observability
 
-Reference for the silent-drop observability system: pattern-layer anti-pattern detection in broadcast, fan-out, and delivery paths, operator-controlled advisory→coercive rollout, audit-chain integrity, and agent-proof enforcement artifacts.
+Silent-drop observability catches delivery paths that discard work without a
+log, metric, or explicit safe-drop annotation. Pattern guidance lives in
+`.claude/memory-bank/best-practices/logging.md`; reviewer behavior lives in
+`.claude/agents/code-reviewer.md` Category H. This doc covers the operator
+scripts, schemas, protected files, audit chain, and replay coverage.
 
-Developer-facing guidance lives in `.claude/memory-bank/best-practices/logging.md` § Silent-Drop Observability. Operator-facing procedure is covered here.
+## System Shape
 
-## System Overview
+| Area | Artifact | Owner |
+| --- | --- | --- |
+| Review detection | code-reviewer Category H | agent |
+| Checklist parser | `.claude/scripts/parse-review-silent-drop-checklist.mjs` | CI or wrapper |
+| Mode flag | `.claude/config/silent-drop-enforcement.json` | operator signed commit |
+| Baseline | `.claude/metrics/silent-drop-baseline.json` | operator or maintainer |
+| Audit chain | `.claude/audit/enforcement-changes.log` | operator appends, verifier checks |
+| Flip preflight | `.claude/scripts/silent-drop-coercive-flip-preflight.mjs` | operator |
+| SLA monitor | `.claude/scripts/silent-drop-baseline-sla-monitor.mjs` | maintainer |
+| File protection | `.claude/scripts/workflow-file-protection.mjs` | hook |
 
-The system operates in three planes:
+Modes:
 
-| Plane              | Artifact                                                    | Owner                             |
-| ------------------ | ----------------------------------------------------------- | --------------------------------- |
-| Detection (review) | code-reviewer Category H + advisory finding emission        | agent                             |
-| Parsing            | `parse-review-silent-drop-checklist.mjs`                    | agent / CI                        |
-| Enforcement        | `silent-drop-enforcement.json`, coercive-flip preflight     | operator (signed commit)          |
-| Audit integrity    | `enforcement-changes.log`, `verify-enforcement-audit-chain` | operator write, anyone verifies   |
-| SLA monitoring     | `silent-drop-baseline-sla-monitor.mjs`                      | maintainer (scheduled invocation) |
-| File protection    | `workflow-file-protection.mjs` (extended)                   | hook (blocks agent writes)        |
+| Mode | Behavior |
+| --- | --- |
+| `advisory` | emits Category H findings such as `silent-drop-suspect`; non-blocking |
+| `coercive` | emits the same findings; CI may block merge |
+| `off` | suppresses this finding family |
 
-## Architecture: Advisory → Coercive Rollout
+Normal flow: advisory baseline, preflight, operator flag edit, audit-log
+append, monitoring. Reverting to advisory restarts reassessment.
 
-Three states and the gates that move between them:
+## Category H
 
+Category H applies when a PR touches delivery-path modules such as broadcast,
+fan-out, dispatch, route, emit, SSE, or pub/sub code.
+
+- `H.1 skip-path-has-log`: `continue`, `return`, and switch fallthrough need
+  nearby `logger.` or `metrics.` evidence unless acknowledged as safe.
+- `H.2 high-volume-also-has-metric`: high-volume fan-out needs metrics, not
+  only logs.
+- `H.3 metric-naming-and-cardinality`: dropped-message metrics use stable names
+  and bounded labels.
+
+Reviewer output uses this sentinel followed by fenced JSON:
+
+```text
+<!-- silent-drop-checklist -->
 ```
-     baseline window        preflight gate        operator reverts
-advisory  ───────────►  coercive-candidate  ──►  coercive  ◄────  revert-advisory
-  ▲                                                                    │
-  └────────────────────── 90-day reassessment cycle ───────────────────┘
+
+The block must validate as `SilentDropChecklistAnswer`. The parser selects by
+sentinel anchor.
+
+Safe-drop annotation:
+
+```js
+// silent-drop: safe - rationale explaining why no external observer needs this
 ```
 
-### State definitions
+Accepted annotations are recorded in `annotations_used[]`; stale or excessive
+annotations become findings.
 
-| State      | Code-reviewer behavior              | Merge gating  | Set by                                 |
-| ---------- | ----------------------------------- | ------------- | -------------------------------------- |
-| `advisory` | Emits `silent-drop-suspect` Medium  | None          | Default / revert-advisory              |
-| `coercive` | Emits same findings; merge-blocking | Yes (CI gate) | Operator signed commit after preflight |
-| `off`      | No findings emitted                 | None          | Operator (explicit override)           |
+## Scripts
 
-The mode lives in `.claude/config/silent-drop-enforcement.json` (schema: `SilentDropEnforcementFlag`). Agents cannot write this file — `workflow-file-protection.mjs` blocks the Write tool at PreToolUse. Only signed-commit operator writes pass.
+### Checklist Parser
 
-### Rollout phases
-
-1. **Baseline window** — Advisory mode runs for ≥14 days and ≥20 delivery-path PRs (or waiver with ≥50-char rationale). Metrics accumulate in `silent-drop-baseline.json`.
-2. **Coercive-flip preflight** — `silent-drop-coercive-flip-preflight.mjs` validates 5 gates. All must pass.
-3. **Flip** — Operator writes `silent-drop-enforcement.json` (mode=coercive) with atomic-rename. Audit entry appended to `enforcement-changes.log`.
-4. **Steady state or revert** — If FP rate spikes, operator may revert-advisory; 90-day reassessment cycle begins.
-
-## CLI Scripts
-
-### parse-review-silent-drop-checklist.mjs
-
-Extracts the silent-drop checklist answer from code-reviewer output and validates against `SilentDropChecklistAnswer`.
-
-**Path**: `.claude/scripts/parse-review-silent-drop-checklist.mjs`
-
-**Usage**:
+Path: `.claude/scripts/parse-review-silent-drop-checklist.mjs`
 
 ```bash
-node .claude/scripts/parse-review-silent-drop-checklist.mjs <path-to-reviewer-output.md>
-node .claude/scripts/parse-review-silent-drop-checklist.mjs -    # stdin
+node .claude/scripts/parse-review-silent-drop-checklist.mjs <review-output.md>
+node .claude/scripts/parse-review-silent-drop-checklist.mjs -
 ```
 
-**Contract**: The parser selects the JSON block by the sentinel anchor `<!-- silent-drop-checklist -->` (NOT "last fence" or "top-level key" heuristics). The emission rule requires no blank line between sentinel and fence; the reader is lenient (Postel) and tolerates blank lines so formatters cannot silently break valid output. Non-blank content between sentinel and fence IS an error.
+Reads the checklist block after `<!-- silent-drop-checklist -->`, validates
+`silentDropChecklistAnswerSchema`, and prints:
 
-**Exit codes**:
-
-| Code | Meaning                                        |
-| ---- | ---------------------------------------------- |
-| 0    | Valid parse; one-line summary on stdout        |
-| 1    | Parse failure; structured error JSON on stderr |
-| 2    | Invocation error (missing file, bad args)      |
-
-**Structured error codes** (stderr JSON `{error, detail, field_path}`):
-
-| Error                  | When                                                                              |
-| ---------------------- | --------------------------------------------------------------------------------- |
-| `sentinel-missing`     | `<!-- silent-drop-checklist -->` not present                                      |
-| `fenced-block-missing` | Sentinel found but no ` ```json` fence follows                                    |
-| `json-invalid`         | Fence present but body not valid JSON                                             |
-| `schema-invalid`       | Block parsed but Zod validation failed; `field_path` names the first invalid path |
-
-**Success summary** (stdout, one line):
-
-```
+```text
 applied=true modules_touched_count=2 findings_count=3 advisory_suspects_count=1 annotations_used_count=0 truncation_present=false
 ```
 
-**Integration**: Invoked by CI on PRs that touched delivery-path modules. Non-zero exit is treated as SC-8 failure for that PR.
+Exit codes: `0` valid, `1` parse/schema failure, `2` invocation failure.
+Structured errors: `sentinel-missing`, `fenced-block-missing`, `json-invalid`,
+`schema-invalid`.
 
-### verify-enforcement-audit-chain.mjs
+### Audit-Chain Verifier
 
-Hash-chain verifier for `.claude/audit/enforcement-changes.log` (JSONL) and baseline schema validator for `.claude/metrics/silent-drop-baseline.json`.
-
-**Path**: `.claude/scripts/verify-enforcement-audit-chain.mjs`
-
-**Usage**:
+Path: `.claude/scripts/verify-enforcement-audit-chain.mjs`
 
 ```bash
-node .claude/scripts/verify-enforcement-audit-chain.mjs                      # default log path
-node .claude/scripts/verify-enforcement-audit-chain.mjs <path>               # explicit log path
-node .claude/scripts/verify-enforcement-audit-chain.mjs --baseline <path>    # force baseline mode
+node .claude/scripts/verify-enforcement-audit-chain.mjs
+node .claude/scripts/verify-enforcement-audit-chain.mjs <log-path>
+node .claude/scripts/verify-enforcement-audit-chain.mjs --baseline <baseline-path>
 ```
 
-**Behavior**: Auto-detects input mode.
+Default chain path: `.claude/audit/enforcement-changes.log`.
 
-| Input                                          | Mode     | Check                                                                                        |
-| ---------------------------------------------- | -------- | -------------------------------------------------------------------------------------------- |
-| JSONL (one `SilentDropAuditLogEntry` per line) | chain    | For each entry, compute SHA-256 of RFC-8785 canonical JSON of prior entry; match `prev_hash` |
-| JSON object with `reengagement_history[]`      | baseline | Validate full `SilentDropBaselineReport` schema; per-entry reengagement validation           |
+Chain mode validates JSONL `SilentDropAuditLogEntry` records and checks each
+linked `prev_hash` against the SHA-256 hash of the prior entry's
+RFC-8785/JCS-canonical JSON. Baseline mode validates
+`SilentDropBaselineReport`, including reengagement history.
 
-**Entry kinds** (discriminated by `entry_kind`):
+Entry kinds:
 
-| Kind         | `prev_hash`           | Special                                                           |
-| ------------ | --------------------- | ----------------------------------------------------------------- |
-| `normal`     | null (genesis) or hex | carries `mode`, `effective_at`, `correlation_id`                  |
-| `quarantine` | null                  | carries `last_valid_prev_hash` (anchor) + `detected_anomaly_kind` |
-| `re-genesis` | null                  | carries `quarantine_ref` (UUID of preceding quarantine)           |
+| Kind | Link behavior |
+| --- | --- |
+| `normal` | genesis has `prev_hash=null`; later entries link to prior entry hash |
+| `quarantine` | marks a detected chain break and carries `last_valid_prev_hash` |
+| `re-genesis` | restarts the chain after quarantine |
 
-**Exit codes**:
+Exit codes: `0` valid, `1` broken/invalid, `2` missing or unreadable.
+Cryptographic identity is enforced by signed commits and ownership substrate,
+not by the free-form `signature` field.
 
-| Code | Meaning                                                                    |
-| ---- | -------------------------------------------------------------------------- |
-| 0    | Chain valid end-to-end (or empty) / baseline valid                         |
-| 1    | Chain broken (structured stderr with broken-link index) / baseline invalid |
-| 2    | Log file missing or unreadable                                             |
+### Coercive-Flip Preflight
 
-**Canonicalization**: RFC-8785 JCS via the shared `lib/jcs-canonicalize.mjs` module (same as `verify-deployment-audit-chain.mjs`). The implementation is a JCS subset (no float normalization, no Unicode NFC); safe when writer and verifier share this JS implementation. Hardening is required before cross-implementation operation.
-
-**Security boundary**: The `signature` field on entries is a free-form bearer string. Cryptographic identity is enforced at the substrate layer (git-signed commits per NFR-11) and operator identity match, NOT within this verifier.
-
-**Integration**: The coercive-flip preflight invokes the verifier first. Non-zero exit blocks the flip.
-
-### silent-drop-coercive-flip-preflight.mjs
-
-Operator-invoked preflight gate prior to any advisory→coercive flip.
-
-**Path**: `.claude/scripts/silent-drop-coercive-flip-preflight.mjs`
-
-**Usage**:
+Path: `.claude/scripts/silent-drop-coercive-flip-preflight.mjs`
 
 ```bash
 node .claude/scripts/silent-drop-coercive-flip-preflight.mjs <baseline-path>
 ```
 
-**Gates evaluated** (all must pass; short-circuit on first failure):
+Blocking gates:
 
-| #   | Gate                                                                                  | Failure code                                       |
-| --- | ------------------------------------------------------------------------------------- | -------------------------------------------------- |
-| 1   | `verify-enforcement-audit-chain` exit 0                                               | `chain-break`                                      |
-| 2   | `(sample_floor_met OR sample_floor_waived)` AND (when waived) rationale ≥50 chars     | `sample-floor-unmet`, `waiver-rationale-too-short` |
-| 3   | `context_engine_replay_pass=true`                                                     | `replay-not-passed`                                |
-| 4   | `false_positive_rate ≤ FP_CEILING` (0.2)                                              | `fp-rate-above-ceiling`                            |
-| 5   | Substrate probe — non-blocking; warns if substrate changed since baseline publication | (warning only)                                     |
+| Gate | Failure code |
+| --- | --- |
+| audit-chain verifier exits 0 | `chain-break` |
+| sample floor met or waived; waiver rationale is long enough | `sample-floor-unmet`, `waiver-rationale-too-short` |
+| `context_engine_replay_pass=true` | `replay-not-passed` |
+| `false_positive_rate <= 0.2` | `fp-rate-above-ceiling` |
 
-**Substrate probe**: Determines whether the deployment substrate is `github-branch-protection`, `local-single-maintainer`, or `other`. Probe order:
+The substrate probe is warning-only. It reports
+`github-branch-protection`, `local-single-maintainer`, or `other`; missing
+`gh` defaults to `other` with a structured warning.
 
-1. `git remote -v` → github.com remote present?
-2. `.github/CODEOWNERS` presence
-3. `gh api repos/:owner/:repo/branches/:branch/protection` response
+Exit codes: `0` flip permitted, `1` rejected, `2` invocation failure.
+Test-only flags require `SILENT_DROP_PREFLIGHT_TEST_MODE=1`.
 
-Missing `gh` CLI defaults substrate to `other` with structured warning (DEC-007). ENOENT never leaks a stack trace.
+### Baseline SLA Monitor
 
-**Exit codes**:
-
-| Code | Meaning                                         |
-| ---- | ----------------------------------------------- |
-| 0    | All gates pass; flip permitted                  |
-| 1    | Blocking gate failed; structured JSON on stderr |
-| 2    | Invocation error                                |
-
-**Test-mode flags** (gated by `SILENT_DROP_PREFLIGHT_TEST_MODE=1`):
-
-| Flag                        | Purpose                                 |
-| --------------------------- | --------------------------------------- |
-| `--force-chain-break`       | Simulate verifier exit 1                |
-| `--force-substrate=<value>` | Override substrate probe result         |
-| `--force-probe-error`       | Simulate substrate probe error          |
-| `--force-gh-enoent`         | Simulate `gh` missing                   |
-| `--print-substrate`         | Print substrate probe result on success |
-
-**Integration**: Operator runs the preflight before editing `silent-drop-enforcement.json`. See rollout-runbook.
-
-### silent-drop-baseline-sla-monitor.mjs
-
-Maintainer-invoked SLA monitor that emits reassessment recommendations. Never writes a decision (NFR-3 operator-controlled flip discipline) — recommendations only.
-
-**Path**: `.claude/scripts/silent-drop-baseline-sla-monitor.mjs`
-
-**Usage**:
+Path: `.claude/scripts/silent-drop-baseline-sla-monitor.mjs`
 
 ```bash
 node .claude/scripts/silent-drop-baseline-sla-monitor.mjs \
@@ -199,214 +150,125 @@ node .claude/scripts/silent-drop-baseline-sla-monitor.mjs \
   --recommendations .claude/metrics/baseline-sla-recommendation.json
 ```
 
-**Triggers** (append recommendation when):
+The monitor appends recommendations only. It never writes decisions and never
+modifies the baseline.
 
-| Rule    | Condition                                                                                                                                                       |
-| ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| AC-20.1 | `operator_decision=revert-advisory` AND `effective_at` >90 days ago (anchored by latest `reengagement_history` date if newer) AND no prior `kill-gate-terminal` |
-| AC-20.2 | Prior `reengagement-trigger` recommendation unaddressed for 14 days (addressed = new `reengagement_history` entry dated AFTER the recommendation)               |
-| AC-20.4 | Terminal — `kill-gate-terminal` in history suppresses all further recommendations                                                                               |
+Triggers:
 
-**Exit codes**:
+| Trigger | Result |
+| --- | --- |
+| `operator_decision=revert-advisory`, effective date at least 90 days old, and no terminal history | append `reengagement-trigger` |
+| prior reengagement recommendation unaddressed for 14 days | append `second-reminder` |
+| `kill-gate-terminal` in history | suppress further recommendations |
 
-| Code | Meaning                                                              |
-| ---- | -------------------------------------------------------------------- |
-| 0    | Success (recommendations appended or no-op)                          |
-| 1    | Baseline validation failure (schema invalid, malformed reengagement) |
-| 2    | Invocation error                                                     |
+Exit codes: `0` success, `1` baseline invalid, `2` invocation failure.
 
-**Write permissions**: The monitor writes to `baseline-sla-recommendation.json`. That file is in `PROTECTED_FILENAMES` — agent writes are blocked; the monitor succeeds because it runs under maintainer identity, not as an agent Write tool call.
+## Schemas
 
-## Data Contracts (Zod Schemas)
+All schemas live in `.claude/scripts/lib/silent-drop-schemas.mjs`.
 
-All five schemas live in `.claude/scripts/lib/silent-drop-schemas.mjs`. Validation happens at every boundary: parsers, writers, verifiers.
+`SilentDropChecklistAnswer` fields:
+`applied`, `delivery_path_modules_touched`, `findings`,
+`advisory_suspects`, `annotations_used`, optional `truncation`.
 
-### SilentDropChecklistAnswer
+Finding kinds:
 
-**Owner**: Emitted by code-reviewer; consumed by `parse-review-silent-drop-checklist.mjs`.
-
-**Purpose**: Single structured record of the Category H checklist outcome for one PR.
-
-**Shape**:
-
-| Field                           | Type                          | Notes                                                             |
-| ------------------------------- | ----------------------------- | ----------------------------------------------------------------- |
-| `applied`                       | boolean                       | Checklist ran                                                     |
-| `delivery_path_modules_touched` | string[]                      | Module IDs                                                        |
-| `findings`                      | `Finding[]` (max 50)          | Category H violations; kind ∈ 8 enum values                       |
-| `advisory_suspects`             | `AdvisorySuspect[]` (max 100) | Regex-heuristic candidates; `function_name` ≤40 chars (NFR-13)    |
-| `annotations_used`              | `AnnotationUsed[]`            | Per-suppression record; `rationale_prefix` ≤40 chars (NFR-14)     |
-| `truncation`                    | `{count_omitted, reason}`     | Optional; reason ∈ `{findings-cap-50, advisory-suspects-cap-100}` |
-
-**Finding kinds** (8):
-
-```
-missing-log | missing-metric | free-form-reason | label-cardinality
-sensitive-reason-value | annotation-overuse | annotation-stale
+```text
+missing-log
+missing-metric
+free-form-reason
+label-cardinality
+sensitive-reason-value
+annotation-overuse
+annotation-stale
 metric-naming-violation
 ```
 
-### SilentDropEnforcementFlag
+`SilentDropEnforcementFlag` fields:
+`mode`, `effective_at`, `operator`, `correlation_id`, `schema_version`.
+Location: `.claude/config/silent-drop-enforcement.json`.
 
-**Owner**: Operator writes via signed commit; consumed by code-reviewer dispatch (read-at-dispatch-start snapshot).
+`SilentDropBaselineReport` key fields:
+`measurement_window`, `sample_floor_met`, `sample_floor_waived`,
+`waiver_rationale`, `sample_count`, `false_positive_rate`, `catch_rate`,
+`context_engine_replay_pass`, `operator_decision`, `published_substrate`,
+`reengagement_history`, `distinct_authors_count`.
+Location: `.claude/metrics/silent-drop-baseline.json`.
 
-**Purpose**: Advisory/coercive/off mode flag.
+Reengagement decisions:
 
-**Location**: `.claude/config/silent-drop-enforcement.json`
+```text
+extend-revert-90d
+attempt-coercive-flip
+kill-gate-terminal
+```
 
-**Shape**:
+`SilentDropAuditLogEntry` common fields: `entry_id`, `timestamp`, `operator`,
+`signature`; discriminant: `entry_kind`.
 
-| Field            | Type                                | Notes                                                   |
-| ---------------- | ----------------------------------- | ------------------------------------------------------- |
-| `mode`           | `'advisory' \| 'coercive' \| 'off'` | Enforcement mode                                        |
-| `effective_at`   | ISO-8601 UTC                        | Bounded to [now-5min, now+24h] at write time (EDGE-004) |
-| `operator`       | string                              | Operator identity                                       |
-| `correlation_id` | UUIDv4                              | Correlates with audit log entry                         |
-| `schema_version` | `'1.0'`                             | Literal                                                 |
+## Protected Files
 
-**Write discipline**: Atomic-rename (write `.tmp` → `rename()`). Readers apply sticky-read on parse failure (last known good).
+`workflow-file-protection.mjs` blocks agent writes to these artifacts by
+basename and expected directory:
 
-**File protection**: `workflow-file-protection.mjs` blocks agent writes.
+| File | Directory | Purpose |
+| --- | --- | --- |
+| `silent-drop-enforcement.json` | `config/` | mode flag |
+| `enforcement-changes.log` | `audit/` | hash-chained audit log |
+| `silent-drop-baseline.json` | `metrics/` | flip baseline |
+| `verify-enforcement-audit-chain.mjs` | `scripts/` | chain verifier |
+| `baseline-sla-recommendation.json` | `metrics/` | reassessment recommendations |
 
-### SilentDropBaselineReport
+The hook uses `PROTECTED_FILENAMES`, `PROTECTED_FILE_DIRS`, realpath symlink
+defense, and Bash pattern checks for redirect, `rm`, `mv`, `cp`, `truncate`,
+and `sed -i`. Operator edits happen outside the agent tool path through signed
+commits, ownership, and review.
 
-**Owner**: Operator-published; consumed by preflight + SLA monitor.
+## Substrate
 
-**Purpose**: Gate the coercive flip. Ships measurement window, sample adequacy, FP rate, replay-pass flag, operator decision, and reengagement history.
+Current substrate is recorded in `.claude/memory-bank/org-context.md`:
 
-**Location**: `.claude/metrics/silent-drop-baseline.json`
+```text
+enforcement_substrate: local-single-maintainer
+```
 
-**Key fields**:
+Accepted values: `github-branch-protection`, `local-single-maintainer`,
+`other`. The preflight warns when the current probe differs from
+`baseline.published_substrate`. CODEOWNERS covers the mode flag, baseline,
+recommendation file, and verifier when branch protection is available.
 
-| Field                        | Type                    | Notes                                                                                           |
-| ---------------------------- | ----------------------- | ----------------------------------------------------------------------------------------------- |
-| `measurement_window`         | `{start, end}` ISO UTC  |                                                                                                 |
-| `sample_floor_met`           | boolean                 |                                                                                                 |
-| `sample_floor_waived`        | boolean                 | AC-5.8 — consumed-once; fresh waiver required after revert                                      |
-| `waiver_rationale`           | string (optional)       | ≥50 chars enforced by preflight (not schema)                                                    |
-| `sample_count`               | number                  | Excludes truncated PRs (NFR-16a)                                                                |
-| `false_positive_rate`        | number 0..1 \| null     | Null iff `sample_count=0`                                                                       |
-| `catch_rate`                 | number 0..1 \| null     | Null iff `sample_count=0`                                                                       |
-| `context_engine_replay_pass` | boolean                 | Gate 3 of preflight                                                                             |
-| `operator_decision`          | 6-value enum            | `scope-narrow \| budget-tune \| revert-advisory \| kill-gate \| flip-coercive \| extend-window` |
-| `effective_at`               | ISO UTC (optional)      | Drives 90-day reengagement clock when `operator_decision=revert-advisory`                       |
-| `published_substrate`        | 3-value enum (optional) | Substrate at publication time (AC-22.3)                                                         |
-| `reengagement_history`       | `ReengagementEntry[]`   | Each entry validated by `reengagementHistoryEntrySchema`                                        |
-| `distinct_authors_count`     | number                  | ≥3 required (NFR-16c)                                                                           |
+## Replay Coverage
 
-### ReengagementHistoryEntry
+Fixtures under `.claude/scripts/__tests__/silent-drop/fixtures/postmortem-replay/`
+pin six Context Engine postmortem issues to Category H.
 
-**Owner**: Operator appends via signed commit.
+| Issue | Category | Fixture | Items |
+| --- | --- | --- | --- |
+| 3 | WS broadcasts | `issue-3-broadcast-drop` | H.1 |
+| 5 | frontend event routers | `issue-5-router-fallthrough` | H.1 |
+| 6 | REST handler routers | `issue-6-card-routing` | H.1 |
+| 7 | emitter fan-out | `issue-7-emitter-fanout` | H.1, H.2 |
+| 9 | SSE | `issue-9-sse-stream` | H.1, H.3 |
+| 10 | pub/sub | `issue-10-pubsub-drop` | H.1 |
 
-**Shape**:
+## Verification
 
-| Field       | Type                                                               | Notes     |
-| ----------- | ------------------------------------------------------------------ | --------- |
-| `date`      | ISO-8601 UTC                                                       |           |
-| `decision`  | `extend-revert-90d \| attempt-coercive-flip \| kill-gate-terminal` | AC-20.3   |
-| `rationale` | string                                                             | ≥30 chars |
+```bash
+npx vitest run --config .claude/scripts/vitest.config.mjs .claude/scripts/__tests__/silent-drop
+npx vitest run --config .claude/scripts/vitest.config.mjs .claude/scripts/__tests__/workflow-file-protection.regression.test.mjs
+```
 
-**Terminal semantics**: `kill-gate-terminal` suppresses all further SLA recommendations. `extend-revert-90d` and `attempt-coercive-flip` are non-terminal.
+Coverage includes parser extraction, schemas, audit chain, preflight gates, SLA
+monitoring, file protection, CODEOWNERS, code-reviewer Category H, incident
+tracking, and replay fixtures.
 
-### SilentDropAuditLogEntry
+Related surfaces:
 
-**Owner**: Operator appends via signed commit; consumed by `verify-enforcement-audit-chain` and the coercive-flip preflight.
-
-**Purpose**: Hash-chained audit trail of enforcement flag mutations and chain-break recovery events.
-
-**Location**: `.claude/audit/enforcement-changes.log` (JSONL)
-
-**Discriminated union** (`entry_kind`):
-
-| Kind         | Key fields                                                        |
-| ------------ | ----------------------------------------------------------------- |
-| `normal`     | `prev_hash`, `correlation_id`, `mode`, `effective_at`             |
-| `quarantine` | `last_valid_prev_hash`, `detected_anomaly_kind`; `prev_hash=null` |
-| `re-genesis` | `quarantine_ref` (UUID of preceding quarantine); `prev_hash=null` |
-
-**Common fields** on every kind: `entry_id` (UUIDv4), `timestamp` (ISO UTC), `operator`, `signature`.
-
-**Chain semantics**:
-
-- `prev_hash` = SHA-256 hex of RFC-8785 canonical JSON of the prior entry (genesis is null).
-- Quarantine + re-genesis pair break and restart the chain; pre-break entries remain in the log as history.
-
-### Coercive-flip-preflight behavioral contract
-
-**Owner**: Behavioral — no data-model artifact.
-
-**Inputs**: baseline JSON path, git/gh substrate probe.
-
-**Outputs**: exit 0 (permitted) or 1 (rejected) or 2 (invocation error). Failures are named with stable codes. See the script section above.
-
-**Invariants**: (1) Verifier runs first; chain break is a hard block regardless of other gates. (2) Substrate change is non-blocking (warning). (3) Waived sample floor is consumed once per flip cycle; reverting to advisory resets `sample_floor_waived=false`.
-
-## File Protection Integration
-
-The hook `workflow-file-protection.mjs` was extended to cover four new artifacts. Each entry is in two data structures:
-
-1. `PROTECTED_FILENAMES` (array of basenames) — the outer block gate.
-2. `PROTECTED_FILE_DIRS` (basename → directory map) — the data-driven matcher that prevents falling through to the `coordination/` default.
-
-Previous implementation had an if/else ladder where unknown directories fell through to the `coordination/` branch. Writes to `.claude/config/silent-drop-enforcement.json` would have been silently unmatched. The map refactor (DEC-004) closes this gap.
-
-### New protected files
-
-| Basename                             | Directory  | Why protected                                              |
-| ------------------------------------ | ---------- | ---------------------------------------------------------- |
-| `silent-drop-enforcement.json`       | `config/`  | Operator-controlled enforcement flag (NFR-3)               |
-| `silent-drop-baseline.json`          | `metrics/` | Gates coercive flip; forgeable baseline = forgeable flip   |
-| `verify-enforcement-audit-chain.mjs` | `scripts/` | NFR-10 hash-chain integrity depends on verifier integrity  |
-| `baseline-sla-recommendation.json`   | `metrics/` | Emitted by monitor; operator responds by updating baseline |
-
-### Protection layers (defense in depth)
-
-| Layer           | Block vector                                                                     |
-| --------------- | -------------------------------------------------------------------------------- |
-| Basename match  | Write tool `file_path` basename ∈ `PROTECTED_FILENAMES` → block                  |
-| Directory match | `PROTECTED_FILE_DIRS[basename]` must match the write's resolved parent directory |
-| Realpath inode  | Canonical realpath resolution defeats symlink bypass (Bash + Write)              |
-| Bash patterns   | `rm`, `mv`, `truncate`, `cp`, `dd`, shell redirection targeting protected names  |
-
-The operator bypass path is signed-commit identity match at the substrate layer (CODEOWNERS + branch protection), NOT relaxation of these hooks.
-
-## CODEOWNERS Substrate
-
-The project records the enforcement substrate in `.claude/memory-bank/org-context.md` as `enforcement_substrate: <value>` where value ∈ `{github-branch-protection, local-single-maintainer, other}`.
-
-The coercive-flip preflight probes the current substrate and warns if it differs from the substrate captured at baseline publication time (`baseline.published_substrate`). This is non-blocking but visible.
-
-See `.github/CODEOWNERS` for the ownership assignments covering:
-
-- `.claude/config/silent-drop-enforcement.json`
-- `.claude/metrics/silent-drop-baseline.json`
-- `.claude/metrics/baseline-sla-recommendation.json`
-- `.claude/scripts/verify-enforcement-audit-chain.mjs`
-
-## Retrospective Replay Coverage
-
-Context Engine postmortem issues 3, 5, 6, 7, 9, and 10 shared the silent-drop root cause: delivery-path code discarded messages with bare `continue`, `return`, or unmatched `switch` paths without an observable log or metric. The replay fixtures in `.claude/scripts/__tests__/silent-drop/fixtures/postmortem-replay/` pin the mapping below.
-
-| Issue | Delivery-path category | Fixture module               | Checklist items |
-| ----- | ---------------------- | ---------------------------- | --------------- |
-| 3     | WS broadcasts          | `issue-3-broadcast-drop`     | H.1             |
-| 5     | Frontend event routers | `issue-5-router-fallthrough` | H.1             |
-| 6     | REST handler routers   | `issue-6-card-routing`       | H.1             |
-| 7     | Emitter fan-out        | `issue-7-emitter-fanout`     | H.1, H.2        |
-| 9     | SSE                    | `issue-9-sse-stream`         | H.1, H.3        |
-| 10    | Pub/sub                | `issue-10-pubsub-drop`       | H.1             |
-
-Replay coverage is 6 of 6. H.1 catches every issue; H.2 and H.3 add coverage for high-volume fan-out and metric naming/cardinality risk.
-
-## See Also
-
-- **Pattern training**: `.claude/memory-bank/best-practices/logging.md` § Silent-Drop Observability — anti-pattern, observable-drop substitution, 7-category delivery-path taxonomy, external-observer litmus test, `<component>.<path>.dropped` naming convention, acknowledgment annotation syntax.
-- **Agent behavior**: `.claude/agents/code-reviewer.md` § Category H — review items H.1/H.2/H.3, hybrid markdown+JSON output pattern, sentinel discipline.
-- **Required context**: `.claude/agents/spec-author.md` § Required Context — includes `logging.md` for spec authors.
-- **Operator procedure**: this document — normal flip path, audit-chain recovery, substrate fallback, SLA response cycle.
-- **Retrospective replay**: this document § Retrospective Replay Coverage — 6/6 Context Engine postmortem issues mapped to Category H items.
-- **Incident tracking**: `.claude/metrics/silent-drop-incident-tracker.md` — dated tracking + postmortem-tagging protocol (SM-001).
-- **Amendment log**: `.claude/prds/silent-drop-observability/AMENDMENT-LOG.md` — cross-PRD coordination with pipeline-integration-gaps.
-- **PRD**: `.claude/prds/silent-drop-observability/prd.md`
-- **Related hook**: `.claude/docs/HOOKS.md` § workflow-file-protection.mjs — canonical hook reference.
-- **Related verifier pattern**: `.claude/docs/deployment-verification-contracts.md` § Verifying the Audit Chain — same RFC-8785 JCS canonicalization pattern, different log file.
+- `.claude/memory-bank/best-practices/logging.md`
+- `.claude/agents/code-reviewer.md`
+- `.claude/scripts/lib/silent-drop-schemas.mjs`
+- `.claude/metrics/silent-drop-incident-tracker.md`
+- `.claude/prds/silent-drop-observability/AMENDMENT-LOG.md`
+- `.claude/prds/silent-drop-observability/prd.md`
+- `.claude/docs/HOOKS.md`
+- `.claude/docs/deployment-verification-contracts.md`
