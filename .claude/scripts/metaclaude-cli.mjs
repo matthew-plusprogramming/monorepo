@@ -422,6 +422,13 @@ async function cmdStatus(projectArg, options) {
       const targetPath = artifact.target_path || artifact.path;
       const localPath = join(projectPath, targetPath);
       const localExists = existsSync(localPath);
+      const statusIsNeverOverwrite = statusEffectivePolicy === 'never-overwrite';
+
+      if (statusIsNeverOverwrite && localExists) {
+        log(`↷ ${artifactPath}: ${artifact.version}@${artifact.hash} (never-overwrite, local file exists)`, 'dim');
+        current++;
+        continue;
+      }
 
       if (!installed && !localExists) {
         log(`+ ${artifactPath}: ${artifact.version}@${artifact.hash} (not installed)`, 'yellow');
