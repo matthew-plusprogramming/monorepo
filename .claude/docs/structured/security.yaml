@@ -1,0 +1,19 @@
+# Security Boundary Template (Security Diagram Source)
+#
+# WARNING: This file contains security boundary definitions.
+# It uses _sync_policy: "never-sync" and will NOT be propagated to consumer projects.
+#
+# Getting started:
+#   1. Run `node .claude/scripts/docs-scaffold-diagrams.mjs` to generate a stub
+#      with the schema_version header and minimal valid structure.
+#   2. Or fill in this template manually with your project's security zones.
+#   3. Run `node .claude/scripts/docs-validate.mjs` to check for issues.
+#   4. Run `node .claude/scripts/docs-generate.mjs` to create Mermaid security diagrams.
+#
+# Each zone defines a trust level and its components.
+# Data flows describe how data moves between zones.
+# The generator produces a flowchart with security zones from this source.
+#
+schema_version: 1
+zones: []
+data_flows: []
