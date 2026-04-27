@@ -8,7 +8,7 @@
 
 The `/route` skill decides which workflow (`oneoff-vibe`, `oneoff-spec`, `orchestrator`, `refactor`, `journal-only`) a user request should take. The decision matters: orchestrator workflows burn ~2-4M tokens and ~4-5h wall-clock per workstream (per the ws-2 and ws-3 retrospectives of the pipeline-efficiency PRD), while oneoff-spec workflows run in a fraction of that. Routing a medium-complexity task to orchestrator pays the full orchestration tax (worktree setup, parallel batches, convergence dispatches, cross-workstream integration) without commensurate benefit.
 
-This document defines the **raised orchestrator bar** and the multi-domain evidence requirement that shipped with `sg-pipeline-efficiency-routing-thresholds`.
+This document defines the current **raised orchestrator bar** and the multi-domain evidence requirement for `/route`.
 
 ## TL;DR
 
@@ -170,7 +170,7 @@ The collector reads `session.json.active_work.route_decisions[]` (populated by `
 
 **T0 case**: the first baseline run after the heuristic ships produces `sample_size: 0` + `bootstrap_note` because the append-only log is newly introduced by this spec. Subsequent runs (after `/route` records real decisions) reflect the true distribution and allow post-change comparison against the bootstrap baseline.
 
-## Ship Effort
+## Current Surfaces
 
 - `.claude/skills/route/SKILL.md` §Complexity Heuristics §Large subsection — rewritten to encode the three-condition gate.
 - `.claude/skills/route/SKILL.md` §Step 5 — `multi_domain_justification` added to the output schema; `record-route-decision` CLI invocation mandated.
@@ -182,8 +182,6 @@ The collector reads `session.json.active_work.route_decisions[]` (populated by `
 
 ## References
 
-- Parent spec: `sg-pipeline-efficiency-routing-thresholds`
 - Parent PRD: `.claude/prds/pipeline-efficiency/prd.md`
 - Retrospective origin: `.claude/context/archive/2026-04-23-routing-threshold-oneoff-handoff.md`
-- Requirements: `.claude/specs/groups/sg-pipeline-efficiency-routing-thresholds/requirements.md` (REQ-001 through REQ-006)
 - Memory-bank (orchestrator economics): `.claude/memory-bank/delegation.guidelines.md`

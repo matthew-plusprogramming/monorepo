@@ -275,7 +275,7 @@ Every response must include:
 - **Medium tasks (oneoff-spec)**: TaskSpec + parallel delegation (implement + test)
 - **Large tasks (orchestrator)**: MasterSpec + full parallel workstream delegation
 
-**Raised orchestrator bar** (per `sg-pipeline-efficiency-routing-thresholds`): `/route` recommends `orchestrator` only when the request clears a three-condition gate (10+ anticipated atomic specs AND ≥2 multi-domain criteria with evidence AND tight parallelization benefit) and emits a `multi_domain_justification` field. Medium-complexity work that previously routed to orchestrator under the legacy "5+ files, 4+ hours" heuristic now defaults to `oneoff-spec`. In-flight orchestrator spec groups are not reclassified — the raised bar is forward-only. See `.claude/docs/ROUTING.md` for the canonical criterion list, worked examples, migration guidance, and measurement instructions.
+**Raised orchestrator bar** (see `.claude/docs/ROUTING.md`): `/route` recommends `orchestrator` only when the request clears a three-condition gate (10+ anticipated atomic specs AND ≥2 multi-domain criteria with evidence AND tight parallelization benefit) and emits a `multi_domain_justification` field. Medium-complexity work that previously routed to orchestrator under the legacy "5+ files, 4+ hours" heuristic now defaults to `oneoff-spec`. In-flight orchestrator spec groups are not reclassified; the raised bar is forward-only.
 
 ### Core Skills
 

@@ -1098,7 +1098,7 @@ export class TestWriterUnlockError extends Error {
  * tests stay stable (mirrors TestWriterUnlockError / SessionOverrideError
  * conventions).
  *
- * Codes (stable discriminators, spec.md §Routing-Decision Output Persistence):
+ * Codes (stable discriminators for record-route-decision):
  *   ROUTE_DECISION_USAGE_ERROR             — missing / invalid required arg
  *   ROUTE_DECISION_WORKFLOW_INVALID        — workflow not in VALID_WORKFLOWS
  *   ROUTE_DECISION_RATIONALE_INVALID       — rationale missing or empty
@@ -1111,7 +1111,7 @@ export class TestWriterUnlockError extends Error {
  *   ROUTE_DECISION_LOCK_FAILED             — session.json lock acquisition failed
  *   ROUTE_DECISION_WRITE_FAILED            — atomic-modify write failed
  *
- * sg-pipeline-efficiency-routing-thresholds / Task 2b / REQ-003.
+ * Owner: .claude/docs/ROUTING.md.
  */
 export class RouteDecisionError extends Error {
   constructor(code, message, details = {}) {
@@ -4309,7 +4309,7 @@ function opFireRefenceTrigger(specGroupId, trigger) {
 }
 
 // =============================================================================
-// sg-pipeline-efficiency-routing-thresholds / Task 2b / REQ-003
+// Routing decision persistence.
 // record-route-decision CLI (sole-writer for session.active_work.route_decisions[])
 // =============================================================================
 
@@ -4411,11 +4411,11 @@ function truncateRationale(s) {
 /**
  * Validate the `multi_domain_justification` shape.
  *
- * Contract (spec.md §Routing-Decision Output Persistence):
+ * Contract (ROUTING.md routing-decision persistence):
  *   - Array of `{criterion: string, evidence: string}` objects.
  *   - Required when workflow === 'orchestrator'; forbidden otherwise.
  *   - Each element must have non-empty `criterion` AND non-empty `evidence`.
- *   - Requires two or more entries (REQ-003).
+ *   - Requires two or more entries.
  *
  * Returns the validated array on success; throws RouteDecisionError on
  * failure with a code describing which validation layer fired.
@@ -4525,10 +4525,9 @@ function validateRouteRiskTier(rawRiskTier) {
  * record-route-decision — append a routing decision to the session's
  * append-only log.
  *
- * Sole-writer for `session.active_work.route_decisions[]` (spec.md
- * §Interfaces & Contracts §Routing-Decision Output Persistence). Called by
- * the main-agent after `/route` produces its decision block, before the
- * next phase transition.
+ * Sole-writer for `session.active_work.route_decisions[]`. Called by the
+ * main-agent after `/route` produces its decision block, before the next
+ * phase transition.
  *
  * Uses `atomicModifyJSON` (and its internal `acquireLock`/`releaseLock`)
  * so concurrent writers cannot corrupt session.json. An audit entry is
@@ -4714,7 +4713,7 @@ export function opRecordRouteDecision(
     throw canonErr;
   }
 
-  // ---- Build entry (per spec.md §Routing-Decision Output Persistence) ----
+  // ---- Build entry (per ROUTING.md routing-decision persistence) ----
   const timestamp = now();
   const entry = {
     timestamp,
@@ -7833,8 +7832,7 @@ References:
 }
 
 /**
- * Per-subcommand --help printer for record-route-decision
- * (sg-pipeline-efficiency-routing-thresholds / Task 2b / REQ-003).
+ * Per-subcommand --help printer for record-route-decision.
  *
  * Emits to stdout (Unix convention for explicit --help) and exits 0 via the
  * surrounding case-branch fallthrough.
@@ -7847,9 +7845,8 @@ record-route-decision — Append a /route decision to session.active_work.route_
 Usage: node session-checkpoint.mjs record-route-decision <workflow> <rationale>
          [--risk-tier <tier>] [--multi-domain-justification <json>]
 
-Sole-writer CLI for session.active_work.route_decisions[] (spec.md §Interfaces
-& Contracts §Routing-Decision Output Persistence). Invoked by the main-agent
-after /route produces its decision block, before phase transitions.
+Sole-writer CLI for session.active_work.route_decisions[]. Invoked by the
+main-agent after /route produces its decision block, before phase transitions.
 
 Required arguments:
   <workflow>                    Positional. One of:
@@ -7892,10 +7889,8 @@ Structured errors (exit 1):
   ROUTE_DECISION_WRITE_FAILED            Lock or atomic-rename failed.
 
 References:
-  Spec:         sg-pipeline-efficiency-routing-thresholds
-  Task:         Task 2b
-  Requirement:  REQ-003 (AC-ORCH-EVIDENCE)
-  Contract:     spec.md §Interfaces & Contracts §Routing-Decision Output Persistence
+  Owner doc:    .claude/docs/ROUTING.md
+  Contract:     Evidence Requirement — multi_domain_justification
 `);
 }
 
@@ -7949,7 +7944,7 @@ Operations:
                                                    workstream-rotate, session-end}. Idempotent.
                                                    Appends test_writer_unlock_refence audit entry.
   record-route-decision <workflow> <rationale>    Append /route decision to session log
-    [--multi-domain-justification <json>]          (sg-pipeline-efficiency-routing-thresholds / Task 2b)
+    [--multi-domain-justification <json>]          (ROUTING.md)
                                                    Sole-writer for session.active_work.route_decisions[];
                                                    --multi-domain-justification required when
                                                    workflow=orchestrator (REQ-003). Rationale
@@ -8180,7 +8175,7 @@ async function main() {
       }
 
       case 'record-route-decision': {
-        // sg-pipeline-efficiency-routing-thresholds / Task 2b / REQ-003
+        // Routing decision persistence.
         // Usage:
         //   record-route-decision <workflow> <rationale>
         //     [--risk-tier <tier>] [--multi-domain-justification <json>]

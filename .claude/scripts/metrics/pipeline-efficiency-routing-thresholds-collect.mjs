@@ -3,22 +3,20 @@
 /**
  * pipeline-efficiency-routing-thresholds-collect.mjs
  *
- * Baseline instrumentation for the routing-threshold tightening work
- * (REQ-001 / AC-1.1 / AC-1.2 / AC-BASELINE-MEASURED).
+ * Baseline instrumentation for the routing-threshold heuristic.
  *
  * Reads recent `/route` decisions from `session.json.active_work.route_decisions[]`
- * (per spec.md §Interfaces & Contracts §Routing-Decision Output Persistence)
+ * (per .claude/docs/ROUTING.md)
  * and emits a JSON baseline artifact to stdout. The artifact captures the
  * pre-change routing distribution so post-change impact is measurable.
  *
- * T0 edge case (EDGE-05 / AC-BASELINE-MEASURED): the `route_decisions[]`
- * append-only log is introduced by THIS spec. At the point this collector
- * first runs, the log will be empty. That is expected — the artifact emits
+ * T0 edge case: when the `route_decisions[]` append-only log is new, the
+ * first run can be empty. That is expected; the artifact emits
  * `sample_size: 0` with a `bootstrap_note` explaining the T0 condition, and
  * exits 0 (NOT a failure). Post-ship decisions populate the log and future
  * runs reflect real distribution.
  *
- * Capture shape (REQ-001 / EDGE-05):
+ * Capture shape:
  *   {
  *     workstream_id: "sg-pipeline-efficiency-routing-thresholds",
  *     run_id: <iso-or-override>,
@@ -35,7 +33,7 @@
  *     distribution: { [workflow]: count }    // summary counts per workflow
  *   }
  *
- * Sample selection (REQ-001):
+ * Sample selection:
  *   - Read `.claude/context/session.json.active_work.route_decisions[]` (if present).
  *   - Keep entries from the last 7 days OR the last 5 entries (whichever is
  *     larger), as required by REQ-001.
@@ -63,8 +61,7 @@
  *   1 - Runtime error (e.g., session.json unreadable).
  *   2 - Invocation error (bad args).
  *
- * Implements: REQ-001, AC-1.1, AC-1.2, AC-BASELINE-MEASURED.
- * Spec: sg-pipeline-efficiency-routing-thresholds Task 1.
+ * Owner: .claude/docs/ROUTING.md.
  */
 
 import {
@@ -96,7 +93,7 @@ const ERR_WRITE_FAILED = 'ERR_WRITE_FAILED';
 
 const T0_BOOTSTRAP_NOTE =
   'route_decisions[] log is empty (T0 case). ' +
-  'The append-only log is newly introduced by sg-pipeline-efficiency-routing-thresholds; ' +
+  'The append-only log is newly introduced by the routing-threshold instrumentation; ' +
   'baseline population begins at this measurement point. ' +
   'Post-change impact is measurable by comparing future runs against this bootstrap baseline.';
 
