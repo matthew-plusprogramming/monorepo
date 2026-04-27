@@ -2,279 +2,123 @@
 _source_spec: sg-e2e-pure-compute-check
 _source_modules:
   ['scripts-lib/pure-compute-matcher', 'scripts-lib/pure-compute-scanner']
-title: Pure-Compute Static-Analysis Sub-Check — Blocklist Reference
-last_reviewed: 2026-04-21
+title: Pure-Compute Static-Analysis Blocklist
+last_reviewed: 2026-04-27
 ---
 
-# Pure-Compute Static-Analysis Sub-Check — Blocklist Reference
+# Pure-Compute Static-Analysis Blocklist
 
-Authoritative blocklist for the pure-compute static-analysis sub-check. Any spec declaring `e2e_skip: true` + `e2e_skip_rationale: pure-compute` that imports or statically references these symbols fails Gate 5.
-
-This document mirrors the `Blocklist` YAML block in [spec.md § Interfaces & Contracts](../specs/groups/sg-e2e-pure-compute-check/spec.md#interfaces--contracts) and the authoritative tables in `pure-compute-matcher.mjs` / `pure-compute-scanner.mjs`. The spec's `Blocklist` block is the source of truth; this doc is the human-readable surface.
-
-For the overview and Gate 5 integration, see [PURE-COMPUTE-CHECK.md](PURE-COMPUTE-CHECK.md). For the API, see [PURE-COMPUTE-CHECK-API.md](PURE-COMPUTE-CHECK-API.md).
+This is the human-readable blocklist for specs using
+`e2e_skip_rationale: pure-compute`. A match fails completion-verifier Gate 5.
+The executable sources are `pure-compute-matcher.mjs` and
+`pure-compute-scanner.mjs`.
 
 ## Rules
 
-- **Blocklist is authoritative**. Not extensible by spec authors. Additions require a spec amendment to `sg-e2e-pure-compute-check`.
-- **Blocklist is append-only**. Adding entries is additive (non-breaking). Removing entries is a breaking change requiring a contract version bump.
-- **`node:` prefix is normalized**. `node:fs` and `fs` match the same blocklist entry.
-- **Type-only imports are ignored**. `import type { Socket } from 'net'` has no runtime effect; the walker filters type-only imports from the frontier.
-- **Safelist is explicit**. `perf_hooks` is the single entry. Safelist matches short-circuit blocklist lookup.
-
-## Detection Layers
-
-The blocklist is matched at three layers of the pipeline:
-
-| Layer              | Detected by              | Matches                                                                                               |
-| ------------------ | ------------------------ | ----------------------------------------------------------------------------------------------------- |
-| **Module-level**   | `matcher.matchBlocklist` | Whole-module imports and re-exports (`import 'net'`, `export * from 'child_process'`).                |
-| **Callsite-level** | `scanner.scanCallSites`  | CallExpression / NewExpression / PropertyAccessExpression matches (`fs.writeFile(...)`, `eval(...)`). |
-| **Dynamic-import** | `extractor` + `matcher`  | `import(...)` call expressions; unconditional `<dynamic-import>` sentinel.                            |
+- `node:` prefixes are normalized before matching.
+- Type-only imports are ignored by traversal.
+- `perf_hooks` is the only safelisted module.
+- Dynamic imports always fail.
+- Structural failures use sentinel symbols and fail the verdict.
+- Spec authors cannot extend or narrow this list locally.
 
 ## Module-Level Blocklist
 
-Whole-module imports of these specifiers fail. Equivalent `node:`-prefixed forms are treated identically.
+Whole-module imports and re-exports fail for these specifiers.
 
-### Network
+| Category | Specifiers |
+| --- | --- |
+| Network | `net`, `http`, `https`, `dns`, `dgram`, `tls`, `http2` |
+| Filesystem write path | `fs/promises` |
+| Process and subprocess | `child_process`, `worker_threads`, `cluster` |
+| Diagnostics | `diagnostics_channel`, `inspector`, `trace_events` |
+| Interactive | `readline`, `repl` |
+| Code execution | `vm` |
 
-| Specifier | Fails |
-| --------- | ----- |
-| `net`     | Yes   |
-| `http`    | Yes   |
-| `https`   | Yes   |
-| `dns`     | Yes   |
-| `dgram`   | Yes   |
-| `tls`     | Yes   |
-| `http2`   | Yes   |
+`node:fs/promises`, `node:http`, and similar prefixed forms match the same
+entries.
 
-Every `node:<name>` prefix variant matches the same entry. Example failing imports:
-
-```javascript
-import net from 'net';
-import http from 'node:http';
-import { createServer } from 'https';
-export * from 'dns';
-```
-
-### Filesystem Write (Module-Level)
-
-Importing the write-side filesystem module fails at the module level:
-
-| Specifier          | Fails |
-| ------------------ | ----- |
-| `fs/promises`      | Yes   |
-| `node:fs/promises` | Yes   |
-
-Importing `fs` itself does **not** fail at the module level. The walker relies on the callsite scanner to detect write-side calls (`fs.writeFile(...)`, etc.). A spec that imports `fs` and only uses read APIs (`fs.readFile`) passes.
-
-### Process / Subprocess
-
-| Specifier        | Fails |
-| ---------------- | ----- |
-| `child_process`  | Yes   |
-| `worker_threads` | Yes   |
-| `cluster`        | Yes   |
-
-Callsite-level `process.exit()` also fails (see below). Other `process.*` accesses (e.g., `process.cwd()`) are allowed.
-
-### Diagnostics / Introspection
-
-| Specifier             | Fails |
-| --------------------- | ----- |
-| `diagnostics_channel` | Yes   |
-| `inspector`           | Yes   |
-| `trace_events`        | Yes   |
-
-### Interactive
-
-| Specifier  | Fails |
-| ---------- | ----- |
-| `readline` | Yes   |
-| `repl`     | Yes   |
-
-### Code Execution
-
-| Specifier | Fails |
-| --------- | ----- |
-| `vm`      | Yes   |
-
-Additional code-execution paths are detected at the callsite level (see below).
+`fs` by itself is not module-blocked. Read APIs can pass; write APIs are caught
+by the scanner.
 
 ## Callsite-Level Blocklist
 
-Call expressions and new expressions that fail even when the imported module itself is allowed.
+These expressions fail even when the containing module import is otherwise
+allowed.
 
-### Filesystem Write Methods
+| Category | Patterns |
+| --- | --- |
+| Filesystem writes | `fs.writeFile`, `fs.writeFileSync`, `fs.appendFile`, `fs.appendFileSync`, `fs.rename`, `fs.renameSync`, `fs.unlink`, `fs.unlinkSync` |
+| Filesystem promises writes | `fs.promises.writeFile`, `fs.promises.appendFile`, `fs.promises.rename`, `fs.promises.unlink`, including sync-name variants in the table |
+| OS network inspection | `os.networkInterfaces()` |
+| Process exit | `process.exit()` |
+| Direct code execution | `eval`, `globalThis.eval`, `Function`, `new Function`, `globalThis.Function` |
+| Async/generator constructors | `AsyncFunction`, `GeneratorFunction`, and `new` forms |
+| Reflected constructors | `Object.getPrototypeOf(async () => {}).constructor`, `Reflect.getPrototypeOf(function*(){}).constructor`, and equivalent async/generator forms |
+| Indirect eval timers | `setTimeout` or `setInterval` when the first argument is a string literal or no-substitution template |
+| Top-level network call | Module-scope `fetch(...)` |
 
-Matched when the root binding resolves to `fs`, `node:fs`, `fs/promises`, or `node:fs/promises`. Namespace imports (`import * as ns from 'fs'`) and default imports (`import fs from 'fs'`) are tracked via binding maps; bare `fs.writeFile(...)` references are matched fail-closed even without an import record.
+Allowed nearby patterns:
 
-| Callsite                                          | Fails  | Notes                                       |
-| ------------------------------------------------- | ------ | ------------------------------------------- |
-| `fs.writeFile(...)`                               | Yes    | Sync and async callbacks.                   |
-| `fs.writeFileSync(...)`                           | Yes    |                                             |
-| `fs.appendFile(...)`                              | Yes    |                                             |
-| `fs.appendFileSync(...)`                          | Yes    |                                             |
-| `fs.rename(...)`                                  | Yes    |                                             |
-| `fs.renameSync(...)`                              | Yes    |                                             |
-| `fs.unlink(...)`                                  | Yes    |                                             |
-| `fs.unlinkSync(...)`                              | Yes    |                                             |
-| `fs.promises.writeFile(...)`                      | Yes    | Equivalent detection on the promises chain. |
-| `fs.promises.rename(...)`                         | Yes    |                                             |
-| _(all other `fs.promises._` write-side methods)\* | Yes    | Same set as above.                          |
-| `fs.readFile(...)`                                | **No** | Read APIs are allowed.                      |
+| Pattern | Reason |
+| --- | --- |
+| `fs.readFile(...)` | Filesystem reads are allowed. |
+| `os.hostname()` | Only `os.networkInterfaces()` is blocked. |
+| `setTimeout(() => {}, 1)` | Function callback is normal timer use. |
+| `fetch(...)` inside a function | Only module-scope fetch is blocked. |
 
-Namespace-binding example:
-
-```javascript
-import * as nfs from 'node:fs';
-nfs.writeFile(...);     // FAILS (matched as fs.writeFile)
-nfs.readFile(...);      // PASSES (read API)
-```
-
-### OS Functions
-
-| Callsite                 | Fails  | Notes                                |
-| ------------------------ | ------ | ------------------------------------ |
-| `os.networkInterfaces()` | Yes    | Direct reference or namespace-bound. |
-| `os.hostname()`          | **No** | Other `os.*` accesses are allowed.   |
-
-`import os from 'os'` itself is allowed. Only the specific `networkInterfaces` call fails.
-
-### Process Methods
-
-| Callsite         | Fails |
-| ---------------- | ----- |
-| `process.exit()` | Yes   |
-
-`process` is a global; no import is required to match the callsite.
-
-### Direct Code Execution
-
-| Callsite / Expression        | Fails | Notes                                         |
-| ---------------------------- | ----- | --------------------------------------------- |
-| `eval(arg)`                  | Yes   | Any identifier reference to `eval` as callee. |
-| `globalThis.eval(arg)`       | Yes   | Indirect-eval pattern.                        |
-| `Function('...')`            | Yes   | Called as regular function.                   |
-| `new Function('...')`        | Yes   | Called as constructor.                        |
-| `globalThis.Function(...)`   | Yes   |                                               |
-| `AsyncFunction(...)`         | Yes   | Direct identifier call.                       |
-| `new AsyncFunction(...)`     | Yes   |                                               |
-| `GeneratorFunction(...)`     | Yes   | Direct identifier call.                       |
-| `new GeneratorFunction(...)` | Yes   |                                               |
-
-### Reflection-Obtained Constructors (SEC-014)
-
-Defeats the bypass pattern where authors construct `AsyncFunction` or `GeneratorFunction` via prototype reflection instead of referencing them directly.
-
-| Pattern                                                   | Fails | Symbol                             |
-| --------------------------------------------------------- | ----- | ---------------------------------- |
-| `Object.getPrototypeOf(async () => {}).constructor`       | Yes   | `AsyncFunction-via-reflection`     |
-| `Object.getPrototypeOf(async function () {}).constructor` | Yes   | `AsyncFunction-via-reflection`     |
-| `Reflect.getPrototypeOf(async () => {}).constructor`      | Yes   | `AsyncFunction-via-reflection`     |
-| `Object.getPrototypeOf(function*(){}).constructor`        | Yes   | `GeneratorFunction-via-reflection` |
-| `Reflect.getPrototypeOf(function*(){}).constructor`       | Yes   | `GeneratorFunction-via-reflection` |
-
-The scanner matches the `.constructor` access whether or not it is immediately invoked — `const AF = Object.getPrototypeOf(async () => {}).constructor` fails even if `AF` is never called.
-
-### Indirect Eval
-
-`setTimeout` and `setInterval` accept a string first argument that is evaluated as code. These fail only when the first argument is a string-like literal.
-
-| Pattern                   | Fails  | Notes                             |
-| ------------------------- | ------ | --------------------------------- |
-| `setTimeout('code', 1)`   | Yes    | String literal.                   |
-| `setTimeout(\`code\`, 1)` | Yes    | No-substitution template literal. |
-| `setInterval('code', 1)`  | Yes    |                                   |
-| `setTimeout(() => {}, 1)` | **No** | Function argument; normal API.    |
-| `setTimeout(someFn, 1)`   | **No** | Identifier reference; normal API. |
-
-### Top-Level `fetch`
-
-`fetch` is a Node 18+ global. Only **top-level** (module-scope) calls fail. Calls inside function bodies, arrow functions, methods, accessors, or constructors are allowed.
-
-```javascript
-// FAILS (top-level fetch)
-await fetch('https://example.com');
-
-// PASSES (fetch inside a function body)
-async function callLater() {
-  return fetch('https://example.com');
-}
-```
+Namespace/default bindings are tracked for `fs`, `fs/promises`, and `os`, so
+`import * as nfs from 'node:fs'; nfs.writeFile(...)` fails.
 
 ## Dynamic Imports
 
-Every `import(...)` call expression produces a `<dynamic-import>` sentinel violation, regardless of the argument.
-
-| Pattern                | Fails | Notes                                            |
-| ---------------------- | ----- | ------------------------------------------------ |
-| `import('./module')`   | Yes   | Static string argument; walker does not resolve. |
-| `import(someVariable)` | Yes   | Dynamic argument; cannot be statically analyzed. |
-
-Rationale: dynamic `import()` opts out of static-analysis soundness. Authors who need dynamic imports cannot claim pure-compute.
+Every `import(...)` expression emits `<dynamic-import>`, regardless of whether
+the argument is a static string or computed expression.
 
 ## Safelist
 
-The safelist contains exactly one entry:
+| Specifier | Result |
+| --- | --- |
+| `perf_hooks` | Pass |
+| `node:perf_hooks` | Pass |
 
-| Specifier         | Safe |
-| ----------------- | ---- |
-| `perf_hooks`      | Yes  |
-| `node:perf_hooks` | Yes  |
+The safelist short-circuits module-level blocklist lookup. It does not hide
+unrelated callsite violations in the same file.
 
-Safelist matches short-circuit blocklist lookup — even if a symbol appeared on both, the safelist wins.
+## Sentinels
 
-```javascript
-import { performance } from 'perf_hooks'; // PASSES
-import { performance } from 'node:perf_hooks'; // PASSES
+Sentinels are not direct blocklist entries, but they produce `verdict: 'fail'`.
+
+| Symbol | Trigger |
+| --- | --- |
+| `<dynamic-import>` | Any dynamic import expression. |
+| `<resolution-failed>` | Missing file, unresolved relative/absolute path, unresolved alias, containment escape, or entry-point escape. |
+| `<parse-error>` | Syntax error or unreadable file. |
+
+Entry-point escapes are reported as `<resolution-failed>` with the entry path
+as both `file` and `importSpecifier`, avoiding disclosure of canonicalized
+realpaths.
+
+## Tests
+
+Focused coverage lives under:
+
+```text
+.claude/scripts/__tests__/pure-compute-check/
+.claude/scripts/__tests__/pure-compute-api-contract.test.mjs
 ```
 
-## Sentinel Symbols
+Fixture directories cover network, filesystem writes, process, diagnostics,
+interactive modules, code execution, dynamic import, top-level fetch, OS
+functions, resolver behavior, and safe-path regressions.
 
-Four sentinel `symbol` values never appear on the direct blocklist but are emitted by the walker / matcher to mark structural failure modes. All four produce `verdict: 'fail'` when present in the violation list.
+## Change Policy
 
-| Sentinel               | When emitted                                                                           | Produced by                                                                                       |
-| ---------------------- | -------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
-| `<dynamic-import>`     | Any `import(...)` call expression.                                                     | Extractor records; matcher emits.                                                                 |
-| `<resolution-failed>`  | Resolver returns null: missing file, unresolvable alias, or path escapes project root. | `makeResolutionFailedViolation` in matcher.                                                       |
-| `<parse-error>`        | Extractor reports syntactic diagnostic OR file cannot be read.                         | `makeParseErrorViolation` in matcher.                                                             |
-| `<entry-point-escape>` | Spec-declared entry point escapes tsconfig-declared containment root.                  | Walker emits via `makeResolutionFailedViolation` with entry as both `file` and `importSpecifier`. |
-
-`<entry-point-escape>` is not a distinct symbol constant; it reuses `<resolution-failed>` to avoid leaking the canonicalized realpath in the diagnostic. The _context_ distinguishes it: `file` and `importSpecifier` both point to the unresolved entry, and `pathToEntry` is a single-element array.
-
-See [PURE-COMPUTE-CHECK.md § The Four Sentinels](PURE-COMPUTE-CHECK.md#the-four-sentinels) for fail-closed semantics.
-
-## Fixtures & Test Coverage
-
-Each blocklist category has positive (FAIL) and negative (PASS) fixtures under `.claude/scripts/__tests__/pure-compute-check/`:
-
-| Category                  | Fixture directory                               | Atomic spec |
-| ------------------------- | ----------------------------------------------- | ----------- |
-| Network                   | `network/`                                      | as-008      |
-| fs-write + process        | `fs-write/`, `process/`                         | as-009      |
-| Diagnostics + interactive | `diagnostics/`, `interactive/`                  | as-010      |
-| Code-exec + eval          | `code-exec/`                                    | as-011      |
-| Dynamic + top-level + os  | `dynamic/`, `top-level-fetch/`, `os-functions/` | as-012      |
-| Resolver integration      | `resolver/`                                     | as-013      |
-
-Shared parameterized driver: `blocklist-fixtures.test.mjs` reads each fixture directory, invokes `checkPureCompute`, and asserts against a co-located `expected.json`.
-
-Safe-path regression fixtures (`perf_hooks`, `fs.readFile`, `os.hostname`, `setTimeout(() => {}, 1)`) are part of the MUST-PASS coverage listed in AC-005.
-
-## What Happens When a Blocklist Entry Changes
-
-The blocklist is a frozen contract. Any change requires:
-
-1. **Addition** (additive, non-breaking): Update the spec's `Blocklist` YAML block, the `MODULE_BLOCKLIST` constant in `pure-compute-matcher.mjs` (or the appropriate scanner table for callsite entries), and add a positive fixture under the relevant `__tests__/pure-compute-check/<category>/` directory.
-2. **Removal** (breaking): Bump the contract version on `contract-pure-compute-sub-check-api`, update consumers, and run the full convergence loop.
-
-Do not rely on blocklist stability without pinning to a specific spec-group version.
+Additions are compatible when matcher/scanner tables and positive fixtures are
+updated together. Removals are breaking because they weaken the proof behind
+`pure-compute`.
 
 ## See Also
 
-- [PURE-COMPUTE-CHECK.md](PURE-COMPUTE-CHECK.md) — Overview, Gate 5 integration, sentinel semantics
-- [PURE-COMPUTE-CHECK-API.md](PURE-COMPUTE-CHECK-API.md) — Module-by-module API reference
-- Spec: [`.claude/specs/groups/sg-e2e-pure-compute-check/spec.md`](../specs/groups/sg-e2e-pure-compute-check/spec.md) § Interfaces & Contracts (canonical Blocklist YAML)
-- Matcher source: [`.claude/scripts/lib/pure-compute-matcher.mjs`](../scripts/lib/pure-compute-matcher.mjs)
-- Scanner source: [`.claude/scripts/lib/pure-compute-scanner.mjs`](../scripts/lib/pure-compute-scanner.mjs)
+- [PURE-COMPUTE-CHECK.md](PURE-COMPUTE-CHECK.md)
+- [PURE-COMPUTE-CHECK-API.md](PURE-COMPUTE-CHECK-API.md)
