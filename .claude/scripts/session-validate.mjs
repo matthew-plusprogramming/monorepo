@@ -21,7 +21,14 @@
 
 import { existsSync, readFileSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
-import { VALID_SUBAGENT_TYPES, VALID_PHASES, VALID_WORKFLOWS } from './lib/workflow-dag.mjs';
+import {
+  VALID_SUBAGENT_TYPES,
+  VALID_PHASES,
+  VALID_WORKFLOWS,
+  VALID_SUBSTAGES,
+} from './lib/workflow-dag.mjs';
+// REQ-008 / as-011: single source of truth for atomic-spec ID regex.
+import { ATOMIC_ID_REGEX } from './lib/atomic-id-schema.mjs';
 
 // Find the .claude directory by walking up from script location
 function findClaudeDir() {
@@ -99,11 +106,14 @@ function isValidSpecGroupId(str) {
 }
 
 /**
- * Check if a string matches the atomic_spec_id pattern (as-NNN or as-NNN-slug)
+ * Check if a string matches the atomic_spec_id pattern (as-NNN or as-NNN-slug).
+ *
+ * REQ-008 / as-011: regex sourced from `./lib/atomic-id-schema.mjs` single
+ * source of truth — semantics identical to the prior inline literal.
  */
 function isValidAtomicSpecId(str) {
   if (typeof str !== 'string') return false;
-  return /^as-[0-9]{3}(-[a-z0-9-]+)?$/.test(str);
+  return ATOMIC_ID_REGEX.test(str);
 }
 
 /**
@@ -331,6 +341,40 @@ function validateSession(data) {
     data.history.forEach((entry, i) => {
       errors.push(...validateHistoryEntry(entry, `history[${i}]`));
     });
+  }
+
+  // substages_visited (ws-dag-substages / as-007c / AC7.4): optional object
+  // keyed by phase name mapping to an array of enum strings. When present,
+  // it MUST be well-formed — programmatic shape check in addition to the
+  // JSON-schema validation. Distinct error prefix ("substages_visited.") so
+  // callers can differentiate from schema-path errors.
+  if (data.substages_visited !== undefined) {
+    const sv = data.substages_visited;
+    if (sv === null || typeof sv !== 'object' || Array.isArray(sv)) {
+      errors.push(
+        `substages_visited: expected object, got ${Array.isArray(sv) ? 'array' : typeof sv}`
+      );
+    } else {
+      for (const [phase, arr] of Object.entries(sv)) {
+        if (!Array.isArray(arr)) {
+          errors.push(
+            `substages_visited.${phase}: expected array, got ${typeof arr}`
+          );
+          continue;
+        }
+        arr.forEach((elem, i) => {
+          if (typeof elem !== 'string') {
+            errors.push(
+              `substages_visited.${phase}[${i}]: expected string, got ${typeof elem}`
+            );
+          } else if (!VALID_SUBSTAGES.includes(elem)) {
+            errors.push(
+              `substages_visited.${phase}[${i}]: '${elem}' is not a valid substage (expected one of: ${VALID_SUBSTAGES.join(', ')})`
+            );
+          }
+        });
+      }
+    }
   }
 
   return errors;

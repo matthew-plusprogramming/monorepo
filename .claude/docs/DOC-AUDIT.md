@@ -31,7 +31,7 @@ The auditor never modifies documentation files. The completion-verifier remains 
 /doc-audit --scope feature --paths .claude/docs/HOOKS.md,.claude/docs/TRACES.md
 
 # Spec-group-scoped audit
-/doc-audit --scope multi --spec-group sg-doc-audit
+/doc-audit --scope multi --spec-group sg-current-work
 ```
 
 ---

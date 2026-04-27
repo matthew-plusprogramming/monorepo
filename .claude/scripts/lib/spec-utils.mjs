@@ -2,7 +2,7 @@
  * Shared spec utility functions.
  *
  * Extracted from import-graph-check.mjs and spec-validate.mjs to eliminate
- * duplication (code review finding M3, sg-pipeline-integration-gaps).
+ * duplicate path extraction logic.
  */
 
 /**

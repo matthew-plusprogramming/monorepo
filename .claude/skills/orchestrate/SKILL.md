@@ -468,63 +468,7 @@ Check: OWASP Top 10, input validation, auth/authz, secrets handling.
 
 ### 9a. Run Browser Test (UI Workstreams Only)
 
-For workstreams that include UI components (frontend, components, user-facing features):
-
-```javascript
-// Check if workstream has UI changes
-const hasUIChanges =
-  workstream.tags?.includes('ui') ||
-  workstream.title.toLowerCase().includes('frontend') ||
-  workstream.title.toLowerCase().includes('ui') ||
-  workstream.title.toLowerCase().includes('component');
-
-if (hasUIChanges) {
-  Task({
-    description: 'Browser test for ws-2 in worktree-2',
-    prompt: `
-Run browser-based UI testing for workstream ws-2.
-
-**Worktree**: worktree-2
-**Path**: /Users/matthewlin/Desktop/Personal Projects/engineering-assistant-ws-2
-
-## TEST REQUIREMENTS
-
-1. Navigate to relevant pages where UI changes were made
-2. Verify visual appearance matches acceptance criteria
-3. Test user interactions (clicks, form inputs, navigation)
-4. Capture screenshots as evidence
-5. Verify error states and edge cases
-
-## ACCEPTANCE CRITERIA TO VERIFY
-
-Reference the atomic specs for ws-2 and verify each UI-related AC:
-- Visual elements render correctly
-- Interactions work as specified
-- Error messages display appropriately
-- Responsive behavior (if applicable)
-
-Report PASS or FAIL with evidence (screenshots, interaction logs).
-    `,
-    subagent_type: 'browser-tester',
-  });
-}
-```
-
-**If PASSED**:
-
-- Update convergence.browser_tests_passed: true
-- Add to merge queue
-
-**If FAILED**:
-
-- Block merge
-- Report UI issues to user with screenshots
-- Wait for fixes, then re-validate
-
-**If NO UI CHANGES**:
-
-- Skip browser test
-- Add directly to merge queue after security review
+After `/docs` completes for each workstream, the main agent MAY dispatch `/manual-test <spec-group-id>` as an advisory final step before merge (bounded exploratory verification — 5 happy + 3 failure + 2 adjacent, then stop). This dispatch is non-blocking: findings are logged to `session.subagent_tasks` and surfaced to the user, but do NOT block the Stop hook. See `.claude/skills/manual-test/SKILL.md` for the full process. The manual-tester subagent is advisory-only; no convergence-field flip is associated with its dispatch.
 
 ### 10. Process Merge Queue
 
@@ -653,33 +597,21 @@ Continue cycle for each workstream:
 
 Until all workstreams merged.
 
-### 12a. Mandatory Post-Merge Quality Gates
+### 12a. Mandatory Quality Gates
 
-After all workstreams are merged and before final validation, the following mandatory gates MUST be executed. Each gate uses the session checkpoint for enforcement tracking.
+Across orchestration, the following gates MUST be tracked through the session checkpoint. The challenger gate runs before workstream dispatch; review and completion gates run after merge/unify.
 
-#### Challenge Dispatches (MANDATORY at 4 stages)
+#### Challenge Dispatch (pre-orchestration only)
 
-Challenge dispatches are tracked per-stage. The orchestration layer emits `--stage` when dispatching challenger subagents (DEC-008).
+Challenge dispatches are tracked per-stage. The current orchestrator-required challenger stage is `pre-orchestration`. Deleted post-implementation challenger dispatches are replaced by `/unify` preflight and reviewer-focus metadata.
 
 ```bash
-# Stage 1: Pre-orchestration (before dispatching implementers, after spec approval)
+# Pre-orchestration (before dispatching implementers, after spec approval)
 node .claude/scripts/session-checkpoint.mjs dispatch-subagent challenge-pre-orch challenger "Pre-orchestration feasibility check" --stage pre-orchestration
 node .claude/scripts/session-checkpoint.mjs transition-phase challenging
 # Dispatch challenger subagent with stage: pre-orchestration
 # After challenger completes:
 node .claude/scripts/session-checkpoint.mjs complete-subagent challenge-pre-orch "Pre-orchestration challenge passed"
-
-# Stage 2: Pre-test (after implementation, before test verification)
-node .claude/scripts/session-checkpoint.mjs dispatch-subagent challenge-pre-test challenger "Pre-test feasibility check" --stage pre-test
-node .claude/scripts/session-checkpoint.mjs transition-phase challenging
-# After challenger completes:
-node .claude/scripts/session-checkpoint.mjs complete-subagent challenge-pre-test "Pre-test challenge passed"
-
-# Stage 3: Pre-review (after unify, before code review)
-node .claude/scripts/session-checkpoint.mjs dispatch-subagent challenge-pre-review challenger "Pre-review feasibility check" --stage pre-review
-node .claude/scripts/session-checkpoint.mjs transition-phase challenging
-# After challenger completes:
-node .claude/scripts/session-checkpoint.mjs complete-subagent challenge-pre-review "Pre-review challenge passed"
 ```
 
 #### Code Review (MANDATORY)

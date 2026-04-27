@@ -2,7 +2,7 @@
  * Deployment Manifest Zod Schema
  *
  * Validates the deployment manifest shape per the Data Model Contract:
- * Deployment Manifest Schema (sg-deployment-verification-gaps, REQ-013).
+ * Deployment Manifest Schema.
  *
  * Schema validates at parser boundary per code-quality.md.
  * Exports both the Zod validator and parsed type inference.
@@ -15,7 +15,6 @@
  * - deployment_env_allowlist: optional string array, defaults to []
  *
  * Implements: AC-13.5
- * Spec: sg-deployment-verification-gaps
  */
 
 import { z } from 'zod';

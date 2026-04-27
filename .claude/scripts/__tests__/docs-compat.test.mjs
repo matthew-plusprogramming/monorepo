@@ -1,7 +1,6 @@
 /**
  * Tests for backward compatibility and directory structure constraints
  *
- * Spec: sg-structured-docs
  * Covers: AC-12.1, AC-12.2
  *
  * Run with: npx vitest run --config .claude/scripts/vitest.config.mjs docs-compat

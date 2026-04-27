@@ -1,0 +1,100 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "SpecGroupPreMigration",
+  "description": "Permissive schema used ONLY by migrate-manifest.mjs for input parsing. Accepts BOTH legacy-flat (top-level prd_id, prd_path, prd_version, prd_content_hash, spec_group_id) AND canonical nested shapes. Post-migration output always conforms to the canonical strict schema (spec-group.schema.json).",
+  "type": "object",
+  "required": ["id", "title"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^sg-[a-z0-9-]+$"
+    },
+    "spec_group_id": {
+      "type": "string",
+      "description": "LEGACY-FLAT marker — migrated OUT by migrate-manifest.mjs. Duplicates `id`."
+    },
+    "prd_id": {
+      "type": "string",
+      "description": "LEGACY-FLAT marker — migrated into nested prd.id by migrate-manifest.mjs."
+    },
+    "prd_path": {
+      "type": "string",
+      "description": "LEGACY-FLAT marker — migrated into nested prd.file_path by migrate-manifest.mjs."
+    },
+    "prd_version": {
+      "type": "string",
+      "description": "LEGACY-FLAT marker — migrated into nested prd.version by migrate-manifest.mjs."
+    },
+    "prd_content_hash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}$",
+      "description": "LEGACY-FLAT marker — migrated into nested prd.content_hash by migrate-manifest.mjs."
+    },
+    "title": {
+      "type": "string"
+    },
+    "description": {
+      "type": "string"
+    },
+    "prd": {
+      "type": ["object", "null"],
+      "description": "Canonical nested PRD link. May co-exist with legacy-flat prd_* fields during migration; migrate-manifest.mjs merges/rejects per AC-4.8.",
+      "properties": {
+        "source": {
+          "type": "string",
+          "enum": ["local-file", "git-repo", "google-docs", "notion", "local"]
+        },
+        "document_id": { "type": "string" },
+        "version": { "type": "string" },
+        "content_hash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}$"
+        },
+        "last_sync": { "type": "string" },
+        "url": { "type": "string" },
+        "repo_url": { "type": "string" },
+        "branch": { "type": "string" },
+        "file_path": { "type": "string" },
+        "tag": { "type": "string" },
+        "id": { "type": "string" }
+      }
+    },
+    "review_state": {
+      "type": "string",
+      "enum": ["DRAFT", "REVIEWED", "APPROVED"]
+    },
+    "work_state": {
+      "type": "string",
+      "enum": [
+        "PLAN_READY",
+        "IMPLEMENTING",
+        "VERIFYING",
+        "READY_TO_MERGE",
+        "MERGED"
+      ]
+    },
+    "updated_by": {
+      "type": "string",
+      "enum": ["agent", "user", "human"],
+      "description": "Permissive enum — accepts legacy `user` for migration input. Migrate-manifest.mjs rewrites `user` -> `human`."
+    },
+    "created_at": { "type": "string" },
+    "updated_at": { "type": "string" },
+    "requirements": { "type": "object" },
+    "atomic_specs": { "type": "object" },
+    "convergence": {
+      "type": "object",
+      "description": "Pre-migration is PERMISSIVE on convergence subfields: legacy *_clean_pass_count subfields are accepted here, then stripped by migrate-manifest.mjs (AC-1a.*)."
+    },
+    "decision_log": { "type": "array" },
+    "last_progress_update": { "type": ["string", "null"] },
+    "heartbeat_warnings": { "type": "integer", "minimum": 0 },
+    "session_ref": { "type": ["object", "null"] },
+    "last_session_id": { "type": ["string", "null"] },
+    "priority": { "type": "string" },
+    "related_prds": {
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  }
+}

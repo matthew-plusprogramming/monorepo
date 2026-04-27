@@ -5,7 +5,7 @@ The trace system provides a hierarchical two-level dependency map of the project
 - **High-level traces** (`high-level.json` / `high-level.md`): Service/module boundaries, cross-module dependency graphs, and skipped file diagnostics.
 - **Low-level traces** (`low-level/<module-id>.json` / `low-level/<module-id>.md`): File-level relationships within each module, including imports, exports (with function signatures and line numbers), function calls, and events.
 
-Traces are stored as JSON (canonical source of truth) with generated markdown views. Agents consult traces before editing code, enforced by hooks.
+Traces are stored as JSON with generated markdown views. Agents may consult high-level traces for orientation and regenerate low-level traces when deeper module context is useful.
 
 ## File Format
 
@@ -20,8 +20,10 @@ Traces are stored as JSON (canonical source of truth) with generated markdown vi
   trace.config.json              # Module definitions
   high-level.json                # High-level trace data (module dependencies)
   high-level.md                  # Generated markdown view
+  staleness.json                 # Generated local cache, gitignored
   low-level/
-    <module-id>.json             # Per-module low-level trace (file/function)
+    <module-id>.json             # Generated per-module low-level trace
+    <module-id>.calls.json       # Generated call data sidecar
     <module-id>.md               # Generated markdown view
 ```
 
@@ -287,15 +289,9 @@ Validates a single dependency entry. Accepts string module IDs (non-empty string
 | `MULTI_LINE_SIGNATURE_BUFFER_LIMIT` | 5     | trace-generate.mjs | Max additional lines buffered for multi-line sigs    |
 | `MULTI_LINE_IMPORT_BUFFER_LIMIT`    | 20    | trace-generate.mjs | Max additional lines buffered for multi-line imports |
 
-## Hook Enforcement
+## Trace Discipline
 
-Three hooks enforce trace discipline:
-
-1. **PreToolUse: trace-read-enforcement** (`Edit|Write` matcher): Blocks file edits in traced modules unless the agent has read the module's trace first. Untraced files pass with an advisory.
-
-2. **PostToolUse: trace-read-tracker** (`Read` matcher, `.claude/traces/**` pattern): Records which trace files the agent has read during the current session. Updates `.claude/coordination/trace-reads.json`.
-
-3. **PostToolUse: trace-commit-staleness** (`Bash` matcher, `git commit`): Blocks commits when staged files belong to modules whose traces are stale (source files modified after last trace generation).
+Trace enforcement scripts are retained as phase/ad-hoc tools, not live per-tool hooks. `trace-read-enforcement.mjs`, `trace-read-tracker.mjs`, and `trace-commit-staleness.mjs` can still be run by workflow commands when trace freshness matters, but normal editing should not pay that hook cost.
 
 ## Session State
 

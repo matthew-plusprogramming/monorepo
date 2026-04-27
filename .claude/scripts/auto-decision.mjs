@@ -32,7 +32,26 @@
  *
  * Implements: REQ-004, REQ-005, REQ-006, REQ-013, REQ-014, REQ-015, REQ-016,
  *   REQ-017, REQ-018, REQ-023, REQ-025, REQ-026
- * Spec: sg-autonomous-convergence
+ *
+ * as-007 / REQ-012 (NFR-16, threshold-reader superset):
+ *   auto-decision.mjs is declared as consumer 2 in the
+ *   contract-threshold-reader-superset roster. Its documented read is
+ *   `session.active_work.threshold_snapshot.per_gate[gate].required_clean_passes`
+ *   for convergence-decision logic. Audit of this file confirms no inline
+ *   `=== 2` or `>= 2` threshold comparison on clean_pass_count exists:
+ *   convergence-count thresholds are evaluated exclusively by
+ *   session-checkpoint.mjs (consumer 1) and the hook-enforcement pair
+ *   (consumer 3/4). This module's safety rails — oscillation detection,
+ *   circuit breaker (90%/95%), 5-iteration cap, security escalation,
+ *   all-or-nothing batch — are finding-quality and audit-trail concerns,
+ *   NOT per-gate pass counts. Contract invariant (c) is preserved here by
+ *   not introducing a threshold read; invariant (d) is vacuously satisfied
+ *   because no inline numeric threshold exists to migrate. If a future ship
+ *   adds a clean_pass_count-driven decision here, it MUST read the
+ *   threshold via `readThresholdFromSnapshot()` from
+ *   `./lib/snapshot-threshold-reader.mjs` — the same canonical reader used
+ *   by session-checkpoint.mjs (consumer 1) and the hook-enforcement pair
+ *   (as-008 consumers 3-4).
  */
 
 import { existsSync, readFileSync, writeFileSync, renameSync } from 'node:fs';

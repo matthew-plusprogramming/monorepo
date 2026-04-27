@@ -9,7 +9,7 @@
     "url": "https://docs.google.com/document/d/10e6fcDFw23EjWX4YDR7_aYtUFnBJvujlC9M9hyNqjMQ"
   },
   "review_state": "APPROVED",
-  "work_state": "CONVERGED",
+  "work_state": "READY_TO_MERGE",
   "updated_by": "agent",
   "created_at": "2026-01-17T20:50:00Z",
   "updated_at": "2026-01-17T23:30:00Z",
@@ -23,11 +23,6 @@
     "enforcement_status": "passing",
     "last_enforced": "2026-01-17T23:30:00Z",
     "implemented": 12
-  },
-  "open_questions_resolved": {
-    "agent_logs_persistence": "DynamoDB with 30-day TTL",
-    "github_polling_interval": "2 times per day",
-    "session_expiration": "Configurable"
   },
   "convergence": {
     "spec_complete": true,

@@ -7,6 +7,13 @@ user-invocable: true
 
 # Unify Skill
 
+## Required Context
+
+Before beginning work, read these files for project-specific guidelines:
+
+- `.claude/memory-bank/best-practices/spec-authoring.md`
+- `.claude/memory-bank/testing.guidelines.md`
+
 ## Purpose
 
 Validate that implementation and tests conform to the spec group's atomic specs. Ensure convergence before approval and merge.
@@ -34,6 +41,14 @@ A spec group is **converged** when:
 
 If any criterion fails → Task is **not converged** → Iteration needed.
 
+### Preflight Advisories (non-blocking)
+
+`/unify` additionally runs a lightweight preflight assertion block that
+surfaces formerly-pre-test-scoped advisories (REQ-003,
+sg-pipeline-efficiency-ws1-convergence-pruning / as-023). Preflight findings
+are ADVISORY — they do NOT block convergence. See **Step 1b: Preflight
+Assertion Block** below.
+
 ## Validation Process
 
 ### Step 1: Load Spec Group
@@ -57,6 +72,59 @@ Verify in manifest.json:
 - `review_state` is `APPROVED`
 - `atomic_specs.enforcement_status` is `passing`
 - `work_state` is `VERIFYING`
+
+### Step 1b: Preflight Assertion Block (REQ-003 / as-023)
+
+Run the lightweight preflight that replaces the deleted `challenger pre-test`
+dispatch. Preflight findings are **advisory**; they are surfaced in the
+convergence report but do NOT fail the gate.
+
+Preflight covers three categories (per Flow 2, step 5 of the parent spec):
+
+1. **test-coverage vs AC mapping** — each atomic spec should have at least as
+   many Test-Evidence rows as ACs
+2. **test-file placement** — test-evidence file paths should live under a
+   recognized test root (`__tests__`, `tests`, `test`, `src/__tests__`,
+   `src/tests`)
+3. **mock-vs-real mismatches** — when an atomic spec's Test Strategy declares
+   integration / real-service preference, its test-evidence should not
+   reference mock files
+
+Invocation (from a Node context):
+
+```mjs
+import { runUnifyPreflight } from '.claude/scripts/lib/unify-preflight.mjs';
+
+const preflight = runUnifyPreflight({
+  specGroupDir: '.claude/specs/groups/<spec-group-id>',
+});
+
+// preflight.status: "pass" | "advisory" (never "fail")
+// preflight.findings: Finding[] -- surface each one under "## Preflight Advisories"
+// preflight.checks: per-category summary {status, finding_count, message}
+```
+
+Render the preflight result in the convergence report under a dedicated
+`## Preflight Advisories` subsection. Example rendering (advisory case):
+
+```markdown
+## Preflight Advisories: advisory (3 findings)
+
+| Category              | Atomic Spec | Message                                                      |
+| --------------------- | ----------- | ------------------------------------------------------------ |
+| coverage_vs_acs       | as-007      | AC count (4) exceeds test-evidence rows (2)                  |
+| test_file_placement   | as-012      | Test file "scripts/misc.test.mjs" is not under a test root   |
+| mock_vs_real_mismatch | as-019      | Strategy signals integration; test-evidence references mocks |
+
+_Advisory only — does not block convergence._
+```
+
+**Clean preflight** (no findings): render a single-line `Preflight Advisories: pass`.
+Do NOT skip the subsection — a present, clean preflight attests the checks ran.
+
+**Do NOT** promote preflight advisories into convergence-failure gates. A
+preflight advisory is a signal for the operator or downstream agent to
+investigate; it does not fail `/unify`.
 
 ### Step 2: Requirements Completeness Check
 
@@ -543,8 +611,8 @@ After convergence, the review chain is:
 1. `/code-review <spec-group-id>` - Code quality review (always)
 2. `/security <spec-group-id>` - Security review (always)
 3. Completion verification - Post-completion gates via `completion-verifier` agent (always, oneoff-vibe exempt)
-4. `/browser-test <spec-group-id>` - UI validation (if UI changes)
-5. `/docs <spec-group-id>` - Documentation generation (if public API)
+4. `/docs <spec-group-id>` - Documentation generation (if public API)
+5. `/manual-test <spec-group-id>` - Bounded exploratory verification (advisory, non-blocking; runs after `/docs` as the final step before commit)
 6. Commit
 
 **Next step after unify passes**: Dispatch `/code-review`

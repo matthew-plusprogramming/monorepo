@@ -1,5 +1,5 @@
 ---
-last_reviewed: 2026-02-14
+last_reviewed: 2026-04-18
 ---
 
 # Testing Guidelines
@@ -102,3 +102,85 @@ E2E tests may only target localhost (any port) and known preview domains. Arbitr
 ### Applicability
 
 E2E tests apply only to specs with cross-boundary contracts (HTTP, SSE, WebSocket, database, external service boundaries). Module-to-module imports within the same process are NOT cross-boundary. Internal-only specs are exempt from E2E testing.
+
+## Bug-Fix Hybrid Mode
+
+Applies to the `test-writer` subagent only. The `e2e-test-writer` is explicitly outside this mode and remains strict-isolation at all times.
+
+The default for every test-writer dispatch is strict isolation: reads are blocked outside spec, contract, template, test, and docs directories. Bug-fix hybrid mode is a narrow, TTL-bounded deviation that lets a test-writer re-read implementation files _after_ producing a first failing run on a bug-fix spec, so the test can be refined against observed behavior. The boundary is clarified via explicit positive signals (`spec_mode: bug-fix` + `test_writer_unlock` + cryptographic marker), not by relaxing defaults.
+
+Canonical reference: [`.claude/docs/design/test-writer-unlock-state-signals.md`](../docs/design/test-writer-unlock-state-signals.md) (as-002 design doc). Owning spec: `sg-pipeline-efficiency-ws2-practice-2.4`.
+
+### When hybrid mode activates
+
+A spec activates hybrid eligibility only when its manifest frontmatter declares:
+
+```yaml
+spec_mode: bug-fix
+```
+
+Any other value (`feature`, `refactor`) or the field's absence pins the dispatch to fenced mode. This is the fail-closed default.
+
+### State machine (four states)
+
+| State    | Meaning                                                                      |
+| -------- | ---------------------------------------------------------------------------- |
+| Fenced   | No `test_writer_unlock[<sg-id>]` entry exists. Strict isolation. Default.    |
+| Eligible | Spec has `spec_mode: bug-fix`; test-writer has produced a first failing run. |
+| Unlocked | Entry exists with TTL unexpired and marker valid. Hybrid reads permitted.    |
+| Expiring | Entry exists but `unlocked_until <= now()`. Next cooperative-check fails.    |
+
+See design doc [§2 State Machine](../docs/design/test-writer-unlock-state-signals.md#2-state-machine) for edge rules.
+
+### 5-minute TTL window
+
+Once `session-checkpoint.mjs record-test-writer-unlock <sg-id>` is invoked and its preflight passes, the TTL is anchored exactly once at record time:
+
+```
+unlocked_until = first_failure_at + 5 minutes
+```
+
+The TTL is never recomputed on subsequent cooperative-checks (prevents clock-skew drift). A 5-minute window is deliberate: long enough to refine one failing case, short enough that an idle re-dispatch expires naturally. See design doc [§1.3 TTL invariant](../docs/design/test-writer-unlock-state-signals.md#13-ttl-invariant).
+
+### Cooperative-check (5-step gate sequence)
+
+Every implementation-file read during a potential unlock window runs through a PreToolUse cooperative-check with propagation SLA < 1 second:
+
+1. Atomic-read `session.json.test_writer_unlock[<sg-id>]` (lstat + realpath + O_NOFOLLOW).
+2. Check `unlocked_until > now()`.
+3. Check `dispatch_id == current_dispatch_id`.
+4. Verify HMAC-SHA256 marker via `crypto.timingSafeEqual`.
+5. If all pass → permit; else emit `UNLOCK_REVOKED`.
+
+On any failure: first attempt yields `UNLOCK_REVOKED`; the one permitted retry yields `TIMEOUT`; test-writer reverts to fenced mode for the remainder of the dispatch. In-flight reads already permitted are not retroactively revoked. See design doc [§5 Cooperative-check Gate Sequence](../docs/design/test-writer-unlock-state-signals.md#5-cooperative-check-gate-sequence-5-steps).
+
+### 5 re-fence triggers
+
+Any of the following clears `test_writer_unlock[<sg-id>]` via the sole-writer path and appends a `test_writer_unlock_refence` audit entry naming which trigger fired:
+
+| #   | Label               | Source signal                                                                |
+| --- | ------------------- | ---------------------------------------------------------------------------- |
+| 1   | `spec-complete`     | `manifest.review_state` transitions to `APPROVED`                            |
+| 2   | `test-pass`         | Unifier records first green test pass for the spec-group                     |
+| 3   | `version-bump`      | `spec.md` `date` OR content_hash changes during a live unlock window         |
+| 4   | `workstream-rotate` | Facilitator rotation hook fires for this spec-group                          |
+| 5   | `session-end`       | `archive-incomplete` OR `complete-work` subcommand enters session-checkpoint |
+
+All 5 triggers serialize through `session-checkpoint.mjs`, so the clear completes before any subsequent test-writer dispatch for the same spec-group arrives. Triggers are idempotent — firing without a pre-existing entry is a no-op. See design doc [§4 Re-fence Triggers](../docs/design/test-writer-unlock-state-signals.md#4-re-fence-triggers-5).
+
+### Misuse heartbeat (observability, non-blocking)
+
+If an unlock was active during a dispatch AND zero test files changed, the Stop hook emits `UNLOCK_USED_NO_TESTS` advisory warning plus a `test_writer_unlock_misuse` audit entry. The dispatch still completes; the entry still expires normally. This is pure observability — a signal that an unlock was granted but not converted into new test coverage.
+
+### What test-writer must do in hybrid mode
+
+- Produce the first failing run in strict mode. The unlock is never a way to skip writing a failing test first.
+- After re-dispatch in hybrid mode, add or modify test cases. Reading implementation without producing new tests triggers the misuse heartbeat.
+- Handle `UNLOCK_REVOKED` and `TIMEOUT` as structured errors. On `TIMEOUT`, drop back to fenced-mode behavior for the rest of the dispatch; do not retry again.
+- Never write to `session.json` or the HMAC secret file. Only `session-checkpoint.mjs` mints markers and clears unlocks.
+
+### Not covered by hybrid mode
+
+- `e2e-test-writer` dispatches. E2E tests remain strict black-box regardless of `spec_mode`.
+- Feature-mode specs (`spec_mode: feature` or field absent). Any unlock attempt against a feature-mode spec is rejected at the CLI preflight with `UNLOCK_MODE_MISMATCH`.
+- Dev-tests, smoke tests, and manual probes. These remain separate from test-writer output and are unaffected by this mechanism.

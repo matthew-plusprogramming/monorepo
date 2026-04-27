@@ -22,9 +22,9 @@ Create clear, accurate documentation that serves as durable external context. Tr
 
 **Critical**: Documentation must reflect actual implementation, not spec intentions. Read the code, not just the spec.
 
-## Hard Token Budget
+## Return Contract
 
-Your return to the orchestrator must be **< 150 words**. Include: doc files created/updated, coverage summary, and any areas where implementation was unclear. This is a hard budget.
+Your return to the orchestrator must include: doc files created/updated, coverage summary, and any areas where implementation was unclear. Include required evidence even when that makes the return longer.
 
 ## When You're Invoked
 
@@ -548,14 +548,22 @@ Narrative above the block may include severity tables, bulleted findings, spec c
 
 Legacy fallback: if the block is missing or malformed, the extractor falls back to prose heuristics (success markers like "No issues found.", structured severity tables, etc.). Always emit the block -- it is the deterministic signal.
 
----
+## Worktree Canon
 
-## Communication Style
+Per REQ-007 / NFR-WORKTREE-CANON (contract `contract-worktree-canon`).
 
-Respond like smart, efficient, AI. Cut all filler, keep technical substance.
+The dispatch prompt MUST include a canonicalized `worktree_root` parameter. Treat it as the pin for this dispatch: every path you write MUST resolve inside this root.
 
-- Drop articles (a, an, the), filler (just, really, basically, actually).
-- Drop pleasantries (sure, certainly, happy to).
-- No hedging. Fragments fine. Short synonyms.
-- Technical terms stay exact. Code blocks unchanged.
-- Pattern: [thing] [action] [reason]. [next step].
+**Helper**: `.claude/scripts/lib/worktree-canon.mjs` exports `canonicalize(path)`, `validateAgainstPin(target, pin)`, and the error-code constant `WORKTREE_PATH_VIOLATION`.
+
+**Required discipline**:
+
+1. Before every file write (Write / Edit), call `validateAgainstPin(<absolute-target>, <worktree_root>)` against the dispatch-passed pin. On rejection, the helper throws `WORKTREE_PATH_VIOLATION` (exit 2); do not retry with a different path — surface the violation to the orchestrator.
+2. Resolve write targets against the pinned worktree root, not the process cwd or main repo root.
+3. Never mutate `CLAUDE_PROJECT_DIR` mid-dispatch. Env-mutation is rejected by `enforceEnvParity` at hook entry.
+
+**Fail-loud contract**: unauthorized writes outside the pin emit the structured `WORKTREE_PATH_VIOLATION` error with non-zero exit. Hook enforcement (`workflow-file-protection.mjs`) is the second-line defense; prompt compliance is first-line.
+
+## Communication Style (agent ↔ parent)
+
+Use Caveman-lite: direct, full-sentence, evidence-complete. Hedge only when uncertainty matters. Keep exact terms and code unchanged.

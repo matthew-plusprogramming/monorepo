@@ -17,7 +17,6 @@
  * - Generated draft uses TODO placeholders for human review
  *
  * Implements: REQ-010
- * Spec: sg-structured-docs, Task 10
  */
 
 import { existsSync, readFileSync, readdirSync, mkdirSync, writeFileSync, statSync } from 'node:fs';

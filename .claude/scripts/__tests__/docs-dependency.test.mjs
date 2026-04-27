@@ -2,7 +2,6 @@
  * Tests that structured docs scripts use only built-in Node.js modules
  * and the permitted yaml parsing package
  *
- * Spec: sg-structured-docs
  * Covers: AC-11.8
  *
  * Run with: npx vitest run --config .claude/scripts/vitest.config.mjs docs-dependency

@@ -21,7 +21,6 @@
  *   node .claude/scripts/docs-scaffold-diagrams.mjs --project-root /path
  *
  * Implements: REQ-023, AC-12.3, AC-12.4
- * Spec: sg-visual-prd-reports, Task 13
  */
 
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';

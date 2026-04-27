@@ -1,7 +1,6 @@
 /**
  * Unit tests for docs-generate.mjs — Mermaid generation, freshness hash, diagrams
  *
- * Spec: sg-structured-docs
  * Covers: AC-6.1, AC-6.2, AC-6.3, AC-6.4
  *
  * Run with: npx vitest run --config .claude/scripts/vitest.config.mjs docs-generate

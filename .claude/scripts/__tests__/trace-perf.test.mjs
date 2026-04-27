@@ -1,8 +1,6 @@
 /**
  * Tests for Trace Regeneration Performance Fixes
  *
- * Spec: sg-trace-perf-20260327
- *
  * Validates:
  * - AC-1: Cache `git ls-files` once per generation run
  * - AC-2: Pre-compute filePath-to-moduleId map for O(1) external ref resolution
@@ -784,9 +782,9 @@ describe('Gap 1: Error path handling', () => {
       // Act
       const result = findFilesMatchingGlobs(['src/**'], nonGitDir);
 
-      // Assert - graceful degradation: empty array, no thrown error
+      // Assert - graceful degradation: filesystem fallback, no thrown error
       expect(Array.isArray(result)).toBe(true);
-      expect(result.length).toBe(0);
+      expect(result).toEqual(['src/file.mjs']);
     });
 
     it('should not throw when git ls-files fails', () => {

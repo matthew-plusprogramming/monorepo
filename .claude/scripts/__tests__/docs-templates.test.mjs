@@ -1,7 +1,6 @@
 /**
  * Unit tests for structured docs template files
  *
- * Spec: sg-structured-docs
  * Covers: AC-8.1
  *
  * Run with: npx vitest run --config .claude/scripts/vitest.config.mjs docs-templates

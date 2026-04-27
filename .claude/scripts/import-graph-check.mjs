@@ -21,7 +21,6 @@
  *     advisory?: string, warnings: string[] }
  *
  * Implements: AC-2.2, AC-2.3, AC-2.4, AC-2.5, AC-2.6, AC-2.7, AC-2.10, AC-1.5
- * Spec: sg-pipeline-integration-gaps
  */
 
 import { readFileSync, existsSync, realpathSync, statSync } from 'node:fs';

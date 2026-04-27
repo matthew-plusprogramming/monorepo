@@ -456,8 +456,8 @@ After implementation:
 1. `/code-review` - Code quality review (always)
 2. `/security` - Security review (always)
 3. Completion verification - Post-completion gates via `completion-verifier` agent (always, oneoff-vibe exempt)
-4. `/browser-test` - UI validation (if UI changes)
-5. `/docs` - Documentation generation (if public API)
+4. `/docs` - Documentation generation (if public API)
+5. `/manual-test` - Bounded exploratory verification (advisory, non-blocking; runs after `/docs` as the final step before commit)
 
 ## Error Handling
 

@@ -130,4 +130,28 @@ describe('matchesPattern', () => {
     // Assert
     expect(result).toBe(false);
   });
+
+  it('should not match ignored worktree copies for root-scoped .claude patterns', () => {
+    // Arrange
+    const filePath = '.claude/worktrees/bugs-1/.claude/skills/spec/SKILL.md';
+    const pattern = '.claude/skills/*/SKILL.md';
+
+    // Act
+    const result = matchesPattern(filePath, pattern);
+
+    // Assert
+    expect(result).toBe(false);
+  });
+
+  it('should still match generic extension patterns under ignored worktrees', () => {
+    // Arrange
+    const filePath = '.claude/worktrees/bugs-1/package.json';
+    const pattern = '*.json';
+
+    // Act
+    const result = matchesPattern(filePath, pattern);
+
+    // Assert
+    expect(result).toBe(true);
+  });
 });

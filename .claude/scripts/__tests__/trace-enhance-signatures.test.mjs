@@ -1,8 +1,6 @@
 /**
  * Tests for Trace System Enhancement -- Milestone 1: Signature & Line Number Capture
  *
- * Spec: .claude/specs/groups/sg-trace-system-enhancement/spec.md
- *
  * Validates:
  * - AC-1.6:  Function signatures captured in `signature` field
  * - AC-1.7:  Signatures truncated at 200 chars (signature) / 500 chars (signatureRaw)

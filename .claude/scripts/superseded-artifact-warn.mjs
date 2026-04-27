@@ -16,8 +16,6 @@
  *   0 - File is not superseded
  *   1 - No file provided or file not found
  *   2 - File is superseded (warning emitted)
- *
- * Implements: REQ-013, AC2.5 from sg-doc-traceability
  */
 
 import { readFileSync, existsSync } from 'node:fs';

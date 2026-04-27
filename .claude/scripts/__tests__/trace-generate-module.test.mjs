@@ -94,7 +94,7 @@ export function gammaHelper(): string {
  * and return the root directory. This gives us a baseline where
  * all modules have existing traces we can check against.
  */
-function setupProjectWithTraces() {
+async function setupProjectWithTraces() {
   const timestamp = Date.now();
   const testRoot = join(
     tmpdir(),
@@ -124,7 +124,8 @@ function setupProjectWithTraces() {
   execSync('git commit -m "init"', { cwd: testRoot });
 
   // Generate all traces first to establish baseline
-  generateAllTraces({ projectRoot: testRoot });
+  // generateAllTraces is async; callers must await.
+  await generateAllTraces({ projectRoot: testRoot });
 
   return testRoot;
 }
@@ -136,8 +137,8 @@ function setupProjectWithTraces() {
 describe('AC-5.2: Single-module generation updates only the specified module', () => {
   let testRoot;
 
-  beforeEach(() => {
-    testRoot = setupProjectWithTraces();
+  beforeEach(async () => {
+    testRoot = await setupProjectWithTraces();
   });
 
   afterEach(() => {
@@ -146,14 +147,14 @@ describe('AC-5.2: Single-module generation updates only the specified module', (
     } catch { /* ignore */ }
   });
 
-  it('should update the targeted module low-level JSON', () => {
+  it('should update the targeted module low-level JSON', async () => {
     // Record the initial version of module-alpha
     const alphaJsonPath = join(testRoot, '.claude', 'traces', 'low-level', 'module-alpha.json');
     const beforeAlpha = JSON.parse(readFileSync(alphaJsonPath, 'utf-8'));
     expect(beforeAlpha.version).toBe(1);
 
     // Run single-module generation for module-alpha
-    const result = generateAllTraces({
+    const result = await generateAllTraces({
       projectRoot: testRoot,
       targetModuleId: 'module-alpha',
     });
@@ -167,12 +168,12 @@ describe('AC-5.2: Single-module generation updates only the specified module', (
     expect(afterAlpha.version).toBe(2);
   });
 
-  it('should update the targeted module low-level markdown', () => {
+  it('should update the targeted module low-level markdown', async () => {
     const alphaMdPath = join(testRoot, '.claude', 'traces', 'low-level', 'module-alpha.md');
     const beforeMd = readFileSync(alphaMdPath, 'utf-8');
     expect(beforeMd.includes('<!-- trace-version: 1 -->')).toBeTruthy();
 
-    generateAllTraces({
+    await generateAllTraces({
       projectRoot: testRoot,
       targetModuleId: 'module-alpha',
     });
@@ -181,7 +182,7 @@ describe('AC-5.2: Single-module generation updates only the specified module', (
     expect(afterMd.includes('<!-- trace-version: 2 -->')).toBeTruthy();
   });
 
-  it('should NOT modify other modules low-level JSON files', () => {
+  it('should NOT modify other modules low-level JSON files', async () => {
     const betaJsonPath = join(testRoot, '.claude', 'traces', 'low-level', 'module-beta.json');
     const gammaJsonPath = join(testRoot, '.claude', 'traces', 'low-level', 'module-gamma.json');
 
@@ -190,7 +191,7 @@ describe('AC-5.2: Single-module generation updates only the specified module', (
     const beforeGamma = readFileSync(gammaJsonPath, 'utf-8');
 
     // Run single-module generation for module-alpha only
-    generateAllTraces({
+    await generateAllTraces({
       projectRoot: testRoot,
       targetModuleId: 'module-alpha',
     });
@@ -203,14 +204,14 @@ describe('AC-5.2: Single-module generation updates only the specified module', (
     expect(afterGamma).toBe(beforeGamma);
   });
 
-  it('should NOT modify other modules low-level markdown files', () => {
+  it('should NOT modify other modules low-level markdown files', async () => {
     const betaMdPath = join(testRoot, '.claude', 'traces', 'low-level', 'module-beta.md');
     const gammaMdPath = join(testRoot, '.claude', 'traces', 'low-level', 'module-gamma.md');
 
     const beforeBetaMd = readFileSync(betaMdPath, 'utf-8');
     const beforeGammaMd = readFileSync(gammaMdPath, 'utf-8');
 
-    generateAllTraces({
+    await generateAllTraces({
       projectRoot: testRoot,
       targetModuleId: 'module-alpha',
     });
@@ -222,12 +223,12 @@ describe('AC-5.2: Single-module generation updates only the specified module', (
     expect(afterGammaMd).toBe(beforeGammaMd);
   });
 
-  it('should update the high-level trace when regenerating a single module', () => {
+  it('should update the high-level trace when regenerating a single module', async () => {
     const highJsonPath = join(testRoot, '.claude', 'traces', 'high-level.json');
     const beforeHigh = JSON.parse(readFileSync(highJsonPath, 'utf-8'));
     expect(beforeHigh.version).toBe(1);
 
-    const result = generateAllTraces({
+    const result = await generateAllTraces({
       projectRoot: testRoot,
       targetModuleId: 'module-alpha',
     });
@@ -238,12 +239,12 @@ describe('AC-5.2: Single-module generation updates only the specified module', (
     expect(result.highLevelVersion === 2).toBeTruthy();
   });
 
-  it('should update high-level markdown when regenerating a single module', () => {
+  it('should update high-level markdown when regenerating a single module', async () => {
     const highMdPath = join(testRoot, '.claude', 'traces', 'high-level.md');
     const beforeMd = readFileSync(highMdPath, 'utf-8');
     expect(beforeMd.includes('<!-- trace-version: 1 -->')).toBeTruthy();
 
-    generateAllTraces({
+    await generateAllTraces({
       projectRoot: testRoot,
       targetModuleId: 'module-alpha',
     });
@@ -252,8 +253,8 @@ describe('AC-5.2: Single-module generation updates only the specified module', (
     expect(afterMd.includes('<!-- trace-version: 2 -->')).toBeTruthy();
   });
 
-  it('should produce valid JSON for the regenerated module', () => {
-    generateAllTraces({
+  it('should produce valid JSON for the regenerated module', async () => {
+    await generateAllTraces({
       projectRoot: testRoot,
       targetModuleId: 'module-beta',
     });
@@ -264,8 +265,8 @@ describe('AC-5.2: Single-module generation updates only the specified module', (
     expect(validation.valid).toBeTruthy();
   });
 
-  it('should produce valid high-level JSON after single-module regeneration', () => {
-    generateAllTraces({
+  it('should produce valid high-level JSON after single-module regeneration', async () => {
+    await generateAllTraces({
       projectRoot: testRoot,
       targetModuleId: 'module-gamma',
     });
@@ -276,22 +277,23 @@ describe('AC-5.2: Single-module generation updates only the specified module', (
     expect(validation.valid).toBeTruthy();
   });
 
-  it('should report correct filesGenerated count for single-module mode', () => {
-    const result = generateAllTraces({
+  it('should report correct filesGenerated count for single-module mode', async () => {
+    const result = await generateAllTraces({
       projectRoot: testRoot,
       targetModuleId: 'module-alpha',
     });
 
-    // Should generate: 2 high-level files (json + md) + 1 module * 2 files (json + md) = 4
-    expect(result.filesGenerated).toBe(4);
+    // Emission set includes .calls.json + .summary.json.
+    // Should generate: 2 high-level (json + md) + 1 module * 4 files (json + md + calls.json + summary.json) = 6
+    expect(result.filesGenerated).toBe(6);
   });
 
-  it('should be faster than full generation', () => {
+  it('should be faster than full generation', async () => {
     // First, do a full regeneration and measure time
-    const fullResult = generateAllTraces({ projectRoot: testRoot });
+    const fullResult = await generateAllTraces({ projectRoot: testRoot });
 
     // Then do single-module regeneration
-    const singleResult = generateAllTraces({
+    const singleResult = await generateAllTraces({
       projectRoot: testRoot,
       targetModuleId: 'module-alpha',
     });
@@ -302,10 +304,10 @@ describe('AC-5.2: Single-module generation updates only the specified module', (
     expect(fullResult.modulesProcessed).toBe(3);
   });
 
-  it('should work for each module individually', () => {
+  it('should work for each module individually', async () => {
     // Test that we can target any of the 3 modules
     for (const moduleId of ['module-alpha', 'module-beta', 'module-gamma']) {
-      const result = generateAllTraces({
+      const result = await generateAllTraces({
         projectRoot: testRoot,
         targetModuleId: moduleId,
       });
@@ -323,8 +325,8 @@ describe('AC-5.2: Single-module generation updates only the specified module', (
 describe('AC-6.1: Invalid module ID produces descriptive error with available modules', () => {
   let testRoot;
 
-  beforeEach(() => {
-    testRoot = setupProjectWithTraces();
+  beforeEach(async () => {
+    testRoot = await setupProjectWithTraces();
   });
 
   afterEach(() => {
@@ -333,16 +335,18 @@ describe('AC-6.1: Invalid module ID produces descriptive error with available mo
     } catch { /* ignore */ }
   });
 
-  it('should throw error for unknown module ID', () => {
-    expect(() => generateAllTraces({
+  it('should throw error for unknown module ID', async () => {
+    // generateAllTraces is async; use rejects.toThrow.
+    await expect(generateAllTraces({
       projectRoot: testRoot,
       targetModuleId: 'nonexistent-module',
-    })).toThrow(/nonexistent-module/);
+    })).rejects.toThrow(/nonexistent-module/);
   });
 
-  it('should list available module IDs in the error message', () => {
+  it('should list available module IDs in the error message', async () => {
+    // Await the rejected promise.
     try {
-      generateAllTraces({
+      await generateAllTraces({
         projectRoot: testRoot,
         targetModuleId: 'nonexistent-module',
       });
@@ -378,10 +382,10 @@ describe('AC-6.1: Invalid module ID produces descriptive error with available mo
     }
   });
 
-  it('should handle empty string module ID as full generation', () => {
+  it('should handle empty string module ID as full generation', async () => {
     // Empty string is falsy in JS, so it behaves like no targetModuleId
     // (falls through to full generation mode)
-    const result = generateAllTraces({
+    const result = await generateAllTraces({
       projectRoot: testRoot,
       targetModuleId: '',
     });
@@ -397,8 +401,8 @@ describe('AC-6.1: Invalid module ID produces descriptive error with available mo
 describe('CLI: single-module generation via command line', () => {
   let testRoot;
 
-  beforeEach(() => {
-    testRoot = setupProjectWithTraces();
+  beforeEach(async () => {
+    testRoot = await setupProjectWithTraces();
   });
 
   afterEach(() => {
@@ -461,8 +465,11 @@ describe('CLI: single-module generation via command line', () => {
   it('backward compatibility: no args still runs full generation', () => {
     const scriptPath = join(process.cwd(), '.claude', 'scripts', 'trace-generate.mjs');
 
+    // Baseline leaves staleness.json, so the bare
+    // CLI invocation defaults to incremental. Pass --full to exercise the "no-target"
+    // full-generation path (what this test was originally asserting).
     const output = execSync(
-      `node "${scriptPath}"`,
+      `node "${scriptPath}" --full`,
       {
         cwd: testRoot,
         encoding: 'utf-8',
@@ -491,7 +498,7 @@ describe('edge cases: single-module generation', () => {
     } catch { /* ignore */ }
   });
 
-  it('should work when only the targeted module has source files', () => {
+  it('should work when only the targeted module has source files', async () => {
     const timestamp = Date.now();
     testRoot = join(
       tmpdir(),
@@ -513,7 +520,7 @@ describe('edge cases: single-module generation', () => {
     execSync('git add .', { cwd: testRoot });
     execSync('git commit -m "init"', { cwd: testRoot });
 
-    const result = generateAllTraces({
+    const result = await generateAllTraces({
       projectRoot: testRoot,
       targetModuleId: 'module-alpha',
     });
@@ -527,7 +534,7 @@ describe('edge cases: single-module generation', () => {
     expect(existsSync(join(testRoot, '.claude', 'traces', 'low-level', 'module-gamma.json'))).toBeFalsy();
   });
 
-  it('should work when targeted module has no matching files', () => {
+  it('should work when targeted module has no matching files', async () => {
     const timestamp = Date.now();
     testRoot = join(
       tmpdir(),
@@ -547,7 +554,7 @@ describe('edge cases: single-module generation', () => {
     execSync('git add .', { cwd: testRoot });
     execSync('git commit -m "init"', { cwd: testRoot });
 
-    const result = generateAllTraces({
+    const result = await generateAllTraces({
       projectRoot: testRoot,
       targetModuleId: 'module-alpha',
     });
@@ -556,12 +563,12 @@ describe('edge cases: single-module generation', () => {
     expect(result.lowLevelResults[0].fileCount).toBe(0);
   });
 
-  it('should handle repeated single-module regeneration (version incrementing)', () => {
-    testRoot = setupProjectWithTraces();
+  it('should handle repeated single-module regeneration (version incrementing)', async () => {
+    testRoot = await setupProjectWithTraces();
 
     // Run single-module 3 times
     for (let i = 0; i < 3; i++) {
-      generateAllTraces({
+      await generateAllTraces({
         projectRoot: testRoot,
         targetModuleId: 'module-beta',
       });

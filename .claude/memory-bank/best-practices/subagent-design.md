@@ -5,11 +5,11 @@
 Every subagent must return using this format:
 
 - **status**: `success` | `partial` | `failed` — machine-readable, not prose
-- **summary**: < 200 words (HARD BUDGET) — what was accomplished, key changes
+- **summary**: what was accomplished and the key changes
 - **blockers**: List of blocking issues (empty if success)
 - **artifacts**: Files created or modified
 
-Without explicit word limits, summaries drift toward 500+ words. The budget is the enforcement mechanism — it protects the orchestrator's context efficiency.
+Return structured status and evidence pointers rather than raw data. The contract protects orchestrator context efficiency without using numeric response caps.
 
 ### Error Escalation
 
@@ -62,10 +62,10 @@ A single agent definition that accepts a parameter (e.g., `stage` for challenger
 
 **Examples**:
 
-- `challenger` — parameterized by `stage` (pre-implementation, pre-test, pre-review, pre-orchestration). The core challenge logic is identical; only the feasibility questions change per stage.
+- `challenger` — parameterized by `stage` (`pre-implementation` or `pre-orchestration`). The core challenge logic is identical; only the input context and fix agent change per stage.
 - `prd-critic` — parameterized by `perspective` (completeness, feasibility, clarity, consistency). Same evaluation structure, different lens.
 
-**Anti-pattern**: Creating `challenger-pre-impl`, `challenger-pre-test`, `challenger-pre-review` as separate agents when a single `challenger` with a `stage` parameter covers all cases.
+**Anti-pattern**: Creating separate challenger agents for each active stage when a single `challenger` with a `stage` parameter covers both cases.
 
 ### Direct-Dispatch Pattern
 

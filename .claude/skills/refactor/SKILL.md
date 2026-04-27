@@ -2,13 +2,33 @@
 name: refactor
 description: Improve code quality while preserving behavior. Handles tech debt, pattern migrations, and structural improvements. Test suite is the contract - all tests must continue passing.
 allowed-tools: Read, Write, Edit, Glob, Grep, Bash, Task
+user-invocable: true
 ---
 
 # Refactor Skill
 
+## Required Context
+
+Before beginning work, read these files for project-specific guidelines:
+
+- `.claude/memory-bank/best-practices/code-quality.md`
+- `.claude/memory-bank/best-practices/software-principles.md`
+- `.claude/memory-bank/testing.guidelines.md`
+
 ## Purpose
 
 Improve code quality without changing behavior. Make code more maintainable, readable, and efficient while ensuring all existing tests continue to pass.
+
+## Dispatch
+
+This skill dispatches the `refactorer` subagent. Behavior preservation is the contract: the test suite must pass before refactoring (baseline) and after refactoring (verification). See `.claude/agents/refactorer.md` for the full agent contract (input schema, return contract, escalation format).
+
+- **Agent**: `refactorer`
+- **Model**: `opus` (per CLAUDE.md MANDATORY model rule)
+- **Precondition**: Baseline `npm test` green (all existing tests passing)
+- **Postcondition**: Verification `npm test` green (same tests passing, no regressions)
+
+If baseline tests are not green, STOP and fix failing tests before dispatch — refactoring on a red suite cannot prove behavior preservation.
 
 ## When to Use
 

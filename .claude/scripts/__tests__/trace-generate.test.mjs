@@ -1021,13 +1021,14 @@ describe('generateAllLowLevelTraces', () => {
     } catch { /* ignore */ }
   });
 
-  it('should generate traces for all modules', () => {
+  it('should generate traces for all modules', async () => {
     writeFileSync(join(testRoot, 'src', 'test-module', 'index.ts'), 'export const x = 1;');
     writeFileSync(join(testRoot, 'src', 'other', 'index.ts'), 'export const y = 2;');
     execSync('git add .', { cwd: testRoot });
     execSync('git commit -m "init"', { cwd: testRoot });
 
-    const result = generateAllLowLevelTraces(undefined, testRoot);
+    // generateAllLowLevelTraces is async; await it.
+    const result = await generateAllLowLevelTraces(undefined, testRoot);
 
     expect(result.modulesProcessed).toBe(2);
     expect(result.results.length).toBe(2);
@@ -1041,13 +1042,14 @@ describe('generateAllLowLevelTraces', () => {
     expect(existsSync(join(testRoot, '.claude', 'traces', 'low-level', 'other-module.md'))).toBeTruthy();
   });
 
-  it('should generate trace for a single targeted module', () => {
+  it('should generate trace for a single targeted module', async () => {
     writeFileSync(join(testRoot, 'src', 'test-module', 'index.ts'), 'export const x = 1;');
     writeFileSync(join(testRoot, 'src', 'other', 'index.ts'), 'export const y = 2;');
     execSync('git add .', { cwd: testRoot });
     execSync('git commit -m "init"', { cwd: testRoot });
 
-    const result = generateAllLowLevelTraces('test-module', testRoot);
+    // generateAllLowLevelTraces is async; await it.
+    const result = await generateAllLowLevelTraces('test-module', testRoot);
 
     expect(result.modulesProcessed).toBe(1);
     expect(result.results.length).toBe(1);
@@ -1058,8 +1060,9 @@ describe('generateAllLowLevelTraces', () => {
     expect(!existsSync(join(testRoot, '.claude', 'traces', 'low-level', 'other-module.json'))).toBeTruthy();
   });
 
-  it('should throw for unknown target module', () => {
-    expect(() => generateAllLowLevelTraces('nonexistent-module', testRoot)).toThrow(/Module "nonexistent-module" not found/);
+  it('should throw for unknown target module', async () => {
+    // Async rejection pattern.
+    await expect(generateAllLowLevelTraces('nonexistent-module', testRoot)).rejects.toThrow(/Module "nonexistent-module" not found/);
   });
 });
 
@@ -1096,7 +1099,7 @@ describe('full round-trip: generate, validate, verify markdown', () => {
     } catch { /* ignore */ }
   });
 
-  it('should produce valid JSON and well-formatted markdown for a real-ish module', () => {
+  it('should produce valid JSON and well-formatted markdown for a real-ish module', async () => {
     // Create a mini module with various file types
     writeFileSync(join(testRoot, 'src', 'test-module', 'service.ts'), SAMPLE_TS_SOURCE);
     writeFileSync(join(testRoot, 'src', 'test-module', 'index.ts'), SAMPLE_INDEX_SOURCE);
@@ -1107,7 +1110,8 @@ describe('full round-trip: generate, validate, verify markdown', () => {
     execSync('git commit -m "init"', { cwd: testRoot });
 
     // Generate
-    const genResult = generateAllLowLevelTraces('test-module', testRoot);
+    // generateAllLowLevelTraces is async; await it.
+    const genResult = await generateAllLowLevelTraces('test-module', testRoot);
     expect(genResult.modulesProcessed).toBe(1);
 
     // Read and validate JSON

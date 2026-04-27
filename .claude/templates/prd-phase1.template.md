@@ -20,8 +20,7 @@ last_updated: <YYYY-MM-DD>
 ## 1. Title & Summary
 
 <!-- PRD Writer: One paragraph summarizing the problem being solved, who it affects,
-     and why it matters. This is the elevator pitch for the entire effort.
-     Keep it concise — 3-5 sentences maximum. -->
+     and why it matters. This is the elevator pitch for the entire effort. -->
 
 **Problem**: <One-paragraph problem statement describing the pain point, who experiences it, and the impact of not solving it.>
 

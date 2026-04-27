@@ -73,6 +73,8 @@ Before code review, verify:
 
 If prerequisites not met → STOP and run `/unify` first.
 
+**Note (REQ-004 / as-024)**: Dispatching this skill no longer requires a preceding `challenger pre-review` pass. The formerly pre-review-scoped reviewer-focus signal is now assembled by `.claude/scripts/lib/reviewer-focus-metadata.mjs` and surfaced as dispatch-prompt context in Step 1a below. On dispatch failure the metadata is persisted at `.claude/coordination/review-dispatch-prompt-<dispatch-id>.json` for retry (EC-10).
+
 ## Code Review Process
 
 ### Step 1: Load Review Context
@@ -92,6 +94,57 @@ ls .claude/specs/groups/<spec-group-id>/atomic/
 # What files changed (from atomic spec evidence)
 # Read Implementation Evidence sections from each atomic spec
 ```
+
+### Step 1a: Assemble Reviewer-Focus Metadata (REQ-004 / as-024)
+
+Before listing files to review, assemble reviewer-focus metadata — the replacement signal for the deleted `challenger pre-review` dispatch. The helper reads the spec evidence table + (optional) diff summary + prior findings and emits a dispatch-prompt JSON payload.
+
+```js
+import {
+  assembleReviewerFocusMetadata,
+  persistDispatchPrompt,
+  readDispatchPrompt,
+  DispatchPromptPersistError,
+} from '.claude/scripts/lib/reviewer-focus-metadata.mjs';
+
+// EC-10 retry path: if a persisted artifact exists for this dispatch, use it.
+let metadata = readDispatchPrompt({
+  coordinationDir: '.claude/coordination',
+  dispatchId: '<dispatch-id>',
+});
+
+if (!metadata) {
+  metadata = assembleReviewerFocusMetadata({
+    specGroupDir: '.claude/specs/groups/<spec-group-id>',
+    diffSummary: {
+      changed_files: /* from `git diff --name-only main..HEAD` */ [],
+    },
+    priorFindings: /* carry-forward from unifier / investigation */ [],
+  });
+
+  // Persist for EC-10 retry. Keep payload in memory until write succeeds.
+  try {
+    persistDispatchPrompt(metadata, {
+      coordinationDir: '.claude/coordination',
+      dispatchId: '<dispatch-id>',
+    });
+  } catch (err) {
+    if (!(err instanceof DispatchPromptPersistError)) throw err;
+    // Artifact write failed — reviewer proceeds with in-memory metadata;
+    // a subsequent retry will re-assemble (EC-10 fail-open).
+  }
+}
+```
+
+**Dispatch prompt inclusion**: Include the `metadata` payload verbatim in the reviewer's dispatch prompt under a "Reviewer-Focus Metadata" heading. The reviewer uses:
+
+- `focus_areas`: ranked riskiest change areas — prioritize attention-severity entries first
+- `changed_files`: file + line-range list built from atomic-spec evidence tables
+- `prior_findings`: carry-forward findings from previous gates — do not re-flag these without adding new signal
+- `integration_surfaces`: cross-boundary paths needing contract stability review
+- `review_recommendations`: reviewer-facing hints derived from the signal above
+
+This metadata is **advisory**, not a convergence signal — findings generated during review remain authoritative for the pass/fail verdict.
 
 ### Step 2: Identify Files to Review
 
@@ -490,8 +543,8 @@ For each atomic spec:
 **Full review chain after code-review**:
 
 1. `/security` - Security review (always)
-2. `/browser-test` - UI validation (if UI changes)
-3. `/docs` - Documentation generation (if public API)
+2. `/docs` - Documentation generation (if public API)
+3. `/manual-test` - Bounded exploratory verification (advisory, non-blocking; runs after `/docs` as the final step before commit)
 4. Commit
 
 ## Constraints

@@ -24,13 +24,13 @@
  *   0 = success (results written)
  *   1 = fatal error (no results written)
  *
- * Implements: AC-1.1, AC-1.3, AC-1.9, AC-1.10, AC-1.11, AC-1.12
- * Spec: sg-doc-audit, Tasks 3-5
+   * Implements: AC-1.1, AC-1.3, AC-1.9, AC-1.10, AC-1.11, AC-1.12
  */
 
 import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync, statSync } from 'node:fs';
 import { join, resolve, relative, basename, extname } from 'node:path';
 import { execSync, execFileSync } from 'node:child_process';
+import { getCanonicalProjectDir } from './lib/hook-utils.mjs';
 
 // =============================================================================
 // Constants
@@ -99,8 +99,11 @@ function parseArgs(argv) {
 function resolveProjectRoot(override) {
   if (override) return resolve(override);
 
-  if (process.env.CLAUDE_PROJECT_DIR) {
-    return process.env.CLAUDE_PROJECT_DIR;
+  // as-012 (REQ-003.6): delegate to canonicalizer; fall back to git/cwd on failure.
+  try {
+    return getCanonicalProjectDir();
+  } catch {
+    /* fall through */
   }
 
   try {

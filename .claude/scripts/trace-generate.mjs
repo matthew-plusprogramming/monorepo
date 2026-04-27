@@ -1258,11 +1258,86 @@ export function writeLowLevelTrace(moduleConfig, traceConfig, projectRoot, known
   // REQ-013: Check trace file size and emit warnings
   checkTraceFileSize(jsonPath, moduleConfig.id);
 
+  // Emit compact .summary.json sidecar for agents that need structural info
+  // without reading the full .json / .calls.json.
+  emitSummary(trace, sidecarData, moduleConfig, lowLevelDir, jsonPath);
+
   return {
     moduleId: moduleConfig.id,
     fileCount: trace.files.length,
     version: trace.version,
   };
+}
+
+/**
+ * Emit compact `.summary.json` sidecar for a module.
+ *
+ * Schema (required minimums):
+ * - moduleId: string
+ * - fileCount: integer (number of files in the module trace)
+ * - exportCount: integer (total exports across all files)
+ * - callCount: integer (total call-graph edges across all files)
+ * - topCalled: Array<{ name: string, count: number }> (top-20 most-called functions)
+ * - mtime: ISO timestamp matching the base `.json` sidecar mtime
+ *
+ * @param {object} trace - LowLevelTrace object (post-calls-removal)
+ * @param {Record<string, Array>} sidecarData - Per-file calls object, keyed by filePath
+ * @param {{ id: string }} moduleConfig
+ * @param {string} lowLevelDir - Absolute path to `.claude/traces/low-level`
+ * @param {string} jsonPath - Absolute path to the base `.json` sidecar (for mtime)
+ */
+export function emitSummary(trace, sidecarData, moduleConfig, lowLevelDir, jsonPath) {
+  // Count exports across all files
+  let exportCount = 0;
+  for (const file of trace.files) {
+    if (Array.isArray(file.exports)) {
+      exportCount += file.exports.length;
+    }
+  }
+
+  // Aggregate call frequencies from the per-file sidecar data
+  const callFrequency = new Map();
+  let callCount = 0;
+  for (const filePath of Object.keys(sidecarData)) {
+    const calls = sidecarData[filePath];
+    if (!Array.isArray(calls)) continue;
+    for (const call of calls) {
+      callCount += 1;
+      // Call schema uses `calleeName` (see trace-utils schema); fall back to legacy/alternate shapes.
+      const name = typeof call === 'object' && call
+        ? (call.calleeName || call.name || call.symbol || call.target || null)
+        : null;
+      if (!name) continue;
+      callFrequency.set(name, (callFrequency.get(name) || 0) + 1);
+    }
+  }
+
+  // Top-20 most-called functions, sorted by count desc then name asc for determinism
+  const topCalled = [...callFrequency.entries()]
+    .sort((a, b) => (b[1] - a[1]) || a[0].localeCompare(b[0]))
+    .slice(0, 20)
+    .map(([name, count]) => ({ name, count }));
+
+  // Resolve mtime from the base .json sidecar (AC-1.3)
+  let mtime = null;
+  try {
+    mtime = statSync(jsonPath).mtime.toISOString();
+  } catch {
+    // Fallback: use current time if stat fails (should not happen since we just wrote the file)
+    mtime = new Date().toISOString();
+  }
+
+  const summary = {
+    moduleId: moduleConfig.id,
+    fileCount: trace.files.length,
+    exportCount,
+    callCount,
+    topCalled,
+    mtime,
+  };
+
+  const summaryPath = join(lowLevelDir, `${moduleConfig.id}.summary.json`);
+  atomicWriteFile(summaryPath, JSON.stringify(summary, null, 2) + '\n');
 }
 
 /**
@@ -1933,7 +2008,7 @@ export async function generateAllTraces(options = {}) {
       const result = writeLowLevelTrace(mod, config, root, knownExports);
       lowLevelResults.push(result);
       modulesProcessed++;
-      filesGenerated += 3; // .json + .md + .calls.json
+      filesGenerated += 4; // .json + .md + .calls.json + .summary.json
 
       // Update staleness.json for this module's files
       if (!stalenessData.modules[mod.id]) {
@@ -2042,7 +2117,7 @@ export async function generateAllTraces(options = {}) {
   // Step 1: Generate low-level traces for all modules (or target module)
   // Must happen before high-level trace so dependency aggregation has import data.
   const { modulesProcessed, results: lowLevelResults } = await generateAllLowLevelTraces(targetModuleId, root, parallelWorkers);
-  filesGenerated += lowLevelResults.length * 3; // .json + .md + .calls.json per module
+  filesGenerated += lowLevelResults.length * 4; // .json + .md + .calls.json + .summary.json per module
 
   // Step 2: Build/rebuild staleness.json from the generated traces
   const config = loadTraceConfig(root);

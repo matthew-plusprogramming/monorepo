@@ -1,7 +1,6 @@
 /**
  * Integration tests for workflow-stop-enforcement.mjs (Stop hook)
  *
- * Spec: sg-coercive-gate-enforcement
  * Component 4: Stop Hook Enforcement
  *
  * Covers: AC-4.1 through AC-4.12
@@ -24,6 +23,11 @@ import { join } from 'node:path';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { dirname } from 'node:path';
+import {
+  makePhaseTransitionHistory,
+  makeChallengerDispatches,
+  FIXTURE_CONSTANTS,
+} from '../lib/test-fixtures-converged.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -503,7 +507,7 @@ describe('AC-4.12: Concurrent stop hook reads accepted', () => {
 
 // ============================================================
 // PRD Staleness Warning Tests (AC-2.1 through AC-2.7)
-// Spec: sg-manifest-prd-staleness-fix, REQ-002
+// PRD staleness warning tests, REQ-002
 // ============================================================
 
 /**
@@ -534,6 +538,22 @@ function writePrdTestManifest(manifestOverrides = {}) {
     ...manifestOverrides,
   };
   writeFileSync(PRD_TEST_MANIFEST_PATH, JSON.stringify(manifest, null, 2));
+  // Audit rule (a): write the three required artifacts so the
+  // completion-invariant artifact-inventory check passes. PRD tests do not
+  // test artifact absence so the inventory must be satisfied.
+  writeFileSync(
+    join(PRD_TEST_SPEC_GROUP_DIR, 'investigation-report.md'),
+    '# Investigation\nFixture.\n',
+  );
+  writeFileSync(
+    join(PRD_TEST_SPEC_GROUP_DIR, 'unify-report.md'),
+    '# Unify\nFixture.\n',
+  );
+  mkdirSync(join(PRD_TEST_SPEC_GROUP_DIR, 'docs'), { recursive: true });
+  writeFileSync(
+    join(PRD_TEST_SPEC_GROUP_DIR, 'docs', 'COVERAGE.md'),
+    '# Coverage\nFixture.\n',
+  );
   return manifest;
 }
 
@@ -551,6 +571,16 @@ function writePrdTestFile(state = 'draft') {
  * all mandatory dispatches satisfied and phase=complete.
  */
 function makePrdTestSession() {
+  // Audit rule (a): supply convergence fields so the completion-invariant
+  // checks (convergence depth, challenger stages, phase DAG, convergence
+  // sanity) pass. PRD tests only care about the PRD-warning injection path
+  // and must NOT be blocked by completion-invariant checks.
+  const challengerDispatches = makeChallengerDispatches('oneoff-spec', {
+    specGroupId: PRD_TEST_SPEC_GROUP_ID,
+  });
+  const phaseHistory = makePhaseTransitionHistory('oneoff-spec', {
+    specGroupId: PRD_TEST_SPEC_GROUP_ID,
+  });
   return {
     active_work: {
       workflow: 'oneoff-spec',
@@ -564,9 +594,18 @@ function makePrdTestSession() {
         { subagent_type: 'security-reviewer', status: 'completed' },
         { subagent_type: 'completion-verifier', status: 'completed' },
         { subagent_type: 'documenter', status: 'completed' },
+        ...challengerDispatches,
       ],
     },
-    history: [],
+    history: phaseHistory,
+    convergence: {
+      code_review: { clean_pass_count: 2 },
+      security_review: { clean_pass_count: 2 },
+      investigation: { clean_pass_count: 2 },
+      challenger: { clean_pass_count: 2 },
+      unifier: { clean_pass_count: 2 },
+      completion_verifier: { clean_pass_count: 2 },
+    },
   };
 }
 

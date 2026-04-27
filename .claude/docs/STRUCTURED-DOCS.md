@@ -1,3 +1,7 @@
+---
+_source_modules: ['docs-scripts']
+---
+
 # Structured Documentation System
 
 Machine-readable YAML documentation with automated validation, Mermaid diagram generation, project scaffolding, and trace system integration.

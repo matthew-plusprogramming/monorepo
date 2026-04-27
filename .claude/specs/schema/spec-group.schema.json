@@ -3,7 +3,16 @@
   "title": "SpecGroup",
   "description": "A collection of atomic specs tied to a PRD version, with two-dimensional state tracking",
   "type": "object",
-  "required": ["id", "title", "review_state", "work_state", "created_at"],
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "title",
+    "prd",
+    "review_state",
+    "work_state",
+    "created_at",
+    "updated_by"
+  ],
   "properties": {
     "id": {
       "type": "string",
@@ -18,8 +27,8 @@
       "type": "string"
     },
     "prd": {
-      "type": "object",
-      "description": "Link to PRD document",
+      "type": ["object", "null"],
+      "description": "Link to PRD document. Nullable for bootstrap/infra specs with no linked PRD (AC-1.3).",
       "properties": {
         "source": {
           "type": "string",
@@ -32,8 +41,13 @@
         },
         "version": {
           "type": "string",
-          "pattern": "^[0-9]+(\\.[0-9]+)*$",
-          "description": "PRD version this spec group is tied to (1, 1.0, 2.0, etc.)"
+          "pattern": "^([0-9]+(\\.[0-9]+)*|unknown)$",
+          "description": "PRD version this spec group is tied to (1, 1.0, 2.0, etc.) OR the transitional placeholder 'unknown' per AC-1.4. The primary numeric subpattern remains ^[0-9]+(\\.[0-9]+)*$; 'unknown' is a transitional literal accepted during migration."
+        },
+        "content_hash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}$",
+          "description": "First 8 chars of SHA-256 hex digest of the PRD content. Nested under prd per AC-4.5a / inv-contract-cfa12b. Declared here per AC-1.7 / inv-contract-6d9a12 to prevent strict validator from rejecting post-migration manifests."
         },
         "last_sync": {
           "type": "string",
@@ -61,6 +75,10 @@
         "tag": {
           "type": "string",
           "description": "Git tag representing the current PRD version (for git-repo source). Example: prd-project-x-v1.2.0"
+        },
+        "id": {
+          "type": "string",
+          "description": "Optional nested PRD identifier (legacy-flat prd_id is migrated here)."
         }
       },
       "required": ["source"]
@@ -83,8 +101,8 @@
     },
     "updated_by": {
       "type": "string",
-      "enum": ["agent", "user"],
-      "description": "Who made the last update (affects state transitions)"
+      "enum": ["agent", "human"],
+      "description": "Who made the last update (affects state transitions). REQUIRED per REQ-M1-003. Enum tightened from legacy [agent, user] to [agent, human] per DEC-A1-SCHEMA-MIGRATE; migrate-manifest.mjs rewrites legacy 'user' -> 'human'."
     },
     "created_at": {
       "type": "string",
@@ -147,7 +165,11 @@
         "security_review_passed": { "type": "boolean" },
         "browser_tests_passed": {
           "type": ["boolean", "null"],
-          "description": "null if not applicable"
+          "description": "DEPRECATED alias for manual_tests_passed. Kept as optional nullable for backward compat with ~25 in-flight manifests (REQ-009-b, no bulk rename). New manifests SHALL use manual_tests_passed."
+        },
+        "manual_tests_passed": {
+          "type": ["boolean", "null"],
+          "description": "Advisory gate for bounded exploratory verification via manual-tester. null if not applicable. Not enforced by Stop hook."
         },
         "docs_generated": {
           "type": ["boolean", "null"],
@@ -170,6 +192,7 @@
             "type": "string",
             "enum": [
               "user",
+              "human",
               "agent",
               "atomizer",
               "implementer",
@@ -247,6 +270,76 @@
     "last_session_id": {
       "type": ["string", "null"],
       "description": "UUID of the last session that modified this spec group"
+    },
+    "priority": {
+      "type": "string",
+      "description": "Optional priority marker (e.g., P0, P1, P2)."
+    },
+    "related_prds": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Optional list of related PRD slugs."
+    },
+    "workflow": {
+      "type": "string",
+      "description": "Optional workflow type that produced this spec group (e.g., oneoff-vibe, oneoff-spec, orchestrator, refactor, journal-only)."
+    },
+    "target_codebase": {
+      "type": "string",
+      "description": "Optional hint at the primary codebase / subsystem affected."
+    },
+    "investigation_status": {
+      "type": ["string", "null"],
+      "description": "Optional status marker for the investigation phase. Nullable for legacy manifests."
+    },
+    "last_investigated": {
+      "type": ["string", "null"],
+      "format": "date-time",
+      "description": "Optional timestamp of the last interface-investigator dispatch."
+    },
+    "amendment_delta": {
+      "type": "object",
+      "description": "Optional structured record of amendments applied to this spec group after initial approval."
+    },
+    "assumptions": {
+      "type": "array",
+      "description": "Optional list of captured assumptions for this spec group.",
+      "items": { "type": "object" }
+    },
+    "milestones": {
+      "type": ["array", "object"],
+      "description": "Optional milestone breakdown (used by multi-milestone WorkstreamSpecs). Accepted as either an array of milestone objects or an object keyed by milestone id (e.g., {M1: {...}, M2: {...}}).",
+      "items": { "type": "object" }
+    },
+    "e2e_skip": {
+      "type": "boolean",
+      "description": "If true, the e2e-test-writer dispatch is skipped for this spec group."
+    },
+    "e2e_skip_rationale": {
+      "type": "string",
+      "enum": [
+        "pure-refactor",
+        "test-infra",
+        "type-only",
+        "docs-only",
+        "pure-compute"
+      ],
+      "description": "Required rationale when e2e_skip is true."
+    },
+    "spec_group": {
+      "type": ["object", "string"],
+      "description": "Optional nested metadata block carried by some legacy/orchestrator manifests. Accepted as either a nested object or a string identifier (some legacy manifests carry it as a duplicate string identifier)."
+    },
+    "spec_mode": {
+      "type": "string",
+      "enum": ["feature", "bug-fix", "refactor"],
+      "default": "feature",
+      "description": "Practice 2.4 bug-fix-mode signal (sg-pipeline-efficiency-ws2-practice-2.4 / AC-005.1, AC-005.2). Positive signal used by test-writer isolation hook and record-test-writer-unlock CLI to distinguish bug-fix workstreams from feature workstreams. Default `feature`; fail-closed to strict isolation when absent. Only `spec_mode: bug-fix` activates hybrid-mode eligibility."
+    },
+    "specs": {
+      "type": "array",
+      "description": "Optional list of enumerated sub-specs (orchestrator-tier manifests).",
+      "items": { "type": "object" }
     }
   }
 }

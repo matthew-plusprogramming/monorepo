@@ -17,6 +17,19 @@ Before beginning work, read these files for project-specific guidelines:
 
 Analyze the user request and determine the appropriate workflow path based on task complexity, scope, and estimated effort.
 
+## Risk-Tier Gate Model
+
+Route MUST emit `risk_tier`, `required_gates`, and `skipped_gates`. Stop-hook dispatch enforcement consumes `risk_tier`; `required_gates` stays in the route output to avoid duplicating derived policy in session state.
+
+| Risk tier | Use when request touches | Target required gates |
+| --- | --- | --- |
+| `trust-bearing` | auth, permissions, credentials, filesystem/path/worktree safety, hooks, session state, registry/hash/sync/audit, deployment, CI, workflow enforcement | investigation, challenge, implementation, tests, e2e-if-relevant, unify, code-review, security-review, completion-verification |
+| `user-visible` | UI/API/user-facing behavior | investigation, implementation, tests, e2e-if-relevant, targeted-review |
+| `shared-library` | shared modules, frameworks, middleware, schemas, parsers, utilities | investigation, implementation, tests, code-review |
+| `local-feature` | isolated implementation behavior | implementation, tests, targeted-review |
+| `docs-prompt-metadata` | docs, prompts, agents, skills, templates, manifests, metadata | targeted-validation, policy-review-if-policy-bearing, hashes-verify-if-registered |
+| `mechanical-cleanup` | typo, formatting, rename, dead-code, version bump | static-validation, affected-tests, hashes-verify-if-registered |
+
 ## Complexity Heuristics
 
 > **Default to specs.** Use oneoff-spec unless the task is truly trivial OR the user explicitly requests to skip specs.
@@ -69,15 +82,34 @@ Route to spec group workflow for **most tasks**:
 
 ### Large (orchestrator / MasterSpec)
 
-Route to multi-workstream orchestration with git worktrees:
+> **Raised bar (REQ-002, `.claude/docs/ROUTING.md`)**: Orchestrator economics (fixed 2-4M token overhead + 4-5h wall-clock per workstream per the pipeline-efficiency retrospective) only pay off above ~10 atomic specs with genuine multi-domain decomposition. Below that bar, oneoff-spec is the right tool. The raised heuristic below encodes that lesson.
+
+Route to multi-workstream orchestration with git worktrees **ONLY when ALL THREE of the following are true**:
+
+1. **10+ anticipated atomic specs** (raised from the prior "5+ files" criterion). If you cannot plausibly enumerate ≥10 atomic units of work, do not route to orchestrator.
+2. **Genuine multi-domain integration** — the request meets **≥2 distinct criteria** from:
+   - 3+ services (e.g., websocket server + auth + database schema)
+   - Distinct test surfaces (unit, integration, e2e across independently-testable boundaries)
+   - Independent contracts (wire protocols, shared schemas, API contracts with separate owners)
+   - Cross-runtime boundaries (browser + server, Node + browser, multi-runtime)
+   - Independently-releasable components (multi-package, separately-shippable workstreams)
+3. **Tight parallelization benefit** — the work decomposes cleanly into independent workstreams with minimal cross-coupling. Sequential dependencies between most workstreams indicate orchestrator is the wrong tool.
+
+If the request clears ALL THREE conditions, orchestrator is warranted. `/route` MUST then emit a `multi_domain_justification` field (see §Step 5) enumerating the specific criteria met with evidence anchors. See `.claude/docs/ROUTING.md` for the canonical criterion list.
+
+**Fallback rule**: When fewer than 2 multi-domain criteria can be named with evidence, route to `oneoff-spec` with a rationale note — do NOT fake a second criterion to clear the bar.
+
+**Supplementary signals** (necessary but NOT sufficient — these alone do NOT warrant orchestrator under the raised bar):
 
 - 5+ files impacted across multiple layers
-- Multiple workstreams with interdependencies
+- Estimated effort: 4+ hours
 - Cross-cutting concerns (contracts, interfaces, shared state)
-- Impacts multiple services, layers, or subsystems
 - Requires parallel execution by multiple subagents
-- Complex coordination and integration needs
-- **Estimated effort**: 4+ hours
+
+When only these signals are present without the three required conditions, default to `oneoff-spec`.
+
+**Orchestrator mechanics** (unchanged):
+
 - **Needs MasterSpec with workstream spec groups**: Each workstream gets its own spec group with atomic specs
 - **Spec structure**: `.claude/specs/groups/<master-spec-group-id>/` with workstream subdirectories
 - **Parallel execution**: Workstreams execute in isolated git worktrees
@@ -384,9 +416,24 @@ Produce a routing decision with delegation plan:
 
 ```yaml
 workflow: oneoff-vibe | oneoff-spec | orchestrator | refactor | journal-only
+risk_tier: trust-bearing | user-visible | shared-library | local-feature | docs-prompt-metadata | mechanical-cleanup
 rationale: <Brief explanation of why this workflow was chosen>
 estimated_scope: small | medium | large
 estimated_files: <N>
+required_gates:
+  - <gate-name>
+skipped_gates:
+  - <gate-name>: <why not required for this risk tier>
+# REQ-003 / AC-ORCH-EVIDENCE — REQUIRED when workflow=orchestrator; FORBIDDEN otherwise.
+# Enumerate ≥2 distinct multi-domain criteria with evidence anchors. If fewer
+# than 2 criteria can be named with evidence, fall back to oneoff-spec (do NOT
+# fake a second criterion to clear the bar). Canonical criterion list lives in
+# .claude/docs/ROUTING.md.
+multi_domain_justification: # Orchestrator-only (omit for other workflows)
+  - criterion: <one of: "3+ services" | "distinct test surfaces" | "independent contracts" | "cross-runtime boundaries" | "independently-releasable components">
+    evidence: <one-line anchor, e.g., "websocket-server + auth + notification-service">
+  - criterion: <second distinct criterion>
+    evidence: <its one-line anchor>
 decomposition:
   human_provided: true | false # Did the human provide explicit task breakdown?
   atomizer_needed: true | false # Only for orchestrator workflows. Always false for oneoff-spec.
@@ -412,6 +459,21 @@ trace_context: # (REQ-016) Include when trace data is available
   dependency_depth: <N> # number of transitive dependency levels
 next_action: <Suggested next step>
 ```
+
+**Record the decision (MANDATORY)**: After producing the decision block above, the main-agent MUST persist the decision to `session.json.active_work.route_decisions[]` via the sole-writer CLI:
+
+```bash
+# Non-orchestrator workflows:
+node .claude/scripts/session-checkpoint.mjs record-route-decision <workflow> "<rationale>" --risk-tier <risk_tier>
+
+# Orchestrator workflow (justification required per REQ-003):
+node .claude/scripts/session-checkpoint.mjs record-route-decision orchestrator "<rationale>" --risk-tier <risk_tier> \
+  --multi-domain-justification '[{"criterion":"3+ services","evidence":"..."},{"criterion":"cross-runtime boundaries","evidence":"..."}]'
+```
+
+This append-only log is consumed by `.claude/scripts/metrics/pipeline-efficiency-routing-thresholds-collect.mjs` to measure routing distribution. `--risk-tier` also writes `active_work.risk_tier` for Stop-hook dispatch requirements. Rationale is truncated to 120 chars (OQ-105). Invoke **after** the decision block and **before** any phase transition (e.g., `start-work`).
+
+**Orchestrator fallback enforcement**: If `/route` cannot name ≥2 criteria with evidence for a would-be orchestrator recommendation, emit `workflow: oneoff-spec` instead, with a rationale note explaining the insufficient warrant. Do NOT emit `workflow: orchestrator` without the `multi_domain_justification` field — the CLI rejects that shape with `ROUTE_DECISION_JUSTIFICATION_REQUIRED`.
 
 **Dispatch prompt enrichment (REQ-016)**:
 
@@ -447,21 +509,14 @@ If trace data is unavailable or integrity validation failed, omit the `trace_con
 - `oneoff-spec`: Investigation is MANDATORY before implementation (mode: `single-spec`). Dispatches interface-investigator with `mode: "single-spec"` which constrains to Category 7 (intra-spec consistency), env/dependency validation, and external integration surface checks. Completes in one pass.
 - `oneoff-vibe`, `refactor`, `journal-only`: Investigation typically not needed
 
-### Step 6: Persist Decision
-
-Save routing decision to session state:
-
-```bash
-# Append to session context
-echo "{\"timestamp\": \"$(date -Iseconds)\", \"workflow\": \"oneoff-spec\", \"rationale\": \"...\"}" >> .claude/context/session.json
-```
+### Step 6: Initialize Active Work
 
 **For non-trivial workflows (oneoff-spec, orchestrator, refactor)**, initialize active work tracking:
 
 ```bash
-# Start work tracking for spec-based workflows
+# Start work tracking for spec-based workflows (positional form)
 # <spec_group_id> is generated during routing (e.g., "logout-button-20260121")
-# <workflow> is the routing decision (oneoff-spec, orchestrator, refactor)
+# <workflow> is the routing decision (oneoff-spec, orchestrator)
 # <objective> is a brief description of the user's request
 node .claude/scripts/session-checkpoint.mjs start-work <spec_group_id> <workflow> "<objective>"
 ```
@@ -474,7 +529,27 @@ This enables resume detection (Step 0) if the session is interrupted.
 node .claude/scripts/session-checkpoint.mjs start-work "logout-button-20260121" "oneoff-spec" "Add logout button to the user dashboard"
 ```
 
-**Note**: Skip work tracking for oneoff-vibe and journal-only workflows as they complete in a single session.
+### Exempt workflows (oneoff-vibe, refactor, journal-only)
+
+sg-enforcement-layer-gaps Task 18 / REQ-M2-001 / AC-8.1: all three EXEMPT_WORKFLOWS require positive-assertion registration via the `--exempt-workflow` flag-only form:
+
+```bash
+# Vibe-mode, refactor, and journal-only workflows use the flag-only form.
+# No positional args required — spec_group_id is auto-generated ("vibe-<ISO>")
+# and the objective is derived from the user prompt.
+node .claude/scripts/session-checkpoint.mjs start-work --exempt-workflow oneoff-vibe
+node .claude/scripts/session-checkpoint.mjs start-work --exempt-workflow refactor
+node .claude/scripts/session-checkpoint.mjs start-work --exempt-workflow journal-only
+```
+
+This replaces the previous "skip start-work for oneoff-vibe, refactor, journal-only" carve-out. The positive assertion lets `workflow-gate-enforcement.mjs` and `workflow-stop-enforcement.mjs` distinguish a legitimate exempt session from an uninitialized fail-open state (Flow 5; AC-8.3, AC-8.4, AC-8.5).
+
+Environment contract (AC-8.9):
+
+- `CLAUDE_USER_PROMPT` (optional) — first line truncated to 120 chars becomes the auto-generated objective. Fallback: "ad-hoc vibe-mode task".
+- `workflow_set_by` is set to `"route-skill"` automatically when the flag form is used.
+
+Inherit semantics (AC-10.3): if the session already has `active_work.workflow === W` and `W ∈ EXEMPT_WORKFLOWS`, the call is a no-op and exits 0 with a `work_started_already_active` audit entry. Downgrade from a non-exempt workflow is rejected (use `complete-work` first).
 
 ## Edge Cases
 
@@ -494,6 +569,21 @@ If user explicitly requests a workflow:
 - "Just do it", "vibe", "quick fix", "skip spec" → oneoff-vibe (honor request, note in rationale)
 - "Write a full spec first" → oneoff-spec or orchestrator
 - User preference always wins, but default assumption is: user wants quality (specs)
+
+### In-Flight Orchestrator Work (Backwards Compatibility, REQ-004)
+
+The raised orchestrator bar (REQ-002) applies only to new `/route` invocations. Spec groups already in flight are not reclassified. New `/route` invocations apply the new heuristic; in-flight orchestrator spec groups retain their existing workflow and continue without re-evaluation.
+
+Rule (manifest-field-based detection per EDGE-04):
+
+- If `.claude/specs/groups/<spec-group-id>/manifest.json` records `workflow: orchestrator` at the time the new heuristic ships, that spec group continues under its existing workflow. No migration, no re-routing, no reclassification.
+- Subsequent `/route` invocations apply the new heuristic and the raised bar; in-flight spec groups are not reclassified.
+- The persistent `workflow` field in manifest.json is authoritative for in-flight work; it is not re-evaluated against the raised bar.
+- Migration scope: the heuristic applies to new /route invocations only; existing orchestrator spec groups remain on the old heuristic until they complete.
+
+In practice: if the operator resumes work on an existing orchestrator spec group, `/route` should detect the existing manifest (per §Existing Spec Group below) and continue from its current phase without applying the raised bar to the already-assigned workflow.
+
+See `.claude/docs/ROUTING.md` §Migration Guidance for the full backwards-compatibility rationale.
 
 ### Existing Spec Group
 
@@ -518,14 +608,17 @@ Always output a clear routing decision:
 ## Routing Decision
 
 **Workflow**: oneoff-spec
+**Risk Tier**: user-visible
+**Required Gates**: investigation, implementation, tests, e2e-if-relevant, targeted-review
+**Skipped Gates**: security-review (not trust-bearing), completion-verification (not required by target gate plan)
 
-**Rationale**: This task involves adding a new API endpoint with authentication, requiring changes to 3-4 files (route handler, service layer, tests). The scope is well-defined but needs formal requirements and test planning.
+**Rationale**: This task adds a user-visible dashboard loading state with clear UI behavior and testable acceptance criteria. It does not touch auth, filesystem safety, registry/sync, hooks, or deployment.
 
 **Estimated Scope**: medium
 
-**Estimated Files**: 4 (controller, service, tests, types)
+**Estimated Files**: 3 (component, styles, tests)
 
-**Next Action**: Use `/prd` skill to gather endpoint requirements, then create TaskSpec.
+**Next Action**: Use `/prd` skill to clarify loading behavior, then create TaskSpec.
 ```
 
 For refactor workflows, include behavior preservation note:
@@ -534,6 +627,8 @@ For refactor workflows, include behavior preservation note:
 ## Routing Decision
 
 **Workflow**: refactor
+**Risk Tier**: shared-library
+**Required Gates**: investigation, implementation, tests, code-review
 
 **Rationale**: Explicit refactoring request to migrate to repository pattern. No behavior changes - code reorganization only.
 
@@ -552,6 +647,8 @@ For journal-only workflows, specify the journal type:
 ## Routing Decision
 
 **Workflow**: journal-only
+**Risk Tier**: docs-prompt-metadata
+**Required Gates**: targeted-validation
 
 **Rationale**: Investigation into memory leak is complete. Findings (root cause in event listener cleanup) should be documented for future reference.
 
@@ -560,27 +657,13 @@ For journal-only workflows, specify the journal type:
 **Next Action**: Create investigation journal documenting the findings and resolution.
 ```
 
-For architectural decisions, use the decision-record template:
-
-```markdown
-## Routing Decision
-
-**Workflow**: journal-only
-
-**Rationale**: Team decided to use Redis for session storage over PostgreSQL. This architectural decision should be recorded with rationale and trade-offs.
-
-**Journal Type**: decision-record
-
-**Next Action**: Create decision record using `.claude/templates/decision-record.template.md`.
-```
-
 ## Integration with Other Skills
 
 After routing:
 
 - **oneoff-vibe**: Proceed directly to implementation (exempt from completion verification gates)
-- **oneoff-spec**: Use `/prd` to gather requirements → `/spec` to create spec group → `/investigate` (MANDATORY, mode: single-spec) → User approval → `/challenge` (MANDATORY, stage: pre-implementation, via `dispatch-subagent --stage pre-implementation`) → `/implement` + `/test` + `/e2e-test` (default, opt-out via `e2e_skip: true` in spec frontmatter) → `/challenge` (MANDATORY, stage: pre-test, via `dispatch-subagent --stage pre-test`) → Integration Verify → `/unify` → `/challenge` (MANDATORY, stage: pre-review, via `dispatch-subagent --stage pre-review`) → `/code-review` → `/security` → completion verification (loop) → `/docs` → (if PRD exists) `/prd amend` to sync discoveries
-- **orchestrator**: Use `/prd` to create PRD with gather-criticize loop → `/spec` to create MasterSpec with workstream spec groups → For each workstream: `/atomize` + `/enforce` → **MANDATORY: `/investigate` to surface cross-workstream inconsistencies** → Resolve decisions → User approval → `/challenge` (MANDATORY, stage: pre-orchestration, via `dispatch-subagent --stage pre-orchestration`) → Facilitator orchestrates parallel execution → `/challenge` (MANDATORY, stage: pre-test, via `dispatch-subagent --stage pre-test`) → Integration Verify → `/unify` → `/challenge` (MANDATORY, stage: pre-review, via `dispatch-subagent --stage pre-review`) → Code Review → Security → completion verification (loop) → `/docs` → `/prd amend` to sync discoveries
+- **oneoff-spec**: `/prd` → `/spec` → `/investigate` (mode: single-spec) → user approval → `/challenge` (pre-implementation) → `/implement` + `/test` + `/e2e-test` unless opted out → `/unify` → reviews/completion/docs/manual as required by current enforcement and the emitted risk-tier gate plan
+- **orchestrator**: `/prd` → `/spec` MasterSpec/workstreams → per-workstream `/atomize` + `/enforce` → `/investigate` → user approval → `/challenge` (pre-orchestration) → facilitator parallel execution → `/unify` → reviews/completion/docs/manual as required by current enforcement and the emitted risk-tier gate plan
 - **refactor**: Use `/refactor` skill → Define scope and patterns → Run tests (baseline) → Execute refactoring → Run tests (verification) → `/code-review` → `/security` (if applicable)
 - **journal-only**: Create appropriate journal entry → For decisions: use decision-record template at `.claude/templates/decision-record.template.md` → For investigations: document findings, root cause, resolution → For hotfixes: document fix, root cause, prevention measures → Store in `.claude/journal/entries/` directory
 
@@ -602,191 +685,10 @@ Investigation is MANDATORY before implementation for both orchestrator and oneof
 
 ## Examples
 
-### Example 1: Truly Trivial (oneoff-vibe)
+Canonical quick examples:
 
-**Request**: "Fix the typo in README.md line 42: 'teh' should be 'the'"
+- Typo in README → `oneoff-vibe`, `mechanical-cleanup`, no delegation.
+- Loading spinner on submit button → `oneoff-spec`, `user-visible`, implementer + test-writer.
+- Real-time notifications across WebSocket/frontend/DB/auth → `orchestrator`, `trust-bearing`, workstreams + full gate plan.
 
-**Routing**:
-
-- workflow: oneoff-vibe
-- rationale: Single character fix, zero ambiguity, no behavioral impact
-- estimated_scope: trivial
-- delegation: none
-- next_action: Make the edit directly
-
-### Example 2: Seems Simple But Gets Spec (oneoff-spec)
-
-**Request**: "Add a loading spinner to the submit button"
-
-**Routing**:
-
-- workflow: oneoff-spec
-- rationale: Seems simple but has decisions: spinner placement, when to show/hide, error states, accessibility. Spec ensures we don't miss edge cases.
-- estimated_scope: small-medium
-- estimated_files: 2-3 (component, styles, tests)
-- delegation:
-  - parallel_subtasks:
-    - implementation: implementer
-    - tests: test-writer
-- next_action: Use `/prd` to clarify loading states and error handling
-
-### Example 3: Large Task (Full Orchestration)
-
-**Request**: "Implement real-time notifications across the application"
-
-**Routing**:
-
-- workflow: orchestrator
-- rationale: Cross-cutting feature affecting multiple layers: WebSocket server, frontend client, database schema, auth middleware, notification service (8+ files, 3+ workstreams)
-- estimated_scope: large
-- workstreams:
-  - ws-1: WebSocket server infrastructure
-  - ws-2: Frontend notification client
-  - ws-3: Notification persistence and delivery
-- delegation:
-  - parallel_subtasks:
-    - ws-1 implementation: implementer (worktree)
-    - ws-2 implementation: implementer (worktree)
-    - ws-3 implementation: implementer (worktree)
-    - per-workstream tests: test-writer (parallel)
-  - sequential_dependencies:
-    - ws-1 must complete before ws-2 (client depends on server)
-  - exploration_needed: true (investigate WebSocket library options)
-  - investigation_required: true (MANDATORY for orchestrator - surface cross-workstream conflicts before implementation)
-- next_action: Use `/prd` to create PRD with gather-criticize loop, dispatch Explore subagent for WebSocket research
-
-### Example 4: Orchestrator with Investigation Findings
-
-**Request**: "Build deployment pipeline with build, deploy, and monitoring workstreams"
-
-**Routing**:
-
-- workflow: orchestrator
-- rationale: Multi-workstream infrastructure project with 3 distinct concerns that will share env vars, secrets, and container conventions
-- estimated_scope: large
-- workstreams:
-  - ws-build: CI build pipeline
-  - ws-deploy: Deployment automation
-  - ws-monitor: Monitoring and alerting
-- delegation:
-  - parallel_subtasks:
-    - workstream specs: spec-author (parallel)
-  - sequential_dependencies:
-    - After specs complete: `/investigate ms-deployment-pipeline` (MANDATORY)
-    - Investigation must complete before approval
-    - Any blocker decisions must be resolved before implementation
-  - investigation_required: true
-- next_action: Use `/prd` to gather requirements, create MasterSpec
-
-**Post-Investigation (example)**:
-
-After `/investigate ms-deployment-pipeline`:
-
-```
-Issues Found:
-  - CRITICAL: ws-monitor missing HMAC_SECRET, LOG_LEVEL from ws-build template
-  - HIGH: GIT_SSH_KEY_PATH (ws-build) vs GIT_SSH_KEY_BASE64 (ws-deploy) conflict
-  - HIGH: Container image format inconsistency
-
-Decisions Required:
-  - DEC-001: SSH key variable naming
-  - DEC-002: Container image format
-  - DEC-003: Required env vars set
-```
-
-User must resolve decisions before implementation proceeds.
-
-### Example 5: Exploration-First (Delegation for Research)
-
-**Request**: "Improve performance of the search feature"
-
-**Routing**:
-
-- workflow: oneoff-spec (may escalate to orchestrator)
-- rationale: Requires investigation to understand bottlenecks before planning
-- estimated_scope: unknown (pending exploration)
-- delegation:
-  - exploration_needed: true
-  - parallel_subtasks:
-    - codebase analysis: Explore subagent
-    - performance profiling: Explore subagent (separate)
-  - sequential_dependencies:
-    - exploration must complete before spec authoring
-- next_action: Dispatch Explore subagent to profile current search implementation
-
-### Example 6: User Requests Vibe (Override)
-
-**Request**: "Just add a console.log to debug this, don't need a spec"
-
-**Routing**:
-
-- workflow: oneoff-vibe
-- rationale: User explicitly requested to skip spec ("don't need a spec"). Honoring user preference.
-- estimated_scope: trivial
-- delegation: none
-- next_action: Make the change directly
-
-**Note**: Without the explicit override, even a "simple" debug statement might warrant a spec if it's part of a larger investigation.
-
-### Example 7: Refactor Request (refactor workflow)
-
-**Request**: "Refactor the authentication service to use the repository pattern"
-
-**Routing**:
-
-- workflow: refactor
-- rationale: Explicit refactoring request with pattern migration goal. No behavior changes expected - restructuring code organization only.
-- estimated_scope: medium
-- estimated_files: 3-5 (service, new repository, tests)
-- delegation:
-  - exploration_needed: true (understand current auth service structure)
-  - parallel_subtasks:
-    - codebase analysis: Explore subagent
-  - sequential_dependencies:
-    - exploration must complete before refactoring
-    - tests must pass before refactoring (baseline)
-    - tests must pass after refactoring (verification)
-- next_action: Use `/refactor` skill to define scope and execute
-
-### Example 8: Refactor with Feature (routes to oneoff-spec, NOT refactor)
-
-**Request**: "Refactor the payment service and add support for crypto payments"
-
-**Routing**:
-
-- workflow: oneoff-spec
-- rationale: Although request includes "refactor", it also adds new behavior (crypto payments). Behavior changes require spec workflow for proper requirements and testing. The refactor portion can be part of implementation.
-- estimated_scope: medium-large
-- estimated_files: 5+
-- delegation:
-  - parallel_subtasks:
-    - implementation: implementer
-    - tests: test-writer
-- next_action: Use `/prd` to gather crypto payment requirements, then create TaskSpec
-
-**Note**: Mixed requests (refactor + feature) always route to oneoff-spec because behavior changes need formal specification.
-
-### Example 9: Investigation Complete (journal-only)
-
-**Request**: "I just spent an hour debugging why the cache was stale. Found that Redis TTL was being set incorrectly. Document this for the team."
-
-**Routing**:
-
-- workflow: journal-only
-- rationale: Investigation is complete, work is done. Findings are valuable for future developers who might encounter similar issues.
-- journal_type: investigation
-- delegation: none
-- next_action: Create investigation journal documenting the Redis TTL issue, root cause, and fix applied
-
-### Example 10: NOT Journal-Only (needs spec)
-
-**Request**: "Found a bug during investigation. Want to fix it and document the fix."
-
-**Routing**:
-
-- workflow: oneoff-spec
-- rationale: "Fix it" indicates future work, not documentation of completed work. Bug fixes need acceptance criteria even when simple.
-- estimated_scope: small
-- next_action: Use `/prd` to clarify bug behavior and expected fix, then create TaskSpec
-
-**Note**: Journal-only is for documenting **completed** work. If work remains to be done (fix, implement, change), use a spec workflow.
+> Additional edge-case examples (orchestrator-with-findings, exploration-first, user-vibe-override, refactor, refactor-with-feature, journal-only, not-journal-only) live in `./EXAMPLES.md`.

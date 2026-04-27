@@ -19,6 +19,7 @@
  *   - * matches any characters except /
  *   - ** matches any characters including /
  *   - Patterns can match anywhere in the path
+ *   - Root-scoped .claude/ patterns do not match ignored .claude/worktrees copies
  */
 
 import { spawn } from 'child_process';
@@ -80,6 +81,14 @@ function globToRegex(pattern) {
   return regexStr;
 }
 
+function isRootClaudePattern(pattern) {
+  return pattern.startsWith('.claude/') && !pattern.startsWith('.claude/worktrees/');
+}
+
+function isUnderClaudeWorktree(filePath) {
+  return /(^|\/)\.claude\/worktrees\//.test(filePath);
+}
+
 /**
  * Simple glob pattern matching (no external dependencies)
  * Supports: *, **, literal characters, and comma-separated OR patterns
@@ -94,6 +103,10 @@ function matchesPattern(filePath, pattern) {
   const patterns = pattern.split(',').map(p => p.trim());
 
   for (const p of patterns) {
+    if (isRootClaudePattern(p) && isUnderClaudeWorktree(filePath)) {
+      continue;
+    }
+
     const regexStr = globToRegex(p);
     // Pattern can match:
     // 1. The entire path

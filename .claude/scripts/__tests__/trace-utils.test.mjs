@@ -75,6 +75,10 @@ function hookWrapperMatchesPattern(filePath, pattern) {
   const patterns = pattern.split(',').map(p => p.trim());
 
   for (const p of patterns) {
+    if (isRootClaudePattern(p) && isUnderClaudeWorktree(filePath)) {
+      continue;
+    }
+
     const regexStr = hookWrapperGlobToRegex(p);
     const regex = new RegExp('(^|/)' + regexStr + '$');
     if (regex.test(filePath)) {
@@ -83,6 +87,14 @@ function hookWrapperMatchesPattern(filePath, pattern) {
   }
 
   return false;
+}
+
+function isRootClaudePattern(pattern) {
+  return pattern.startsWith('.claude/') && !pattern.startsWith('.claude/worktrees/');
+}
+
+function isUnderClaudeWorktree(filePath) {
+  return /(^|\/)\.claude\/worktrees\//.test(filePath);
 }
 
 // --- Test fixtures ---
@@ -219,6 +231,11 @@ describe('glob matching consistency with hook-wrapper.mjs (AC-4.4)', () => {
     ['apps/dashboard/tsconfig.json', '*.json', 'nested json with root glob'],
     ['.claude/traces/high-level.md', '.claude/traces/**', 'trace file pattern'],
     ['.claude/traces/low-level/dev-team.md', '.claude/traces/**', 'low-level trace pattern'],
+    [
+      '.claude/worktrees/bugs-1/.claude/scripts/hook-wrapper.mjs',
+      '.claude/scripts/**',
+      'ignored worktree copy of .claude pattern',
+    ],
   ];
 
   for (const [filePath, pattern, desc] of testCases) {

@@ -1,7 +1,6 @@
 /**
  * Integration tests for Write and Bash protection of enforcement files
  *
- * Spec: sg-coercive-gate-enforcement
  * Component 3: Agent Write Protection
  *
  * Covers: AC-3.1, AC-3.2, AC-3.3, AC-3.4, Bash tool defense-in-depth
@@ -343,14 +342,28 @@ describe("Bash tool: Allows safe commands", () => {
     expect(result.exitCode).toBe(0);
   });
 
-  it("should allow read-only cat of session.json (no redirect)", async () => {
+  // Structured classifier live-session repro: read-intent commands on
+  // protected files are now correctly ALLOWED.
+  // The previous as-007 contract over-matched any reference to a protected
+  // filename as a write-attempt; that substring-scan is replaced by a
+  // structured classifier that distinguishes read-intent (cat/grep/jq/awk/...)
+  // from write-intent at argument-position granularity. Write protection
+  // remains active for any real write path (cp/mv/tee/>/>>/sed -i/node -e
+  // fs.writeFile/etc.) — see "Bash tool: Blocks write operations" above.
+  //
+  // Contract: if intent === 'read', allow (exit 0).
+  // Test: contract.test.mjs + live-repro.test.mjs + positive.test.mjs cover
+  //       the classifier layer; these subprocess tests verify the hook's
+  //       integration with the classifier at the tool-call boundary.
+  it("allows read-only cat of session.json (FR-001 / TST-003 SR-1)", async () => {
     const result = await runHook(
       makeBashStdin("test-session", "cat .claude/context/session.json"),
     );
     expect(result.exitCode).toBe(0);
+    expect(result.stderr).toBe("");
   });
 
-  it("should allow grep on session.json", async () => {
+  it("allows grep on session.json (FR-004 read-verb allowlist)", async () => {
     const result = await runHook(
       makeBashStdin(
         "test-session",
@@ -358,13 +371,15 @@ describe("Bash tool: Allows safe commands", () => {
       ),
     );
     expect(result.exitCode).toBe(0);
+    expect(result.stderr).toBe("");
   });
 
-  it("should allow jq on session.json", async () => {
+  it("allows jq on session.json (FR-004 read-verb allowlist)", async () => {
     const result = await runHook(
       makeBashStdin("test-session", "jq .phase .claude/context/session.json"),
     );
     expect(result.exitCode).toBe(0);
+    expect(result.stderr).toBe("");
   });
 
   it("should allow empty command (fail-open)", async () => {

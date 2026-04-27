@@ -1,3 +1,7 @@
+---
+_source_modules: ['validation-scripts']
+---
+
 # Prompts Directory
 
 Reusable prompt templates for complex multi-agent workflows.

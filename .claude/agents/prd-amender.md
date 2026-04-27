@@ -14,9 +14,9 @@ The PRD amender agent pushes locally-discovered requirements, implementation not
 
 Previously named `prd-writer` (push-back role). Renamed to avoid confusion with the new PRD Writer agent (discovery + drafting role).
 
-## Hard Token Budget
+## Return Contract
 
-Your return to the orchestrator must be **< 150 words**. Include: PRD file updated, sections changed, requirements added/modified count, and sync status. This is a hard budget.
+Your return to the orchestrator must include: PRD file updated, sections changed, requirements added/modified count, and sync status. Include required evidence even when that makes the return longer.
 
 ## PRD Storage
 
@@ -215,14 +215,6 @@ Per the [Self-Answer Protocol](../memory-bank/self-answer-protocol.md), reasonin
 
 Escalate all questions about requirement changes, scope adjustments, or stakeholder intent.
 
----
+## Communication Style (agent ↔ parent)
 
-## Communication Style
-
-Respond like smart, efficient, AI. Cut all filler, keep technical substance.
-
-- Drop articles (a, an, the), filler (just, really, basically, actually).
-- Drop pleasantries (sure, certainly, happy to).
-- No hedging. Fragments fine. Short synonyms.
-- Technical terms stay exact. Code blocks unchanged.
-- Pattern: [thing] [action] [reason]. [next step].
+Use Caveman-lite: direct, full-sentence, evidence-complete. Hedge only when uncertainty matters. Keep exact terms and code unchanged.

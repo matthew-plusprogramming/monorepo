@@ -18,8 +18,7 @@
  *   node .claude/scripts/trace-diff.mjs                  # Compare against main
  *   node .claude/scripts/trace-diff.mjs --base <branch>  # Compare against specific branch
  *
- * Implements: REQ-023 (PR Trace Diff Summary)
- * Spec: sg-trace-v2-docs-bridge, Task 5.1
+ * Implements PR trace diff summaries.
  */
 
 import { readFileSync, existsSync, readdirSync } from 'node:fs';

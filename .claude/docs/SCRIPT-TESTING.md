@@ -1,3 +1,7 @@
+---
+_source_modules: ['script-tests', 'validation-scripts']
+---
+
 # Script Testing Guide
 
 This document describes how to write and run unit tests for scripts in `.claude/scripts/`.

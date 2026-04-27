@@ -1,7 +1,6 @@
 /**
  * Integration tests for registry and sync integration of structured docs artifacts
  *
- * Spec: sg-structured-docs
  * Covers: AC-8.2, AC-8.3
  *
  * Run with: npx vitest run --config .claude/scripts/vitest.config.mjs docs-registry

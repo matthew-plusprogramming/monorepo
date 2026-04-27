@@ -1,7 +1,6 @@
 /**
  * Tests for the shared DAG module (workflow-dag.mjs)
  *
- * Spec: sg-coercive-gate-enforcement
  * Component 1: Shared DAG Module
  *
  * Covers: AC-1.1, AC-1.2, AC-1.3, AC-1.4, AC-1.5, AC-1.7
@@ -87,7 +86,7 @@ function hasPrereqForConvergence(prereqs, gateName) {
 // ============================================================
 
 describe('AC-1.1: Module exports all expected constants and functions', () => {
-  it('should export ORCHESTRATOR_PREDECESSORS with 14 entries', async () => {
+  it('should export ORCHESTRATOR_PREDECESSORS with deleted post-implementation challenge stages removed', async () => {
     // Arrange
     const mod = await loadModule();
     expect(mod).not.toBeNull();
@@ -98,10 +97,12 @@ describe('AC-1.1: Module exports all expected constants and functions', () => {
     // Assert
     expect(ORCHESTRATOR_PREDECESSORS).toBeDefined();
     expect(typeof ORCHESTRATOR_PREDECESSORS).toBe('object');
-    expect(Object.keys(ORCHESTRATOR_PREDECESSORS).length).toBe(14);
+    expect(Object.keys(ORCHESTRATOR_PREDECESSORS).length).toBe(13);
+    expect(ORCHESTRATOR_PREDECESSORS).not.toHaveProperty('challenging:pre-test');
+    expect(ORCHESTRATOR_PREDECESSORS).not.toHaveProperty('challenging:pre-review');
   });
 
-  it('should export ONEOFF_SPEC_PREDECESSORS with 12 entries', async () => {
+  it('should export ONEOFF_SPEC_PREDECESSORS with deleted post-implementation challenge stages removed', async () => {
     // Arrange
     const mod = await loadModule();
     expect(mod).not.toBeNull();
@@ -112,7 +113,9 @@ describe('AC-1.1: Module exports all expected constants and functions', () => {
     // Assert
     expect(ONEOFF_SPEC_PREDECESSORS).toBeDefined();
     expect(typeof ONEOFF_SPEC_PREDECESSORS).toBe('object');
-    expect(Object.keys(ONEOFF_SPEC_PREDECESSORS).length).toBe(12);
+    expect(Object.keys(ONEOFF_SPEC_PREDECESSORS).length).toBe(11);
+    expect(ONEOFF_SPEC_PREDECESSORS).not.toHaveProperty('challenging:pre-test');
+    expect(ONEOFF_SPEC_PREDECESSORS).not.toHaveProperty('challenging:pre-review');
   });
 
   it('should export EXEMPT_WORKFLOWS as an array containing oneoff-vibe, refactor, journal-only', async () => {
@@ -396,7 +399,7 @@ describe('AC-1.4: getPrerequisites returns correct prerequisites per enforcement
     expect(prereqs.length).toBe(0);
   });
 
-  it('should return prerequisites including unifier and pre-review challenger for code-reviewer', async () => {
+  it('should return unifier-only dispatch prerequisites for code-reviewer', async () => {
     // Arrange
     const mod = await loadModule();
     expect(mod).not.toBeNull();
@@ -406,10 +409,11 @@ describe('AC-1.4: getPrerequisites returns correct prerequisites per enforcement
 
     // Assert
     expect(hasPrereqForType(prereqs, 'unifier')).toBe(true);
-    expect(hasPrereqForChallengerStage(prereqs, 'pre-review')).toBe(true);
+    expect(hasPrereqForChallengerStage(prereqs, 'pre-review')).toBe(false);
+    expect(prereqs.length).toBe(1);
   });
 
-  it('should return dispatch prerequisites for security-reviewer (same as code-reviewer, parallel execution)', async () => {
+  it('should return unifier-only dispatch prerequisites for security-reviewer', async () => {
     // Arrange
     const mod = await loadModule();
     expect(mod).not.toBeNull();
@@ -417,10 +421,10 @@ describe('AC-1.4: getPrerequisites returns correct prerequisites per enforcement
     // Act
     const prereqs = mod.getPrerequisites('oneoff-spec', 'security-reviewer');
 
-    // Assert — same prerequisites as code-reviewer: challenger pre-review + unifier
+    // Assert — same prerequisites as code-reviewer; deleted pre-review challenger is not required.
     expect(Array.isArray(prereqs)).toBe(true);
-    expect(prereqs.length).toBe(2);
-    expect(hasPrereqForChallengerStage(prereqs, 'pre-review')).toBe(true);
+    expect(prereqs.length).toBe(1);
+    expect(hasPrereqForChallengerStage(prereqs, 'pre-review')).toBe(false);
     expect(hasPrereqForType(prereqs, 'unifier')).toBe(true);
   });
 

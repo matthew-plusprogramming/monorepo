@@ -109,6 +109,27 @@ export const artifactEntrySchema = z
  * are validated separately via `validateArtifactEntries()` below so that category-level
  * metadata (e.g., `_sync_policy`) does not trigger per-entry validation errors.
  */
+/**
+ * Coverage telemetry schema (sg-enforcement-layer-gaps Task 15b / REQ-SH-003 /
+ * AC-13.2). The `canonical_shape_lint` coverage metric is OPTIONAL — older
+ * registries shipped before M1 do not carry it, so the `.optional()` on the
+ * outer object preserves backward compatibility. When present, it must be an
+ * object with a `count` integer >= 0. Keeping this schema explicit means the
+ * registry validation accepts the Task 15 registry edit deterministically
+ * instead of relying on `.passthrough()` to swallow unknowns.
+ */
+export const coverageSchema = z
+  .object({
+    canonical_shape_lint: z
+      .object({
+        count: z.number().int().nonnegative(),
+      })
+      .passthrough()
+      .optional(),
+  })
+  .passthrough()
+  .optional();
+
 export const registrySchema = z
   .object({
     $schema: z.string().optional(),
@@ -126,6 +147,7 @@ export const registrySchema = z
         .passthrough()
     ),
     orphans: orphansSchema.default([]),
+    coverage: coverageSchema,
   })
   .passthrough();
 

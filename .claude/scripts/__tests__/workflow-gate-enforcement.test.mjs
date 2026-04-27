@@ -1,7 +1,6 @@
 /**
  * Integration tests for workflow-gate-enforcement.mjs (PreToolUse Agent hook)
  *
- * Spec: sg-coercive-gate-enforcement
  * Component 2: PreToolUse Gate Enforcement
  *
  * Covers: AC-0.1, AC-2.1 through AC-2.19
@@ -318,17 +317,13 @@ describe('AC-2.2: test-writer has no coercive prerequisites (parallel with imple
 });
 
 // ============================================================
-// AC-2.3: Blocks code-reviewer without pre-review challenge + unifier
+// AC-2.3: Blocks code-reviewer without unifier
 // ============================================================
 
 describe('AC-2.3: Blocks code-reviewer without prerequisites', () => {
   it('should block code-reviewer when no unifier dispatch exists', async () => {
     // Arrange
-    const session = makeSessionJson({
-      subagent_tasks: [
-        { subagent_type: 'challenger', stage: 'pre-review', status: 'completed' },
-      ],
-    });
+    const session = makeSessionJson({ subagent_tasks: [] });
     writeSessionJson(session);
 
     // Act
@@ -339,7 +334,7 @@ describe('AC-2.3: Blocks code-reviewer without prerequisites', () => {
     expect(result.stderr).toMatch(/unifier/i);
   });
 
-  it('should block code-reviewer when no pre-review challenger exists', async () => {
+  it('should allow code-reviewer when unifier is present without pre-review challenger', async () => {
     // Arrange
     const session = makeSessionJson({
       subagent_tasks: [
@@ -352,11 +347,10 @@ describe('AC-2.3: Blocks code-reviewer without prerequisites', () => {
     const result = await runHook(makeAgentStdin('test-session', 'code-reviewer'));
 
     // Assert
-    expect(result.exitCode).toBe(2);
-    expect(result.stderr).toMatch(/challenger|pre-review/i);
+    expect(result.exitCode).toBe(0);
   });
 
-  it('should allow code-reviewer when both prerequisites are met', async () => {
+  it('should still allow code-reviewer when legacy pre-review challenger is present', async () => {
     // Arrange
     const session = makeSessionJson({
       subagent_tasks: [
@@ -378,7 +372,7 @@ describe('AC-2.3: Blocks code-reviewer without prerequisites', () => {
 // AC-2.4: security-reviewer has same prerequisites as code-reviewer (parallel)
 // ============================================================
 
-describe('AC-2.4: security-reviewer requires challenger(pre-review) + unifier (parallel with code-reviewer)', () => {
+describe('AC-2.4: security-reviewer requires unifier (parallel with code-reviewer)', () => {
   it('should block when no prerequisites are met', async () => {
     // Arrange
     const session = makeSessionJson({ subagent_tasks: [] });
@@ -389,10 +383,10 @@ describe('AC-2.4: security-reviewer requires challenger(pre-review) + unifier (p
 
     // Assert
     expect(result.exitCode).toBe(2);
-    expect(result.stderr).toMatch(/challenger|unifier|pre-review/i);
+    expect(result.stderr).toMatch(/unifier/i);
   });
 
-  it('should block when only unifier is present (missing challenger pre-review)', async () => {
+  it('should allow when unifier is present without pre-review challenger', async () => {
     // Arrange
     const session = makeSessionJson({
       subagent_tasks: [
@@ -405,11 +399,10 @@ describe('AC-2.4: security-reviewer requires challenger(pre-review) + unifier (p
     const result = await runHook(makeAgentStdin('test-session', 'security-reviewer'));
 
     // Assert
-    expect(result.exitCode).toBe(2);
-    expect(result.stderr).toMatch(/challenger|pre-review/i);
+    expect(result.exitCode).toBe(0);
   });
 
-  it('should allow when both challenger(pre-review) and unifier are present', async () => {
+  it('should still allow when legacy challenger(pre-review) and unifier are present', async () => {
     // Arrange
     const session = makeSessionJson({
       subagent_tasks: [
@@ -505,11 +498,11 @@ describe('AC-2.5: Blocks documenter until both code_review AND security_review c
 });
 
 // ============================================================
-// AC-2.6: Blocks completion-verifier without documenter
+// AC-2.6: Blocks completion-verifier until review convergence
 // ============================================================
 
-describe('AC-2.6: Blocks completion-verifier without documenter', () => {
-  it('should block when no documenter dispatch exists', async () => {
+describe('AC-2.6: Blocks completion-verifier until review convergence', () => {
+  it('should block when review convergence is missing', async () => {
     // Arrange
     const session = makeSessionJson({ subagent_tasks: [] });
     writeSessionJson(session);
@@ -519,15 +512,16 @@ describe('AC-2.6: Blocks completion-verifier without documenter', () => {
 
     // Assert
     expect(result.exitCode).toBe(2);
-    expect(result.stderr).toMatch(/documenter/i);
+    expect(result.stderr).toMatch(/code.?review|security.?review|convergence/i);
   });
 
-  it('should allow when documenter has been dispatched', async () => {
+  it('should allow when code and security reviews have converged', async () => {
     // Arrange
     const session = makeSessionJson({
-      subagent_tasks: [
-        { subagent_type: 'documenter', status: 'completed' },
-      ],
+      convergence: {
+        code_review: { clean_pass_count: 2 },
+        security_review: { clean_pass_count: 2 },
+      },
     });
     writeSessionJson(session);
 
@@ -555,7 +549,7 @@ describe('AC-2.7: Non-enforced subagent types pass through', () => {
     'prd-amender',
     'refactorer',
     'facilitator',
-    'browser-tester',
+    'manual-tester',
     'challenger',
     'unifier',
     'interface-investigator',

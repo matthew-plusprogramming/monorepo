@@ -10,7 +10,7 @@
   },
   "review_state": "APPROVED",
   "work_state": "PLAN_READY",
-  "updated_by": "user",
+  "updated_by": "human",
   "created_at": "2026-01-14T09:00:00Z",
   "updated_at": "2026-01-14T12:00:00Z",
   "requirements": {

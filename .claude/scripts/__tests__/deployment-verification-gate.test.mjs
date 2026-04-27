@@ -1,7 +1,6 @@
 /**
  * Tests for deployment verification gate (stop hook enforcement)
  *
- * Spec: sg-deployment-verification-gaps
  * AC Groups: AC-5 (Coercive Enforcement), AC-6 (Fail-Open Behavior)
  *
  * These tests exercise the workflow-stop-enforcement.mjs stop hook's
@@ -201,6 +200,7 @@ describe('AC-5.2: Stop hook allows verified deployment', () => {
     }
     // Exit 0 means allow
     expect(result.exitCode).toBe(0);
+    expect(result.stdout).not.toContain('"decision":"block"');
   });
 });
 
@@ -229,6 +229,7 @@ describe('AC-5.3: Stop hook allows failed deployment', () => {
       expect(output.decision).not.toBe('block');
     }
     expect(result.exitCode).toBe(0);
+    expect(result.stdout).not.toContain('"decision":"block"');
   });
 
   it('should allow completion even when failed=true and verify_deploy_passed=true', async () => {
@@ -249,6 +250,7 @@ describe('AC-5.3: Stop hook allows failed deployment', () => {
       expect(parseStopOutput(result.stdout).decision).not.toBe('block');
     }
     expect(result.exitCode).toBe(0);
+    expect(result.stdout).not.toContain('"decision":"block"');
   });
 });
 
@@ -277,6 +279,7 @@ describe('AC-5.4: verify_build_passed is advisory only', () => {
       expect(output.decision).not.toBe('block');
     }
     expect(result.exitCode).toBe(0);
+    expect(result.stdout).not.toContain('"decision":"block"');
   });
 
   it('should still block when both verify_build_passed=false and verify_deploy_passed=false', async () => {
@@ -378,6 +381,7 @@ describe('AC-6.3: Stop hook fail-open on structural errors', () => {
 
     // Assert - Fail-open: exit 0, no block
     expect(result.exitCode).toBe(0);
+    expect(result.stdout).not.toContain('"decision":"block"');
     const output = parseStopOutput(result.stdout);
     if (output) {
       expect(output.decision).not.toBe('block');
@@ -400,6 +404,7 @@ describe('AC-6.3: Stop hook fail-open on structural errors', () => {
 
     // Assert - Structural error: fail-open
     expect(result.exitCode).toBe(0);
+    expect(result.stdout).not.toContain('"decision":"block"');
   });
 
   it('should log structural error to stderr', async () => {
@@ -414,6 +419,7 @@ describe('AC-6.3: Stop hook fail-open on structural errors', () => {
 
     // Assert - stderr should contain diagnostic info
     expect(result.exitCode).toBe(0);
+    expect(result.stdout).not.toContain('"decision":"block"');
     // Structural error should be logged (implementation may vary)
   });
 
@@ -426,6 +432,7 @@ describe('AC-6.3: Stop hook fail-open on structural errors', () => {
 
     // Assert - Fail-open
     expect(result.exitCode).toBe(0);
+    expect(result.stdout).not.toContain('"decision":"block"');
   });
 });
 

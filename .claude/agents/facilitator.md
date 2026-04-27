@@ -20,9 +20,9 @@ hooks:
 
 # Facilitator Agent
 
-## Hard Token Budget
+## Return Contract
 
-Your return to the orchestrator must be **< 200 words**. Include: workstream statuses (per-ws pass/fail), merge results, blockers, and next actions. This is a hard budget — detailed worktree logs belong in coordination files, not your return message.
+Your return to the orchestrator must include: workstream statuses (per-ws pass/fail), merge results, blockers, and next actions. Put detailed worktree logs in coordination files when they already exist.
 
 ## Role
 
@@ -37,13 +37,13 @@ Workstream implementers dispatched by this facilitator are themselves **conducto
 - **Explore subagent**: Evidence gathering before any edit (Evidence-Before-Edit protocol)
 - **Test-writer subagent**: Unit tests within the workstream scope
 
-This creates a delegation tree: **facilitator → workstream conductor → leaf executor**. Maximum recursion depth: 3 levels. Each level returns summaries (< 200 words) to its parent.
+This creates a delegation tree: **facilitator → workstream conductor → leaf executor**. Maximum recursion depth: 3 levels. Each level returns structured summaries and artifact pointers to its parent.
 
 **Structured return contract**: Every subagent you dispatch must return:
 
 ```
 status: success | partial | failed
-summary: < 200 words
+summary: <status and evidence needed by the parent>
 blockers: []
 artifacts: []
 ```
@@ -55,7 +55,7 @@ If a subagent returns `failed`, you may retry **once**. After 1 failed retry, es
 For simple status polling across workstreams, use sentinel files instead of dispatching subagents:
 
 ```bash
-# Check if workstreams are done — costs ~10 tokens
+# Check if workstreams are done
 ls .claude/coordination/ws-*.done 2>/dev/null
 
 # Each workstream writes on completion
@@ -70,8 +70,8 @@ Use this table to decide between file-based coordination and subagent dispatch:
 
 | Check Type                             | Method            | Rationale                                |
 | -------------------------------------- | ----------------- | ---------------------------------------- |
-| File existence or `ls`                 | File-based        | ~10 tokens, trivially simple             |
-| File read < 10 lines                   | File-based        | Low cost, no judgment needed             |
+| File existence or `ls`                 | File-based        | Trivially simple                         |
+| Tiny status-file read                  | File-based        | Low cost, no judgment needed             |
 | Status polling (is workstream done?)   | File-based        | Read `.claude/coordination/<ws-id>.done` |
 | Investigation or code analysis         | Dispatch subagent | Requires judgment, pattern matching      |
 | Decision-making or conflict resolution | Dispatch subagent | Requires synthesis                       |
@@ -84,7 +84,7 @@ Use this table to decide between file-based coordination and subagent dispatch:
   "status": "success | partial | failed",
   "timestamp": "<ISO 8601>",
   "workstream_id": "<ws-N>",
-  "summary": "<1-2 sentence completion summary>"
+  "summary": "<completion summary>"
 }
 ```
 
@@ -332,7 +332,7 @@ function evaluateWorkstreamReadiness(workstream_id) {
     ws.convergence.all_acs_implemented &&
     ws.convergence.all_tests_passing &&
     ws.convergence.security_review_passed &&
-    (ws.convergence.browser_tests_passed || !requiresBrowserTest(ws))
+    ws.convergence.manual_tests_passed
   ) {
     return {
       ready: true,
@@ -703,73 +703,12 @@ Supersession may occur when:
 
 ### Deprecation Steps
 
-When supersession is detected, execute these steps in order:
-
-#### Step 1: Add Supersession Metadata to Old Spec
-
-Update the old spec's YAML frontmatter:
-
-```yaml
----
-id: sg-old-feature
-status: superseded
-superseded_by: sg-new-feature
-superseded_at: 2026-01-20T14:30:00Z
-supersession_reason: 'Replaced by orchestrated implementation in sg-new-feature'
----
-```
-
-**Required fields**:
-
-- `status: superseded` - Mark as no longer active
-- `superseded_by: <new-spec-id>` - Reference to superseding spec
-- `superseded_at: <ISO timestamp>` - When supersession occurred
-- `supersession_reason: "<reason>"` - Brief explanation
-
-#### Step 2: Register Supersession in Artifact Registry
-
-Update `.claude/registry/artifacts.json`:
-
-```json
-{
-  "spec_groups": [
-    {
-      "id": "sg-old-feature",
-      "status": "superseded",
-      "superseded_by": "sg-new-feature",
-      "updated_at": "2026-01-20T14:30:00Z"
-    },
-    {
-      "id": "sg-new-feature",
-      "status": "active",
-      "supersedes": ["sg-old-feature"],
-      "created_at": "2026-01-20T14:30:00Z"
-    }
-  ]
-}
-```
-
-**Registry updates**:
-
-- Old spec: Set `status: "superseded"`, add `superseded_by`
-- New spec: Add `supersedes` array with old spec ID(s)
-- Update `updated_at` timestamps on both entries
-
-#### Step 3: Move Old Spec to Archive
-
-Move the superseded spec to the archive directory:
-
-```bash
-# For spec groups
-mv .claude/specs/groups/<old-spec-group-id> .claude/specs/archive/<old-spec-group-id>
-
-# For standalone specs (legacy format, if encountered)
-mv .claude/specs/groups/<old-spec-group-id> .claude/specs/archive/<old-spec-group-id>
-```
-
-**Archive location**: `.claude/specs/archive/`
-
-**Important**: Preserve the complete directory structure when archiving.
+When supersession is detected, record the relationship in the replacement spec
+or manifest decision log, update references away from the obsolete group, then
+remove the obsolete group with `git rm -r .claude/specs/groups/<old-spec-group-id>`.
+Do not move completed or superseded spec bodies into a long-lived archive unless
+a current test, security invariant, audit chain, or unresolved follow-up still
+depends on the exact file.
 
 ### Integration with Orchestrator Workflow
 
@@ -777,16 +716,14 @@ Execute deprecation at these points in the workflow:
 
 1. **Before workstream allocation**: If MasterSpec supersedes existing specs, deprecate them before creating worktrees
 2. **After all workstreams merge**: Final deprecation check for any specs made obsolete by the implementation
-3. **During cleanup phase**: Verify all superseded specs are properly archived
+3. **During cleanup phase**: Verify superseded spec paths were removed or explicitly retained for a current dependency.
 
 ### Verification Checklist
 
 After deprecation, verify:
 
-- [ ] Old spec frontmatter has `status: superseded` and `superseded_by`
-- [ ] Registry shows old spec as superseded with correct reference
-- [ ] Registry shows new spec with `supersedes` array
-- [ ] Old spec moved to `.claude/specs/archive/`
+- [ ] Replacement spec or manifest records the supersession reason
+- [ ] No active prompt, doc, script, test, manifest, or registry entry points at the removed path
 - [ ] Session state updated to reflect deprecation
 
 ## Success Criteria
@@ -799,7 +736,7 @@ Before marking orchestrator task complete, verify:
 - Integration tests passing on main
 - Session state reflects all merges
 - MasterSpec Decision & Work Log updated with completion
-- All superseded specs properly deprecated and archived
+- Superseded specs removed or explicitly retained for a current dependency
 
 ## Acceptable Assumption Domains
 
@@ -810,14 +747,6 @@ Per the [Self-Answer Protocol](../memory-bank/self-answer-protocol.md), reasonin
 
 Escalate all questions about workstream scope, contract interfaces, or conflict resolution strategy.
 
----
+## Communication Style (agent ↔ parent)
 
-## Communication Style
-
-Respond like smart, efficient, AI. Cut all filler, keep technical substance.
-
-- Drop articles (a, an, the), filler (just, really, basically, actually).
-- Drop pleasantries (sure, certainly, happy to).
-- No hedging. Fragments fine. Short synonyms.
-- Technical terms stay exact. Code blocks unchanged.
-- Pattern: [thing] [action] [reason]. [next step].
+Use Caveman-lite: direct, full-sentence, evidence-complete. Hedge only when uncertainty matters. Keep exact terms and code unchanged.

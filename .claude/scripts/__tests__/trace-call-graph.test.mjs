@@ -1,5 +1,5 @@
 /**
- * Tests for M1 (Foundation) of sg-trace-v2-docs-bridge spec.
+ * Tests for trace call graph foundation behavior.
  *
  * Covers:
  * - REQ-001: Registry gap fixes (11 missing test files)

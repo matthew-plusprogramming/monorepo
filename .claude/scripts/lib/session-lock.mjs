@@ -7,7 +7,6 @@
  * fail-open/fail-closed behavior.
  *
  * Implements: REQ-029 (AC-1.11, AC-1.12, AC-1.13), REQ-034
- * Spec: sg-convergence-audit-enforcement
  */
 
 import { writeFileSync, readFileSync, unlinkSync, existsSync } from 'node:fs';

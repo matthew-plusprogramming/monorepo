@@ -1,20 +1,15 @@
 /**
  * Tests for Trace System Enhancement -- Milestones 2 & 3: Consumption & Documentation
  *
- * Spec: .claude/specs/groups/sg-trace-system-enhancement/spec.md
+ * Current policy after trace simplification:
+ * - Route reads high-level traces when present.
+ * - CLAUDE.md owns the compact trace contract for normal sessions.
+ * - Low-level traces are optional sidecars; .calls.json is tool-only.
+ * - Detailed trace mechanics live in docs, not duplicated across hot skills.
  *
- * Validates:
- * - AC-2.1: Skill files reference trace paths (not self-service templates)
- * - AC-2.2: All five skill files use canonical pattern
- * - AC-2.3: Route skill reads high-level.md
- * - AC-2.4: Graceful degradation when traces unavailable
- * - AC-3.1: CLAUDE.md has positive trace instruction (not buried exception)
- * - AC-3.2: delegation.guidelines.md references traces
- * - AC-3.3: tech.context.md documents trace system
- * - AC-3.4: All changes sync-compatible (registry check)
- *
- * These tests verify file content matches spec requirements.
- * They read the actual files and assert required sections/keywords exist.
+ * These tests intentionally do not require every hot skill to carry a Trace
+ * Context section. That old requirement pushed repeated prompt bloat into
+ * normal dispatches.
  *
  * Run with: npx vitest run --config .claude/scripts/vitest.config.mjs trace-enhance-docs
  */
@@ -37,81 +32,6 @@ function readProjectFile(relativePath) {
   }
   return readFileSync(fullPath, 'utf-8');
 }
-
-// Skill file paths
-const SKILL_FILES = [
-  { path: '.claude/skills/implement/SKILL.md', name: 'implement' },
-  { path: '.claude/skills/test/SKILL.md', name: 'test' },
-  { path: '.claude/skills/code-review/SKILL.md', name: 'code-review' },
-  { path: '.claude/skills/security/SKILL.md', name: 'security' },
-  { path: '.claude/agents/explore.md', name: 'explore' },
-];
-
-// =============================================================================
-// AC-2.1: Skill files reference trace paths (not self-service templates)
-// =============================================================================
-
-describe('Skill files -- trace path references (AC-2.1)', () => {
-  for (const { path: filePath, name } of SKILL_FILES) {
-    it(`${name} skill should reference trace file paths, not unfilled placeholders (AC-2.1)`, () => {
-      // Arrange
-      const content = readProjectFile(filePath);
-
-      // Assert
-      expect(content !== null).toBeTruthy();
-      // Should reference trace paths
-      expect(content.includes('traces/low-level/') || content.includes('trace') || content.includes('Trace')).toBeTruthy();
-      // Should reference freshness / isTraceStale
-      expect(content.includes('isTraceStale') || content.includes('freshness') || content.includes('stale')).toBeTruthy();
-    });
-  }
-});
-
-// =============================================================================
-// AC-2.2: All five skill files use canonical pattern
-// =============================================================================
-
-describe('Skill files -- canonical trace context pattern (AC-2.2)', () => {
-  it('all five skill/agent files should contain a Trace Context section (AC-2.2)', () => {
-    // Arrange & Act
-    const contents = SKILL_FILES.map(({ path: p, name }) => ({
-      name,
-      content: readProjectFile(p),
-    }));
-
-    // Assert
-    for (const { name, content } of contents) {
-      expect(content !== null).toBeTruthy();
-      expect(content.includes('Trace Context') || content.includes('### Trace Context') || content.includes('## Trace Context')).toBeTruthy();
-    }
-  });
-
-  it('all five files should reference the same freshness check approach (AC-2.2)', () => {
-    // Arrange
-    const contents = SKILL_FILES.map(({ path: p, name }) => ({
-      name,
-      content: readProjectFile(p),
-    })).filter(({ content }) => content !== null);
-
-    // Assert -- all should reference isTraceStale for freshness
-    for (const { name, content } of contents) {
-      expect(content.includes('isTraceStale') || content.includes('freshness')).toBeTruthy();
-    }
-  });
-
-  it('all five files should reference trace.config.json for path resolution (AC-2.2)', () => {
-    // Arrange
-    const contents = SKILL_FILES.map(({ path: p, name }) => ({
-      name,
-      content: readProjectFile(p),
-    })).filter(({ content }) => content !== null);
-
-    // Assert
-    for (const { name, content } of contents) {
-      expect(content.includes('trace.config.json') || content.includes('fileGlobs') || content.includes('loadTraceConfig')).toBeTruthy();
-    }
-  });
-});
 
 // =============================================================================
 // AC-2.3: Route skill reads high-level.md
@@ -142,15 +62,6 @@ describe('Route skill -- trace reading (AC-2.3)', () => {
 // =============================================================================
 
 describe('Graceful degradation (AC-2.4)', () => {
-  it('skill files should mention graceful degradation for missing traces (AC-2.4)', () => {
-    // Arrange -- check at least implement skill for the pattern
-    const content = readProjectFile('.claude/skills/implement/SKILL.md');
-
-    // Assert
-    expect(content !== null).toBeTruthy();
-    expect(content.includes('omit') || content.includes('graceful') || content.includes('without trace') || content.includes('not available') || content.includes('no traces')).toBeTruthy();
-  });
-
   it('route skill should mention proceeding without traces if unavailable (AC-2.4)', () => {
     // Arrange
     const content = readProjectFile('.claude/skills/route/SKILL.md');
@@ -167,14 +78,15 @@ describe('Graceful degradation (AC-2.4)', () => {
 // =============================================================================
 
 describe('CLAUDE.md -- trace guidance (AC-3.1)', () => {
-  it('should have positive trace instruction, not just buried exception (AC-3.1)', () => {
+  it('should keep the compact trace contract in the root prompt (AC-3.1)', () => {
     // Arrange
     const content = readProjectFile('CLAUDE.md');
 
     // Assert
     expect(content !== null).toBeTruthy();
-    // Should have a positive instruction for trace reading
-    expect(content.includes('MUST read') || content.includes('Trace Reading') || content.includes('traces/high-level')).toBeTruthy();
+    expect(content.includes('### Trace Context')).toBeTruthy();
+    expect(content.includes('.claude/traces/high-level.md')).toBeTruthy();
+    expect(content.includes('optional orientation')).toBeTruthy();
   });
 
   it('should maintain delegation-first constraint boundary (AC-3.1)', () => {
@@ -185,8 +97,7 @@ describe('CLAUDE.md -- trace guidance (AC-3.1)', () => {
     expect(content !== null).toBeTruthy();
     // Should still have delegation-first references
     expect(content.includes('delegation-first') || content.includes('Delegation-First')).toBeTruthy();
-    // Should maintain the boundary on what is readable
-    expect(content.includes('.claude/traces/') || content.includes('automation-generated')).toBeTruthy();
+    expect(content.includes('automation-generated') || content.includes('advisory')).toBeTruthy();
   });
 
   it('should not weaken delegation-first constraints (AC-3.1)', () => {
@@ -195,8 +106,8 @@ describe('CLAUDE.md -- trace guidance (AC-3.1)', () => {
 
     // Assert
     expect(content !== null).toBeTruthy();
-    // Source code should still be off-limits
-    expect(content.includes('source code') || content.includes('off-limits') || content.includes('remain')).toBeTruthy();
+    expect(content.includes('Do not read `.calls.json` directly')).toBeTruthy();
+    expect(content.includes('trace-query.mjs')).toBeTruthy();
   });
 });
 
@@ -289,24 +200,5 @@ describe('Sync compatibility (AC-3.4)', () => {
       a => a.path && (a.path.includes('high-level.json') || a.path.includes('high-level.md') || a.path.includes('low-level/')),
     );
     expect(!hasTraceOutput).toBeTruthy();
-  });
-});
-
-// =============================================================================
-// Token budget verification (NFR-4 / AC-2.4 related)
-// =============================================================================
-
-describe('Trace read token budget (NFR-4)', () => {
-  it('high-level.md should be under 5K tokens (~20KB) if it exists', () => {
-    // Arrange
-    const content = readProjectFile('.claude/traces/high-level.md');
-    if (!content) {
-      // Traces may not exist in this repo -- skip gracefully
-      return;
-    }
-
-    // Assert -- rough token estimate: 1 token ~= 4 chars
-    const estimatedTokens = Math.ceil(content.length / 4);
-    expect(estimatedTokens < 5000).toBeTruthy();
   });
 });

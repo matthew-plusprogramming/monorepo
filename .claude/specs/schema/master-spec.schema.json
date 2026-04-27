@@ -6,6 +6,7 @@
   "properties": {
     "id": { "type": "string" },
     "title": { "type": "string" },
+    "date": { "type": "string" },
     "workstreams": { "type": "array", "items": { "type": "string" } },
     "contracts": { "type": "array", "items": { "type": "string" } },
     "gates": { "type": "array", "items": { "type": "string" } },

@@ -1,7 +1,6 @@
 /**
  * Unit tests for docs-scaffold.mjs — Directory scanning, module proposal, overwrite guard
  *
- * Spec: sg-structured-docs
  * Covers: AC-7.1, AC-7.2
  *
  * Run with: npx vitest run --config .claude/scripts/vitest.config.mjs docs-scaffold

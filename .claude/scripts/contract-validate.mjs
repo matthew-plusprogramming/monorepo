@@ -24,7 +24,6 @@
  *   2 - Validation failed in blocker mode
  *
  * Implements: AC-8.1 through AC-8.11, AC-9.1 through AC-9.8, AC-12.1
- * Spec: sg-contract-system, Tasks 11-12
  */
 
 import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync } from 'node:fs';

@@ -203,7 +203,6 @@ function phase2PatternMatching() {
     ['.claude/templates/*', '/Users/me/project/.claude/scripts/test.mjs', false],
     ['.claude/specs/groups/**/manifest.json', '/Users/me/project/.claude/specs/groups/sg-test/manifest.json', true],
     ['.claude/specs/**', '/Users/me/project/.claude/specs/groups/sg-test/atomic/as-001.md', true],
-    ['.claude/registry/artifacts.json', '/Users/me/project/.claude/registry/artifacts.json', true],
   ];
 
   let phasePassed = 0;
@@ -354,8 +353,8 @@ function phase3PostToolUseHooks(settings) {
   const specScript = resolve(SCRIPTS_DIR, 'spec-validate.mjs');
   testDirect('spec-validate', specScript, 'valid-spec.md', 0,
     'valid-spec.md -> exit 0');
-  testDirect('spec-validate', specScript, 'invalid-spec-missing-sections.md', 1,
-    'invalid-spec-missing-sections.md -> exit non-zero');
+  testDirect('spec-validate', specScript, 'invalid-spec-missing-sections.md', 0,
+    'invalid-spec-missing-sections.md -> exit 0 (outside specs path)');
 
   // --- Spec Schema Validate ---
   // Note: spec-schema-validate tries to determine spec type from path/frontmatter.
@@ -493,27 +492,6 @@ function phase3PostToolUseHooks(settings) {
     }
   }
 
-  // --- Registry Artifact Validate ---
-  const regArtifactScript = resolve(SCRIPTS_DIR, 'registry-artifact-validate.mjs');
-  if (existsSync(regArtifactScript)) {
-    const artifactsFile = resolve(CLAUDE_DIR, 'registry', 'artifacts.json');
-    if (existsSync(artifactsFile)) {
-      phaseTotal++;
-      const result = runScript(regArtifactScript, artifactsFile);
-      if (result.code === 0) {
-        pass('registry-artifact-validate: artifacts.json -> exit 0');
-        phasePassed++;
-      } else {
-        // Might fail due to warnings about missing paths etc. -- still a valid test
-        fail('registry-artifact-validate: artifacts.json -> exit non-zero', result.stderr);
-      }
-    } else {
-      phaseTotal++;
-      skip('registry-artifact-validate', 'artifacts.json not found');
-      phaseSkipped++;
-    }
-  }
-
   // --- TypeScript Typecheck ---
   const tscScript = resolve(SCRIPTS_DIR, 'workspace-tsc.mjs');
   if (existsSync(tscScript)) {
@@ -612,112 +590,80 @@ function phase4SubagentStopHooks() {
   let phaseSkipped = 0;
   let phaseTotal = 0;
 
-  const gateScript = resolve(SCRIPTS_DIR, 'convergence-gate-reminder.mjs');
+  const recorderScript = resolve(SCRIPTS_DIR, 'convergence-pass-recorder.mjs');
 
-  if (!existsSync(gateScript)) {
-    phaseTotal = 2;
-    skip('convergence-gate-reminder: implementer', 'script not found');
-    skip('convergence-gate-reminder: explore', 'script not found');
-    phaseSkipped = 2;
+  if (!existsSync(recorderScript)) {
+    phaseTotal = 1;
+    skip('convergence-pass-recorder: script exists', 'script not found');
+    phaseSkipped = 1;
     phaseResult(phasePassed, phaseTotal, phaseSkipped);
     return;
   }
 
-  // Test 1: implementer -> gate present in stdout
-  phaseTotal++;
-  {
-    const stdinData = JSON.stringify({ agent_type: 'implementer' });
-    const result = runWithStdin(`node ${gateScript}`, stdinData);
-
-    if (result.code === 0 && result.stdout.includes('all_acs_implemented')) {
-      pass('convergence-gate-reminder: implementer -> gate present');
-      phasePassed++;
-    } else {
-      fail(
-        'convergence-gate-reminder: implementer -> gate present',
-        `code=${result.code}, stdout=${result.stdout.trim()}`
-      );
-    }
-  }
-
-  // Test 2: test-writer -> gate present
-  phaseTotal++;
-  {
-    const stdinData = JSON.stringify({ agent_type: 'test-writer' });
-    const result = runWithStdin(`node ${gateScript}`, stdinData);
-
-    if (result.code === 0 && result.stdout.includes('all_tests_passing')) {
-      pass('convergence-gate-reminder: test-writer -> gate present');
-      phasePassed++;
-    } else {
-      fail(
-        'convergence-gate-reminder: test-writer -> gate present',
-        `code=${result.code}, stdout=${result.stdout.trim()}`
-      );
-    }
-  }
-
-  // Test 3: code-reviewer -> gate present
-  phaseTotal++;
-  {
-    const stdinData = JSON.stringify({ agent_type: 'code-reviewer' });
-    const result = runWithStdin(`node ${gateScript}`, stdinData);
-
-    if (result.code === 0 && result.stdout.includes('code_review_passed')) {
-      pass('convergence-gate-reminder: code-reviewer -> gate present');
-      phasePassed++;
-    } else {
-      fail(
-        'convergence-gate-reminder: code-reviewer -> gate present',
-        `code=${result.code}, stdout=${result.stdout.trim()}`
-      );
-    }
-  }
-
-  // Test 4: explore (unmapped) -> empty JSON
+  // Test 1: unmapped subagent -> empty JSON
   phaseTotal++;
   {
     const stdinData = JSON.stringify({ agent_type: 'explore' });
-    const result = runWithStdin(`node ${gateScript}`, stdinData);
+    const result = runWithStdin(`node ${recorderScript}`, stdinData);
 
     if (result.code === 0 && result.stdout.trim() === '{}') {
-      pass('convergence-gate-reminder: explore -> empty JSON (unmapped)');
+      pass('convergence-pass-recorder: explore -> empty JSON (unmapped)');
       phasePassed++;
     } else {
       fail(
-        'convergence-gate-reminder: explore -> empty JSON',
+        'convergence-pass-recorder: explore -> empty JSON',
         `code=${result.code}, stdout=${result.stdout.trim()}`
       );
     }
   }
 
-  // Test 5: empty stdin -> empty JSON
+  // Test 2: short convergence message -> ignored empty JSON
   phaseTotal++;
   {
-    const result = runWithStdin(`node ${gateScript}`, '');
+    const stdinData = JSON.stringify({
+      agent_type: 'unifier',
+      last_assistant_message: 'too short',
+    });
+    const result = runWithStdin(`node ${recorderScript}`, stdinData);
 
     if (result.code === 0 && result.stdout.trim() === '{}') {
-      pass('convergence-gate-reminder: empty stdin -> empty JSON');
+      pass('convergence-pass-recorder: short message -> empty JSON');
       phasePassed++;
     } else {
       fail(
-        'convergence-gate-reminder: empty stdin -> empty JSON',
+        'convergence-pass-recorder: short message -> empty JSON',
         `code=${result.code}, stdout=${result.stdout.trim()}`
       );
     }
   }
 
-  // Test 6: malformed JSON -> empty JSON
+  // Test 3: empty stdin -> empty JSON
   phaseTotal++;
   {
-    const result = runWithStdin(`node ${gateScript}`, '{not valid json');
+    const result = runWithStdin(`node ${recorderScript}`, '');
 
     if (result.code === 0 && result.stdout.trim() === '{}') {
-      pass('convergence-gate-reminder: malformed JSON -> empty JSON');
+      pass('convergence-pass-recorder: empty stdin -> empty JSON');
       phasePassed++;
     } else {
       fail(
-        'convergence-gate-reminder: malformed JSON -> empty JSON',
+        'convergence-pass-recorder: empty stdin -> empty JSON',
+        `code=${result.code}, stdout=${result.stdout.trim()}`
+      );
+    }
+  }
+
+  // Test 4: malformed JSON -> empty JSON
+  phaseTotal++;
+  {
+    const result = runWithStdin(`node ${recorderScript}`, '{not valid json');
+
+    if (result.code === 0 && result.stdout.trim() === '{}') {
+      pass('convergence-pass-recorder: malformed JSON -> empty JSON');
+      phasePassed++;
+    } else {
+      fail(
+        'convergence-pass-recorder: malformed JSON -> empty JSON',
         `code=${result.code}, stdout=${result.stdout.trim()}`
       );
     }

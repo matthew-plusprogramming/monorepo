@@ -47,5 +47,7 @@
       "action": "investigation_fixes_applied",
       "details": "Applied 8 fixes from interface investigation: INC-001 (checkArtifactFreshness signature), INC-002 (shared SENSITIVE_KEYS), INC-003 (optional correlation import), INC-004 (logger fake update), INC-005 (verified ARTIFACT_SOURCE_DIRS), INC-006 (Record not Map), INC-007 (journal singular), INC-009 (sg- prefix)"
     }
-  ]
+  ],
+  "updated_by": "agent",
+  "prd": null
 }

@@ -1,7 +1,6 @@
 /**
  * Unit tests for M3: Integration -- Trace-Informed Routing + Trace-to-Docs Bridge
  *
- * Spec: sg-trace-v2-docs-bridge (Milestone 3)
  * Covers: REQ-014, REQ-015, REQ-016, REQ-017, REQ-018, REQ-019
  *
  * Run with: npx vitest run --config .claude/scripts/vitest.config.mjs trace-docs-bridge

@@ -1,7 +1,6 @@
 /**
  * Tests for deployment verification runners (verify:build, verify:deploy)
  *
- * Spec: sg-deployment-verification-gaps
  * AC Groups: AC-3 (Build Verification), AC-4 (Post-Deploy Smoke Test)
  *
  * These tests verify the behavior of the deployment-verify.mjs helper module

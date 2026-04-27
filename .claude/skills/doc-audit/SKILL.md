@@ -8,6 +8,12 @@ allowed-tools: Read, Glob, Grep
 
 # Documentation Audit Skill
 
+## Required Context
+
+Before beginning work, read these files for project-specific guidelines:
+
+- `.claude/memory-bank/tech.context.md`
+
 ## Purpose
 
 Perform read-only diagnostic audits of documentation across all known documentation directories. Identifies staleness, broken references, coverage gaps, inconsistencies, and structural quality issues. Produces machine-parseable JSON reports that feed into the remediation convergence loop via the documenter agent.

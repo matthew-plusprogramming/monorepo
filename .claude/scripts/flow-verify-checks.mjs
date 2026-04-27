@@ -25,8 +25,7 @@
  *   0 = success (results written)
  *   1 = fatal error (no results written)
  *
- * Implements: AC-1.3, AC-1.4, AC-1.5, AC-1.6, AC-1.10, AC-1.11, AC-1.12, AC-1.15
- * Spec: sg-flow-verifier, Tasks B1-B10
+ * Current contract summary: .claude/docs/FLOW-VERIFIER.md
  */
 
 import { existsSync, readFileSync, readlinkSync, writeFileSync, mkdirSync, readdirSync, statSync, lstatSync } from 'node:fs';
@@ -40,8 +39,17 @@ import { execFileSync } from 'node:child_process';
 /** Valid stage modes (AC-1.1, REQ-001) */
 const VALID_STAGES = ['prd-review', 'spec-review', 'impl-verify', 'post-impl'];
 
-/** Valid scope modes */
-const VALID_SCOPES = ['full', 'workstream', 'post-merge'];
+/** Valid scope modes (REQ-006 adds 'diff' for impl-verify/post-impl diff-scope) */
+const VALID_SCOPES = ['full', 'workstream', 'post-merge', 'diff'];
+
+/** Stages where scope === 'diff' is permitted (REQ-006 / AC2.1-AC2.4) */
+const DIFF_SCOPE_ALLOWED_STAGES = ['impl-verify', 'post-impl'];
+
+/** Carry-forward source stages that bypass diff-scope filter (REQ-006 / AC2.2) */
+const CARRY_FORWARD_SOURCE_STAGES = ['prd-review', 'spec-review'];
+
+/** Regex detecting a newly added `export` line in a diff hunk (REQ-006 / AC2.3) */
+const NEW_EXPORT_LINE_REGEX = /^\+\s*export\b/;
 
 /** Wiring bug categories (6-category taxonomy per spec) */
 export const WIRING_BUG_CATEGORIES = [
@@ -94,6 +102,7 @@ function parseArgs(argv) {
     scope: 'full',
     workstream: null,
     projectRoot: null,
+    diffBase: null, // REQ-006: ref for diff computation (e.g. HEAD~10)
   };
 
   for (let i = 2; i < argv.length; i++) {
@@ -112,6 +121,9 @@ function parseArgs(argv) {
         break;
       case '--project-root':
         args.projectRoot = argv[++i];
+        break;
+      case '--diff-base':
+        args.diffBase = argv[++i];
         break;
     }
   }
@@ -1301,6 +1313,376 @@ function generateContentHash(content) {
 }
 
 // =============================================================================
+// Diff-Scope Integration (REQ-006 — AC2.1, AC2.2, AC2.3, AC2.4)
+// =============================================================================
+
+/**
+ * Determine whether a finding (or carry-forward entry) originates from a stage
+ * that must be re-evaluated regardless of diff scope (REQ-006 / AC2.2).
+ *
+ * Carry-forward entries written at prd-review / spec-review MUST be re-evaluated
+ * at impl-verify / post-impl even when scope === 'diff', because the earlier
+ * stage's analysis spans modules that may not intersect the diff.
+ *
+ * @param {string|null|undefined} sourceStage - Stage the finding originated from
+ * @returns {boolean}
+ */
+export function isCarryForwardSourceStage(sourceStage) {
+  if (!sourceStage) return false;
+  return CARRY_FORWARD_SOURCE_STAGES.includes(sourceStage);
+}
+
+/**
+ * Extract module IDs touched by a finding. A finding may reference a source
+ * file and/or a target file; either participating file's module qualifies the
+ * finding for diff-scope retention.
+ *
+ * @param {object} finding - FlowFinding (with source.file, target.file)
+ * @param {Function} fileToModule - Maps file path → module ID
+ * @returns {string[]} Module IDs referenced by this finding
+ */
+export function findingModuleIds(finding, fileToModule) {
+  if (!finding || typeof fileToModule !== 'function') return [];
+  const ids = new Set();
+  const srcFile = finding.source?.file;
+  const tgtFile = finding.target?.file;
+  if (srcFile && srcFile !== 'unknown') {
+    const id = fileToModule(srcFile);
+    if (id) ids.add(id);
+  }
+  if (tgtFile && tgtFile !== 'unknown') {
+    const id = fileToModule(tgtFile);
+    if (id) ids.add(id);
+  }
+  return [...ids];
+}
+
+/**
+ * Filter findings to only those whose referenced files map to affected modules
+ * (AC2.1). Findings that touch no known module are retained conservatively to
+ * avoid silently dropping coverage.
+ *
+ * @param {object[]} findings - Current-pass findings
+ * @param {string[]} affectedModules - Module IDs from `resolveDiffScope`
+ * @param {Function} fileToModule - Maps file path → module ID
+ * @returns {object[]} Filtered findings
+ */
+export function filterFindingsByAffectedModules(findings, affectedModules, fileToModule) {
+  if (!Array.isArray(findings)) return [];
+  if (!Array.isArray(affectedModules) || affectedModules.length === 0) {
+    // SELF-RESOLVED(spec): AC2.1 scopes to affected modules; empty set
+    // means no diff → trivial-pass at caller layer already handled upstream
+    // (resolveDiffScope.fallback === 'none' with empty changed_files). Here
+    // we match that semantic by returning empty findings.
+    return [];
+  }
+  const affectedSet = new Set(affectedModules);
+
+  return findings.filter((f) => {
+    // Retain carry-forward-sourced findings regardless of module scope (AC2.2).
+    if (isCarryForwardSourceStage(f.source_stage || f.stage)) return true;
+
+    const modules = findingModuleIds(f, fileToModule);
+    if (modules.length === 0) {
+      // Finding references no known module (e.g. 'unknown' placeholders);
+      // retain conservatively — filter is for in-scope subset, not hard cull.
+      return true;
+    }
+    return modules.some((id) => affectedSet.has(id));
+  });
+}
+
+/**
+ * Detect whether a git diff contains newly added `export` statements in files
+ * that map to module boundaries (AC2.3 / NFR-10). When present, diff-scope
+ * MUST degrade to full scope so new-boundary-crossing symbols are not missed.
+ *
+ * @param {string} diffText - Unified diff text (output of `git diff <base>..HEAD`)
+ * @param {Function} fileToModule - Maps file path → module ID
+ * @returns {{ detected: boolean, file: string|null, line: string|null, module: string|null }}
+ */
+export function detectNewBoundaryExport(diffText, fileToModule) {
+  const result = { detected: false, file: null, line: null, module: null };
+  if (!diffText || typeof diffText !== 'string') return result;
+  if (typeof fileToModule !== 'function') return result;
+
+  const lines = diffText.split('\n');
+  let currentFile = null;
+
+  for (const line of lines) {
+    // Git diff file header: `+++ b/<path>`; we ignore `+++ /dev/null` (deletions).
+    if (line.startsWith('+++ ')) {
+      const pathPart = line.slice(4).trim();
+      if (pathPart === '/dev/null') {
+        currentFile = null;
+        continue;
+      }
+      // Strip the `b/` (or `a/`) prefix that git emits.
+      currentFile = pathPart.replace(/^b\//, '').replace(/^a\//, '');
+      continue;
+    }
+
+    // Skip hunk headers (`@@ ... @@`) and the outer `--- a/<path>` header.
+    if (line.startsWith('@@') || line.startsWith('--- ') || line.startsWith('diff ') || line.startsWith('index ')) {
+      continue;
+    }
+
+    if (!currentFile) continue;
+    if (!NEW_EXPORT_LINE_REGEX.test(line)) continue;
+
+    // Only count the export when its file belongs to a known module boundary.
+    const moduleId = fileToModule(currentFile);
+    if (moduleId) {
+      result.detected = true;
+      result.file = currentFile;
+      result.line = line;
+      result.module = moduleId;
+      return result;
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Fetch the raw unified diff text for the supplied base → HEAD range so the
+ * new-boundary detector can inspect hunks. Returns `null` on failure so the
+ * caller treats detection as absent (conservative: fall through to normal scope).
+ *
+ * @param {string} base - Git ref to diff against (e.g. 'HEAD~10')
+ * @param {string} projectRoot
+ * @returns {string|null}
+ */
+export function fetchDiffHunks(base, projectRoot) {
+  if (!base || typeof base !== 'string') return null;
+  try {
+    const output = execFileSync('git', ['diff', '--unified=0', `${base}..HEAD`], {
+      cwd: projectRoot,
+      encoding: 'utf8',
+      timeout: 30_000,
+    });
+    return output;
+  } catch {
+    // Intentional: fallback-friendly. If git diff fails (missing ancestor,
+    // shallow clone), the caller keeps the provided scope. Correctness note:
+    // the primary new-symbol gate is defense-in-depth; diff-scope filtering
+    // is already conservative (AC2.1 retains unknown-module findings).
+    return null;
+  }
+}
+
+/**
+ * Contract adapter (REQ-006) — filter findings by diff scope.
+ *
+ * Consumer contract used by test-writer fixtures and test-driven callers:
+ *   applyDiffScopeFilter({ scope, diff_scope_result, findings }) → { findings }
+ *
+ * Semantics:
+ * - scope === 'full' → retain all findings (AC2.4 backward compat).
+ * - scope === 'diff' → retain findings whose `module_id` is in
+ *   `diff_scope_result.affected_modules`, OR whose `source_stage` is a
+ *   carry-forward stage (prd-review / spec-review per AC2.2).
+ *
+ * This helper operates on the shape used by test fixtures
+ * (`{id, module_id, source_stage, ...}`) and is symmetric with
+ * `filterFindingsByAffectedModules` which operates on the runtime
+ * FlowFinding shape (`{source.file, target.file, stage}`).
+ *
+ * @param {object} params
+ * @param {'full'|'diff'|'workstream'|'post-merge'} params.scope
+ * @param {object|null} params.diff_scope_result
+ * @param {object[]} params.findings
+ * @returns {{ findings: object[] }}
+ */
+export function applyDiffScopeFilter({ scope, diff_scope_result, findings }) {
+  const input = Array.isArray(findings) ? findings : [];
+
+  // AC2.4: scope !== 'diff' → no filtering.
+  if (scope !== 'diff') {
+    return { findings: [...input] };
+  }
+
+  const affectedModules = Array.isArray(diff_scope_result?.affected_modules)
+    ? diff_scope_result.affected_modules
+    : [];
+
+  // AC2.1 edge: affected_modules empty → no module passes the filter; only
+  // carry-forward entries survive (but none by construction in this path).
+  const affectedSet = new Set(affectedModules);
+
+  return {
+    findings: input.filter((f) => {
+      // AC2.2 — carry-forward entries from earlier stages always retained.
+      const sourceStage = f?.source_stage || f?.stage;
+      if (isCarryForwardSourceStage(sourceStage)) return true;
+
+      // AC2.1 — gate on module membership.
+      const moduleId = f?.module_id;
+      if (!moduleId) return false;
+      return affectedSet.has(moduleId);
+    }),
+  };
+}
+
+/**
+ * Contract adapter (REQ-006) — new-boundary-symbol detector on structured hunks.
+ *
+ * Consumer contract used by test-writer fixtures:
+ *   detectNewBoundarySymbol({ diff_scope_result, boundary_files }) →
+ *     { degrade_to_full: boolean, reason: string|null }
+ *
+ * Scans `diff_scope_result.diff_hunks` (array of `{file, lines}`) for lines
+ * matching `NEW_EXPORT_LINE_REGEX` (`^\+\s*export\b`) whose `file` is present
+ * in `boundary_files` (Set). If found, signals scope MUST degrade to 'full'
+ * (AC2.3 / NFR-10).
+ *
+ * This helper is symmetric with `detectNewBoundaryExport`, which scans raw
+ * unified-diff text + uses the trace `fileToModule` resolver.
+ *
+ * @param {object} params
+ * @param {object} params.diff_scope_result
+ * @param {Set<string>|string[]} params.boundary_files
+ * @returns {{ degrade_to_full: boolean, reason: string|null }}
+ */
+export function detectNewBoundarySymbol({ diff_scope_result, boundary_files }) {
+  const boundarySet = boundary_files instanceof Set
+    ? boundary_files
+    : new Set(Array.isArray(boundary_files) ? boundary_files : []);
+
+  const hunks = Array.isArray(diff_scope_result?.diff_hunks)
+    ? diff_scope_result.diff_hunks
+    : [];
+
+  for (const hunk of hunks) {
+    const file = hunk?.file;
+    if (!file || !boundarySet.has(file)) continue;
+    const lines = Array.isArray(hunk?.lines) ? hunk.lines : [];
+    for (const line of lines) {
+      if (typeof line !== 'string') continue;
+      if (NEW_EXPORT_LINE_REGEX.test(line)) {
+        return {
+          degrade_to_full: true,
+          reason: `new boundary-crossing export detected in ${file}`,
+        };
+      }
+    }
+  }
+
+  return { degrade_to_full: false, reason: null };
+}
+
+/**
+ * Apply diff-scope filtering + new-boundary degradation + carry-forward
+ * re-evaluation to a batch of findings (REQ-006 / AC2.1-AC2.4).
+ *
+ * Contract (matches `resolveDiffScope` output shape from as-001):
+ *   diffScopeResult = { scope: 'diff'|'full', changed_files, affected_modules, fallback }
+ *
+ * @param {object} params
+ * @param {string} params.scope - Effective scope: 'full' | 'diff' | 'workstream' | 'post-merge'
+ * @param {object|null} params.diffScopeResult - Output of `resolveDiffScope` (optional)
+ * @param {object[]} params.findings - Current-pass findings
+ * @param {object[]} params.carryForwardFindings - Prior-stage carry-forward entries
+ * @param {string} params.stage
+ * @param {string} params.projectRoot
+ * @param {Function} params.fileToModule
+ * @returns {{ findings: object[], scope: string, newBoundaryDetected: object, scopeDegraded: boolean, warnings: string[] }}
+ */
+export function applyDiffScope(params) {
+  const {
+    scope,
+    diffScopeResult,
+    findings,
+    carryForwardFindings,
+    stage,
+    projectRoot,
+    fileToModule,
+  } = params;
+
+  const warnings = [];
+  let effectiveScope = scope;
+  let scopeDegraded = false;
+  let newBoundaryDetected = { detected: false, file: null, line: null, module: null };
+
+  // AC2.4 — backward compat: scope !== 'diff' is a no-op (no filter).
+  if (scope !== 'diff') {
+    return {
+      findings: [...(findings || [])],
+      scope: effectiveScope,
+      newBoundaryDetected,
+      scopeDegraded: false,
+      warnings,
+    };
+  }
+
+  // Reject diff scope at unsupported stages (REQ-006 contract behavioral guarantee).
+  if (!DIFF_SCOPE_ALLOWED_STAGES.includes(stage)) {
+    warnings.push(`scope 'diff' is not valid at stage '${stage}'; degrading to 'full'`);
+    return {
+      findings: [...(findings || [])],
+      scope: 'full',
+      newBoundaryDetected,
+      scopeDegraded: true,
+      warnings,
+    };
+  }
+
+  // AC2.3 — new boundary export → degrade to full.
+  // Prefer diff-hunk text from resolveDiffScope if supplied; otherwise fetch via git.
+  const diffText = diffScopeResult?.diff_text
+    || fetchDiffHunks(diffScopeResult?.base || 'HEAD~10', projectRoot);
+  if (diffText) {
+    newBoundaryDetected = detectNewBoundaryExport(diffText, fileToModule);
+    if (newBoundaryDetected.detected) {
+      warnings.push(
+        `New boundary-crossing export detected in ${newBoundaryDetected.file} (${newBoundaryDetected.module}); degrading scope from 'diff' to 'full' (NFR-10)`
+      );
+      effectiveScope = 'full';
+      scopeDegraded = true;
+      return {
+        findings: [...(findings || [])],
+        scope: effectiveScope,
+        newBoundaryDetected,
+        scopeDegraded,
+        warnings,
+      };
+    }
+  }
+
+  // AC2.1 — filter current-pass findings to affected modules only.
+  const affectedModules = Array.isArray(diffScopeResult?.affected_modules)
+    ? diffScopeResult.affected_modules
+    : [];
+
+  const filteredCurrent = filterFindingsByAffectedModules(
+    findings || [],
+    affectedModules,
+    fileToModule
+  );
+
+  // AC2.2 — re-evaluate carry-forward findings regardless of diff scope.
+  // Carry-forward entries with source stage in prd-review / spec-review pass through.
+  const carryForwardRetained = (carryForwardFindings || []).filter((entry) =>
+    isCarryForwardSourceStage(entry.stage)
+  );
+
+  // Merge: filtered current-pass findings + carry-forward entries from earlier stages.
+  // De-dup by finding_id when both sources reference the same id.
+  const seen = new Set(filteredCurrent.map((f) => f.finding_id).filter(Boolean));
+  const mergedCarry = carryForwardRetained.filter(
+    (entry) => !entry.finding_id || !seen.has(entry.finding_id)
+  );
+
+  return {
+    findings: [...filteredCurrent, ...mergedCarry],
+    scope: effectiveScope,
+    newBoundaryDetected,
+    scopeDegraded,
+    warnings,
+  };
+}
+
+// =============================================================================
 // Main Entry Point
 // =============================================================================
 
@@ -1447,6 +1829,54 @@ export async function runFlowVerification(args) {
     coverage = 'partial';
   }
 
+  // Step 5.5: Apply diff-scope integration (REQ-006 / AC2.1-AC2.4).
+  // `args.diff_scope_result` is produced by `resolveDiffScope(...)` from
+  // `.claude/scripts/lib/flow-verify-diff-scope.mjs` (as-001 helper). When
+  // `scope === 'full'` (default) this is a no-op (AC2.4). When `scope === 'diff'`
+  // we (a) filter findings to affected modules (AC2.1), (b) re-evaluate carry-
+  // forward findings from prd-review / spec-review regardless of scope (AC2.2),
+  // and (c) degrade to full scope on detection of a new boundary-crossing
+  // export (AC2.3 / NFR-10).
+  const requestedScope = args.scope || 'full';
+  let effectiveScope = requestedScope;
+  let diffScopeMeta = null;
+
+  if (requestedScope === 'diff' || args.diff_scope_result) {
+    // Load carry-forward entries so AC2.2 re-evaluation can include prior stages.
+    const { findings: carryForwardFindings, warning: cfWarning } = readCarryForward(
+      specGroupId,
+      projectRoot,
+    );
+    if (cfWarning) warnings.push(cfWarning);
+
+    const diffScopeOutcome = applyDiffScope({
+      scope: requestedScope,
+      diffScopeResult: args.diff_scope_result || null,
+      findings: allFindings,
+      carryForwardFindings,
+      stage,
+      projectRoot,
+      fileToModule: traceSystem.fileToModule,
+    });
+
+    // Replace allFindings with scope-applied findings; carry forward metadata.
+    allFindings.length = 0;
+    allFindings.push(...diffScopeOutcome.findings);
+    effectiveScope = diffScopeOutcome.scope;
+    diffScopeMeta = {
+      requested_scope: requestedScope,
+      effective_scope: diffScopeOutcome.scope,
+      scope_degraded: diffScopeOutcome.scopeDegraded,
+      new_boundary_detected: diffScopeOutcome.newBoundaryDetected,
+      affected_modules: Array.isArray(args.diff_scope_result?.affected_modules)
+        ? args.diff_scope_result.affected_modules
+        : [],
+      carry_forward_count: carryForwardFindings.length,
+      fallback: args.diff_scope_result?.fallback || null,
+    };
+    for (const w of diffScopeOutcome.warnings) warnings.push(w);
+  }
+
   // Step 6: Compute gate decision (for impl-verify)
   const gateOutput = computeGateDecision(allFindings, coverage);
 
@@ -1456,7 +1886,8 @@ export async function runFlowVerification(args) {
     timestamp: new Date().toISOString(),
     spec_group: specGroupId,
     stage: stage,
-    scope: args.scope || 'full',
+    scope: effectiveScope,
+    diff_scope: diffScopeMeta,
     modified_files: modifiedFiles,
     trace_results: {
       modules_checked: [...moduleMap.keys()],

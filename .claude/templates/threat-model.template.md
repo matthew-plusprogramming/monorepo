@@ -1,48 +1,94 @@
-# Threat Model: {FEATURE_NAME}
+# Threat Model: <Feature Name>
 
-## Scope
+**PRD**: .claude/prds/<prd-id>.md
+**Date**: <ISO date>
 
-- **Component**: {component being modeled}
-- **Data Flows**: {what data moves through this component}
-- **Trust Boundaries**: {where trust levels change}
+## System Overview
 
----
+<Brief description of the feature and its security boundaries>
+
+## Trust Boundaries
+
+```
++------------------+     +------------------+     +------------------+
+|  Browser/Client  |<--->|   API Gateway    |<--->|     Backend      |
+|   (Untrusted)    |     |      (DMZ)       |     |    (Trusted)     |
++------------------+     +------------------+     +------------------+
+                                                          |
+                                                          v
+                                                 +------------------+
+                                                 |     Database     |
+                                                 |    (Trusted)     |
+                                                 +------------------+
+```
 
 ## Assets
 
-| Asset  | Sensitivity       | Description  |
-| ------ | ----------------- | ------------ |
-| {name} | {high/medium/low} | {what it is} |
+| Asset            | Sensitivity | Impact if Compromised |
+| ---------------- | ----------- | --------------------- |
+| User credentials | Critical    | Account takeover      |
+| Session tokens   | High        | Impersonation         |
+| User data        | Medium-High | Privacy breach        |
 
----
+## STRIDE Analysis
 
-## Threats
+### Spoofing
 
-### {THREAT_ID}: {Threat Name}
+| Threat              | Risk   | Mitigation                 |
+| ------------------- | ------ | -------------------------- |
+| Session hijacking   | High   | Secure cookies, HTTPS only |
+| Credential stuffing | Medium | Rate limiting, MFA         |
 
-- **Category**: {STRIDE category: Spoofing|Tampering|Repudiation|Information Disclosure|Denial of Service|Elevation of Privilege}
-- **Description**: {how the threat manifests}
-- **Likelihood**: {high|medium|low}
-- **Impact**: {high|medium|low}
-- **Risk**: {critical|high|medium|low} (likelihood x impact)
+### Tampering
 
-#### Attack Vector
+| Threat               | Risk   | Mitigation             |
+| -------------------- | ------ | ---------------------- |
+| Request modification | Medium | Input validation, HMAC |
+| Token manipulation   | High   | Signed tokens (JWT)    |
 
-{How an attacker would exploit this}
+### Repudiation
 
-#### Mitigations
+| Threat        | Risk   | Mitigation                  |
+| ------------- | ------ | --------------------------- |
+| Action denial | Medium | Comprehensive audit logging |
 
-- [ ] {Mitigation 1}
-- [ ] {Mitigation 2}
+### Information Disclosure
 
----
+| Threat                   | Risk   | Mitigation             |
+| ------------------------ | ------ | ---------------------- |
+| Data leakage in logs     | Medium | PII filtering          |
+| Error message disclosure | Low    | Generic error messages |
 
-## Assumptions
+### Denial of Service
 
-- {Security assumptions made}
+| Threat                | Risk   | Mitigation                |
+| --------------------- | ------ | ------------------------- |
+| Resource exhaustion   | Medium | Rate limiting, quotas     |
+| Account lockout abuse | Low    | CAPTCHA, graduated delays |
 
----
+### Elevation of Privilege
 
-## Out of Scope
+| Threat                | Risk     | Mitigation                       |
+| --------------------- | -------- | -------------------------------- |
+| Horizontal escalation | High     | Resource-level authz checks      |
+| Vertical escalation   | Critical | Role validation, least privilege |
 
-- {What this model explicitly does not cover}
+## Attack Scenarios
+
+### Scenario 1: <Name>
+
+**Attack Path**: <Step by step>
+**Likelihood**: High/Medium/Low
+**Impact**: Critical/High/Medium/Low
+**Mitigation**: <Control>
+
+### Scenario 2: <Name>
+
+...
+
+## Security Testing Recommendations
+
+1. [ ] Penetration test: <Focus area>
+2. [ ] Fuzzing: <Input targets>
+3. [ ] Auth bypass testing: <Endpoints>
+4. [ ] Rate limit validation: <Endpoints>

@@ -195,10 +195,46 @@
             "type": "integer",
             "minimum": 0,
             "description": "Number of consecutive clean passes recorded for this gate"
+          },
+          "last_pass_history_index": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Index into session.history[] of the most recent convergence_pass_recorded entry for this gate. Field is OMITTED (undefined) when no pass has been recorded for this gate yet. Used by the reconcile guard to preserve recent pass evidence."
           }
         },
         "required": ["clean_pass_count"]
       }
+    },
+    "force_reset_reconcile_skip": {
+      "type": "object",
+      "description": "Per-spec-group skip records written by start-work --force-reset-convergence. Read by reconcileConvergenceFromManifest to short-circuit reconcile after an intentional force reset. Stale entries (mismatched session_id) are cleared lazily on read.",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "session_id": {
+            "type": "string",
+            "description": "session.session_id at force-reset write time. Used for freshness check (match current session.session_id) vs stale (lazy cleanup)."
+          },
+          "sequence": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "session.history.length at force-reset write time. Informational provenance marker."
+          }
+        },
+        "required": ["session_id", "sequence"]
+      }
+    },
+    "substages_visited": {
+      "type": "object",
+      "description": "Map of phase name -> ordered-by-first-add (deduped) array of challenger sub-stages visited this session. Default canonical location for the ws-dag-substages attribute set; populated by session-checkpoint.mjs transition-phase per contract-substages-visited-schema. Sole writer: transition-phase (R-021 / NFR-19).",
+      "additionalProperties": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "enum": ["pre-impl", "pre-test", "pre-orch"]
+        }
+      },
+      "default": {}
     },
     "convergence_evidence": {
       "type": "object",
@@ -219,7 +255,7 @@
     },
     "convergence_log_failures": {
       "type": "object",
-      "description": "Per-gate circuit-breaker state for session.log write failures (sg-convergence-recorder-tolerance REQ-NFR-9, AC-13)",
+      "description": "Per-gate circuit-breaker state for session.log write failures",
       "additionalProperties": {
         "type": "object",
         "properties": {
@@ -331,7 +367,7 @@
             "documenter",
             "refactorer",
             "facilitator",
-            "browser-tester",
+            "manual-tester",
             "prd-writer",
             "prd-critic",
             "prd-reader",
@@ -433,14 +469,8 @@
         },
         "record_source": {
           "type": "string",
-          "enum": [
-            "hook",
-            "manual",
-            "manual_fallback",
-            "parse_failed",
-            "hook_manual"
-          ],
-          "description": "How this record was created: hook (automated SubagentStop), manual (CLI operator write), manual_fallback (EC-7 fail-closed after log-write failure), parse_failed (extractor missed all 4 paths -- streak-breaking diagnostic), hook_manual (operator emergency remediation -- streak-breaking)"
+          "enum": ["hook", "parse_failed", "manual_fallback"],
+          "description": "How this record was created: hook (automated SubagentStop -- only source that counts toward clean_pass_count), parse_failed (extractor missed all 4 paths -- streak-breaking diagnostic), manual_fallback (EC-7 fail-closed after log-write failure -- streak-breaking). Narrowed by sg-convergence-manual-pass-removal (AC-10): legacy values `manual` and `hook_manual` are no longer written but remain parseable in pre-existing session.json files."
         },
         "auto_decision_batch_id": {
           "type": ["string", "null"],

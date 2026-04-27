@@ -75,6 +75,8 @@ Before security review, verify:
 
 If prerequisites not met → STOP and run `/code-review` first.
 
+**Note (REQ-004 / as-024)**: Dispatching this skill no longer requires a preceding `challenger pre-review` pass. The formerly pre-review-scoped reviewer-focus signal is now assembled by `.claude/scripts/lib/reviewer-focus-metadata.mjs` and surfaced as dispatch-prompt context in Step 1a below. On dispatch failure the metadata is persisted at `.claude/coordination/review-dispatch-prompt-<dispatch-id>.json` for retry (EC-10).
+
 ## Security Review Process
 
 ### Step 1: Load Spec Group and Implementation Evidence
@@ -100,6 +102,57 @@ Identify:
 - Entry points (API routes, event handlers)
 - Data flows (input → processing → output)
 - External boundaries (user input, APIs, database)
+
+### Step 1a: Assemble Reviewer-Focus Metadata (REQ-004 / as-024)
+
+Before auditing inputs, assemble reviewer-focus metadata — the replacement signal for the deleted `challenger pre-review` dispatch. The helper reads the spec evidence table + (optional) diff summary + prior findings and emits a dispatch-prompt JSON payload oriented toward security-relevant surfaces.
+
+```js
+import {
+  assembleReviewerFocusMetadata,
+  persistDispatchPrompt,
+  readDispatchPrompt,
+  DispatchPromptPersistError,
+} from '.claude/scripts/lib/reviewer-focus-metadata.mjs';
+
+// EC-10 retry path: if a persisted artifact exists for this dispatch, use it.
+let metadata = readDispatchPrompt({
+  coordinationDir: '.claude/coordination',
+  dispatchId: '<dispatch-id>',
+});
+
+if (!metadata) {
+  metadata = assembleReviewerFocusMetadata({
+    specGroupDir: '.claude/specs/groups/<spec-group-id>',
+    diffSummary: {
+      changed_files: /* from `git diff --name-only main..HEAD` */ [],
+    },
+    priorFindings: /* carry-forward from unifier / code-reviewer */ [],
+  });
+
+  // Persist for EC-10 retry. Keep payload in memory until write succeeds.
+  try {
+    persistDispatchPrompt(metadata, {
+      coordinationDir: '.claude/coordination',
+      dispatchId: '<dispatch-id>',
+    });
+  } catch (err) {
+    if (!(err instanceof DispatchPromptPersistError)) throw err;
+    // Artifact write failed — reviewer proceeds with in-memory metadata;
+    // a subsequent retry will re-assemble (EC-10 fail-open).
+  }
+}
+```
+
+**Dispatch prompt inclusion**: Include the `metadata` payload verbatim in the reviewer's dispatch prompt under a "Reviewer-Focus Metadata" heading. The security reviewer consults:
+
+- `integration_surfaces`: cross-boundary paths — highest priority for input-validation / auth-boundary audit
+- `focus_areas`: attention-severity entries frequently correspond to multi-spec changes that span trust boundaries
+- `prior_findings`: carry-forward security-relevant signal from unifier / code-reviewer — do not re-flag without adding new evidence
+- `changed_files`: file + line-range list from atomic-spec evidence tables
+- `review_recommendations`: reviewer-facing hints derived from the signal above
+
+This metadata is **advisory**, not a convergence signal — security findings generated during review remain authoritative for the pass/fail verdict.
 
 ### Step 2: Input Validation Review
 
@@ -511,9 +564,8 @@ Coercive enforcement: `workflow-gate-enforcement.mjs` blocks downstream dispatch
 
 **After security review**:
 
-- If PASS with UI changes → Proceed to `/browser-test`
 - If PASS → Trigger `/docs` for documentation (mandatory for all spec-based workflows)
-- If PASS (no UI) → Skip browser test, proceed to `/docs`
+- If PASS → After `/docs` completes, dispatch `/manual-test` as the advisory final step before commit (bounded exploratory verification, non-blocking)
 - If FAIL → Use `/implement` to fix issues, then re-run `/security`
 
 **Documentation trigger**: Documentation is mandatory for all spec-based workflows (oneoff-spec and orchestrator). Dispatch the documenter subagent after security passes.

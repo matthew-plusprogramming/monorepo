@@ -1,5 +1,5 @@
 ---
-last_reviewed: 2026-03-12
+last_reviewed: 2026-04-18
 ---
 
 # Delegation Guidelines
@@ -58,14 +58,14 @@ Always dispatch subagents with `model: "opus"`. Never override with sonnet or ha
 
 Your context window is a **non-renewable resource** within a conversation.
 
-| Action                       | Context Cost                  | Benefit                   |
-| ---------------------------- | ----------------------------- | ------------------------- |
-| Read file directly           | 100-2000 tokens (permanent)   | Immediate but costly      |
-| Dispatch Explore             | ~50 tokens (task description) | Summary uses ~100 tokens  |
-| Read 5 files                 | 500-10000 tokens (permanent)  | Context severely depleted |
-| Explore 5 files via subagent | ~50 tokens                    | Summary uses ~200 tokens  |
+| Action                       | Context Effect                                  | Benefit                              |
+| ---------------------------- | ----------------------------------------------- | ------------------------------------ |
+| Read file directly           | Raw data permanently enters the main context    | Immediate but costly                 |
+| Dispatch Explore             | Raw data stays in the subagent context          | Parent receives structured findings  |
+| Read multiple files          | Main context fills with details it may not need | Context severely depleted            |
+| Explore files via subagent   | Parent receives only findings and pointers      | Context preserved for orchestration  |
 
-**Delegation is 10-50x more context-efficient.**
+**Delegation is materially more context-efficient.**
 
 ### Why This Matters
 
@@ -142,7 +142,7 @@ You retain ownership of:
 - User communication and expectation management
 - Progress tracking and state persistence
 
-**Subagent outputs must be summarized to < 200 words before reuse in main context.**
+**Subagent outputs must be summarized before reuse in main context. Preserve required fields and evidence pointers.**
 
 ## Self-Answer Protocol Integration
 
@@ -157,21 +157,21 @@ The protocol reduces unnecessary escalations without removing the human from gen
 
 ---
 
-## Hard Token Budgets
+## Return Shape
 
-Vague "summarize" instructions produce vague results. Concrete budgets produce concrete summaries.
+Vague "summarize" instructions produce vague results. Use structured return fields instead of numeric response caps.
 
-| Return Type               | Word Budget             | When                               |
-| ------------------------- | ----------------------- | ---------------------------------- |
-| Standard exploration      | < 200 words             | Most subagent returns              |
-| Status check              | < 50 words              | Simple completion/progress check   |
-| Investigation report      | < 300 words             | Cross-spec analysis, deep research |
-| Code review finding       | < 200 words per finding | Single issue with evidence         |
-| Implementation completion | < 150 words             | Summary of changes and status      |
+| Return Type               | Required Shape                                       |
+| ------------------------- | ---------------------------------------------------- |
+| Standard exploration      | Findings, evidence pointers, missing symbols, notes  |
+| Status check              | Status, blocker state, artifact pointer if relevant  |
+| Investigation report      | Findings, scope, confidence, evidence, open questions |
+| Code review finding       | Severity, impact, evidence, recommendation, confidence |
+| Implementation completion | Status, files changed, tests, blockers, artifacts    |
 
-**Empirical basis**: A production workstream agent used 163 tool calls across 22 modified files while consuming only ~153k tokens total. The hard budget kept each subagent return to ~200 tokens, achieving 250x compression vs. direct reads.
+**Empirical basis**: A production workstream agent used 163 tool calls across 22 modified files while consuming only ~153k tokens total. Context efficiency came from delegating raw reads to subagents and returning structured summaries with artifact pointers.
 
-If findings genuinely require more detail, the subagent should write a journal entry and return a pointer: "Full analysis in `.claude/journal/entries/<id>.md`. Summary: [< 200 words]."
+If findings genuinely require more detail, the subagent should write a journal entry and return a pointer to it.
 
 ---
 
@@ -186,7 +186,7 @@ Workstream agents are themselves conductors, not just executors. When a facilita
 - **Explore subagent**: Evidence gathering before any edit (see Evidence-Before-Edit)
 - **Test-writer subagent**: Unit tests within the workstream scope
 
-This creates a delegation tree: **main agent → workstream conductor → leaf executor**. Maximum depth: 3 levels. Each level returns summaries (< 200 words) to its parent, never raw data.
+This creates a delegation tree: **main agent → workstream conductor → leaf executor**. Maximum depth: 3 levels. Each level returns structured summaries and artifact pointers to its parent, never raw data.
 
 ### Error Escalation Protocol
 
@@ -194,7 +194,7 @@ When subagents fail, the failure must propagate clearly. Every subagent return m
 
 ```
 status: success | partial | failed
-summary: < 200 words (hard budget)
+summary: <status and evidence needed by the parent>
 blockers: []    # Empty if success; list of blocking issues otherwise
 artifacts: []   # Files created or modified
 ```
@@ -300,9 +300,9 @@ For trivially simple inter-agent coordination, use sentinel files instead of dis
 .claude/coordination/<workstream-id>.status  # Machine-readable status JSON
 ```
 
-Polling agents check: `ls .claude/coordination/*.done` — costs ~10 tokens. Dispatching an explore subagent to check status costs ~150 tokens minimum. For high-frequency coordination checks, use files.
+Polling agents check: `ls .claude/coordination/*.done`. For high-frequency coordination checks, use files instead of dispatching an explore subagent.
 
-The rule: if the check is a single `ls` or file read under 10 lines, do it directly. If it requires investigation or judgment, delegate.
+The rule: if the check is a single `ls` or tiny status-file read, do it directly. If it requires investigation or judgment, delegate.
 
 ### Pre-Computed Structure
 

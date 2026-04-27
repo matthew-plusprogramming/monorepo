@@ -1,3 +1,7 @@
+---
+_source_modules: ['docs-scripts', 'trace-scripts']
+---
+
 # Trace System
 
 Automated structural analysis of the codebase. Generates module-level and file-level traces with import/export maps, call graphs, event patterns, and cross-module dependency tracking.
@@ -16,7 +20,7 @@ The trace system consists of:
 - **Staleness**: `staleness.json` tracks file-level hashes for incremental regeneration
 - **Docs Bridge**: `trace-docs-sync.mjs` compares trace data against structured docs
 
-All trace files live under `.claude/traces/`. Low-level traces are per-module; high-level traces aggregate cross-module dependencies. Regenerable trace JSON files (low-level traces and sidecar files) are excluded from git via `.gitignore`; only `trace.config.json`, `high-level.json`, and `high-level.md` are committed.
+All trace files live under `.claude/traces/`. Low-level traces are per-module; high-level traces aggregate cross-module dependencies. Regenerable trace files are excluded from git via `.gitignore`; only `trace.config.json`, `high-level.json`, `high-level.md`, and documentation are committed.
 
 ---
 
@@ -52,7 +56,7 @@ node .claude/scripts/trace-diff.mjs --base main
 ```
 .claude/traces/
   trace.config.json              # Module definitions and file globs (committed)
-  staleness.json                 # Per-file hashes for incremental generation
+  staleness.json                 # Per-file hashes for incremental generation (gitignored)
   high-level.json                # Cross-module dependency graph (committed)
   high-level.md                  # Human-readable dependency view (committed)
   low-level/
@@ -63,11 +67,13 @@ node .claude/scripts/trace-diff.mjs --base main
 
 ### Git Tracking
 
-Regenerable trace JSON is excluded from git to reduce repository size. The `.gitignore` rules:
+Regenerable trace files are excluded from git to reduce repository size and accidental read surface. The `.gitignore` rules:
 
 ```gitignore
+.claude/traces/staleness.json
 .claude/traces/low-level/*.json
 .claude/traces/low-level/*.calls.json
+.claude/traces/low-level/*.md
 !.claude/traces/trace.config.json
 !.claude/traces/high-level.json
 !.claude/traces/high-level.md
@@ -140,74 +146,22 @@ Controls which files are excluded from tracing across all modules.
 
 ## Trace Generation
 
-### Full Generation
+| Command | Effect |
+| --- | --- |
+| `node .claude/scripts/trace-generate.mjs` | Full generation for every module. Writes low-level JSON/markdown, sidecar calls files, high-level JSON/markdown, and `staleness.json`. |
+| `node .claude/scripts/trace-generate.mjs --incremental` | Uses `staleness.json` hashes to re-analyze changed files and modules affected by export-signature changes. |
+| `node .claude/scripts/trace-generate.mjs --full` | Forces full regeneration regardless of staleness state. |
+| `node .claude/scripts/trace-generate.mjs <module-id>` | Regenerates one module's low-level trace and updates the high-level trace. |
+| `node .claude/scripts/trace-generate.mjs --low-level-only` | Skips high-level trace generation. |
+| `node .claude/scripts/trace-generate.mjs --bootstrap` | Creates `trace.config.json` from detected `apps/`, `packages/`, `.claude/scripts/`, and `src/` directories when config is absent. |
 
-Default mode. Analyzes all files in all modules (after applying `globalExcludes` filters) and regenerates all traces.
-
-```bash
-node .claude/scripts/trace-generate.mjs
-```
-
-Output per module:
-
-- `low-level/<module-id>.json` -- canonical structural data (calls externalized to sidecar)
-- `low-level/<module-id>.calls.json` -- sidecar file containing per-file calls data
-- `low-level/<module-id>.md` -- human-readable markdown view
-
-Output for the project:
-
-- `high-level.json` -- cross-module dependency graph
-- `high-level.md` -- human-readable dependency view
-- `staleness.json` -- per-file hashes (rebuilt from scratch)
-
-### Incremental Generation
-
-When `staleness.json` exists and the `--incremental` flag is passed (typically by the commit-staleness hook), only files whose content hash has changed are re-analyzed.
-
-Incremental generation:
-
-1. Loads `staleness.json` and computes SHA-256 hash of each source file
-2. Compares against stored hashes; files with matching hashes are skipped
-3. Regenerates modules that contain stale files
-4. Computes new export signature hashes; if a module's export signature changes, dependent modules' files are marked stale via `externalRefs`
-5. Updates `staleness.json` after all trace files are written
-
-```bash
-# Force full regeneration (escape hatch)
-node .claude/scripts/trace-generate.mjs --full
-```
-
-The `--full` flag forces complete regeneration regardless of staleness state. It recomputes all hashes in `staleness.json` from source content.
-
-### Single Module
-
-```bash
-node .claude/scripts/trace-generate.mjs <module-id>
-```
-
-Regenerates only the specified module's low-level trace, then updates the high-level trace.
-
-### Low-Level Only
-
-```bash
-node .claude/scripts/trace-generate.mjs --low-level-only
-```
-
-Skips high-level trace generation.
-
-### Bootstrap
-
-```bash
-node .claude/scripts/trace-generate.mjs --bootstrap
-```
-
-Auto-detects modules from the project structure and creates `trace.config.json`. Scans `apps/`, `packages/`, `.claude/scripts/`, and `src/` directories. Only runs when `trace.config.json` does not already exist.
+Per-module output: `low-level/<module-id>.json`, `low-level/<module-id>.calls.json`, and `low-level/<module-id>.md`. Project output: `high-level.json`, `high-level.md`, and `staleness.json`.
 
 ---
 
 ## Sidecar Calls Files
 
-Calls data (function call sites) is stored in separate sidecar files rather than inline in the main trace JSON. This reduces main trace file sizes by 60-80%, bringing total committed trace data from ~20MB to under 5MB.
+Calls data is stored in `low-level/<module-id>.calls.json` sidecars instead of inline in the main trace JSON. Main trace files reference sidecars through top-level `callsFile`.
 
 ### Format
 
@@ -227,8 +181,6 @@ Each sidecar file is a JSON object keyed by source file path:
   ".claude/scripts/trace-query.mjs": []
 }
 ```
-
-**Naming convention**: `low-level/<module-id>.calls.json`
 
 ### Main Trace JSON Reference
 
@@ -250,35 +202,15 @@ The main trace JSON references its sidecar file via a top-level `callsFile` fiel
 }
 ```
 
-File entries in the main JSON no longer contain a `calls` array. When no calls data exists for a module, `callsFile` is set to the sidecar path and the sidecar contains an empty object `{}`.
+File entries in main JSON do not carry `calls[]` in the current format. When no calls exist, the sidecar is `{}`.
 
 ### Atomic Write Safety
 
-Sidecar files are written using an atomic write-then-rename pattern:
-
-1. Write to temporary file: `<module-id>.calls.json.tmp.<process-pid>`
-2. Rename to final path: `<module-id>.calls.json`
-
-If `rename()` fails (e.g., permissions error), the error is logged with the OS error code, the temp file is cleaned up (best-effort), and generation continues for remaining modules.
-
-### Concurrent Safety
-
-Multiple `trace-generate.mjs` processes use PID-based temp filenames, preventing write collisions. Last-writer-wins on the final rename without corruption.
-
-### Stale Temp File Cleanup
-
-On startup, `trace-generate.mjs` scans `low-level/` for `.tmp.*` files older than 1 hour and deletes them. These accumulate from crashed or interrupted generation processes.
-
-### Size Warnings
-
-When a sidecar file exceeds 10MB, a warning is logged with the file path and actual size. Generation completes normally.
+Sidecars use write-to-temp plus rename. Temp filenames include the process id; startup deletes stale `.tmp.*` files older than 1 hour. Rename failure logs the OS error, cleans temp best-effort, and continues other modules. Sidecar files over 10 MB warn but do not block generation.
 
 ### Backward Compatibility
 
-- **Old trace-query reading new format**: An older `trace-query.mjs` that does not support sidecar reads will find no inline `calls` array and return empty results for calls queries. No crash occurs.
-- **New trace-query reading old format**: When no `callsFile` reference exists, the query falls back to reading inline `file.calls` if present.
-- **Missing sidecar**: Returns empty calls array with a warning logged to stderr.
-- **Corrupt sidecar (parse error)**: Returns empty calls array with a warning identifying the file and parse error.
+`trace-query.mjs` reads `callsFile` when present and falls back to inline `file.calls` for old traces. Missing or corrupt sidecars return empty calls with a stderr warning.
 
 ---
 
@@ -286,87 +218,25 @@ When a sidecar file exceeds 10MB, a warning is logged with the file path and act
 
 ### TypeScript Compiler API (Default)
 
-The trace system uses the TypeScript compiler API (`ts-analyzer.mjs`) by default for source analysis. This provides AST-based accuracy for:
-
-- Destructured imports and re-exports
-- Nested function calls and method chains
-- Complex function signatures
-- Correct handling of `.mjs`, `.js`, `.ts`, `.tsx`, `.jsx`, `.cjs` files
-
-The analyzer uses `allowJs` and `checkJs` settings to handle JavaScript files natively.
+The default analyzer is `.claude/scripts/lib/ts-analyzer.mjs`. It uses the TypeScript compiler API for imports/re-exports, nested calls, signatures, and JS/TS-family files.
 
 ### Regex Fallback
 
-A legacy regex-based analyzer is available as a fallback:
-
-```javascript
-import { analyzeFile } from '.claude/scripts/trace-generate.mjs';
-
-// Use regex analyzer explicitly
-const result = analyzeFile(filePath, projectRoot, { parser: 'regex' });
-```
+A regex analyzer remains available through `analyzeFile(filePath, projectRoot, { parser: 'regex' })`.
 
 ### Configurable File Extensions
 
-The analyzer accepts configurable file extensions via the `config` parameter. Default: `['.mjs', '.js']`.
-
-```javascript
-const result = analyzeFile(filePath, projectRoot, {
-  fileExtensions: ['.mjs', '.js', '.ts'],
-});
-```
+File extensions come from `trace.config.json` or default to `[".mjs", ".js"]`.
 
 ---
 
 ## File Analysis Output
 
-Each file analyzed by `analyzeFile()` produces:
-
-```javascript
-{
-  filePath: ".claude/scripts/trace-generate.mjs",
-  exports: [
-    {
-      symbol: "parseCallGraph",
-      type: "function",            // function | class | interface | type | const | enum | default
-      lineNumber: 554,
-      signature: "(source, importMap, knownExports, filePath)",
-      signatureRaw: "(source, importMap, knownExports, filePath)"
-    }
-  ],
-  imports: [
-    { source: "./lib/trace-utils.mjs", symbols: ["loadTraceConfig", "findFilesMatchingGlobs"] }
-  ],
-  calls: [
-    {
-      callerFile: ".claude/scripts/trace-generate.mjs",
-      callerLine: 801,
-      calleeName: "parseCallGraph",
-      calleeFile: ".claude/scripts/trace-generate.mjs",  // null if unresolved
-      calleeLine: 554                                      // null if unresolved
-    }
-  ],
-  events: [
-    {
-      file: ".claude/scripts/lib/sdlc-events.mjs",
-      line: 42,
-      eventName: "task:complete",
-      type: "emit"    // "emit" or "subscribe"
-    }
-  ]
-}
-```
-
-Note: In the persisted main trace JSON, the `calls` array is moved to the sidecar file. The analysis output above shows the full structure before sidecar separation.
+Each file entry records `filePath`, `exports[]`, `imports[]`, and `events[]`. Calls are produced by analysis but persisted in the sidecar file referenced by `callsFile`.
 
 ### Call Graph (calls[])
 
-Populated by detecting `identifier(` patterns in source code. Each call is resolved against:
-
-1. Imported symbols (from the file's import statements)
-2. Known exports (cross-module export index built from all traced modules)
-
-Unresolved callees (external packages, local-only functions) have `calleeFile: null` and `calleeLine: null`.
+Calls resolve against imported symbols and the cross-module export index. External packages and unresolved local functions use `calleeFile: null` and `calleeLine: null`.
 
 ### Event Patterns (events[])
 
@@ -383,7 +253,7 @@ Detected patterns:
 | `.once(`             | subscribe |
 | `.addListener(`      | subscribe |
 
-Only string literal event names are captured (template literals and variables are excluded).
+Only string-literal event names are captured.
 
 ---
 
@@ -391,7 +261,7 @@ Only string literal event names are captured (template literals and variables ar
 
 ### staleness.json
 
-Located at `.claude/traces/staleness.json`. Tracks per-file content hashes and cross-module dependency references.
+`.claude/traces/staleness.json` tracks per-file hashes, last-traced timestamps, module export signature hashes, and `externalRefs` for cross-module propagation.
 
 ```json
 {
@@ -413,27 +283,13 @@ Located at `.claude/traces/staleness.json`. Tracks per-file content hashes and c
 }
 ```
 
-| Field                 | Description                                               |
-| --------------------- | --------------------------------------------------------- |
-| `version`             | Schema version (current: 1)                               |
-| `modules.<id>.files`  | Per-file hash and last-traced timestamp                   |
-| `exportSignatureHash` | Hash of module's export signatures (name + kind + params) |
-| `externalRefs`        | Which symbols this file imports from which other modules  |
-
 ### Export Signature Hashing
 
-The export signature hash covers export name, kind (function/const/class/type), and parameter names. It excludes JSDoc comments, whitespace, and function bodies. A parameter addition or rename changes the hash; a body-only edit does not.
-
-When a module's export signature hash changes, files in dependent modules that have `externalRefs` pointing to the changed module are marked stale.
+Export signature hashes cover export name, kind, and parameter names. They ignore comments, whitespace, and function bodies. A signature change marks dependent modules stale through `externalRefs`.
 
 ### Cross-Module Staleness Propagation
 
-Propagation is gated by export signature hash comparison and capped at depth 3:
-
-1. Module A's export signature hash changes
-2. Files in Module B with `externalRefs` to Module A are marked stale
-3. If Module B is then regenerated and its export signature changes, propagation continues to Module C
-4. Propagation stops at depth 3 with a warning
+Propagation follows export-signature changes through `externalRefs` and stops at depth 3 with a warning.
 
 ### Integrity Validation
 
@@ -445,49 +301,18 @@ Propagation is gated by export signature hash comparison and capped at depth 3:
 
 ### Write Ordering
 
-All trace and staleness writes use atomic write-rename (write to `.tmp`, then rename). Write ordering: trace file first, then `staleness.json`. If interrupted between the two, `staleness.json` lags behind, causing a safe redundant re-trace on next run (self-healing).
+Trace files are written before `staleness.json`. If interrupted between writes, the stale metadata causes a safe redundant re-trace on the next run.
 
 ---
 
 ## Trace Query
 
-### Module Dependencies
-
-```bash
-node .claude/scripts/trace-query.mjs --module <id>
-node .claude/scripts/trace-query.mjs --module <id> --detail
-```
-
-Shows a module's upstream dependencies (what it depends on) and downstream dependents (what depends on it). The `--detail` flag includes file-level exports, imports, calls, and events. In detail mode, calls data is loaded from the sidecar file when available.
-
-### Impact Analysis
-
-```bash
-node .claude/scripts/trace-query.mjs --impact <file-path>
-```
-
-Determines which module owns the file and reports all downstream modules that would be affected by changes. Validates the file path stays within the project root (path traversal protection).
-
-### Call Graph Query
-
-```bash
-node .claude/scripts/trace-query.mjs --calls <functionName>
-```
-
-Searches all low-level trace data for the given function name. Calls data is loaded from sidecar files (when `callsFile` references are present) or from inline `file.calls` arrays (for backward compatibility with older trace formats). Returns:
-
-- **Callers**: All files across all modules that call the function
-- **Callees**: All functions called from files that export the queried function
-
-Output follows existing CLI conventions:
-
-```
-Callers of isTraceStale:
-  trace-scripts / .claude/scripts/trace-commit-staleness.mjs:28
-
-Callees of isTraceStale:
-  scripts-lib / .claude/scripts/lib/trace-utils.mjs:307 - loadStalenessMetadata -> .claude/scripts/lib/trace-utils.mjs:682
-```
+| Command | Purpose |
+| --- | --- |
+| `node .claude/scripts/trace-query.mjs --module <id>` | Show upstream dependencies and downstream dependents. |
+| `node .claude/scripts/trace-query.mjs --module <id> --detail` | Include file exports, imports, events, and call data loaded through sidecars. |
+| `node .claude/scripts/trace-query.mjs --impact <file-path>` | Resolve owning module and affected downstream modules. Rejects paths outside project root. |
+| `node .claude/scripts/trace-query.mjs --calls <functionName>` | Search callers/callees using sidecar calls data or legacy inline calls. |
 
 ---
 
@@ -500,34 +325,7 @@ node .claude/scripts/trace-sync.mjs --dry-run     # Preview changes
 node .claude/scripts/trace-sync.mjs --auto-merge  # Auto-merge additions; flag deletions
 ```
 
-Parses structured sections from markdown trace files and updates the corresponding JSON files. When updating calls data, changes are written to sidecar files (not inline in main JSON) to maintain the sidecar architecture.
-
-### Synced Sections
-
-| Section        | Columns                                                    |
-| -------------- | ---------------------------------------------------------- |
-| Dependencies   | target, relationship-type, description                     |
-| Dependents     | target, relationship-type, description                     |
-| Exports        | symbol, type, line, signature                              |
-| Imports        | source, symbols                                            |
-| Function Calls | callerFile, callerLine, calleeName, calleeFile, calleeLine |
-| Events         | file, line, eventName, type                                |
-
-Sections with "(not synced)" in the heading are ignored (freeform content).
-
-### Conflict Detection
-
-When JSON and markdown have been modified independently (different `lastGenerated` timestamps), the sync detects conflicts. Both the JSON value and the markdown value are reported for each conflict.
-
-### Auto-Merge
-
-With `--auto-merge`, the sync classifies each conflict:
-
-- **Additions** (entry in markdown but not JSON): auto-merged
-- **Deletions** (entry in JSON but not markdown): requires manual resolution
-- **Modifications** (entry differs between JSON and markdown): requires manual resolution
-
-A dry-run log shows what was merged and what requires manual attention.
+Parses structured markdown trace sections and updates JSON. Calls are written to sidecar files, not inline main JSON. Synced sections: Dependencies, Dependents, Exports, Imports, Function Calls, and Events. Sections marked "(not synced)" are freeform. `--auto-merge` accepts additions; deletions and modifications require manual resolution.
 
 ---
 
@@ -538,46 +336,19 @@ node .claude/scripts/trace-diff.mjs              # Compare against main
 node .claude/scripts/trace-diff.mjs --base <ref>  # Compare against specific branch
 ```
 
-Generates a human-readable architectural change summary by comparing trace data between the current branch and a base branch. Shows:
-
-- New/removed modules
-- New/removed exports per module
-- Changed dependencies
-- New/removed call graph edges
-- New/removed event patterns
-
-Call graph data is loaded from sidecar files when the trace format includes a `callsFile` reference. The diff tool filters out `.calls.json` files when loading main trace data to avoid double-counting.
-
-When no trace changes are detected, outputs: "No architectural changes detected."
-
-The base branch's traces are loaded via `git show` without checking out the branch. Git ref names are validated to reject shell metacharacters (defense-in-depth alongside `execFileSync`).
+Compares current trace data with a base ref and reports module/export/dependency/call/event changes. Base traces are loaded with `git show`; ref names are validated before use. `.calls.json` files are skipped as main trace inputs to avoid double-counting sidecars.
 
 ---
 
 ## Trace-Informed Routing
 
-The `/route` skill uses trace data for impact-aware routing decisions:
-
-1. Reads `high-level.json` directly (via Read tool, not CLI)
-2. Validates trace integrity (`generatedBy` and `lastGenerated` must be present and plausible)
-3. Parses module dependencies to identify affected modules
-4. Uses affected module count to inform workflow complexity (e.g., 3+ modules suggests oneoff-spec)
-5. Enriches dispatch prompts with which low-level traces the implementer should read
-
-If trace data is missing or invalid, routing proceeds without trace input (conservative fallback).
+`/route` may read `high-level.json` to identify affected modules and enrich dispatch prompts with relevant low-level trace files. Missing or invalid traces are advisory only; routing proceeds from source/task context.
 
 ---
 
 ## Trace Integrity Validation
 
-Before consuming trace data for routing or enforcement decisions, `validateTraceIntegrity()` checks:
-
-- `generatedBy` is a non-empty string
-- `lastGenerated` is a valid ISO 8601 timestamp
-- Timestamp is not in the future (with 60-second clock skew tolerance)
-- Timestamp is not older than 1 year
-
-On validation failure, consumers fall back to safe defaults (no trace data available).
+`validateTraceIntegrity()` requires `generatedBy`, plausible `lastGenerated`, no future timestamp beyond 60-second skew, and age <= 1 year. Failures make trace data unavailable to consumers.
 
 ---
 
@@ -597,14 +368,7 @@ Generation is never blocked by file size.
 
 ### Low-Level Trace Schema
 
-`validateLowLevelTrace()` validates:
-
-- Top-level fields: `moduleId` (non-empty string), `version` (integer), `lastGenerated` (valid ISO 8601), `generatedBy` (non-empty string), `files` (array)
-- Optional top-level field: `callsFile` (string or null) -- references the sidecar calls file
-- Each file entry: `filePath`, `exports[]`, `imports[]`, `events[]` with correct types
-- Each file entry's `calls[]`: accepted as either an array or absent/undefined when `callsFile` is present at the trace root (sidecar format)
-- Each `calls[]` entry (when present) conforms to CallEntry schema: `callerFile` (string), `callerLine` (integer), `calleeName` (string), `calleeFile` (string or null), `calleeLine` (integer or null)
-- Each `events[]` entry conforms to EventEntry schema: `file` (string), `line` (integer), `eventName` (string), `type` ("emit" or "subscribe")
+`validateLowLevelTrace()` checks required top-level metadata, `files[]`, optional `callsFile`, file exports/imports/events, legacy inline `calls[]` when present, and event/call entry shapes.
 
 ### Path Traversal Protection
 
@@ -616,35 +380,17 @@ Generation is never blocked by file size.
 
 ## Trace-to-Docs Bridge
 
-### Cross-Reference Validation
-
-`docs-validate.mjs` compares module references in `architecture.yaml` against traced modules:
-
-- Modules referenced in docs but not in traces: reported as warnings
-- Traced modules not referenced in docs: reported as informational notes
-- Projects without `architecture.yaml` skip silently
-
-```bash
-node .claude/scripts/docs-validate.mjs
-```
-
-### Scaffold Population
-
-`docs-scaffold.mjs` pre-populates architecture.yaml TODO placeholders with trace data when available:
-
-- Export names from low-level traces
-- Dependency lists from high-level traces
-- Module descriptions from trace metadata
-
-Entries remain marked as TODO for human review. Without trace data, the scaffolder generates empty placeholders as before.
-
-### Sync Report
+| Script | Trace use |
+| --- | --- |
+| `docs-validate.mjs` | Compares `architecture.yaml` module references with traced modules. Missing docs/traces are warnings or info; no architecture file skips silently. |
+| `docs-scaffold.mjs` | Pre-populates TODO placeholders from trace exports, dependencies, and module descriptions; human review remains required. |
+| `trace-docs-sync.mjs` | Reports divergence between trace data and structured docs without modifying docs. |
 
 ```bash
 node .claude/scripts/trace-docs-sync.mjs
 ```
 
-Compares trace data (exports, dependencies) against architecture.yaml and produces a human-readable divergence report:
+`trace-docs-sync.mjs` report example:
 
 ```
 Trace-Docs Sync Report
@@ -658,7 +404,6 @@ Module: scripts-lib
 Summary: 1 module(s) with divergence, 2 new export(s), 0 removed export(s)
 ```
 
-The report is informational only; no docs files are modified.
 
 ---
 
@@ -679,55 +424,72 @@ The report is informational only; no docs files are modified.
 
 ## Troubleshooting
 
-### "Module not found in trace.config.json"
+| Symptom | Action |
+| --- | --- |
+| Module not found in `trace.config.json` | Inspect `.claude/traces/trace.config.json` module ids. |
+| High-level trace missing | Run `node .claude/scripts/trace-generate.mjs`. |
+| Low-level traces missing after clone | Regenerate; low-level JSON, markdown, calls sidecars, and `staleness.json` are gitignored. |
+| Sidecar missing or corrupt | Calls queries return empty calls with warnings; regenerate traces. |
+| `staleness.json` corrupt | The system falls back to full regeneration and rewrites it. |
+| Trace analysis failed for a file | Warning only; binary, permission, or syntax-problem files get empty trace arrays. |
+| Incremental generation not reducing time | Use `--incremental`; default generation is full. |
+| `globalExcludes` rejected | Use relative patterns only; `..` and absolute paths are rejected. |
 
-The specified module ID does not match any module in `trace.config.json`. Check available modules with:
+---
 
-```bash
-cat .claude/traces/trace.config.json | grep '"id"'
+## Consumer: Flow-Verifier Diff-Scope
+
+Flow-verifier (`/flow-verify`) consumes trace data to scope impl-verify and post-impl verification to files changed in the current branch diff. See [FLOW-VERIFIER.md § Diff-Scope Mode](FLOW-VERIFIER.md#diff-scope-mode) for the dispatch-side contract.
+
+### fileGlobs -> Module ID Mapping
+
+The `trace.config.json` `modules[].fileGlobs` field is the authoritative mapping used by the flow-verifier to resolve changed files to affected modules. Pipeline:
+
+```
+git diff --name-only <base>..HEAD     ->  changed-files list
+for each changed file:
+  for each module in trace.config.json:
+    if minimatch(file, module.fileGlobs):
+      affected_modules.add(module.id)
 ```
 
-### "High-level trace not found"
+Helper entry point: `.claude/scripts/lib/flow-verify-diff-scope.mjs` exports `resolveDiffScope({ base, stage })` returning `{ scope, changed_files, affected_modules, fallback }`.
 
-Run `node .claude/scripts/trace-generate.mjs` to generate traces.
+### Trace Sidecar Consumption
 
-### Low-level traces missing after clone
+For each affected module, the flow-verifier reads the base low-level trace sidecar (`low-level/<module-id>.json`) per the agent-readable-sidecar rule in CLAUDE.md § Trace Context for Subagents. The `.calls.json` sidecar is NOT read directly by the flow-verifier -- it uses the offline `trace-query.mjs` tool when call-graph data is required.
 
-Low-level trace JSON and sidecar files are gitignored. Run trace generation after cloning:
+| Sidecar                              | Flow-Verifier Reads? | Purpose                                          |
+| ------------------------------------ | -------------------- | ------------------------------------------------ |
+| `low-level/<module-id>.json`         | Yes                  | Exports, imports, events per file                |
+| `low-level/<module-id>.summary.json` | Yes (optional)       | Compact structural overview (file/export counts) |
+| `low-level/<module-id>.calls.json`   | No                   | Reserved for `trace-query.mjs` offline tooling   |
 
-```bash
-node .claude/scripts/trace-generate.mjs
-```
+### Staleness and Fallback
 
-### Sidecar file not found warning
+When a module's trace is stale (mtime older than staleness threshold per `isTraceStale()` in `lib/trace-utils.mjs`), the flow-verifier:
 
-The sidecar `.calls.json` file for a module is missing. This occurs when traces have not been regenerated after the sidecar separation change. Regenerate traces to create sidecar files. Calls queries return empty results until the sidecar is generated.
+1. Still consumes the stale sidecar (advisory per agent-side trace contract)
+2. Verifies critical assumptions (file existence, export availability) against source before irreversible gate decisions
+3. Records `coverage: "partial"` in the output with `stale_modules: [...]`
 
-### Corrupt sidecar file
+When no trace data exists for a changed file (new module not yet in `trace.config.json`, or file outside all module `fileGlobs`), the flow-verifier degrades to Grep/Glob source analysis capped at 500 files and 120 seconds, returning `coverage: "partial"` and an `unchecked_files` array. See [FLOW-VERIFIER.md § Fallback Behavior](FLOW-VERIFIER.md#fallback-behavior).
 
-If a sidecar file contains invalid JSON (from a truncated write or disk-full condition), a warning is logged with the file path and parse error, and calls queries return empty results. Regenerate traces to recreate the sidecar file.
+### Empty-Diff and New-Symbol Degradation
 
-### Staleness.json corrupt or invalid
+| Scenario                                       | Diff-Scope Outcome                                                                  |
+| ---------------------------------------------- | ----------------------------------------------------------------------------------- |
+| `git diff --name-only` returns zero files      | Trivial-pass; no trace reads performed                                              |
+| Non-empty diff, no files match any `fileGlobs` | Trivial-pass; structured log records `changed_files > 0` with `affected_modules: 0` |
+| Diff introduces new boundary-crossing symbols  | Degrade to full-scope (NFR-10); read all module sidecars                            |
 
-The system automatically falls back to `--full` regeneration and recreates `staleness.json` from scratch. A warning is logged to stderr.
-
-### Trace analysis failed for a file
-
-Binary files, permission issues, or syntax errors in source files cause analysis warnings (logged to stderr) but do not block trace generation. The file's entry in the trace has empty arrays.
-
-### Incremental generation not reducing time
-
-Incremental mode is only active when explicitly requested via `--incremental` (used by the commit-staleness hook). The CLI defaults to full generation for backward compatibility.
-
-### globalExcludes pattern rejected
-
-Patterns containing `..` (path traversal) or starting with `/` (absolute paths) are rejected with an error. Use relative glob patterns only.
+Cross-reference: [ws-3 spec Flow 1 sequence diagram](../specs/groups/sg-pipeline-efficiency-ws3-orchestrator-hygiene/spec.md#flow-verify-diff-scope-dispatch).
 
 ---
 
 ## See Also
 
-- [Trace Regeneration Performance Fixes](../docs/trace-regeneration-performance-fixes.md) -- Worker threads, caching, incremental mode
 - [Structured Documentation System](STRUCTURED-DOCS.md) -- YAML documentation with trace bridge integration
-- [Hooks System](HOOKS.md) -- PostToolUse hook architecture including commit-staleness
+- [Hooks System](HOOKS.md) -- live hook inventory and hook placement reference
 - [Sync System](SYNC-SYSTEM.md) -- Registry sync for distributing trace scripts
+- [Flow Verifier](FLOW-VERIFIER.md) -- Consumer of `trace.config.json` fileGlobs for diff-scope mode

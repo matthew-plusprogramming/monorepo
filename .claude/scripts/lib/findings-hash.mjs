@@ -5,7 +5,6 @@
  * lexicographically and hashing the resulting JSON array string.
  *
  * Implements: REQ-013 (AC-1.6)
- * Spec: sg-convergence-audit-enforcement
  */
 
 import { createHash } from 'node:crypto';

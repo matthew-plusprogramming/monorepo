@@ -1,8 +1,6 @@
 /**
  * Tests for Trace System Enhancement -- Milestone 1: Cross-Module Dependency Aggregation
  *
- * Spec: .claude/specs/groups/sg-trace-system-enhancement/spec.md
- *
  * Validates:
  * - AC-1.1:  Cross-module dependencies populated as string moduleId arrays
  * - AC-1.2:  Bidirectional deps (if A depends on B, B lists A as dependent)

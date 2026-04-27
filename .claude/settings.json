@@ -2,17 +2,6 @@
   "hooks": {
     "PreToolUse": [
       {
-        "matcher": "Edit|Write",
-        "hooks": [
-          {
-            "_source": "metaclaude",
-            "_id": "trace-read-enforcement",
-            "type": "command",
-            "command": "cd \"$CLAUDE_PROJECT_DIR\" && node .claude/scripts/trace-read-enforcement.mjs"
-          }
-        ]
-      },
-      {
         "matcher": "Agent",
         "hooks": [
           {
@@ -81,46 +70,6 @@
     ],
     "PostToolUse": [
       {
-        "matcher": "Bash",
-        "hooks": [
-          {
-            "_source": "metaclaude",
-            "_id": "journal-commit-check",
-            "type": "command",
-            "command": "cd \"$CLAUDE_PROJECT_DIR\" && node .claude/scripts/journal-commit-check.mjs"
-          },
-          {
-            "_source": "metaclaude",
-            "_id": "dirty-manifest-check",
-            "type": "command",
-            "command": "cd \"$CLAUDE_PROJECT_DIR\" && node .claude/scripts/dirty-manifest-check.mjs"
-          },
-          {
-            "_source": "metaclaude",
-            "_id": "trace-commit-staleness",
-            "type": "command",
-            "command": "cd \"$CLAUDE_PROJECT_DIR\" && node .claude/scripts/trace-commit-staleness.mjs"
-          }
-        ]
-      },
-      {
-        "matcher": "Read",
-        "hooks": [
-          {
-            "_source": "metaclaude",
-            "_id": "superseded-artifact-warn",
-            "type": "command",
-            "command": "cd \"$CLAUDE_PROJECT_DIR\" && node .claude/scripts/hook-wrapper.mjs '.claude/specs/**/*.md' 'node .claude/scripts/superseded-artifact-warn.mjs {{file}}'"
-          },
-          {
-            "_source": "metaclaude",
-            "_id": "trace-read-tracker",
-            "type": "command",
-            "command": "cd \"$CLAUDE_PROJECT_DIR\" && node .claude/scripts/trace-read-tracker.mjs"
-          }
-        ]
-      },
-      {
         "matcher": "Edit|Write",
         "hooks": [
           {
@@ -131,27 +80,9 @@
           },
           {
             "_source": "metaclaude",
-            "_id": "claude-md-drift",
-            "type": "command",
-            "command": "cd \"$CLAUDE_PROJECT_DIR\" && node .claude/scripts/hook-wrapper.mjs '*CLAUDE.md' 'node .claude/scripts/verify-claude-md-base.mjs \"$(dirname {{file}})\" 2>&1 | head -10'"
-          },
-          {
-            "_source": "metaclaude",
-            "_id": "manifest-validate",
-            "type": "command",
-            "command": "cd \"$CLAUDE_PROJECT_DIR\" && node .claude/scripts/hook-wrapper.mjs '*manifest.json' 'node .claude/scripts/validate-manifest.mjs {{file}}'"
-          },
-          {
-            "_source": "metaclaude",
             "_id": "convergence-field-validate",
             "type": "command",
-            "command": "cd \"$CLAUDE_PROJECT_DIR\" && node .claude/scripts/hook-wrapper.mjs '*manifest.json' 'node .claude/scripts/validate-convergence-fields.mjs {{file}}'"
-          },
-          {
-            "_source": "metaclaude",
-            "_id": "spec-manifest-sync",
-            "type": "command",
-            "command": "cd \"$CLAUDE_PROJECT_DIR\" && node .claude/scripts/hook-wrapper.mjs '.claude/specs/groups/**/manifest.json' 'node .claude/scripts/validate-spec-manifest-sync.mjs {{file}}'"
+            "command": "cd \"$CLAUDE_PROJECT_DIR\" && node .claude/scripts/hook-wrapper.mjs '.claude/specs/groups/**/manifest.json' 'node .claude/scripts/validate-convergence-fields.mjs {{file}}'"
           },
           {
             "_source": "metaclaude",
@@ -169,85 +100,25 @@
             "_source": "metaclaude",
             "_id": "skill-frontmatter-validate",
             "type": "command",
-            "command": "cd \"$CLAUDE_PROJECT_DIR\" && node .claude/scripts/hook-wrapper.mjs '*SKILL.md' 'node .claude/scripts/validate-skill-frontmatter.mjs {{file}}'"
-          },
-          {
-            "_source": "metaclaude",
-            "_id": "typescript-typecheck",
-            "type": "command",
-            "command": "cd \"$CLAUDE_PROJECT_DIR\" && node .claude/scripts/hook-wrapper.mjs '*.ts,*.tsx' 'node .claude/scripts/workspace-tsc.mjs {{file}}'"
-          },
-          {
-            "_source": "metaclaude",
-            "_id": "eslint-check",
-            "type": "command",
-            "command": "cd \"$CLAUDE_PROJECT_DIR\" && node .claude/scripts/hook-wrapper.mjs '*.ts,*.tsx,*.js,*.jsx' 'node .claude/scripts/workspace-eslint.mjs {{file}}'"
-          },
-          {
-            "_source": "metaclaude",
-            "_id": "structured-error-validate",
-            "type": "command",
-            "command": "cd \"$CLAUDE_PROJECT_DIR\" && node .claude/scripts/hook-wrapper.mjs '*.ts,*.tsx' 'node .claude/scripts/structured-error-validator.mjs {{file}}'"
+            "command": "cd \"$CLAUDE_PROJECT_DIR\" && node .claude/scripts/hook-wrapper.mjs '.claude/skills/*/SKILL.md' 'node .claude/scripts/validate-skill-frontmatter.mjs {{file}}'"
           },
           {
             "_source": "metaclaude",
             "_id": "spec-schema-validate",
             "type": "command",
-            "command": "cd \"$CLAUDE_PROJECT_DIR\" && node .claude/scripts/hook-wrapper.mjs '.claude/specs/**/*.md' 'node .claude/scripts/spec-schema-validate.mjs {{file}}'"
+            "command": "cd \"$CLAUDE_PROJECT_DIR\" && node .claude/scripts/hook-wrapper.mjs '.claude/specs/groups/**/*.md' 'node .claude/scripts/spec-schema-validate.mjs {{file}}'"
           },
           {
             "_source": "metaclaude",
             "_id": "spec-validate",
             "type": "command",
-            "command": "cd \"$CLAUDE_PROJECT_DIR\" && node .claude/scripts/hook-wrapper.mjs '.claude/specs/**/*.md' 'node .claude/scripts/spec-validate.mjs {{file}}'"
-          },
-          {
-            "_source": "metaclaude",
-            "_id": "contract-validate",
-            "type": "command",
-            "command": "cd \"$CLAUDE_PROJECT_DIR\" && node .claude/scripts/hook-wrapper.mjs '.claude/specs/**/*.md' 'node .claude/scripts/contract-validate.mjs {{file}}'"
-          },
-          {
-            "_source": "metaclaude",
-            "_id": "evidence-table-check",
-            "type": "command",
-            "command": "cd \"$CLAUDE_PROJECT_DIR\" && node .claude/scripts/hook-wrapper.mjs '.claude/specs/**/*.md' 'node .claude/scripts/evidence-table-check.mjs {{file}}'"
-          },
-          {
-            "_source": "metaclaude",
-            "_id": "spec-approval-hash",
-            "type": "command",
-            "command": "cd \"$CLAUDE_PROJECT_DIR\" && node .claude/scripts/hook-wrapper.mjs '.claude/specs/**/*.md' 'node .claude/scripts/spec-approval-hash.mjs {{file}}'"
-          },
-          {
-            "_source": "metaclaude",
-            "_id": "registry-artifact-validate",
-            "type": "command",
-            "command": "cd \"$CLAUDE_PROJECT_DIR\" && node .claude/scripts/hook-wrapper.mjs '.claude/registry/artifacts.json' 'node .claude/scripts/registry-artifact-validate.mjs {{file}}'"
-          },
-          {
-            "_source": "metaclaude",
-            "_id": "progress-heartbeat-check",
-            "type": "command",
-            "command": "cd \"$CLAUDE_PROJECT_DIR\" && node .claude/scripts/hook-wrapper.mjs '.claude/specs/**' 'node .claude/scripts/progress-heartbeat-check.mjs {{file}}'"
-          },
-          {
-            "_source": "metaclaude",
-            "_id": "session-state-validate",
-            "type": "command",
-            "command": "cd \"$CLAUDE_PROJECT_DIR\" && node .claude/scripts/session-validate.mjs"
+            "command": "cd \"$CLAUDE_PROJECT_DIR\" && node .claude/scripts/hook-wrapper.mjs '.claude/specs/groups/**/*.md' 'node .claude/scripts/spec-validate.mjs {{file}}'"
           },
           {
             "_source": "metaclaude",
             "_id": "structured-docs-validate",
             "type": "command",
             "command": "cd \"$CLAUDE_PROJECT_DIR\" && node .claude/scripts/hook-wrapper.mjs '.claude/docs/**/*.yaml' 'node .claude/scripts/docs-validate.mjs --hook'"
-          },
-          {
-            "_source": "metaclaude",
-            "_id": "prettier-format",
-            "type": "command",
-            "command": "cd \"$CLAUDE_PROJECT_DIR\" && node .claude/scripts/hook-wrapper.mjs '*.{ts,tsx,js,jsx,json,md,css,scss,yml,yaml}' 'npx prettier --write {{file}} 2>/dev/null || true'"
           }
         ]
       }
@@ -257,15 +128,16 @@
         "hooks": [
           {
             "_source": "metaclaude",
-            "_id": "convergence-gate-reminder",
-            "type": "command",
-            "command": "cd \"$CLAUDE_PROJECT_DIR\" && node .claude/scripts/convergence-gate-reminder.mjs"
-          },
-          {
-            "_source": "metaclaude",
             "_id": "convergence-pass-recorder",
             "type": "command",
             "command": "cd \"$CLAUDE_PROJECT_DIR\" && node .claude/scripts/convergence-pass-recorder.mjs"
+          },
+          {
+            "_source": "metaclaude",
+            "_id": "dispatch-record-hook",
+            "_comment": "sg-enforcement-layer-gaps Task 23/24/32. Records Task-tool dispatches via session-checkpoint.mjs (sole writer). Uses SubagentStop per Task 22 fallback path (PostToolUse+Agent unsupported in Claude Code). Fail-open: any error -> exit 0 with stderr warning.",
+            "type": "command",
+            "command": "cd \"$CLAUDE_PROJECT_DIR\" && node .claude/scripts/dispatch-record-hook.mjs"
           }
         ]
       }
@@ -278,24 +150,6 @@
             "_id": "workflow-stop-enforcement",
             "type": "command",
             "command": "cd \"$CLAUDE_PROJECT_DIR\" && node .claude/scripts/workflow-stop-enforcement.mjs"
-          },
-          {
-            "_source": "metaclaude",
-            "_id": "session-log",
-            "type": "command",
-            "command": "cd \"$CLAUDE_PROJECT_DIR\" && echo \"Session ended at $(date)\" >> .claude/context/session.log 2>/dev/null || true"
-          },
-          {
-            "_source": "metaclaude",
-            "_id": "session-state-finalize",
-            "type": "command",
-            "command": "cd \"$CLAUDE_PROJECT_DIR\" && node -e \"const fs=require('fs');const p='.claude/context/session.json';if(fs.existsSync(p)){const s=JSON.parse(fs.readFileSync(p));if(s.active_work){s.phase_checkpoint.checkpoint_state='interrupted';s.updated_at=new Date().toISOString();fs.writeFileSync(p,JSON.stringify(s,null,2))}}\" 2>/dev/null || true"
-          },
-          {
-            "_source": "metaclaude",
-            "_id": "journal-promotion-check",
-            "type": "command",
-            "command": "cd \"$CLAUDE_PROJECT_DIR\" && node .claude/scripts/journal-promotion-check.mjs"
           }
         ]
       }

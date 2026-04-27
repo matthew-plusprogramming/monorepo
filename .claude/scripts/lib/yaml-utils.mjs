@@ -11,7 +11,6 @@
  *
  * Implements: REQ-023 (safe YAML parsing), REQ-024 (path confinement),
  *             REQ-025 (input size limits)
- * Spec: sg-structured-docs, Task 3
  */
 
 import { readFileSync, statSync, realpathSync } from 'node:fs';
@@ -19,6 +18,7 @@ import { resolve, normalize, relative, sep } from 'node:path';
 import { createHash } from 'node:crypto';
 import { execSync } from 'node:child_process';
 import YAML from 'yaml';
+import { getCanonicalProjectDir } from './hook-utils.mjs';
 
 // =============================================================================
 // Constants
@@ -396,8 +396,11 @@ export function resolveProjectRoot() {
     return resolve(args[rootIdx2 + 1]);
   }
 
-  if (process.env.CLAUDE_PROJECT_DIR) {
-    return process.env.CLAUDE_PROJECT_DIR;
+  // as-012 (REQ-003.6): delegate to canonicalizer; fall back to git/cwd on failure.
+  try {
+    return getCanonicalProjectDir();
+  } catch {
+    /* fall through */
   }
 
   try {

@@ -1,7 +1,6 @@
 /**
  * Tests for workflow-dag.mjs e2e-test-writer registration
  *
- * Spec: sg-e2e-testing
  * Covers: AC-12.1, AC-12.2, AC-12.3, AC-12.4
  *
  * Run with: npx vitest run --config .claude/scripts/vitest.config.mjs e2e-workflow-dag
@@ -132,7 +131,7 @@ describe('AC-12.3: getPrerequisites returns empty prerequisites for e2e-test-wri
 });
 
 // ============================================================================
-// AC-12.4 (INVERTED per sg-e2e-default-dispatch AC-10.1):
+// AC-12.4 (inverted by the default E2E dispatch contract):
 // e2e-test-writer IS in STOP_MANDATORY_DISPATCHES
 // ============================================================================
 
@@ -198,7 +197,7 @@ describe('AC-1.1b: STOP_PHASE_REQUIREMENTS includes e2e-test-writer in all four 
 // ============================================================================
 
 describe('AC-3.2: VALID_E2E_SKIP_RATIONALES exported from workflow-dag', () => {
-  it('should export VALID_E2E_SKIP_RATIONALES with 4 valid rationale values', async () => {
+  it('should export VALID_E2E_SKIP_RATIONALES with 5 valid rationale values', async () => {
     const mod = await loadModule();
     expect(mod).not.toBeNull();
     expect(Array.isArray(mod.VALID_E2E_SKIP_RATIONALES)).toBe(true);
@@ -207,6 +206,7 @@ describe('AC-3.2: VALID_E2E_SKIP_RATIONALES exported from workflow-dag', () => {
       'test-infra',
       'type-only',
       'docs-only',
+      'pure-compute',
     ]);
   });
 });

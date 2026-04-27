@@ -1,7 +1,6 @@
 /**
  * Tests for deployment verification CLI commands (record-deployment, record-deployment-failure)
  *
- * Spec: sg-deployment-verification-gaps
  * AC Groups: AC-1 (Deployment Detection), AC-2 (Deployment Failure)
  *
  * These tests exercise session-checkpoint.mjs CLI commands that write

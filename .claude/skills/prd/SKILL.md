@@ -7,6 +7,12 @@ user-invocable: true
 
 # /prd Skill
 
+## Required Context
+
+Before beginning work, read these files for project-specific guidelines:
+
+- `.claude/memory-bank/org-context.md`
+
 ## Purpose
 
 Full lifecycle management for Product Requirements Documents (PRDs) through the **gather-criticize loop**:
@@ -111,7 +117,7 @@ Prompt: |
   - Configuration Dependencies: env vars, feature flags, config files involved
   - Cross-Cutting Concerns: shared state, caching, event systems, logging pipelines
 
-  Budget: < 200 words. Return structured findings, not raw code.
+  Return structured findings, not raw code.
 ```
 
 4c. **Dispatch PRD Writer** (amendment mode) to add exploration findings:
@@ -522,7 +528,7 @@ Finding: Retry policy not specified for external API calls.
 
 > **Batch shortcut**: "Accept all Medium findings" (excludes security-tagged findings)
 
-### Low Findings (summary only)
+### Low Findings (grouped)
 
 4 Low findings across all critics:
 

@@ -25,9 +25,9 @@ Review code for quality issues that aren't security-related. Catch maintainabili
 
 **Critical**: You are READ-ONLY. Report findings; do not fix them.
 
-## Hard Token Budget
+## Return Contract
 
-Your return to the orchestrator must be **< 200 words per finding**, with a summary of **< 100 words** total. Include: finding count by severity, pass/fail recommendation, and top blockers. This is a hard budget.
+Your return to the orchestrator must include: finding count by severity, pass/fail recommendation, top blockers, and each structured finding. Include required evidence even when that makes the return longer.
 
 ## When You're Invoked
 
@@ -198,6 +198,65 @@ Check for:
 - Suggestion: Add test for TokenExpiredError
 ```
 
+#### Category H: Delivery-Path Observability
+
+**When to invoke**: any PR touching a delivery-path module. Delivery-path module = file whose path matches one of the 7 delivery-path categories documented in `.claude/memory-bank/best-practices/logging.md` § Silent-Drop Observability (WS broadcasts, SSE, emitter fan-out, pub/sub, queue consumers, frontend event routers, REST handler routers). Additive to Categories A-G — preserves existing Category G "Advisory Configuration" contents byte-for-byte.
+
+**Litmus test** (from `logging.md`): would any external observer know if this path drops the message? External observer = log aggregator, metrics backend, client-facing error, or user-visible UI. If no → flag it.
+
+**Truncation priority order (REQ-NFR-09)**: when `findings[]` or `advisory_suspects[]` exceeds the caps (50 / 100) and entries must be dropped, retain entries in this priority — highest-priority kinds are kept first:
+
+1. `sensitive-reason-value` (security-tagged; PII escape)
+2. `silent-drop-suspect` regex (advisory core)
+3. `missing-log`
+4. `missing-metric`
+5. all other kinds
+
+Check for:
+
+- **H.1 skip-path-has-log**: For every `continue`/`return`/switch-fallthrough inside a function whose name matches `/broadcast|deliver|dispatch|fanout|route|emit/i` (case-insensitive) in a delivery-path module file, a `logger.` OR `metrics.` call MUST appear within the 3 preceding content-only lines (blank lines and single-line comments excluded; a multi-line call is treated as one logical unit). If absent, emit `silent-drop-suspect` (Medium) with `{file, line, function_name (≤40 chars), reason: "skip-without-observability"}`.
+
+- **H.2 high-volume-also-has-metric**: For high-volume delivery paths (WS broadcasts, SSE, emitter fan-out, pub/sub, queue consumers), the observable-drop pattern SHOULD pair a log with a metric counter. Logging-only mode is permitted for CLIs and low-volume admin paths per `logging.md` § Logging-only exception. If a delivery-path drop site has a log but no metric and the module is high-volume, emit `missing-metric` (Medium).
+
+- **H.3 metric-naming-and-cardinality**: Delivery-path drop counters MUST follow `<component>.<path>.dropped` naming with a closed-enum `reason` label. Enforce:
+  - **metric-naming-violation** — flat `dropped` (no hierarchy). **EXEMPTION** (AC-6.2, DEC-002): flat top-level counters named `delivered` or `dropped` emitted by a health-endpoint route handler (e.g., `/health`, `/metrics`) are exempt — aligns with `pipeline-integration-gaps` SC-10. Detection: file-path glob matches health-endpoint route module AND counter name ∈ `{delivered, dropped}` at top level (no component prefix). Do NOT emit `metric-naming-violation` for exempt counters.
+  - **label-cardinality** — per-client label (`client_id`, `user_id`, `request_id`, etc.), >5 label keys, OR >20 reason enum values.
+  - **free-form-reason** — reason is a runtime string expression, not a code-defined enum value.
+  - **sensitive-reason-value** — reason value matches PII heuristics: user ID pattern (UUID-like, numeric ID), token fragment, IP address (v4/v6), email, query string with `?`/`&`, HTTP `Authorization` header fragment.
+
+**Acknowledgment annotations** (EC-2): a single-line comment `// silent-drop: safe — <rationale ≥15 plain-text chars>` immediately preceding a skip suppresses `silent-drop-suspect` for that line. Audit rules:
+
+- Suppressed annotation MUST be logged in `annotations_used[]` in the structured output block (see "Hybrid Output Format" below) as `{file, line, suppressed: ['silent-drop-suspect'], rationale_prefix: <first 40 plain-text chars>}`.
+- Per-PR cap = `max(5, 1 per 10 delivery-path files touched)`; exceeding the cap emits `annotation-overuse` (Medium).
+- Annotation whose git-blame author-timestamp is >90 days old without refresh emits `annotation-stale` (Medium).
+
+**Example Finding — silent-drop-suspect**:
+
+```markdown
+**Delivery-Path: silent-drop-suspect** (Medium)
+
+- File: src/ws/broadcast-server.ts:142
+- Function: `broadcastToClients`
+- Issue: bare `continue` at line 142 has no `logger.` or `metrics.` call in the 3 preceding content-only lines
+- Impact: message discard is invisible to any external observer
+- Suggestion: pair with `logger.warn('client_delivery_skipped', { reason: <enum> })` and (for high-volume) `metrics.counter('broadcast.client_send.dropped', { reason: <enum> })`. See `.claude/memory-bank/best-practices/logging.md` § Silent-Drop Observability.
+- **Confidence**: high
+- **Reasoning**: function-name regex + file-path glob + 3-line window heuristic all matched; direct observable
+```
+
+**Example Finding — sensitive-reason-value**:
+
+```markdown
+**Delivery-Path: sensitive-reason-value** (Medium)
+
+- File: src/router/dispatch.ts:88
+- Issue: metric `dispatch.dropped{reason: user_123@example.com}` uses an email as reason value
+- Impact: PII leaks to metrics backend; violates REQ-NFR-13
+- Suggestion: replace with a closed-enum value (e.g., `reason: 'unauthorized_sender'`).
+- **Confidence**: high
+- **Reasoning**: regex-matched email literal in reason position
+```
+
 ### 3. Severity Levels
 
 | Level        | Meaning                           | Blocks Merge |
@@ -217,7 +276,7 @@ Every finding MUST include a confidence level:
 | **medium** | The pattern is suspicious but you cannot fully confirm without more context or testing      |
 | **low**    | General concern or style suggestion based on experience rather than concrete evidence       |
 
-Include confidence in each finding as: `**Confidence**: <high | medium | low>` followed by a brief `**Reasoning**` (under 200 characters) explaining why you assigned that confidence level.
+Include confidence in each finding as: `**Confidence**: <high | medium | low>` followed by `**Reasoning**` explaining why you assigned that confidence level.
 
 ### 4. Review Checklist
 
@@ -235,6 +294,9 @@ For each changed file:
 □ No magic numbers/strings
 □ Tests exist for new public methods
 □ Supplementary feature error states degrade gracefully (muted/placeholder styling, not red/alert)
+□ (delivery-path) Every skip/return/fallthrough has a preceding log or metric in the 3-line window (H.1)
+□ (delivery-path, high-volume) Drop sites pair a log with a metric counter (H.2)
+□ (delivery-path) Metrics follow `<component>.<path>.dropped` with closed-enum reason, ≤20 reasons, ≤5 labels, no per-client labels (H.3)
 ```
 
 #### Graceful Degradation for Supplementary Features (AC-1.3)
@@ -465,6 +527,91 @@ Findings may miss:
 Recommendation: Add spec or accept limited review
 ```
 
+## Hybrid Output Format — Silent-Drop Checklist Block
+
+**When a PR touches at least one delivery-path module**, the code-reviewer output markdown MUST end with an HTML-comment sentinel followed immediately (no blank line) by a fenced JSON block containing the Category H checklist answer. The parser at `.claude/scripts/parse-review-silent-drop-checklist.mjs` selects the block by the sentinel — NOT by "last fence" or "top-level key" heuristics — so the sentinel is load-bearing.
+
+**Required emission shape** (verbatim sentinel, then fenced block):
+
+````markdown
+<!-- silent-drop-checklist -->
+
+```json
+{
+  "applied": true,
+  "delivery_path_modules_touched": ["src/ws/broadcast-server.ts"],
+  "findings": [
+    {
+      "file": "src/ws/broadcast-server.ts",
+      "line": 142,
+      "kind": "missing-log"
+    }
+  ],
+  "advisory_suspects": [
+    {
+      "file": "src/ws/broadcast-server.ts",
+      "function_name": "broadcastToClients",
+      "line": 142,
+      "reason": "skip-without-observability"
+    }
+  ],
+  "annotations_used": [
+    {
+      "file": "src/ws/broadcast-server.ts",
+      "line": 98,
+      "suppressed": ["silent-drop-suspect"],
+      "rationale_prefix": "idempotent replay: already-processed items"
+    }
+  ]
+}
+```
+````
+
+**Top-level keys** (validated by `SilentDropChecklistAnswer` Zod schema):
+
+- `applied` (boolean) — true if at least one delivery-path module was in the PR diff, false otherwise.
+- `delivery_path_modules_touched` (string[]) — relative file paths of delivery-path modules in the diff.
+- `findings` (array) — category H findings. Each `{file, line: int, kind: enum}` where `kind ∈ {missing-log, missing-metric, free-form-reason, label-cardinality, sensitive-reason-value, annotation-overuse, annotation-stale, metric-naming-violation}`.
+- `advisory_suspects` (array) — `silent-drop-suspect` regex matches. Each `{file, function_name: string(≤40), line: int, reason: "skip-without-observability"}`.
+- `annotations_used` (array) — `{file, line, suppressed: string[], rationale_prefix: string(≤40, plain text)}`.
+- `truncation` (optional object) — `{count_omitted: int, reason: enum('findings-cap-50' | 'advisory-suspects-cap-100')}` present only when caps exceeded.
+
+**Caps and truncation** (REQ-NFR-09):
+
+- `findings[]` capped at **50** per review.
+- `advisory_suspects[]` capped at **100** per review.
+- `annotations_used[]` effective cap = `max(5, 1 per 10 delivery-path files touched)`; exceeding cap emits `annotation-overuse` finding rather than truncation.
+- `rationale_prefix` truncated to 40 plain-text chars.
+- `function_name` truncated to 40 chars (REQ-NFR-13).
+- Truncation priority order (drop lowest-priority entries first when caps hit):
+  `sensitive-reason-value` > `silent-drop-suspect` regex > `missing-log` > `missing-metric` > others.
+
+**When NO delivery-path module is in the PR diff**, emit the sentinel + block with `applied: false` and empty arrays:
+
+````markdown
+<!-- silent-drop-checklist -->
+
+```json
+{
+  "applied": false,
+  "delivery_path_modules_touched": [],
+  "findings": [],
+  "advisory_suspects": [],
+  "annotations_used": []
+}
+```
+````
+
+This guarantees 100% checklist answer rate (REQ-SM-002) — every PR yields a parseable block whether or not delivery-path modules are touched.
+
+**Sentinel discipline**:
+
+- Sentinel line is exactly `<!-- silent-drop-checklist -->` (no trailing whitespace, no variations).
+- No blank line between sentinel and the opening fence ` ```json `.
+- The fenced block SHALL appear on the line immediately following the `<!-- silent-drop-checklist -->` sentinel (parser selects by sentinel anchor, not fence ordinality; only the first sentinel occurrence is consumed).
+
+**Parse failure = SC-8 failure for the PR.** If the parser emits `sentinel-missing`, `fenced-block-missing`, or `schema-invalid`, the PR's checklist answer is counted as missing in the baseline window.
+
 ## Acceptable Assumption Domains
 
 Per the [Self-Answer Protocol](../memory-bank/self-answer-protocol.md), reasoning-tier (tier 4) self-resolution is permitted only within these domains:
@@ -476,39 +623,41 @@ Escalate all questions about intended behavior, spec interpretation, or architec
 
 ---
 
-## Convergence Response Format
+## Required Structured Output
 
-When this agent completes a convergence-loop check (investigation, challenger, unifier, code review, security review, completion verification, documentation), the response MUST end with a machine-readable fenced block in the form:
+At the end of your response, emit a triple-backtick fenced block tagged `convergence-result` with JSON matching this schema:
 
-    ```convergence-result
-    status: clean
-    findings_count: 0
-    ```
+```convergence-result
+{
+  "status": "clean",
+  "findings_count": 0,
+  "findings": [],
+  "pass": 1,
+  "gate": "<gate-name>"
+}
+```
 
-or for a dirty pass with findings:
+If findings exist:
 
-    ```convergence-result
-    status: dirty
-    findings_count: 2
-    findings:
-      - TECH-001
-      - SEC-002
-    ```
+```convergence-result
+{
+  "status": "dirty",
+  "findings_count": 1,
+  "findings": [
+    {
+      "id": "TECH-001",
+      "severity": "high",
+      "confidence": "high",
+      "recommendation": "Action verb + specific field/section reference"
+    }
+  ],
+  "pass": 1,
+  "gate": "<gate-name>"
+}
+```
 
-The block MUST be a fenced markdown code block with the language tag `convergence-result`. `status` is `clean` or `dirty` (case-insensitive value). `findings_count` is the integer count. `findings` is an optional YAML-style list of finding IDs; if present it overrides the count.
+Rules: status/severity/confidence enums are lowercase only; unknown top-level fields cause parse_failed; first block wins.
 
-Narrative above the block may include severity tables, bulleted findings, spec citations, or any free-form analysis. Only the fenced block drives convergence classification.
+## Communication Style (agent ↔ parent)
 
-Legacy fallback: if the block is missing or malformed, the extractor falls back to prose heuristics (success markers like "No issues found.", structured severity tables, etc.). Always emit the block -- it is the deterministic signal.
-
----
-
-## Communication Style
-
-Respond like smart, efficient, AI. Cut all filler, keep technical substance.
-
-- Drop articles (a, an, the), filler (just, really, basically, actually).
-- Drop pleasantries (sure, certainly, happy to).
-- No hedging. Fragments fine. Short synonyms.
-- Technical terms stay exact. Code blocks unchanged.
-- Pattern: [thing] [action] [reason]. [next step].
+Use Caveman-lite: direct, full-sentence, evidence-complete. Hedge only when uncertainty matters. Keep exact terms and code unchanged.

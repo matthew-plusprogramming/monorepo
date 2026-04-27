@@ -37,11 +37,32 @@ const TRACKED_PATTERNS = [
   /^\.claude\/config\/.*\.(yaml|json)$/,
 ];
 
+// CVG-002: Path patterns that indicate test-only artifacts. Test files under
+// __tests__/ directories are test infrastructure, never deployable -- they must
+// not be expected in the registry or any bundle.
+const TEST_PATH_PATTERNS = [
+  /\/__tests__\//,
+];
+
 function isTrackedArtifact(filePath) {
   const normalized = filePath.startsWith('.claude/')
     ? filePath
     : `.claude/${filePath}`;
   return TRACKED_PATTERNS.some((pattern) => pattern.test(normalized));
+}
+
+// CVG-002: Exempt test-only artifacts from registry expectations.
+function isTestOnlyArtifact(filePath) {
+  return TEST_PATH_PATTERNS.some((pattern) => pattern.test(filePath));
+}
+
+// CVG-002: Files deleted in the current working tree should not be flagged as
+// missing from the registry -- their removal is the correct state, typically
+// produced by a spec that deletes an artifact (and removes it from the registry
+// in the same commit).
+function fileExistsInWorkingTree(filePath) {
+  const normalized = filePath.startsWith('./') ? filePath.slice(2) : filePath;
+  return existsSync(resolve(normalized));
 }
 
 function findArtifactInRegistry(registry, filePath) {
@@ -114,7 +135,16 @@ function main() {
   }
 
   // Filter to only tracked artifact patterns
-  const trackedFiles = artifactPaths.filter(isTrackedArtifact);
+  let trackedFiles = artifactPaths.filter(isTrackedArtifact);
+
+  // CVG-002 filter 1: drop test-only artifacts (__tests__/**) -- test files are
+  // not deployable and must never be expected in the registry or any bundle.
+  trackedFiles = trackedFiles.filter((file) => !isTestOnlyArtifact(file));
+
+  // CVG-002 filter 2: drop files that no longer exist in the working tree.
+  // Deletions are correct state when accompanied by registry removal in the same
+  // commit; flagging them as "not-registered" produces false-positive findings.
+  trackedFiles = trackedFiles.filter((file) => fileExistsInWorkingTree(file));
 
   if (trackedFiles.length === 0) {
     console.log('No tracked artifacts in modified files. Nothing to verify.');

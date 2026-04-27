@@ -7,6 +7,13 @@ user-invocable: true
 
 # /investigate Skill
 
+## Required Context
+
+Before beginning work, read these files for project-specific guidelines:
+
+- `.claude/memory-bank/best-practices/contract-first.md`
+- `.claude/memory-bank/best-practices/ears-format.md`
+
 ## Purpose
 
 Investigate and surface connection points between different specs, systems, and components. Identify inconsistencies, conflicting assumptions, and missing contracts before they become implementation bugs.
@@ -128,27 +135,17 @@ Prompt: |
    - If `iteration_count >= 5`: **Escalate** to human with iteration history.
    - Otherwise: Back to step 1.
 
-6. **Cross-stage resolution**: If a finding resolution introduces a blocker at the challenger stage, increment `cross_stage_resolution_count`. If count reaches 3, escalate to human.
+6. **Cross-stage resolution** (advisory — not code-enforced): If a finding resolution introduces a blocker at the challenger stage, the operator should escalate to human after roughly 3 round-trips rather than continue indefinitely.
 
 ### 3. Record Convergence
 
-After 2 consecutive clean passes:
+After 2 consecutive clean passes, run the canonical recorder:
 
 ```bash
-# Set manifest flat boolean for PHASE_OBLIGATIONS
-# (implementer reads manifest.convergence.investigation_converged)
-node -e "
-const fs = require('fs');
-const path = '<spec-group-dir>/manifest.json';
-const m = JSON.parse(fs.readFileSync(path));
-m.convergence = m.convergence || {};
-m.convergence.investigation_converged = true;
-fs.writeFileSync(path, JSON.stringify(m, null, 2) + '\\n');
-"
-
-# Set session.json for coercive enforcement
 node .claude/scripts/session-checkpoint.mjs update-convergence investigation
 ```
+
+Do not edit `manifest.json` or `session.json` directly. On verified convergence, `update-convergence` updates the session counters and mirrors `convergence.investigation_converged = true` to the manifest.
 
 ### 4. Report Results
 

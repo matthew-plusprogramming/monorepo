@@ -7,6 +7,12 @@ user-invocable: true
 
 # /atomize Skill
 
+## Required Context
+
+Before beginning work, read these files for project-specific guidelines:
+
+- `.claude/memory-bank/best-practices/spec-authoring.md`
+
 ## Purpose
 
 Decompose a high-level spec (`spec.md`) into atomic specs—units that are independently testable, deployable, reviewable, and reversible.

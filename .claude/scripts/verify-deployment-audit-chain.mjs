@@ -18,7 +18,6 @@
  *   node verify-deployment-audit-chain.mjs [--path <log-path>]
  *
  * Implements: AC-14.7
- * Spec: sg-deployment-verification-gaps
  */
 
 import { existsSync, readFileSync } from 'node:fs';

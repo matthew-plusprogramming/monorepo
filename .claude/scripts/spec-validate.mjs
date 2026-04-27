@@ -34,7 +34,7 @@ try {
   const dagModule = await import(join(__dirname, 'lib', 'workflow-dag.mjs'));
   VALID_E2E_SKIP_RATIONALES = dagModule.VALID_E2E_SKIP_RATIONALES;
 } catch {
-  VALID_E2E_SKIP_RATIONALES = ['pure-refactor', 'test-infra', 'type-only', 'docs-only'];
+  VALID_E2E_SKIP_RATIONALES = ['pure-refactor', 'test-infra', 'type-only', 'docs-only', 'pure-compute'];
 }
 
 // Sections that must be present (case-insensitive match)
@@ -181,7 +181,7 @@ function validateSpecFile(filePath) {
     // AC-7.3: When e2e_skip is true, e2e_skip_rationale is required (EC-1)
     if (frontmatter.e2e_skip === true) {
       if (!frontmatter.e2e_skip_rationale) {
-        errors.push('e2e_skip: true requires e2e_skip_rationale (one of: pure-refactor, test-infra, type-only, docs-only)');
+        errors.push('e2e_skip: true requires e2e_skip_rationale (one of: pure-refactor, test-infra, type-only, docs-only, pure-compute)');
       } else if (!VALID_E2E_SKIP_RATIONALES.includes(frontmatter.e2e_skip_rationale)) {
         errors.push(`e2e_skip_rationale '${frontmatter.e2e_skip_rationale}' is not valid (must be one of: ${VALID_E2E_SKIP_RATIONALES.join(', ')})`);
       }
@@ -225,7 +225,7 @@ function validateSpecFile(filePath) {
 }
 
 // ---------------------------------------------------------------------------
-// Env-dependent AC enforcement (AC-1.6, sg-pipeline-integration-gaps)
+// Env-dependent AC enforcement (AC-1.6)
 // ---------------------------------------------------------------------------
 
 /** Patterns that indicate environment-dependent code */

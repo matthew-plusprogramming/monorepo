@@ -1,5 +1,5 @@
 /**
- * Tests for M4 (Engine Upgrade -- Type-Aware Analysis) of sg-trace-v2-docs-bridge spec.
+ * Tests for trace engine type-aware analysis.
  *
  * Covers:
  * - REQ-020: TypeScript compiler API replacement

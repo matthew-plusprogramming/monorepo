@@ -7,6 +7,13 @@ allowed-tools: Read, Write, Glob, Grep
 
 # Documentation Skill
 
+## Required Context
+
+Before beginning work, read these files for project-specific guidelines:
+
+- `.claude/memory-bank/best-practices/spec-authoring.md`
+- `.claude/memory-bank/best-practices/typescript.md`
+
 ## Purpose
 
 Generate documentation artifacts from implemented code. Create durable external context that survives beyond the current session.
@@ -424,9 +431,10 @@ to the login page. Any cached credentials are cleared.
 
 **After docs**:
 
-- Ready for commit/merge
+- `/manual-test <spec-group-id>` — Bounded exploratory verification (5 happy + 3 failure + 2 adjacent, then stop). **Advisory — findings logged but not blocking. Final step before commit for spec-based workflows.** Main-agent discretion governs dispatch; no hook enforcement. See `.claude/skills/manual-test/SKILL.md`.
+- Ready for commit/merge after `/manual-test` findings are reviewed.
 
-Documentation is typically the final step before commit for substantial changes.
+Documentation followed by `/manual-test` is the final pre-commit step for substantial changes in spec-based workflows.
 
 ## Structured Documentation Nudge (AC-10.1, AC-10.2)
 

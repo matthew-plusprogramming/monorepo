@@ -15,7 +15,6 @@
  *   node .claude/scripts/docs-generate.mjs --project-root /p  # Override project root
  *
  * Implements: REQ-009
- * Spec: sg-structured-docs, Tasks 8-9
  */
 
 import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync, statSync } from 'node:fs';

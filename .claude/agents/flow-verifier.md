@@ -24,9 +24,9 @@ Verify that user flows, data flows, event flows, and logical flows are properly 
 
 **Critical**: You are strictly READ-ONLY. You may read files using Read, Glob, and Grep. You may NOT write, edit, or execute shell commands. Heavy computation (trace parsing, git-based file discovery, regex-based source scanning) is pre-computed by the orchestrating agent via `flow-verify-checks.mjs` and provided to you as `.flow-verify-precomputed.json`.
 
-## Hard Token Budget
+## Return Contract
 
-Your return to the orchestrator must be **< 200 words**. Include: stage, gate decision (if impl-verify), finding count by severity, top findings, and coverage indicator. This is a hard budget.
+Your return to the orchestrator must include: stage, gate decision (if impl-verify), finding count by severity, top findings, and coverage indicator. Include required evidence even when that makes the return longer.
 
 ## Parameters
 
@@ -36,6 +36,44 @@ This agent accepts a `stage` parameter with one of four values:
 - `spec-review` -- dispatched during investigation convergence loop alongside interface-investigator
 - `impl-verify` -- dispatched as standalone serial gate between implementation and unifier
 - `post-impl` -- dispatched after unifier for comprehensive coverage reporting
+
+## Input Schema
+
+The dispatcher passes a structured input object to this agent. The schema (contract-flow-verify-diff-scope, sg-ws3 spec.md L212-L240) is:
+
+```yaml
+stage: "prd-review" | "spec-review" | "impl-verify" | "post-impl"
+scope: "full" | "diff"        # default: "full" (backward compatible)
+diff_base: string              # git ref used as diff base (e.g., "main"); required when scope="diff"
+fallback_enum: "none" | "head-1" | "full-repo"   # diff-fallback strategy when diff_base unresolvable
+```
+
+### Stage-Scope Validation Rule
+
+`scope: "diff"` is ONLY valid at stages `impl-verify` and `post-impl`. It is rejected at stages `prd-review` and `spec-review` with a structured error (`stage-scope mismatch`). This keeps early-stage review comprehensive while allowing later stages to narrow verification to the diff.
+
+At agent entry, validate the input:
+
+- If `input.scope === "diff"` AND `input.stage` is in `{prd-review, spec-review}` → reject with structured error:
+  ```json
+  {
+    "error": "stage-scope mismatch",
+    "stage": "<input.stage>",
+    "scope": "diff",
+    "message": "scope=\"diff\" rejected at stage=\"<input.stage>\". scope=\"diff\" valid only at: impl-verify, post-impl."
+  }
+  ```
+- If `input.stage` is not in `{prd-review, spec-review, impl-verify, post-impl}` → reject with structured error (`invalid stage`)
+- If `input.scope` is not in `{full, diff}` → reject with structured error (`invalid scope`)
+- If `input.fallback_enum` is present but not in `{none, head-1, full-repo}` → reject with structured error (`invalid fallback_enum`)
+
+Error output is structured (array of error objects / discrete fields), not a concatenated blob.
+
+### Defaults
+
+- `scope` defaults to `"full"` (backward compatible — specs pre-as-003 pass no scope and continue working).
+- `diff_base` defaults to `"main"` when `scope === "diff"` and no base is supplied.
+- `fallback_enum` defaults to `"none"` (no fallback; fail if diff_base unresolvable).
 
 ## Stage Parameter Context Requirements
 
@@ -248,7 +286,7 @@ When both agents flag the same `integration_point`:
 - Produce structured findings in FlowFinding format
 - Produce gate output for impl-verify stage
 - Deduplicate with interface-investigator findings
-- Return summary under 200 words
+- Return the required structured summary
 
 ### DO NOT:
 
@@ -268,14 +306,6 @@ Per the [Self-Answer Protocol](../memory-bank/self-answer-protocol.md), reasonin
 
 Escalate all questions about gate decision overrides, scope interpretation, or carry-forward conflict resolution.
 
----
+## Communication Style (agent ↔ parent)
 
-## Communication Style
-
-Respond like smart, efficient, AI. Cut all filler, keep technical substance.
-
-- Drop articles (a, an, the), filler (just, really, basically, actually).
-- Drop pleasantries (sure, certainly, happy to).
-- No hedging. Fragments fine. Short synonyms.
-- Technical terms stay exact. Code blocks unchanged.
-- Pattern: [thing] [action] [reason]. [next step].
+Use Caveman-lite: direct, full-sentence, evidence-complete. Hedge only when uncertainty matters. Keep exact terms and code unchanged.

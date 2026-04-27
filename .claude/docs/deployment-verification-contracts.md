@@ -284,8 +284,7 @@ node .claude/scripts/session-checkpoint.mjs record-deployment-clear-failure --se
 
 ## Cross-Reference
 
-- **Spec**: `.claude/specs/groups/sg-deployment-verification-gaps/spec.md`
-- **Requirements**: `.claude/specs/groups/sg-deployment-verification-gaps/requirements.md`
+- **PRD**: `.claude/prds/deployment-verification-gaps/prd.md`
 - **Schema**: `.claude/specs/schema/session.schema.json` (deployment object)
 - **Stop Hook**: `.claude/scripts/workflow-stop-enforcement.mjs` (Step 7.8)
 - **Verification Runners**: `.claude/scripts/lib/deployment-verify.mjs`

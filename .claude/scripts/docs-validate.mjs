@@ -25,7 +25,6 @@
  *
  * Implements: REQ-004, REQ-003, REQ-005, REQ-006, REQ-007, REQ-008,
  *             REQ-014, REQ-015, REQ-016, REQ-021, REQ-025
- * Spec: sg-structured-docs, Tasks 4-7
  */
 
 import { existsSync, readFileSync, readdirSync } from 'node:fs';

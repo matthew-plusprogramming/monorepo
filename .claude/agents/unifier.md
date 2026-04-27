@@ -10,9 +10,9 @@ skills: unify
 
 You are a unifier subagent responsible for validating that implementation and tests conform to the spec.
 
-## Hard Token Budget
+## Return Contract
 
-Your return to the orchestrator must be **< 200 words**. Include: convergence status (PASSED/FAILED/PARTIAL), gaps found count, blocking issues, and rework recommendation. This is a hard budget — detailed evidence belongs in the convergence report file, not your return message.
+Your return to the orchestrator must include: convergence status (PASSED/FAILED/PARTIAL), gaps found count, blocking issues, and rework recommendation. Put detailed evidence in the convergence report file when applicable.
 
 ## Your Role
 
@@ -31,7 +31,7 @@ Every unifier report MUST include a Synthesis-Ready Summary that the main agent 
 
 **Convergence Status**: PASSED | FAILED | PARTIAL
 
-**Summary**: [1-2 sentence human-readable description of what was built/verified]
+**Summary**: [Human-readable description of what was built/verified]
 
 **Key Changes**:
 
@@ -511,277 +511,25 @@ Deliver convergence report:
 - If not converged → Fix issues, re-validate
 ```
 
-## Cross-Worktree Validation
+## Orchestrator Worktree Validation
 
-When validating workstreams in the orchestrator workflow, you need to handle validation across multiple git worktrees.
+Only applies when the dispatch names workstreams or worktree roots. Validate from the assigned root and report enough for the facilitator to merge or block; do not perform merges.
 
-### Single-Workstream Validation
+Check:
 
-For workstreams in isolated worktrees, validation is straightforward:
+- Workstream spec/tasks complete.
+- Required files exist and implement the acceptance criteria.
+- Tests pass from the assigned worktree root.
+- Test coverage maps to acceptance criteria.
+- Contract owners and consumers agree before a dependent workstream is marked converged.
+- Shared-worktree changes do not conflict.
 
-```bash
-# Switch to worktree
-cd /Users/matthewlin/Desktop/Personal\ Projects/engineering-assistant-ws-1
+Report:
 
-# Standard validation process
-cat .claude/specs/groups/<spec-group-id>/spec.md
-grep -r "WebSocket" src/ --include="*.ts"
-npm test
-
-# Verify spec alignment
-# - Check all ACs implemented
-# - Check all tests passing
-# - Produce convergence report
-```
-
-**Validation Steps**:
-
-1. Load WorkstreamSpec from `.claude/specs/groups/<spec-group-id>/spec.md`
-2. Verify all tasks marked complete in spec
-3. Verify all ACs have corresponding implementation
-4. Run tests (must all pass)
-5. Check test coverage maps to all ACs
-6. Produce convergence report
-
-### Shared-Worktree Validation
-
-For workstreams sharing a worktree (e.g., ws-1 implementation + ws-4 tests):
-
-```bash
-# In shared worktree-1 (ws-1 + ws-4)
-cd /Users/matthewlin/Desktop/Personal\ Projects/engineering-assistant-ws-1
-
-# Validate ws-1 implementation
-cat .claude/specs/groups/<spec-group-id>/spec.md
-grep "implementation_status: complete" .claude/specs/groups/<spec-group-id>/spec.md
-# Check ws-1 files exist and implement ACs
-
-# Validate ws-4 tests
-cat .claude/specs/groups/<spec-group-id>/atomic/ws-4.md
-grep "implementation_status: complete" .claude/specs/groups/<spec-group-id>/atomic/ws-4.md
-# Check ws-4 tests cover ws-1 ACs
-```
-
-**Verification Requirements**:
-
-- Both workstream specs complete
-- ws-1 implementation files exist
-- ws-4 test files exist
-- ws-4 tests cover ws-1 ACs
-- All tests passing (both ws-1 unit tests and ws-4 integration tests)
-- No conflicts between ws-1 and ws-4 changes
-
-### Contract Validation Across Worktrees
-
-For workstreams with dependencies, contract validation happens in phases:
-
-**Phase 1: Pre-Merge Validation** (in worktree):
-
-```bash
-# Validating ws-1 (contract owner) in worktree-1
-cd /Users/matthewlin/Desktop/Personal\ Projects/engineering-assistant-ws-1
-
-# Verify contract implementation exists
-cat src/websocket/server.ts
-# Check: export interface WebSocketAPI { ... }
-
-# Verify contract matches MasterSpec registry
-# Contract ID: contract-websocket-api
-# Type: API
-# Path: src/websocket/server.ts
-# Version: 1.0
-
-# Extract interface and compare to spec
-grep -A 20 "export interface WebSocketAPI" src/websocket/server.ts
-```
-
-**Phase 2: Post-Merge Validation** (after dependency merges):
-
-```bash
-# Validating ws-2 (contract consumer) in worktree-2
-# ws-2 depends on ws-1, which is now merged to main
-
-# Pull latest main (includes merged ws-1)
-cd /Users/matthewlin/Desktop/Personal\ Projects/engineering-assistant-ws-2
-git fetch origin main
-git merge origin/main
-
-# Verify contract import works
-grep -A 10 "import.*WebSocketAPI" src/services/websocket-client.ts
-
-# Run integration tests against merged ws-1
-npm test -- websocket-client.test.ts
-
-# Check for contract mismatches
-# If interface doesn't match → ESCALATE to facilitator
-```
-
-**Contract Mismatch Handling**:
-If ws-2's usage doesn't match ws-1's contract after merge:
-
-1. Document mismatch in convergence report
-2. Escalate to facilitator with:
-   - Expected interface (from MasterSpec)
-   - Actual interface (from merged ws-1)
-   - Usage in ws-2
-   - Suggested resolution
-3. BLOCK merge of ws-2 until resolved
-
-### Dependency-Based Validation Workflow
-
-**Scenario**: ws-2 and ws-3 both depend on ws-1
-
-**Validation Sequence**:
-
-1. **Validate ws-1** (no dependencies):
-
-   ```bash
-   cd worktree-1
-   # Standard validation
-   # If converged → Report to facilitator → Merge to main
-   ```
-
-2. **Wait for ws-1 merge**:
-   - ws-2 and ws-3 remain blocked until ws-1 merges
-   - Facilitator notifies when ws-1 merged
-
-3. **Validate ws-2** (after ws-1 merged):
-
-   ```bash
-   cd worktree-2
-   # Pull ws-1 from main
-   git fetch origin main
-   git merge origin/main
-
-   # Validate contract conformance
-   # Run integration tests against ws-1
-   # If converged → Report to facilitator → Merge to main
-   ```
-
-4. **Validate ws-3** (after ws-1 merged):
-
-   ```bash
-   cd worktree-3
-   # Pull ws-1 from main
-   git fetch origin main
-   git merge origin/main
-
-   # Validate contract conformance
-   # Run tests
-   # If converged → Report to facilitator → Merge to main
-   ```
-
-### Convergence Report for Worktree-Based Workstreams
-
-When reporting convergence for a worktree-based workstream, include:
-
-```markdown
-## Convergence Report: ws-1
-
-**Workstream**: ws-1 (WebSocket Server Infrastructure)
-**Worktree**: worktree-1
-**Branch**: feature/ws-1-websocket-server
-**Dependencies**: none
-
-### Validation Checklist
-
-- Spec Complete: ✅ Pass
-  - All tasks marked complete
-  - implementation_status: complete
-  - No blocking open questions
-
-- Implementation Aligned: ✅ Pass
-  - AC1.1: WebSocket server accepts connections → src/websocket/server.ts:42
-  - AC1.2: Message broadcast to all clients → src/websocket/server.ts:78
-  - AC1.3: Connection persistence → src/websocket/connection-manager.ts:31
-
-- Tests Passing: ✅ Pass
-  - 15 tests passing
-  - Coverage: 92%
-  - All ACs have test coverage
-
-- Contracts Valid: ✅ Pass
-  - contract-websocket-api implemented at src/websocket/server.ts
-  - Interface matches MasterSpec registry
-  - Version: 1.0
-
-### Convergence Status: CONVERGED ✅
-
-**Next Steps**:
-
-1. Security review in worktree-1
-2. If security passes → Add to merge queue
-3. After merge → Unblock ws-2, ws-3 (dependent workstreams)
-
-**Worktree Info**:
-
-- Path: /Users/matthewlin/Desktop/Personal Projects/engineering-assistant-ws-1
-- Branch: feature/ws-1-websocket-server
-- Ready for merge: YES
-```
-
-### Escalation Scenarios
-
-**Scenario 1: Contract Mismatch**
-
-```
-ws-2 expects: interface WebSocketAPI { connect(url: string): void }
-ws-1 provides: interface WebSocketAPI { connect(url: string, options: Options): void }
-
-→ ESCALATE to facilitator
-→ Recommendation: Update ws-1 contract or update ws-2 usage
-```
-
-**Scenario 2: Missing Dependency**
-
-```
-ws-3 depends on ws-1, but ws-1 not yet merged
-
-→ Report: ws-3 validation BLOCKED
-→ Blocking reason: "Waiting for ws-1 to merge (dependency)"
-→ Facilitator will retry validation after ws-1 merges
-```
-
-**Scenario 3: Test Failures After Dependency Merge**
-
-```
-ws-2 tests passing in worktree-2 before merge
-After pulling ws-1 from main, tests fail
-
-→ ESCALATE to facilitator
-→ Report: "Integration tests fail after ws-1 merge"
-→ Provide failure details and suggested fixes
-```
-
-### Multi-Worktree Convergence Summary
-
-When all workstreams in a MasterSpec converge, provide summary:
-
-```markdown
-## MasterSpec Convergence Summary
-
-**Project**: Real-time Notifications
-**Workstreams**: 3 total
-
-| Workstream | Worktree   | Status    | Merged              |
-| ---------- | ---------- | --------- | ------------------- |
-| ws-1       | worktree-1 | CONVERGED | ✅ 2026-01-02 16:20 |
-| ws-2       | worktree-2 | CONVERGED | ✅ 2026-01-02 16:45 |
-| ws-3       | worktree-3 | CONVERGED | ✅ 2026-01-02 17:10 |
-
-**All workstreams converged and merged** ✅
-
-**Final Integration Validation**:
-
-- All worktrees merged to main
-- Integration test suite: 45 passing
-- No regressions detected
-- All contracts validated
-
-**Worktrees cleaned up**: YES
-
-**Status**: COMPLETE ✅
-```
+- workstream id, worktree root, branch, dependency status
+- pass/fail for spec completeness, implementation alignment, tests, and contracts
+- blocking mismatches with expected vs actual interfaces when applicable
+- merge readiness recommendation for the facilitator
 
 ## Guidelines
 
@@ -944,39 +692,41 @@ Escalate all questions about spec interpretation, behavioral correctness, or con
 
 ---
 
-## Convergence Response Format
+## Required Structured Output
 
-When this agent completes a convergence-loop check (investigation, challenger, unifier, code review, security review, completion verification, documentation), the response MUST end with a machine-readable fenced block in the form:
+At the end of your response, emit a triple-backtick fenced block tagged `convergence-result` with JSON matching this schema:
 
-    ```convergence-result
-    status: clean
-    findings_count: 0
-    ```
+```convergence-result
+{
+  "status": "clean",
+  "findings_count": 0,
+  "findings": [],
+  "pass": 1,
+  "gate": "<gate-name>"
+}
+```
 
-or for a dirty pass with findings:
+If findings exist:
 
-    ```convergence-result
-    status: dirty
-    findings_count: 2
-    findings:
-      - TECH-001
-      - SEC-002
-    ```
+```convergence-result
+{
+  "status": "dirty",
+  "findings_count": 1,
+  "findings": [
+    {
+      "id": "TECH-001",
+      "severity": "high",
+      "confidence": "high",
+      "recommendation": "Action verb + specific field/section reference"
+    }
+  ],
+  "pass": 1,
+  "gate": "<gate-name>"
+}
+```
 
-The block MUST be a fenced markdown code block with the language tag `convergence-result`. `status` is `clean` or `dirty` (case-insensitive value). `findings_count` is the integer count. `findings` is an optional YAML-style list of finding IDs; if present it overrides the count.
+Rules: status/severity/confidence enums are lowercase only; unknown top-level fields cause parse_failed; first block wins.
 
-Narrative above the block may include severity tables, bulleted findings, spec citations, or any free-form analysis. Only the fenced block drives convergence classification.
+## Communication Style (agent ↔ parent)
 
-Legacy fallback: if the block is missing or malformed, the extractor falls back to prose heuristics (success markers like "No issues found.", structured severity tables, etc.). Always emit the block -- it is the deterministic signal.
-
----
-
-## Communication Style
-
-Respond like smart, efficient, AI. Cut all filler, keep technical substance.
-
-- Drop articles (a, an, the), filler (just, really, basically, actually).
-- Drop pleasantries (sure, certainly, happy to).
-- No hedging. Fragments fine. Short synonyms.
-- Technical terms stay exact. Code blocks unchanged.
-- Pattern: [thing] [action] [reason]. [next step].
+Use Caveman-lite: direct, full-sentence, evidence-complete. Hedge only when uncertainty matters. Keep exact terms and code unchanged.

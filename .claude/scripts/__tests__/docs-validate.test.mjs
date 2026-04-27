@@ -2,7 +2,6 @@
  * Unit tests for docs-validate.mjs — Schema validation, cross-references,
  * staleness detection, size limits, schema versioning
  *
- * Spec: sg-structured-docs
  * Covers: AC-1.1 through AC-1.7, AC-2.1 through AC-2.3, AC-3.1, AC-3.2,
  *         AC-4.1 through AC-4.5, AC-5.1 through AC-5.3, AC-6.5, AC-7.3,
  *         AC-11.6, AC-11.7

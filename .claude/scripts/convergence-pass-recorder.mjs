@@ -9,7 +9,7 @@
  * session-checkpoint.mjs's exported recordPass() function via direct module
  * import.
  *
- * Spec: sg-convergence-recorder-tolerance (v1.3) -- Path 0 structured block
+ * Path 0 structured block support.
  *
  * Extraction pipeline (first-match-wins):
  *   Path 0 -- structured convergence-result fenced block (highest priority)
@@ -93,6 +93,29 @@ const GATE_MAP = {
   'completion-verifier': 'completion_verifier',
 };
 
+// SubagentStop double-fire guard: the hook fires twice per agent. The first
+// fire carries a partial/interim `last_assistant_message` too short to hold a
+// fenced `convergence-result` block; the second carries the final message.
+// Without this guard the first fire records a spurious `parse_failed` entry
+// that breaks the `countConsecutiveCleanFromTail()` streak walker in
+// session-checkpoint.mjs.
+//
+// 109 bytes is the empirically observed minimum for valid agent-emitted fenced
+// blocks in session.json. The algebraic minimum accepted by
+// parseStructuredConvergenceBlock() is smaller (~40 bytes for the shortest
+// YAML form, e.g. "```convergence-result\nstatus: clean\n```"), but real agent
+// responses include an opening narrative sentence plus JSON/YAML body. A
+// partial message under 109 bytes cannot carry a complete fenced block,
+// regardless of extraction-path fallbacks, so short-circuiting here is safe.
+const MIN_VALID_RESPONSE_LENGTH = 109;
+
+// Idempotency window: if the most recent evidence record for a given
+// (gate, agent_id) tuple has the same findings_hash AND its timestamp is
+// within this many milliseconds of now(), the new record is suppressed.
+// Protects against any future double-fire paths beyond the short-message case
+// (e.g., retries, hook restarts, upstream envelope duplication).
+const IDEMPOTENCY_WINDOW_MS = 2000;
+
 const HIGH_PLUS_THRESHOLD_GATES = new Set(['code_review']);
 
 // AC-7 streak-reset semantics: degraded threshold for circuit breaker
@@ -160,8 +183,7 @@ const SEVERITY_WORD_PROSE =
   /(?<!\b(?:no|zero|0|without)\s)\b(critical|high|medium|low)\b[^\n]{0,40}\b(issue|issues|finding|findings|found|problem|problems|concern|concerns)\b/gim;
 
 // SC-2 / EDGE-016 / EDGE-019 success-marker (matches normalized last non-empty line)
-// Widened per sg-convergence-recorder-tolerance v1.3 follow-up to accept a
-// broader natural-language vocabulary. Standalone-line anchor and terminator
+// Accepts a broad natural-language vocabulary. Standalone-line anchor and terminator
 // constraints preserved: `^\s*<marker>\s*[\.!,\u2026]*\s*$`.
 const SUCCESS_MARKER =
   /^\s*(no issues found|no issues detected|no issues|no concerns found|no concerns|no problems found|no problems|no blockers found|no blocking issues|no blocking findings|no findings|no blockers|all checks passed|all clear|all good|all systems go|everything passes|everything looks good|nothing to flag|nothing blocking|verified clean|clean pass|clean|passed|pass|ok|approved|approval granted|looks good|lgtm|ready to ship|ready to merge|ready for merge)\s*[\.!,\u2026]*\s*$/im;
@@ -394,6 +416,67 @@ export function parseStructuredConvergenceBlock(text) {
 
   // Last block wins.
   const body = matches[matches.length - 1];
+
+  // JSON-first path: handle structured JSON blocks (common from interface-investigator)
+  const trimmed = body.trim();
+  if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        for (const key of Object.keys(parsed)) {
+          if (!CANONICAL_ALLOWED_TOP_LEVEL_FIELDS.has(key)) return null;
+        }
+        const rawStatus = parsed.status;
+        if (typeof rawStatus !== 'string') return null;
+        // Canonical schema requires lowercase status. Uppercase/mixed-case
+        // returns null so the classifier flags NON_LOWERCASE_STATUS_ENUM.
+        if (rawStatus !== rawStatus.toLowerCase()) return null;
+        const status = rawStatus;
+        if (!['clean', 'dirty'].includes(status)) return null;
+        let count;
+        let findingIds = [];
+        if (Array.isArray(parsed.findings)) {
+          for (const finding of parsed.findings) {
+            if (!finding || typeof finding !== 'object' || Array.isArray(finding)) {
+              return null;
+            }
+            if (
+              finding.severity !== undefined &&
+              (typeof finding.severity !== 'string' ||
+                !CANONICAL_VALID_SEVERITY_LOWERCASE.has(finding.severity))
+            ) {
+              return null;
+            }
+            if (
+              finding.confidence !== undefined &&
+              (typeof finding.confidence !== 'string' ||
+                !CANONICAL_VALID_CONFIDENCE_LOWERCASE.has(finding.confidence))
+            ) {
+              return null;
+            }
+          }
+          if (
+            typeof parsed.findings_count === 'number' &&
+            parsed.findings_count !== parsed.findings.length
+          ) {
+            return null;
+          }
+          findingIds = parsed.findings
+            .map(f => (f && (f.id || f.finding_id)) || null)
+            .filter(Boolean);
+          count = parsed.findings.length;
+        } else if (typeof parsed.findings_count === 'number') {
+          count = parsed.findings_count;
+        } else {
+          count = status === 'clean' ? 0 : 1;
+        }
+        return { status, count, findingIds };
+      }
+    } catch {
+      // Fall through to YAML parsing
+    }
+  }
+
   const lines = body.split('\n');
 
   // Parse status (required).
@@ -488,6 +571,199 @@ function tryPath0StructuredBlock(text) {
     finding_count: parsed.count,
     finding_ids: parsed.findingIds.length > 0 ? parsed.findingIds : null,
   };
+}
+
+// =============================================================================
+// Parse-failure reason classification.
+// =============================================================================
+
+/**
+ * Canonical parse-failure reason enum (AC-004.3).
+ * Exported for test consumption and shared with session.log sources[].parse_failed_reason.
+ */
+export const PARSE_FAILURE_REASONS = Object.freeze({
+  MISSING_FENCE: 'missing_fence',
+  MALFORMED_JSON: 'malformed_json',
+  UNKNOWN_TOP_LEVEL_FIELD: 'unknown_top_level_field',
+  NON_LOWERCASE_STATUS_ENUM: 'non_lowercase_status_enum',
+  NON_LOWERCASE_SEVERITY_CONFIDENCE_ENUM: 'non_lowercase_severity_confidence_enum',
+  FINDINGS_COUNT_MISMATCH: 'findings_count_mismatch',
+  REQUIRED_FIELD_MISSING: 'required_field_missing',
+});
+
+const CANONICAL_ALLOWED_TOP_LEVEL_FIELDS = new Set([
+  'status', 'findings_count', 'findings', 'pass', 'gate',
+]);
+const CANONICAL_VALID_STATUS_LOWERCASE = new Set(['clean', 'dirty']);
+const CANONICAL_VALID_SEVERITY_LOWERCASE = new Set(['critical', 'high', 'medium', 'low']);
+const CANONICAL_VALID_CONFIDENCE_LOWERCASE = new Set(['high', 'medium', 'low']);
+
+/**
+ * Classify why a `convergence-result` block failed canonical schema validation.
+ *
+ * Inspects `text` and returns one of PARSE_FAILURE_REASONS. Called only when
+ * the happy-path extractor already determined a parse failure occurred.
+ *
+ * Classification order (first match wins):
+ *   1. MISSING_FENCE — no ```convergence-result fence at all
+ *   2. MALFORMED_JSON — block body fails JSON.parse AND fails YAML-style key/value read
+ *   3. UNKNOWN_TOP_LEVEL_FIELD — JSON parses but contains field outside whitelist
+ *   4. NON_LOWERCASE_STATUS_ENUM — status present but not lowercase clean/dirty
+ *   5. NON_LOWERCASE_SEVERITY_CONFIDENCE_ENUM — finding severity/confidence not lowercase
+ *   6. FINDINGS_COUNT_MISMATCH — findings_count != findings.length when both present
+ *   7. REQUIRED_FIELD_MISSING — status field missing entirely
+ *
+ * Returns: string (one of PARSE_FAILURE_REASONS values) or null if unclassifiable.
+ * Exported for test consumption.
+ */
+export function classifyParseFailureReason(text) {
+  if (!text || typeof text !== 'string') {
+    return PARSE_FAILURE_REASONS.MISSING_FENCE;
+  }
+  if (!text.includes('```' + STRUCTURED_BLOCK_LANG)) {
+    return PARSE_FAILURE_REASONS.MISSING_FENCE;
+  }
+  const blockRegex = new RegExp(
+    '```' + STRUCTURED_BLOCK_LANG + '[^\\n]*\\n([\\s\\S]*?)\\n```',
+    'g'
+  );
+  const matches = [];
+  for (const m of text.matchAll(blockRegex)) {
+    matches.push(m[1]);
+  }
+  if (matches.length === 0) {
+    return PARSE_FAILURE_REASONS.MISSING_FENCE;
+  }
+  // Last-block-wins per parser semantics.
+  const body = matches[matches.length - 1];
+
+  // Try JSON parse first (canonical schema form).
+  const trimmed = body.trim();
+  // Anything that opens with `{` is classified as intended-JSON: if parse
+  // fails OR the close brace is missing, report MALFORMED_JSON rather than
+  // falling through to YAML key scanning (which would misreport as
+  // REQUIRED_FIELD_MISSING when `status:` isn't found in the broken JSON).
+  const looksLikeJson = trimmed.startsWith('{');
+  const looksLikeCompleteJson = looksLikeJson && trimmed.endsWith('}');
+  if (looksLikeJson && !looksLikeCompleteJson) {
+    return PARSE_FAILURE_REASONS.MALFORMED_JSON;
+  }
+  if (looksLikeCompleteJson) {
+    let parsed;
+    try {
+      parsed = JSON.parse(trimmed);
+    } catch {
+      return PARSE_FAILURE_REASONS.MALFORMED_JSON;
+    }
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      return PARSE_FAILURE_REASONS.MALFORMED_JSON;
+    }
+    // Unknown top-level fields
+    for (const key of Object.keys(parsed)) {
+      if (!CANONICAL_ALLOWED_TOP_LEVEL_FIELDS.has(key)) {
+        return PARSE_FAILURE_REASONS.UNKNOWN_TOP_LEVEL_FIELD;
+      }
+    }
+    // Required field: status
+    if (parsed.status === undefined) {
+      return PARSE_FAILURE_REASONS.REQUIRED_FIELD_MISSING;
+    }
+    // Non-lowercase status enum
+    if (
+      typeof parsed.status !== 'string' ||
+      !CANONICAL_VALID_STATUS_LOWERCASE.has(parsed.status)
+    ) {
+      return PARSE_FAILURE_REASONS.NON_LOWERCASE_STATUS_ENUM;
+    }
+    // Non-lowercase severity/confidence in findings
+    if (Array.isArray(parsed.findings)) {
+      for (const f of parsed.findings) {
+        if (f && typeof f === 'object') {
+          if (
+            f.severity !== undefined &&
+            (typeof f.severity !== 'string' ||
+              !CANONICAL_VALID_SEVERITY_LOWERCASE.has(f.severity))
+          ) {
+            return PARSE_FAILURE_REASONS.NON_LOWERCASE_SEVERITY_CONFIDENCE_ENUM;
+          }
+          if (
+            f.confidence !== undefined &&
+            (typeof f.confidence !== 'string' ||
+              !CANONICAL_VALID_CONFIDENCE_LOWERCASE.has(f.confidence))
+          ) {
+            return PARSE_FAILURE_REASONS.NON_LOWERCASE_SEVERITY_CONFIDENCE_ENUM;
+          }
+        }
+      }
+      // findings_count mismatch
+      if (
+        typeof parsed.findings_count === 'number' &&
+        parsed.findings_count !== parsed.findings.length
+      ) {
+        return PARSE_FAILURE_REASONS.FINDINGS_COUNT_MISMATCH;
+      }
+    }
+    // JSON parsed successfully against schema — but happy-path parser still
+    // failed. Most likely cause: the YAML-style parser (current implementation)
+    // does not accept JSON form. Classify as malformed against current parser.
+    return PARSE_FAILURE_REASONS.MALFORMED_JSON;
+  }
+
+  // Non-JSON body (YAML-style). Mirror the happy-path parser's failure modes.
+  const lines = body.split('\n');
+  let sawStatus = false;
+  let statusRaw = null;
+  let explicitCount = null;
+  const findingIds = [];
+  let inFindingsList = false;
+  for (const rawLine of lines) {
+    const line = rawLine.replace(/\r$/, '');
+    if (inFindingsList) {
+      const listItemMatch = line.match(/^\s*-\s+(\S.*?)\s*$/);
+      if (listItemMatch) {
+        findingIds.push(listItemMatch[1]);
+        continue;
+      }
+      if (line.trim() !== '') {
+        inFindingsList = false;
+      } else {
+        continue;
+      }
+    }
+    const keyMatch = line.match(/^\s*([A-Za-z_][A-Za-z0-9_]*)\s*:\s*(.*?)\s*$/);
+    if (!keyMatch) continue;
+    const key = keyMatch[1].toLowerCase();
+    const value = keyMatch[2];
+    if (key === 'status') {
+      sawStatus = true;
+      statusRaw = value.trim();
+    } else if (key === 'findings_count') {
+      const n = Number.parseInt(value.trim(), 10);
+      if (Number.isFinite(n) && n >= 0 && String(n) === value.trim()) {
+        explicitCount = n;
+      } else {
+        return PARSE_FAILURE_REASONS.MALFORMED_JSON;
+      }
+    } else if (key === 'findings') {
+      inFindingsList = true;
+    }
+  }
+  if (!sawStatus) {
+    return PARSE_FAILURE_REASONS.REQUIRED_FIELD_MISSING;
+  }
+  // Status must be lowercase per canonical schema.
+  if (statusRaw !== statusRaw.toLowerCase()) {
+    return PARSE_FAILURE_REASONS.NON_LOWERCASE_STATUS_ENUM;
+  }
+  if (!CANONICAL_VALID_STATUS_LOWERCASE.has(statusRaw.toLowerCase())) {
+    return PARSE_FAILURE_REASONS.NON_LOWERCASE_STATUS_ENUM;
+  }
+  // If explicit count + findings list both present and disagree, that's a mismatch.
+  if (explicitCount !== null && findingIds.length > 0 && explicitCount !== findingIds.length) {
+    return PARSE_FAILURE_REASONS.FINDINGS_COUNT_MISMATCH;
+  }
+  // Fallback — parser should have accepted; if it didn't, treat as malformed.
+  return PARSE_FAILURE_REASONS.MALFORMED_JSON;
 }
 
 // =============================================================================
@@ -1008,6 +1284,41 @@ function readCircuitBreakerState(gateName) {
 }
 
 /**
+ * Idempotency guard: check whether the most recent evidence record for the
+ * given (gate, agent_id) tuple matches the candidate findings_hash AND was
+ * written within the IDEMPOTENCY_WINDOW_MS window.
+ *
+ * Returns true when the caller should SUPPRESS the new record (duplicate).
+ *
+ * Semantics:
+ *   - If session.json is unreadable or has no evidence for the gate, returns
+ *     false (fail-open -- do NOT suppress).
+ *   - If agent_id is missing on either side, the tuple does not match and
+ *     suppression is not applied.
+ *   - findings_hash equality is strict (both values must be exactly equal).
+ *     This includes the null === null case, which matches duplicate
+ *     parse_failed records whose hash is always null.
+ */
+function isDuplicateRecentRecord(gateName, agentId, candidateHash) {
+  if (!existsSync(SESSION_JSON_PATH)) return false;
+  try {
+    const session = JSON.parse(readFileSync(SESSION_JSON_PATH, 'utf8'));
+    const passes = session?.convergence_evidence?.[gateName]?.passes;
+    if (!Array.isArray(passes) || passes.length === 0) return false;
+    const last = passes[passes.length - 1];
+    if (!last || !last.agent_id || !agentId) return false;
+    if (last.agent_id !== agentId) return false;
+    if (last.findings_hash !== candidateHash) return false;
+    const lastTime = Date.parse(last.timestamp);
+    if (!Number.isFinite(lastTime)) return false;
+    const nowMs = Date.now();
+    return (nowMs - lastTime) <= IDEMPOTENCY_WINDOW_MS;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Invoke the update-circuit-breaker CLI op via subprocess (origin-insensitive
  * state per design notes). Spawning a subprocess for circuit-breaker state
  * updates is acceptable; only `source='hook'` writes require module import.
@@ -1048,15 +1359,28 @@ export async function extractAndRecord(opts) {
   const result = classify(responseText, gateName);
 
   if (result.source === 'hook') {
+    const findingsHash = result.finding_ids
+      ? computeFindingsHash(result.finding_ids)
+      : (result.finding_count === 0 ? computeFindingsHash([]) : null);
+
+    // Idempotency guard: suppress duplicate (gate, agent_id, findings_hash)
+    // records within IDEMPOTENCY_WINDOW_MS. See isDuplicateRecentRecord().
+    if (isDuplicateRecentRecord(gateName, agentId, findingsHash)) {
+      process.stderr.write(
+        `[convergence-pass-recorder] IDEMPOTENCY_SKIP: gate=${gateName} ` +
+        `agent_id=${agentId} findings_hash=${findingsHash} ` +
+        `-- duplicate within ${IDEMPOTENCY_WINDOW_MS}ms window\n`
+      );
+      return;
+    }
+
     // Paths 1/2/3/4 hit -- module-import recordPass (AC-9)
     await recordPass({
       source: 'hook',
       gate: gateName,
       clean: result.clean,
       findingCount: result.finding_count,
-      findingsHash: result.finding_ids
-        ? computeFindingsHash(result.finding_ids)
-        : (result.finding_count === 0 ? computeFindingsHash([]) : null),
+      findingsHash,
       agentType,
       agentId,
     });
@@ -1064,8 +1388,61 @@ export async function extractAndRecord(opts) {
   }
 
   // result.source === 'parse_failed': diagnostic log + circuit-breaker logic
+
+  // Short-message early-return: SubagentStop fires twice per agent. The first
+  // fire carries a partial/interim `last_assistant_message` too short to hold
+  // a fenced `convergence-result` block; the second carries the final message.
+  // Absent this guard, the first fire records a spurious parse_failed entry
+  // that breaks the countConsecutiveCleanFromTail() streak walker in
+  // session-checkpoint.mjs (L2582 family) -- every clean pass is invalidated
+  // by the parse_failed record that precedes it, so `clean_pass_count` sticks
+  // at 1 forever.
+  //
+  // Scope: applied only on the parse_failed branch so short natural-language
+  // messages that successfully classify via paths 1-5 (e.g. the 60-byte
+  // "Findings by severity: Critical 2 / High 1 / Medium 0 / Low 0") still
+  // record normally. A message that reached the parse_failed branch and is
+  // below MIN_VALID_RESPONSE_LENGTH bytes is structurally incapable of holding
+  // a valid fenced block (which real agent responses exceed by a wide margin
+  // in practice), so suppression is safe.
+  if (responseText.length < MIN_VALID_RESPONSE_LENGTH) {
+    process.stderr.write(
+      `[convergence-pass-recorder] SHORT_MESSAGE_SKIP: gate=${gateName} ` +
+      `agent_type=${agentType} length=${responseText.length} ` +
+      `min=${MIN_VALID_RESPONSE_LENGTH} -- treating as double-fire partial\n`
+    );
+    return;
+  }
+
+  // Idempotency guard: suppress duplicate parse_failed records (findings_hash
+  // is always null for this source) within IDEMPOTENCY_WINDOW_MS.
+  if (isDuplicateRecentRecord(gateName, agentId, null)) {
+    process.stderr.write(
+      `[convergence-pass-recorder] IDEMPOTENCY_SKIP: gate=${gateName} ` +
+      `agent_id=${agentId} source=parse_failed ` +
+      `-- duplicate within ${IDEMPOTENCY_WINDOW_MS}ms window\n`
+    );
+    return;
+  }
+
   const cbState = readCircuitBreakerState(gateName);
   const inDegradedMode = cbState?.degraded_mode === true;
+
+  // Classify the parse-failure reason so operators can distinguish output-shape failures.
+  // reason so operators can distinguish (a) missing fence, (b) malformed JSON,
+  // (c) unknown field, (d) non-lowercase status, (e) non-lowercase
+  // severity/confidence, (f) findings_count mismatch, (g) required field missing.
+  const parseFailedReason = classifyParseFailureReason(responseText);
+
+  // Structured log line naming the reason (stderr; additive to existing
+  // diagnostic session.log entry). Two key=value forms emitted so downstream
+  // log scrapers can parse either the legacy `reason=<name>` or the canonical
+  // `parse_failed_reason=<name>` token.
+  process.stderr.write(
+    `[convergence-pass-recorder] PARSE_FAILED_REASON ` +
+    `gate=${gateName} agent_type=${agentType} ` +
+    `parse_failed_reason=${parseFailedReason} reason=${parseFailedReason}\n`
+  );
 
   // Build diagnostic entry once (used for both paths)
   const entry = buildDiagnosticEntry({
@@ -1076,6 +1453,12 @@ export async function extractAndRecord(opts) {
     normalizedLength: result.normalized_length,
     structuredBlockTried: result.structured_block_tried === true,
   });
+  // Additive field: surface the classification reason in the diagnostic entry
+  // so operators reading session.log can pinpoint the cause without re-running
+  // the classifier.
+  if (parseFailedReason) {
+    entry.parse_failed_reason = parseFailedReason;
+  }
 
   if (inDegradedMode) {
     // Degraded mode: stderr-only, skip session.log write entirely, record parse_failed
@@ -1090,6 +1473,7 @@ export async function extractAndRecord(opts) {
       findingCount: null,
       agentType,
       agentId,
+      meta: { parse_failed_reason: parseFailedReason },
     });
     return;
   }
@@ -1110,6 +1494,7 @@ export async function extractAndRecord(opts) {
       findingCount: null,
       agentType,
       agentId,
+      meta: { parse_failed_reason: parseFailedReason },
     });
   } catch (logErr) {
     // EC-7 fail-closed: emit stderr, record manual_fallback, bump circuit breaker
@@ -1127,13 +1512,77 @@ export async function extractAndRecord(opts) {
 }
 
 // =============================================================================
+// 4-tier agent-type extractor (ws-hook-firing as-001)
+// =============================================================================
+
+/**
+ * Resolve `agent_type` from a SubagentStop payload via a 4-tier fallback chain.
+ *
+ * Rationale (sg-workflow-convergence-bugs / ws-hook-firing / as-001):
+ * Real Claude Code SubagentStop payloads do NOT always carry `agent_type` at
+ * the top level. Historic/alternate envelopes place the subagent identity at
+ * one of four locations:
+ *
+ *   Tier 1: input.agent_type                      (documented canonical field)
+ *   Tier 2: input.subagent_type                   (alternate envelope key; used
+ *                                                  by sibling dispatch-record-hook.mjs
+ *                                                  as a fallback since chk-boundary-d7e8f102)
+ *   Tier 3: input.tool_input.subagent_type        (PreToolUse-style envelope)
+ *   Tier 4: input.hookSpecificOutput.subagent_type (alternate hook-specific envelope)
+ *
+ * First tier to yield a non-empty trimmed string wins (first-match semantics,
+ * matching the extraction-pipeline idiom elsewhere in this module).
+ *
+ * Contract (ws-hook-firing parent §Interfaces & Contracts):
+ *   - Returns string | null. null means "no tier resolved".
+ *   - MUST NOT mutate input.
+ *   - MUST NOT throw; always safe to call.
+ *   - parse_failed semantics live at the caller: if this returns null, the
+ *     caller records source='parse_failed' (NEVER 'hook' / 'manual_fallback').
+ *
+ * @param {unknown} input SubagentStop payload (already parsed JSON).
+ * @returns {string|null} Resolved agent_type or null if no tier resolved.
+ */
+export function extractAgentType(input) {
+  if (!input || typeof input !== 'object') return null;
+
+  // Tier 1: input.agent_type (canonical per convergence-pass-recorder docs)
+  const tier1 = input.agent_type;
+  if (typeof tier1 === 'string' && tier1.trim() !== '') return tier1.trim();
+
+  // Tier 2: input.subagent_type (alternate documented key)
+  const tier2 = input.subagent_type;
+  if (typeof tier2 === 'string' && tier2.trim() !== '') return tier2.trim();
+
+  // Tier 3: input.tool_input.subagent_type (PreToolUse-style nested envelope)
+  const toolInput = input.tool_input;
+  if (toolInput && typeof toolInput === 'object') {
+    const tier3 = toolInput.subagent_type;
+    if (typeof tier3 === 'string' && tier3.trim() !== '') return tier3.trim();
+  }
+
+  // Tier 4: input.hookSpecificOutput.subagent_type (hook-specific envelope)
+  const hso = input.hookSpecificOutput;
+  if (hso && typeof hso === 'object') {
+    const tier4 = hso.subagent_type;
+    if (typeof tier4 === 'string' && tier4.trim() !== '') return tier4.trim();
+  }
+
+  return null;
+}
+
+// =============================================================================
 // Hook envelope handler
 // =============================================================================
 
 async function processSubagentStop(input) {
-  const agentType = input.agent_type;
-  if (!agentType || typeof agentType !== 'string' || agentType.trim() === '') {
-    if (agentType !== undefined) {
+  // as-001: 4-tier extractor (widened from single-tier input.agent_type check).
+  // First-match-wins; null => no tier resolved => unknown payload shape.
+  const agentType = extractAgentType(input);
+  if (agentType === null) {
+    // No tier resolved. Only warn if the payload was non-empty (avoid noise on
+    // truly empty envelopes or non-SubagentStop events that share the hook path).
+    if (input && typeof input === 'object' && Object.keys(input).length > 0) {
       process.stderr.write(
         `[convergence-pass-recorder] WARNING: agent_type is empty or invalid -- ignoring event\n`
       );

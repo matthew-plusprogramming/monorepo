@@ -7,6 +7,13 @@ user-invocable: true
 
 # E2E Test Skill
 
+## Required Context
+
+Before beginning work, read these files for project-specific guidelines:
+
+- `.claude/memory-bank/testing.guidelines.md`
+- `.claude/memory-bank/best-practices/contract-first.md`
+
 ## Purpose
 
 Generate end-to-end tests that exercise the real deployed system through its external surfaces. Tests are derived from spec contracts only -- never from implementation code.

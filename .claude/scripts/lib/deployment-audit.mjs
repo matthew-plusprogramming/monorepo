@@ -8,7 +8,6 @@
  * Genesis entry has prev_hash: null. Subsequent entries chain to prior.
  *
  * Implements: AC-14.7, AC-14.8
- * Spec: sg-deployment-verification-gaps
  */
 
 import { existsSync, readFileSync, appendFileSync, mkdirSync } from 'node:fs';

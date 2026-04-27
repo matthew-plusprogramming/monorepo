@@ -1,3 +1,7 @@
+---
+_source_modules: ['validation-scripts']
+---
+
 # Sync System
 
 How metaclaude-assistant artifacts are synced to consumer projects.
@@ -123,8 +127,8 @@ minimal -> core-workflow -> full-workflow -> orchestrator
 
 **full-workflow** -- Extends core-workflow. Adds all review agents and remaining skills. **This is the default bundle for all projects** (set in `projects.json` defaults).
 
-- Agents: explore, spec-author, code-reviewer, security-reviewer, documenter, browser-tester, interface-investigator, facilitator, refactorer, prd-writer, prd-critic, prd-reader, prd-amender
-- Skills: route, spec, code-review, security, docs, browser-test, investigate, prd, orchestrate, refactor
+- Agents: explore, spec-author, code-reviewer, security-reviewer, documenter, manual-tester, interface-investigator, facilitator, refactorer, prd-writer, prd-critic, prd-reader, prd-amender
+- Skills: route, spec, code-review, security, docs, manual-test, investigate, prd, orchestrate, refactor
 - Templates: prd, spec-group-summary, qa-checklist, integration-testing, git-issue, fix-report, investigation-report, decision-record, agent
 
 **orchestrator** -- Extends full-workflow. Adds multi-workstream orchestration.
@@ -140,20 +144,12 @@ A bundle includes all artifacts from its parent. You do NOT need to repeat paren
 
 **If an artifact exists in the registry but is NOT listed in any bundle's `includes` array, it will NOT be synced to any project.**
 
-This is the single most common source of sync bugs. The registry and bundles are separate concerns:
+Registry and bundles are separate concerns:
 
 - **Registry** = "this artifact exists and here is its metadata"
 - **Bundle includes** = "this artifact should be synced to projects using this bundle"
 
-Both are required. Adding an artifact to the registry without adding it to a bundle means it will sit in metaclaude-assistant and never reach consumer projects.
-
-**Past bugs caused by this:**
-
-- The `facilitator` and `refactorer` agents were in the registry but missing from the `full-workflow` bundle includes, so they never synced to consumer projects despite being registered.
-- Convergence-related scripts were registered but not added to any bundle, silently missing from all targets.
-- `scripts/spec-utils` (a shared library imported by `spec-validate.mjs`) was missing from the registry entirely -- consumers crashed with `ERR_MODULE_NOT_FOUND` at runtime. This class of "half-wired artifact" is now caught by the preventive gates (see Sync Validation Gates below).
-
-The fix is always the same: add the artifact's path (`category/name`) to the appropriate bundle's `includes` array.
+Both are required. The fix for a registered-but-unsynced artifact is always to add its `category/name` to the correct bundle `includes` array. Import/bundle gaps are also caught by the validation gates below.
 
 ### Per-Project Overrides
 
@@ -243,53 +239,14 @@ diff .claude/agents/my-agent.md ../target-project/.claude/agents/my-agent.md
 
 ## Common Pitfalls
 
-### Artifact in registry but not in bundle
-
-**Symptom**: Artifact exists in metaclaude-assistant, is in the registry, but never appears in consumer projects.
-
-**Cause**: Missing from the bundle's `includes` array.
-
-**Fix**: Add `"category/name"` to the appropriate bundle. This has caused bugs with facilitator, refactorer, and convergence scripts.
-
-### Bundle inheritance confusion
-
-**Symptom**: Artifact added to `minimal` bundle but someone also adds it to `full-workflow`.
-
-**Cause**: Misunderstanding that `full-workflow` extends `core-workflow` extends `minimal`.
-
-**Fix**: Only add to the lowest bundle level where the artifact belongs. Child bundles automatically include parent artifacts. Duplicating entries is harmless but creates maintenance confusion.
-
-### Local modifications overwritten
-
-**Symptom**: Consumer project had local changes to a synced file, sync overwrites them.
-
-**Cause**: `--force` flag was used, or the file was not in the `protected` list.
-
-**Fix**: Add the file to the project's `protected` array in `projects.json`, or avoid `--force`. Without `--force`, the CLI detects local modifications and reports conflicts instead of overwriting.
-
-### Hash mismatch after editing
-
-**Symptom**: `compute-hashes.mjs --verify` fails after editing an artifact.
-
-**Cause**: The file content changed but the registry hash was not updated.
-
-**Fix**: Run `node .claude/scripts/compute-hashes.mjs --update` after any artifact edit.
-
-### settings.json merge surprises
-
-**Symptom**: Hooks appear duplicated or project-specific hooks disappear.
-
-**Cause**: Misunderstanding the merge strategy (see section below).
-
-**Fix**: Ensure project-specific hooks do NOT have `"_source": "metaclaude"`. Only metaclaude-managed hooks should have this field.
-
-### `ERR_MODULE_NOT_FOUND` on consumer after sync
-
-**Symptom**: Running a synced `.mjs` script on a consumer throws `ERR_MODULE_NOT_FOUND` for a relative import.
-
-**Cause**: The script imports a shared library (e.g., `./lib/helper.mjs`) that exists in metaclaude-assistant but was never added to the registry. The script ships, the helper does not, and the consumer crashes at runtime.
-
-**Fix**: Register the helper in `metaclaude-registry.json`, add it to a bundle with the same-or-lower tier as the importer, and re-sync. To prevent this from happening again, the import-graph gate at `compute-hashes --update` now hard-blocks this class of drift at the author.
+| Symptom | Cause | Fix |
+| --- | --- | --- |
+| Registered artifact never appears in consumers | Missing from bundle `includes` | Add `category/name` to the lowest correct bundle. |
+| Duplicate bundle entries | Parent/child inheritance confusion | Keep the artifact at the lowest bundle level that needs it. |
+| Local consumer edits overwritten | `--force` or missing `protected` entry | Avoid `--force` or add the path to `projects.json` `protected`. |
+| `compute-hashes --verify` mismatch | Artifact changed without registry hash refresh | Run `node .claude/scripts/compute-hashes.mjs --update`. |
+| settings hooks duplicated or disappear | `_source` ownership misunderstood | Only metaclaude-managed hooks carry `"_source": "metaclaude"`. |
+| Consumer `ERR_MODULE_NOT_FOUND` | Synced script imports an unregistered helper | Register helper, place it in same-or-lower bundle tier, re-sync. |
 
 ---
 
@@ -316,14 +273,7 @@ The `config/settings` artifact uses `merge_strategy: "settings-merge"` instead o
 
 ### How It Works
 
-1. **If no existing settings.json** in the target: copy source directly.
-2. **If existing settings.json** in the target:
-   - Parse both source and target as JSON
-   - For each hook type (PostToolUse, Stop, etc.) and matcher group:
-     - **Remove** hooks with `"_source": "metaclaude"` from the target
-     - **Add** all hooks from the source (which all have `"_source": "metaclaude"`)
-     - **Preserve** project-specific hooks (those without `_source` field)
-   - Also preserve entire hook groups that exist only in the target (project-specific matchers)
+If the target has no settings file, sync copies the source. Otherwise it parses both JSON files, removes target hooks with `"_source": "metaclaude"`, adds current source hooks, and preserves project-specific hooks/groups that lack `_source`.
 
 ### The `_source` Field
 
@@ -332,36 +282,7 @@ The `_source: "metaclaude"` field on hooks is the key to the merge strategy:
 - **metaclaude hooks** (`_source: "metaclaude"`) -- Managed by sync. Replaced on every sync with the latest version from metaclaude-assistant.
 - **Project hooks** (no `_source` field) -- Owned by the consumer project. Never touched by sync.
 
-### Example
-
-Target project has a custom hook for database migrations:
-
-```json
-{
-  "hooks": {
-    "PostToolUse": [
-      {
-        "matcher": "*.sql",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "sqlfluff lint $file",
-            "_source": "metaclaude"
-          },
-          { "type": "command", "command": "run-migration-check $file" }
-        ]
-      }
-    ]
-  }
-}
-```
-
-After sync:
-
-- The `sqlfluff lint` hook (metaclaude) gets replaced with whatever the current metaclaude version is
-- The `run-migration-check` hook (project-specific, no `_source`) is preserved untouched
-
-For full hook documentation, see `.claude/docs/HOOKS.md`.
+For live hook placement, see `.claude/docs/HOOKS.md`.
 
 ---
 
@@ -392,33 +313,21 @@ Lock files at `.claude/locks/<project>.lock.json` track what was installed in ea
 - **During sync**: The CLI compares the lock hash against the registry hash and the local file hash. If the registry has a newer hash, the artifact is synced. If the local file hash differs from the lock hash (local modification), sync reports a conflict unless `--force` is used.
 - **During status**: Shows which artifacts are current, have updates available, are missing, or have been locally modified.
 - **During verify**: Confirms every locked artifact still exists and matches its recorded hash in the target project.
-- **Pruning**: When an artifact is removed from a bundle, the next sync removes it from the lock file.
+- **Deletion detection**: When a locked artifact is no longer targeted by the resolved bundle/additional/excluded set, `status` reports it as deletion pending and the next sync deletes the consumer copy, then removes it from the lock file. Protected files are not deleted automatically.
 
 ### The `--force` Flag
 
-`--force` overrides conflict detection. Use it when:
-
-- You intentionally want to overwrite local modifications
-- You are doing a clean re-sync of all artifacts
-- A previous sync was interrupted and left inconsistent state
-
-Without `--force`, locally modified files are reported as conflicts and skipped.
+`--force` overwrites local modifications and is appropriate for intentional clean re-syncs or interrupted sync recovery. Without it, locally modified files are reported as conflicts and skipped.
 
 ### The `--resolve-conflicts` Flag
 
-`--resolve-conflicts` accepts upstream versions for conflicting artifacts only. It has the same effect as `--force` for artifacts that have local modifications, but leaves non-conflicting artifacts untouched. This provides clearer intent than `--force` when you specifically want to accept upstream changes for known conflicts rather than doing a blanket overwrite.
+`--resolve-conflicts` accepts upstream versions for conflicting artifacts only and leaves non-conflicting artifacts untouched.
 
 ```bash
 node .claude/scripts/metaclaude-cli.mjs sync <project> --resolve-conflicts
 ```
 
-The output includes a resolved count showing how many conflicting artifacts were updated:
-
-```
-Synced: 3 updated, 2 resolved, 0 skipped
-```
-
-Use `--resolve-conflicts` instead of `--force` when you have reviewed the conflicts (via `status`) and decided to accept upstream versions. Use `--force` when you want a clean slate regardless of local state.
+Use `--resolve-conflicts` after reviewing `status`; use `--force` for a clean slate regardless of local state.
 
 ---
 
@@ -536,10 +445,10 @@ Every violation is a JSON line with this shape:
 
 At the author, these are written to stderr and the process exits non-zero. At the consumer, the same JSON is prefixed with `WARNING:` and the sync continues.
 
-### Performance Budgets
+### Runtime Notes
 
-- **Orphan detector**: ≤ 2 seconds wall-clock. Pure `fs.readdirSync` walk, no child processes.
-- **Import-graph validator**: ≤ 5 seconds wall-clock. Serial `acorn` AST parse of ~150 registered `.mjs` files. No worker pool, no AST cache. If the budget is exceeded on a larger repo, add a worker pool before adding caching.
+- **Orphan detector**: pure `fs.readdirSync` walk, no child processes.
+- **Import-graph validator**: serial `acorn` AST parse over registered `.mjs` files; add a worker pool before adding caching if repo size makes this slow.
 
 `--verbose` prints per-phase wall-clock to stderr.
 
@@ -563,12 +472,7 @@ node .claude/scripts/compute-hashes.mjs --update --skip-gates="refactor: moving 
 
 `compute-hashes --update` never leaves the registry in a half-written state:
 
-1. Parse `--skip-gates` flag if present, validate reason.
-2. Read registry, validate via Zod.
-3. Run orphan detector, import-graph validator, cross-bundle closure check.
-4. If any gate fails (and `--skip-gates` is not set), write findings to stderr and **exit without touching the registry** (file mtime unchanged).
-5. Otherwise, write to `.claude/metaclaude-registry.json.<pid>.tmp` then `rename()` atomically.
-6. Clean up any `.tmp` siblings older than 1 hour at script start.
+The command validates flags, registry shape, orphan/import/bundle gates, and either exits without touching the registry or writes `.claude/metaclaude-registry.json.<pid>.tmp` and atomically renames it. Stale registry temp siblings older than 1 hour are cleaned at startup.
 
 ### Sync-Time Drift Warning
 
@@ -595,16 +499,9 @@ Naive `target.startsWith(claudeRoot)` without the trailing separator is prohibit
 
 ---
 
-## Legacy Orphans Backlog
+## Legacy Orphan Support
 
-During the M1 migration (spec group `sg-sync-registry-gaps`), the `orphans[]` array was migrated from legacy `string[]` form to object form `{path, reason, added_by, added_date}`. Entries that existed before the migration were backfilled with `reason: "legacy"` because their original rationale was not recorded.
-
-Legacy entries are tracked in `.claude/audit/legacy-orphans-backlog.md` with a deadline of **2026-09-30**. Before that date, each legacy entry must be either:
-
-- **Resolved**: file is archived, deleted, or registered with a real rationale string (≥ 20 chars)
-- **Acknowledged**: entry's `reason` is rewritten with a real rationale and `added_by`/`added_date` are updated
-
-After 2026-09-30, `compute-hashes --update` emits a non-blocking WARNING for every remaining `reason: "legacy"` entry. See `.claude/audit/legacy-orphans-backlog.md` for the current list.
+The registry still accepts historical `orphans[]` entries with `reason: "legacy"` so old fixtures and consumers remain parseable. The source registry no longer relies on legacy reasons; `.claude/audit/legacy-orphans-backlog.md` records the resolved migration.
 
 ---
 
@@ -616,23 +513,21 @@ A composite Husky v9 pre-commit hook at `.husky/pre-commit` runs before every co
 2. **`skip-gates-append-only-check.mjs`** -- Rejects any diff that modifies an existing line in `.claude/audit/skip-gates.jsonl`. Appends are permitted. Intentional rotation (archiving the full file) is detected via an archive-detection exception.
 3. **`import-graph-validator.mjs`** (invoked via `compute-hashes`) -- Runs the three sync validation gates.
 
-If step 1 fails, steps 2 and 3 do not run. The hook exits with the first failing step's exit code.
-
-Husky v9 uses a simplified hook format -- hooks are plain shell scripts with a shebang. The legacy `. "$(dirname -- "$0")/_/husky.sh"` loader is not used.
+The hook exits with the first failing step's exit code. Husky v9 hooks are plain shell scripts with a shebang; the legacy loader is not used.
 
 ### Bypassing the hook
 
-The client-side pre-commit hook can be bypassed via `git commit --no-verify`. This is accepted under the sole-developer trust model. Future hardening (CI-enforced append-only check, signed commits, CODEOWNERS, branch protection) is documented in `org-context.md` under "Multi-developer hardening" and activates when a second committer joins, external consumers appear, or the project acquires remote CI.
+The client-side hook can be bypassed with `git commit --no-verify`. This is accepted under the sole-developer trust model; multi-developer hardening is documented in `org-context.md`.
 
 ### Bootstrap on fresh clone
 
-Husky installs via the `prepare` script in `package.json`. On a fresh clone:
+Husky installs via the `prepare` script in `package.json`:
 
 ```bash
 npm install               # Runs `prepare: husky` and installs hooks
 ```
 
-If you need to install dependencies without running the prepare script (e.g., CI builds that do not commit):
+To install dependencies without running `prepare`:
 
 ```bash
 npm install --ignore-scripts
@@ -640,13 +535,13 @@ npm install --ignore-scripts
 
 ### Rollback
 
-If the sync validation gates produce unexpected false positives, roll back by reverting the `.husky/pre-commit` file (or flipping `GATE_MODE = 'block'` back to `'warn'` in `compute-hashes.mjs`) and committing. The gates themselves are not hot-pluggable -- rollback requires a source edit, visible in review.
+If gates produce unexpected false positives, revert `.husky/pre-commit` or switch `GATE_MODE` in `compute-hashes.mjs` and commit the visible source change.
 
 ---
 
 ## See Also
 
 - `.claude/docs/SYNC-SYSTEM-INTERNALS.md` -- Developer reference for the validation pipeline, Zod schemas, trust root, and extension points
-- `.claude/docs/HOOKS.md` -- Full documentation of the validation hooks system
-- `.claude/audit/legacy-orphans-backlog.md` -- Current legacy orphan entries with remediation deadline
+- `.claude/docs/HOOKS.md` -- Live hook inventory and hook placement reference
+- `.claude/audit/legacy-orphans-backlog.md` -- Resolved legacy orphan migration record
 - `.claude/memory-bank/org-context.md` -- Sole-developer trust model and multi-developer hardening triggers

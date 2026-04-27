@@ -24,9 +24,9 @@
  *   node metaclaude-cli.mjs <command> [project] [options]
  */
 
-import { readFileSync, writeFileSync, existsSync, mkdirSync, copyFileSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync, copyFileSync, readdirSync, rmSync } from 'node:fs';
 import { resolve, dirname, basename, join, isAbsolute } from 'node:path';
-import { execSync } from 'node:child_process';
+import { execSync, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { mergeGitignore } from './lib/gitignore-merge.mjs';
@@ -167,6 +167,32 @@ function getArtifact(registry, artifactPath) {
   // (e.g., artifacts.scripts['scripts/example']) rather than splitting by
   // category. Support both shapes for consumer compatibility.
   return registry.artifacts[category]?.[artifactPath];
+}
+
+function resolveTargetArtifactsForProject(registry, projectConfig, defaults) {
+  const bundleName = projectConfig.bundle || defaults?.bundle;
+  if (!bundleName) return null;
+
+  const targetArtifacts = resolveBundleArtifacts(registry, bundleName);
+  if (projectConfig.additional) {
+    projectConfig.additional.forEach(a => targetArtifacts.add(a));
+  }
+  if (projectConfig.excluded) {
+    projectConfig.excluded.forEach(a => targetArtifacts.delete(a));
+  }
+
+  return targetArtifacts;
+}
+
+function resolveInstalledTargetPath(installed) {
+  return installed?.target_path || installed?.targetPath || installed?.path || null;
+}
+
+function isProtectedArtifact(projectConfig, artifactPath, targetPath, sourcePath) {
+  const protectedPaths = projectConfig.protected || [];
+  return protectedPaths.includes(artifactPath)
+    || (targetPath && protectedPaths.includes(targetPath))
+    || (sourcePath && protectedPaths.includes(sourcePath));
 }
 
 function getProjectsToProcess(config, projectArg) {
@@ -336,7 +362,7 @@ async function cmdStatus(projectArg, options) {
   for (const projectName of projects) {
     const projectConfig = config.projects[projectName];
     const projectPath = resolveProjectPath(projectName, projectConfig, config.defaults, options);
-    const lockPath = getLockPath(projectName);
+    const lockPath = getLockPath(projectName, projectPath);
     const lock = loadJson(lockPath) || { installed: {} };
 
     log(`\n${colors.bold}${projectName}${colors.reset}`, 'cyan');
@@ -355,23 +381,16 @@ async function cmdStatus(projectArg, options) {
       continue;
     }
 
-    const targetArtifacts = resolveBundleArtifacts(registry, bundleName);
-
-    // Add additional artifacts
-    if (projectConfig.additional) {
-      projectConfig.additional.forEach(a => targetArtifacts.add(a));
-    }
-
-    // Remove excluded
-    if (projectConfig.excluded) {
-      projectConfig.excluded.forEach(a => targetArtifacts.delete(a));
-    }
+    const targetArtifacts = resolveTargetArtifactsForProject(registry, projectConfig, config.defaults);
 
     let updatesAvailable = 0;
     let missing = 0;
     let current = 0;
     let modified = 0;
     let agentAssisted = 0;
+    let deletionsPending = 0;
+    let deletionConflicts = 0;
+    let obsoleteLocks = 0;
 
     for (const artifactPath of [...targetArtifacts].sort()) {
       const artifact = getArtifact(registry, artifactPath);
@@ -442,9 +461,39 @@ async function cmdStatus(projectArg, options) {
       }
     }
 
+    for (const [artifactPath, installed] of Object.entries(lock.installed || {}).sort()) {
+      if (targetArtifacts.has(artifactPath)) continue;
+
+      const targetPath = resolveInstalledTargetPath(installed);
+      if (!targetPath) {
+        log(`- ${artifactPath}: obsolete lock entry (no target path recorded)`, 'yellow');
+        obsoleteLocks++;
+        continue;
+      }
+
+      const localPath = join(projectPath, targetPath);
+      if (!existsSync(localPath)) {
+        log(`- ${artifactPath}: obsolete lock entry (file already absent)`, 'dim');
+        obsoleteLocks++;
+        continue;
+      }
+
+      const localHash = computeHash(readFileSync(localPath, 'utf-8'));
+      if (installed.hash && localHash === installed.hash) {
+        log(`- ${artifactPath}: no longer targeted (deletion pending)`, 'yellow');
+        deletionsPending++;
+      } else {
+        log(`! ${artifactPath}: no longer targeted but locally modified`, 'yellow');
+        deletionConflicts++;
+      }
+    }
+
     log('');
     const agentMsg = agentAssisted > 0 ? `, ${agentAssisted} agent-assisted` : '';
-    log(`Summary: ${current} current, ${updatesAvailable} updates, ${missing} missing, ${modified} modified${agentMsg}`);
+    const deletionMsg = deletionsPending > 0 ? `, ${deletionsPending} deletion pending` : '';
+    const deletionConflictMsg = deletionConflicts > 0 ? `, ${deletionConflicts} deletion conflict` : '';
+    const obsoleteMsg = obsoleteLocks > 0 ? `, ${obsoleteLocks} obsolete lock` : '';
+    log(`Summary: ${current} current, ${updatesAvailable} updates, ${missing} missing, ${modified} modified${agentMsg}${deletionMsg}${deletionConflictMsg}${obsoleteMsg}`);
   }
 
   log('');
@@ -516,6 +565,73 @@ function syncTimeContainmentOk(sourceFile, artifactPath) {
   }
 }
 
+/**
+ * Pre-flight manifest shape validation (sg-enforcement-layer-gaps Task 14 /
+ * REQ-M1-009 / AC-7.1, AC-7.2, AC-7.3).
+ *
+ * For a given consumer project directory, discovers
+ * `.claude/specs/groups/*\/manifest.json` and runs the main-repo's
+ * `validate-manifest.mjs` (strict shape-lint) against each. Returns
+ * `{ blocked: boolean, offenders: string[] }`.
+ *
+ * Blocking behavior: ANY non-zero validator exit blocks the sync push for
+ * this consumer with an actionable error pointing to `migrate-manifest.mjs`.
+ * The pre-flight is NON-destructive — it never writes to the consumer.
+ *
+ * Graceful degradation:
+ *   - If the consumer has no `specs/groups/` directory, skip (empty corpus =
+ *     legal state for a freshly-added consumer).
+ *   - If the main-repo validator script is missing (shouldn't happen post-sync
+ *     but we defensively guard), log a warning and pass through (fail-open on
+ *     internal config error rather than stranding the consumer).
+ */
+function preflightValidateConsumerManifests(projectPath) {
+  const specsGroupsDir = join(projectPath, '.claude', 'specs', 'groups');
+  if (!existsSync(specsGroupsDir)) {
+    return { blocked: false, offenders: [], scanned: 0 };
+  }
+  const validatorPath = join(METACLAUDE_ROOT, '.claude', 'scripts', 'validate-manifest.mjs');
+  if (!existsSync(validatorPath)) {
+    log(`  Pre-flight skipped: validator script not found at ${validatorPath}`, 'yellow');
+    return { blocked: false, offenders: [], scanned: 0 };
+  }
+
+  let manifestPaths = [];
+  try {
+    const groups = readdirSync(specsGroupsDir, { withFileTypes: true });
+    for (const g of groups) {
+      if (!g.isDirectory()) continue;
+      const mp = join(specsGroupsDir, g.name, 'manifest.json');
+      if (existsSync(mp)) manifestPaths.push(mp);
+    }
+  } catch (err) {
+    log(`  Pre-flight error reading consumer manifests: ${err.message}`, 'yellow');
+    return { blocked: false, offenders: [], scanned: 0 };
+  }
+
+  if (manifestPaths.length === 0) {
+    return { blocked: false, offenders: [], scanned: 0 };
+  }
+
+  const offenders = [];
+  for (const mp of manifestPaths) {
+    const r = spawnSync('node', [validatorPath, mp], {
+      encoding: 'utf-8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    if (r.status !== 0) {
+      offenders.push(mp);
+      if (r.stderr) {
+        // Surface first few lines of validator output for operator context.
+        const lines = r.stderr.split('\n').filter((l) => l.length > 0).slice(0, 4);
+        for (const line of lines) log(`    ${line}`, 'red');
+      }
+    }
+  }
+
+  return { blocked: offenders.length > 0, offenders, scanned: manifestPaths.length };
+}
+
 async function cmdSync(projectArg, options) {
   const config = loadProjectsConfig();
   const registry = loadRegistry();
@@ -547,6 +663,27 @@ async function cmdSync(projectArg, options) {
       continue;
     }
 
+    // sg-enforcement-layer-gaps Task 14 / AC-7.1, AC-7.2, AC-7.3 — pre-flight
+    // manifest-shape-lint of the consumer's own spec-group manifests BEFORE
+    // pushing artifacts. Legacy-flat shape detection blocks the push here; the
+    // operator must run `migrate-manifest.mjs --all` in the consumer to clear.
+    const preflight = preflightValidateConsumerManifests(projectPath);
+    if (preflight.blocked) {
+      log(
+        `  [SYNC:manifest-preflight-blocked] ${projectPath} has ${preflight.offenders.length}/${preflight.scanned} unmigrated manifests`,
+        'red'
+      );
+      log(
+        '  Remediation: in the consumer repo, run `node .claude/scripts/migrate-manifest.mjs --all`,',
+        'dim'
+      );
+      log('  review the git diff, commit, then re-run `metaclaude-cli.mjs sync`.', 'dim');
+      for (const offender of preflight.offenders) {
+        log(`    offender: ${offender}`, 'dim');
+      }
+      continue; // Skip sync for this consumer; proceed to next.
+    }
+
     const lock = loadJson(lockPath) || {
       lock_version: '1.0.0',
       project: projectName,
@@ -562,13 +699,7 @@ async function cmdSync(projectArg, options) {
       continue;
     }
 
-    const targetArtifacts = resolveBundleArtifacts(registry, bundleName);
-    if (projectConfig.additional) {
-      projectConfig.additional.forEach(a => targetArtifacts.add(a));
-    }
-    if (projectConfig.excluded) {
-      projectConfig.excluded.forEach(a => targetArtifacts.delete(a));
-    }
+    const targetArtifacts = resolveTargetArtifactsForProject(registry, projectConfig, config.defaults);
 
     log(`Syncing ${targetArtifacts.size} artifacts...`);
 
@@ -593,7 +724,7 @@ async function cmdSync(projectArg, options) {
       }
 
       // Check if protected
-      if (projectConfig.protected?.includes(artifact.path)) {
+      if (isProtectedArtifact(projectConfig, artifactPath, targetPath, artifact.path)) {
         log(`  Skip ${artifactPath}: protected`, 'dim');
         skipped++;
         continue;
@@ -757,14 +888,59 @@ async function cmdSync(projectArg, options) {
       synced++;
     }
 
-    // Prune obsolete lock entries (artifacts no longer in target set)
+    // Apply upstream deletions for obsolete lock entries. Safe delete only when
+    // the consumer file still matches the recorded lock hash; modified files
+    // are left in place unless --force is explicit.
     let pruned = 0;
-    for (const artifactPath of Object.keys(lock.installed)) {
-      if (!targetArtifacts.has(artifactPath)) {
+    let deleted = 0;
+    for (const [artifactPath, installed] of Object.entries(lock.installed || {})) {
+      if (targetArtifacts.has(artifactPath)) continue;
+
+      const targetPath = resolveInstalledTargetPath(installed);
+      if (!targetPath) {
         delete lock.installed[artifactPath];
-        log(`  - ${artifactPath}: removed (no longer in bundle)`, 'dim');
+        log(`  - ${artifactPath}: pruned obsolete lock entry (no target path recorded)`, 'dim');
         pruned++;
+        continue;
       }
+
+      if (isProtectedArtifact(projectConfig, artifactPath, targetPath, installed.path)) {
+        log(`  Skip deletion ${artifactPath}: protected`, 'dim');
+        skipped++;
+        continue;
+      }
+
+      const targetFile = join(projectPath, targetPath);
+      if (!existsSync(targetFile)) {
+        delete lock.installed[artifactPath];
+        log(`  - ${artifactPath}: pruned obsolete lock entry (file already absent)`, 'dim');
+        pruned++;
+        continue;
+      }
+
+      try {
+        assertContainment(targetFile, join(projectPath, '.claude'));
+      } catch (err) {
+        const rule = err instanceof PathEscapeError ? 'path-escape' : 'path-check-failed';
+        log(`  Conflict ${artifactPath}: deletion skipped (${rule})`, 'yellow');
+        conflicts++;
+        continue;
+      }
+
+      const localHash = computeHash(readFileSync(targetFile, 'utf-8'));
+      const safeToDelete = installed.hash && localHash === installed.hash;
+      if (!safeToDelete && !options.force) {
+        log(`  Conflict ${artifactPath}: no longer targeted but locally modified`, 'yellow');
+        log('    Use --force to delete the local file and prune the lock', 'dim');
+        conflicts++;
+        continue;
+      }
+
+      rmSync(targetFile, { force: true });
+      delete lock.installed[artifactPath];
+      const reason = safeToDelete ? 'removed upstream/no longer in bundle' : 'forced deletion of locally modified obsolete artifact';
+      log(`  - ${artifactPath}: deleted (${reason})`, 'yellow');
+      deleted++;
     }
 
     // Update lock metadata
@@ -776,8 +952,9 @@ async function cmdSync(projectArg, options) {
     log('');
     const pendingMsg = pendingMerges.length > 0 ? `, ${pendingMerges.length} pending merge` : '';
     const prunedMsg = pruned > 0 ? `, ${pruned} pruned` : '';
+    const deletedMsg = deleted > 0 ? `, ${deleted} deleted` : '';
     const resolvedMsg = resolved > 0 ? `, ${resolved} resolved` : '';
-    log(`Complete: ${synced} synced, ${skipped} skipped, ${conflicts} conflicts${resolvedMsg}${pendingMsg}${prunedMsg}`);
+    log(`Complete: ${synced} synced, ${skipped} skipped, ${conflicts} conflicts${resolvedMsg}${pendingMsg}${deletedMsg}${prunedMsg}`);
 
     // Report agent-assisted merges
     if (pendingMerges.length > 0) {
@@ -833,7 +1010,7 @@ async function cmdVerify(projectArg, options) {
   for (const projectName of projects) {
     const projectConfig = config.projects[projectName];
     const projectPath = resolveProjectPath(projectName, projectConfig, config.defaults, options);
-    const lockPath = getLockPath(projectName);
+    const lockPath = getLockPath(projectName, projectPath);
     const lock = loadJson(lockPath);
 
     log(`\n${colors.bold}Verifying: ${projectName}${colors.reset}`, 'cyan');
@@ -848,14 +1025,28 @@ async function cmdVerify(projectArg, options) {
       continue;
     }
 
+    const bundleName = projectConfig.bundle || config.defaults?.bundle;
+    if (!bundleName) {
+      log('No bundle specified', 'yellow');
+      continue;
+    }
+    const targetArtifacts = resolveTargetArtifactsForProject(registry, projectConfig, config.defaults);
+
     let passed = 0;
     let failed = 0;
 
     for (const [artifactPath, installed] of Object.entries(lock.installed)) {
+      if (!targetArtifacts.has(artifactPath)) {
+        log(`✗ ${artifactPath}: no longer targeted (run metaclaude sync to delete/prune)`, 'red');
+        failed++;
+        continue;
+      }
+
       // Get actual path from registry
       const artifact = getArtifact(registry, artifactPath);
       if (!artifact) {
-        log(`? ${artifactPath}: not found in registry`, 'yellow');
+        log(`✗ ${artifactPath}: not found in registry (run metaclaude sync to delete/prune)`, 'red');
+        failed++;
         continue;
       }
 

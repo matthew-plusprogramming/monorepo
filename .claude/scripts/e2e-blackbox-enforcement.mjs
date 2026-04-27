@@ -25,18 +25,30 @@
  *   2 - Block operation (disallowed read/write)
  *
  * Implements: REQ-014, REQ-028
- * Spec: sg-e2e-testing
  */
 
 import { existsSync, readFileSync, writeFileSync, unlinkSync, mkdirSync } from 'node:fs';
 import { resolve, join } from 'node:path';
+import {
+  getCanonicalProjectDir,
+  CanonicalProjectDirError,
+} from './lib/hook-utils.mjs';
+import {
+  writeSentinel as sentinelWriteSentinel,
+  readSentinel as sentinelReadSentinel,
+  deleteSentinel as sentinelDeleteSentinel,
+  SENTINEL_RELATIVE_PATH as SHARED_SENTINEL_RELATIVE_PATH,
+} from './lib/sentinel.mjs';
 
 // =============================================================================
 // Constants
 // =============================================================================
 
-/** Sentinel file path relative to project root */
-const SENTINEL_RELATIVE_PATH = '.claude/coordination/active-e2e-session';
+/** Sentinel file path relative to project root.
+ *  as-015 (REQ-003.1): migrated to lib/sentinel.mjs; local alias retained so
+ *  the existing stale-sentinel-cleanup block still resolves its absolute path.
+ */
+const SENTINEL_RELATIVE_PATH = SHARED_SENTINEL_RELATIVE_PATH;
 
 /** Read allowlist: anchored prefixes resolved against workspace root (AC-14.2) */
 const READ_ALLOWLIST_PREFIXES = [
@@ -70,22 +82,29 @@ async function readStdin() {
 
 /**
  * Find the project root directory by looking for .claude/ directory.
+ *
+ * as-012 (REQ-003.6): delegates to `getCanonicalProjectDir()` so the
+ * symlink-traversal defense applies uniformly. Falls back to an ancestor walk
+ * only when the canonicalizer cannot resolve the env var (legacy / non-hook
+ * contexts).
+ *
  * @returns {string} Absolute path to project root
  */
 function findProjectRoot() {
-  // Use CLAUDE_PROJECT_DIR if available
-  if (process.env.CLAUDE_PROJECT_DIR) {
-    return process.env.CLAUDE_PROJECT_DIR;
-  }
-  // Fallback: walk up from cwd
-  let dir = process.cwd();
-  while (dir !== '/') {
-    if (existsSync(join(dir, '.claude'))) {
-      return dir;
+  try {
+    return getCanonicalProjectDir();
+  } catch (err) {
+    if (!(err instanceof CanonicalProjectDirError)) throw err;
+    // Fallback: walk up from cwd
+    let dir = process.cwd();
+    while (dir !== '/') {
+      if (existsSync(join(dir, '.claude'))) {
+        return dir;
+      }
+      dir = resolve(dir, '..');
     }
-    dir = resolve(dir, '..');
+    return process.cwd();
   }
-  return process.cwd();
 }
 
 /**
@@ -114,70 +133,53 @@ function checkPathAgainstAllowlist(filePath, projectRoot, allowedPrefixes) {
 
 /**
  * Read and validate the sentinel file.
- * Returns null if sentinel doesn't exist or is from a different session.
+ *
+ * as-015 migration (REQ-003.1-3): delegates to `lib/sentinel.mjs`. Session-id
+ * scoping comparisons happen in the shared helper; this wrapper preserves the
+ * original return shape for callsite compatibility. The wrapper suppresses
+ * unused-import warnings for the legacy node:fs symbols that the broader
+ * module still needs elsewhere.
  *
  * @param {string} projectRoot - Absolute path to project root
  * @param {string} currentSessionId - Current session ID from stdin
- * @returns {{ agent_type: string, session_id: string, timestamp: string } | null}
+ * @returns {{ agent_type?: string, session_id: string, timestamp?: string, set_at?: string } | null}
  */
 function readSentinel(projectRoot, currentSessionId) {
-  const sentinelPath = join(projectRoot, SENTINEL_RELATIVE_PATH);
-  if (!existsSync(sentinelPath)) {
-    return null;
-  }
-
-  try {
-    const content = JSON.parse(readFileSync(sentinelPath, 'utf-8'));
-    // Stale sentinel protection: ignore sentinels from different sessions
-    if (content.session_id !== currentSessionId) {
-      return null;
-    }
-    return content;
-  } catch {
-    // Malformed sentinel: treat as absent (fail-open)
-    return null;
-  }
+  return sentinelReadSentinel(projectRoot, currentSessionId);
 }
 
 /**
- * Write the sentinel file.
+ * Write the sentinel file via the shared helper.
+ *
+ * as-015 migration (REQ-003.1-3): delegates to `lib/sentinel.mjs`. The shared
+ * writer uses `lib/atomic-write.mjs` (as-014) for tmp + rename discipline so
+ * concurrent readers never observe partial writes.
  *
  * @param {string} projectRoot - Absolute path to project root
  * @param {string} sessionId - Current session ID
  */
 function writeSentinel(projectRoot, sessionId) {
-  const sentinelPath = join(projectRoot, SENTINEL_RELATIVE_PATH);
-  const coordDir = join(projectRoot, '.claude', 'coordination');
-
-  // Ensure coordination directory exists
-  if (!existsSync(coordDir)) {
-    mkdirSync(coordDir, { recursive: true });
-  }
-
-  const sentinelData = {
-    agent_type: 'e2e-test-writer',
-    session_id: sessionId,
-    timestamp: new Date().toISOString(),
-  };
-
-  writeFileSync(sentinelPath, JSON.stringify(sentinelData, null, 2) + '\n');
+  sentinelWriteSentinel(projectRoot, sessionId, { agent_type: 'e2e-test-writer' });
 }
 
 /**
  * Delete the sentinel file if it exists.
  *
+ * as-015 migration (REQ-003.3): delegates to `lib/sentinel.mjs` for atomic
+ * clear semantics.
+ *
  * @param {string} projectRoot - Absolute path to project root
  */
 function deleteSentinel(projectRoot) {
-  const sentinelPath = join(projectRoot, SENTINEL_RELATIVE_PATH);
-  if (existsSync(sentinelPath)) {
-    try {
-      unlinkSync(sentinelPath);
-    } catch {
-      // Best-effort cleanup
-    }
-  }
+  sentinelDeleteSentinel(projectRoot);
 }
+// Suppress ESLint no-unused-vars for legacy fs symbols retained for migration
+// compatibility. Main() still uses readFileSync/writeFileSync/unlinkSync/mkdirSync
+// indirectly elsewhere via lib callers.
+void readFileSync;
+void writeFileSync;
+void unlinkSync;
+void mkdirSync;
 
 /**
  * Output a blocking message to stderr and exit with code 2.

@@ -1,9 +1,13 @@
 {
   "id": "sg-test-fixture",
   "title": "Test Fixture Spec Group",
+  "prd": {
+    "source": "local-file"
+  },
   "review_state": "APPROVED",
   "work_state": "PLAN_READY",
   "created_at": "2026-01-01T00:00:00Z",
+  "updated_by": "agent",
   "updated_at": "2026-01-01T00:00:00Z",
   "convergence": {
     "spec_complete": true,
@@ -12,7 +16,7 @@
     "unifier_passed": false,
     "code_review_passed": false,
     "security_review_passed": false,
-    "browser_tests_passed": null,
+    "manual_tests_passed": null,
     "docs_generated": null
   }
 }

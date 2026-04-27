@@ -18,6 +18,7 @@ import { readFileSync, writeFileSync, statSync, renameSync, readdirSync, existsS
 import { join, resolve, relative } from 'node:path';
 import { execSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
+import { getCanonicalProjectDir as getCanonicalProjectDirFromHookUtils } from './hook-utils.mjs';
 
 
 // === Performance Caches (AC-1, AC-6) ===
@@ -97,7 +98,8 @@ export function globToRegex(pattern) {
  *
  * Uses the same matching semantics as hook-wrapper.mjs matchesPattern:
  * the pattern can match the entire path, the end of the path, or
- * a suffix after a / separator.
+ * a suffix after a / separator. Root-scoped .claude/ patterns do not
+ * match ignored .claude/worktrees copies.
  *
  * @param {string} filePath - File path to test (e.g., "apps/node-server/src/index.ts")
  * @param {string} pattern - Glob pattern (e.g., "apps/node-server/src/**")
@@ -108,6 +110,10 @@ export function matchesGlob(filePath, pattern) {
   const patterns = pattern.split(',').map(p => p.trim());
 
   for (const p of patterns) {
+    if (isRootClaudePattern(p) && isUnderClaudeWorktree(filePath)) {
+      continue;
+    }
+
     // AC-6: Use cached compiled regex to avoid redundant globToRegex() + new RegExp() calls
     let regex = regexCache.get(p);
     if (!regex) {
@@ -127,6 +133,14 @@ export function matchesGlob(filePath, pattern) {
   return false;
 }
 
+function isRootClaudePattern(pattern) {
+  return pattern.startsWith('.claude/') && !pattern.startsWith('.claude/worktrees/');
+}
+
+function isUnderClaudeWorktree(filePath) {
+  return /(^|\/)\.claude\/worktrees\//.test(filePath);
+}
+
 /**
  * Resolve the project root directory.
  *
@@ -136,8 +150,16 @@ export function matchesGlob(filePath, pattern) {
  * @returns {string} Absolute path to the project root
  */
 export function resolveProjectRoot() {
-  if (process.env.CLAUDE_PROJECT_DIR) {
-    return process.env.CLAUDE_PROJECT_DIR;
+  // as-012 (REQ-003.6): delegate to canonicalizer via dynamic import to avoid
+  // a circular dependency (hook-utils does not import trace-utils, but the
+  // lint must see ONE env-var reader and it lives in hook-utils.mjs).
+  try {
+    // Synchronous dynamic read via direct require-like pattern is impossible
+    // in ESM; instead, re-delegate via hook-utils import at top-of-module.
+    // The top-level import statement was added in the file header.
+    return getCanonicalProjectDirFromHookUtils();
+  } catch {
+    /* fall through */
   }
 
   try {

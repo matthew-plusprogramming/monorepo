@@ -148,14 +148,14 @@ Practice 4.5 prose in CLAUDE.md references the flow verifier as its implementati
 
 Four contracts define the data exchange formats:
 
-| Contract                 | Entity                   | Purpose                                                  |
-| ------------------------ | ------------------------ | -------------------------------------------------------- |
-| `contract-flow-finding`  | `FlowFinding`            | Single wiring finding (ID, category, severity, evidence) |
-| `contract-gate-output`   | `FlowVerifierGateOutput` | Impl-verify gate result (status, counts, coverage)       |
-| `contract-carry-forward` | `CarryForwardEntry`      | Persistent finding entry across stages                   |
-| `contract-flow-coverage` | `FlowCoverageReport`     | Post-impl coverage summary for structured docs           |
+| Contract                 | Entity                   | Required Shape                                                                                                                                     |
+| ------------------------ | ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `contract-flow-finding`  | `FlowFinding`            | `finding_id`, `category`, `severity`, `flow_type`, `source`, `target`, `integration_point`, `evidence`, `recommendation`, `stage`, `confidence`   |
+| `contract-gate-output`   | `FlowVerifierGateOutput` | `status`, severity counts, `findings`, `coverage`, `unchecked_files`                                                                               |
+| `contract-carry-forward` | `CarryForwardEntry`      | `finding_id`, `severity`, `summary`, `stage`, `pass_number`, `integration_point`, `status`, `superseded_by`, `written_by`                         |
+| `contract-flow-coverage` | `FlowCoverageReport`     | `doc_type`, `spec_group`, `timestamp`, `integration_points`, `verified_count`, `gap_count`, `coverage_percentage`, `gaps`                         |
 
-Full contract definitions are in the spec at `.claude/specs/groups/sg-flow-verifier/spec.md`.
+Enums: `status` is `pass | warn | block`; `coverage` is `full | partial`; finding severity is `Critical | High | Medium | Low`; stages are `prd-review | spec-review | impl-verify | post-impl`; finding categories are the six taxonomy values above.
 
 ---
 
@@ -185,11 +185,81 @@ When trace data is unavailable (missing modules, stale traces), the script falls
 
 ---
 
+## Diff-Scope Mode
+
+Scoping flow-verification to files changed in the current branch diff. Applies at `impl-verify` and `post-impl` stages only; `prd-review` and `spec-review` always run full-scope. Extends existing scope-mode parameterization at `flow-verify-checks.mjs:94, 1459`. Closes the `38 out-of-scope findings on pure-refactor diffs` evidence pattern (REQ-006 / SC-6).
+
+### Parameters
+
+| Param           | Values                                  | Default                                                               | Stage Applicability                           |
+| --------------- | --------------------------------------- | --------------------------------------------------------------------- | --------------------------------------------- |
+| `scope`         | `"full"` \| `"diff"`                    | `"full"` at prd-review/spec-review; `"diff"` at impl-verify/post-impl | `"diff"` rejected at prd-review / spec-review |
+| `diff_base`     | git ref (branch / SHA)                  | `<branch-base>`                                                       | All diff-scope dispatches                     |
+| `fallback_enum` | `"none"` \| `"head-1"` \| `"full-repo"` | recorded (not supplied)                                               | Output-only; records actual fallback applied  |
+
+### Stage Mapping
+
+| Stage         | Default `scope` | `scope: "diff"` Accepted? | Carry-Forward Re-Evaluation |
+| ------------- | --------------- | ------------------------- | --------------------------- |
+| `prd-review`  | `full`          | No (rejected)             | N/A (first stage)           |
+| `spec-review` | `full`          | No (rejected)             | Yes                         |
+| `impl-verify` | `diff`          | Yes                       | Yes (regardless of scope)   |
+| `post-impl`   | `diff`          | Yes                       | Yes (regardless of scope)   |
+
+### Carry-Forward Rule
+
+Findings surfaced at earlier stages (`prd-review`, `spec-review`) are **always re-evaluated** at impl-verify / post-impl, even when `scope: "diff"`. Diff-scope filters _new_ findings to affected modules; it does not suppress persisted prior-stage findings. Severity elevation rules (Low -> Medium -> High -> Critical, one level per stage) apply unchanged.
+
+### Empty-Diff Trivial-Pass
+
+| Condition                                              | Outcome                                                                                                                     |
+| ------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------- |
+| `git diff --name-only <base>..HEAD` returns zero files | Trivial-pass; structured log entry `{ scope: "diff", diff_base, changed_files: 0, outcome: "trivial-pass" }`; NOT a failure |
+| Non-empty diff, no affected modules                    | Trivial-pass (diff outside traced fileGlobs); structured log                                                                |
+
+### New-Symbol Degradation (NFR-10 Gate Condition)
+
+When the diff introduces **new boundary-crossing symbols** (new exports in cross-module surfaces, new route registrations, new event publishers/subscribers), the flow-verifier degrades from diff-scope to **full-scope regardless of `scope` param**. This preserves coverage on genuinely new integration surfaces. Output records `fallback: "new-symbol-degradation"` and `actual_scope: "full"`.
+
+### Fallback Enum
+
+When `git diff <base>..HEAD` fails (missing ancestor, single-commit history, post-reset), the following fallbacks apply in order:
+
+| Fallback    | Trigger                                   | Logged As     |
+| ----------- | ----------------------------------------- | ------------- |
+| `none`      | Diff resolved cleanly against base        | `"none"`      |
+| `head-1`    | `<base>` unresolvable; `HEAD~1` available | `"head-1"`    |
+| `full-repo` | `HEAD~1` unavailable; fallback to full    | `"full-repo"` |
+
+Fallbacks are recorded in the structured log (`.claude/specs/groups/<sg>/flow-findings.json` `fallback_log` field) and returned in the agent output.
+
+### Example Dispatch
+
+```bash
+# Pre-computation at impl-verify with diff scope
+node .claude/scripts/flow-verify-checks.mjs \
+  --sg sg-pipeline-efficiency-ws3-orchestrator-hygiene \
+  --stage impl-verify \
+  --scope diff \
+  --diff-base main
+
+# Agent dispatch consumes pre-computed result
+/flow-verify --stage impl-verify --sg sg-pipeline-efficiency-ws3-orchestrator-hygiene --scope diff
+```
+
+Helper library: `.claude/scripts/lib/flow-verify-diff-scope.mjs` exports `resolveDiffScope({ base, stage })` returning `{ scope, changed_files, affected_modules, fallback }`. Consumers in `flow-verify-checks.mjs` filter findings to `affected_modules` before emitting. Module resolution uses `trace.config.json` `fileGlobs` (see TRACES.md § Consumer: Flow-Verifier Diff-Scope).
+
+Cross-reference: [ws-3 spec Flow 1 sequence diagram](../specs/groups/sg-pipeline-efficiency-ws3-orchestrator-hygiene/spec.md#flow-verify-diff-scope-dispatch).
+
+---
+
 ## See Also
 
 - `.claude/agents/flow-verifier.md` -- Agent definition
 - `.claude/skills/flow-verify/SKILL.md` -- Skill file with full parameter reference
 - `.claude/scripts/flow-verify-checks.mjs` -- Pre-computation script
-- `.claude/specs/groups/sg-flow-verifier/spec.md` -- Full specification (40 ACs, contracts)
+- `.claude/scripts/lib/flow-verify-diff-scope.mjs` -- Diff-scope resolver helper
+- `.claude/specs/groups/sg-pipeline-efficiency-ws3-orchestrator-hygiene/spec.md` -- Diff-scope contract (REQ-006)
 - `.claude/prds/flow-verifier/prd.md` -- PRD with motivation and success metrics
+- `.claude/docs/TRACES.md` -- Trace system (fileGlobs -> module mapping consumed by diff-scope)
 - `.claude/docs/DOC-AUDIT.md` -- Doc-audit system (analogous two-layer architecture)

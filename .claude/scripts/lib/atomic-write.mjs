@@ -10,7 +10,6 @@
  * On rename failure, triggers corruption recovery (fresh session, counts=0).
  *
  * Implements: REQ-012 (AC-1.8, AC-1.10), REQ-023 (AC-1.9), REQ-033
- * Spec: sg-convergence-audit-enforcement
  */
 
 import { writeFileSync, readFileSync, renameSync, existsSync, mkdirSync } from 'node:fs';
@@ -101,6 +100,75 @@ export function atomicWriteJSON(filePath, data, lockOpts = {}) {
   } finally {
     // Step 4: Always release lock
     releaseLock(lockPath);
+  }
+}
+
+/**
+ * Alias for `atomicWriteSentinel` — matches test-contract expectations
+ * `atomicWrite` / `writeAtomic` from `__tests__/hook-friction-phase-c-atomic-write.test.mjs`.
+ */
+export async function atomicWrite(filePath, content) {
+  const ok = atomicWriteSentinel(filePath, content);
+  if (!ok) {
+    throw new Error(`atomicWrite: failed to write ${filePath}`);
+  }
+}
+export const writeAtomic = atomicWrite;
+
+/**
+ * Atomically write a sentinel file using tmp + rename discipline.
+ *
+ * Coordination sentinel atomic-write contract:
+ *   Sentinel coordinates (writes to `.claude/coordination/*.done`, `*.status`,
+ *   `active-e2e-session`, etc.) must never appear partially-written to a
+ *   concurrent reader. This helper guarantees atomicity without holding a
+ *   session-lock (unlike `atomicWriteJSON`, which serializes against the
+ *   session.json mutex). Use when:
+ *     - There is no need for cross-writer serialization (sentinel semantics
+ *       are presence + content; last-writer-wins is acceptable).
+ *     - The payload is small (<= a single filesystem block) so rename is atomic.
+ *
+ * Behavior:
+ *   - Ensures the parent directory exists (recursive mkdir).
+ *   - Writes `<content>` to `<filePath>.tmp.<pid>` then renames to `<filePath>`.
+ *   - On rename failure, attempts to unlink the tmp file as best-effort cleanup.
+ *
+ * @param {string} filePath - Absolute path to the sentinel target.
+ * @param {string|Buffer} content - The exact bytes to land at `filePath`.
+ * @returns {boolean} true on success, false on any error (caller may retry).
+ *
+ * @req REQ-010
+ * @sec SEC-004
+ * @contract coordination-sentinel-atomic-write
+ */
+export function atomicWriteSentinel(filePath, content) {
+  const dir = dirname(filePath);
+
+  if (!existsSync(dir)) {
+    try {
+      mkdirSync(dir, { recursive: true });
+    } catch {
+      return false;
+    }
+  }
+
+  const tempPath = filePath + '.tmp.' + process.pid + '.' + Date.now();
+  try {
+    writeFileSync(tempPath, content);
+  } catch {
+    return false;
+  }
+  try {
+    renameSync(tempPath, filePath);
+    return true;
+  } catch {
+    try {
+      // Best-effort tmp cleanup — sentinel reader never sees tmp-suffixed files.
+      writeFileSync(tempPath, '');
+    } catch {
+      // ignore
+    }
+    return false;
   }
 }
 

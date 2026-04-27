@@ -8,6 +8,13 @@ allowed-tools: Read, Glob, Grep
 
 # Flow Verify Skill
 
+## Required Context
+
+Before beginning work, read these files for project-specific guidelines:
+
+- `.claude/memory-bank/best-practices/contract-first.md`
+- `.claude/memory-bank/tech.context.md`
+
 ## Purpose
 
 Verify that cross-boundary wiring is correct across all independently-created systems in a spec group. Catches six categories of wiring bugs: missing imports, unregistered routes, mismatched event names, wrong config references, disconnected handlers, and missing middleware.
@@ -28,13 +35,32 @@ Uses a two-layer architecture (following the doc-audit pattern):
 
 ## Parameters
 
-| Parameter    | Type   | Required | Default | Description                                                         |
-| ------------ | ------ | -------- | ------- | ------------------------------------------------------------------- |
-| `stage`      | string | Yes      | --      | Stage mode: `prd-review`, `spec-review`, `impl-verify`, `post-impl` |
-| `sg`         | string | Yes\*    | --      | Spec group ID (required for all stages except prd-review)           |
-| `prd`        | string | No       | --      | PRD file path (used for prd-review stage)                           |
-| `scope`      | string | No       | `full`  | Verification scope: `full`, `workstream`, `post-merge`              |
-| `workstream` | string | No       | --      | Workstream ID (for per-workstream scoping in orchestrator)          |
+| Parameter       | Type   | Required | Default | Description                                                                                  |
+| --------------- | ------ | -------- | ------- | -------------------------------------------------------------------------------------------- |
+| `stage`         | string | Yes      | --      | Stage mode: `prd-review`, `spec-review`, `impl-verify`, `post-impl`                          |
+| `sg`            | string | Yes\*    | --      | Spec group ID (required for all stages except prd-review)                                    |
+| `prd`           | string | No       | --      | PRD file path (used for prd-review stage)                                                    |
+| `scope`         | string | No       | `full`  | Verification scope: `full`, `diff`, `workstream`, `post-merge` (stage-dependent — see below) |
+| `diff_base`     | string | No       | `main`  | Git ref used as diff base when `scope=diff` (e.g., branch base ref for PR diffs)             |
+| `fallback_enum` | string | No       | `none`  | Diff-fallback strategy when `diff_base` unresolvable: `none`, `head-1`, `full-repo`          |
+| `workstream`    | string | No       | --      | Workstream ID (for per-workstream scoping in orchestrator)                                   |
+
+### Stage → Scope Mapping (as-003 / REQ-006)
+
+The dispatcher applies an automatic stage → scope mapping when `scope` is not explicitly overridden:
+
+| Stage         | Auto-Scope | Rationale                                                                                |
+| ------------- | ---------- | ---------------------------------------------------------------------------------------- |
+| `prd-review`  | `full`     | Comprehensive review of PRD boundaries; no diff context yet.                             |
+| `spec-review` | `full`     | Spec-stage review covers all integration interfaces; no implementation diff yet.         |
+| `impl-verify` | `diff`     | Narrows verification to changed files for efficiency; full-repo unnecessary post-impl.   |
+| `post-impl`   | `diff`     | Comprehensive coverage against the merged diff; pairs with `diff_base` from branch base. |
+
+At `impl-verify` and `post-impl`, the dispatcher additionally passes `diff_base` (default `main`) and `fallback_enum` (default `none`). At `prd-review` and `spec-review`, the dispatcher passes `scope: "full"`.
+
+**Stage-scope validation**: `scope: "diff"` is rejected at `prd-review` / `spec-review` with a structured `stage-scope mismatch` error (see agent prompt § Stage-Scope Validation Rule). Callers attempting `scope: "diff"` at those stages receive a rejection without dispatching the agent work.
+
+**Backward compatibility**: `scope: "full"` remains the safe default across all stages. Pre-as-003 dispatches that pass no scope continue working unchanged.
 
 ## Workflow Applicability
 

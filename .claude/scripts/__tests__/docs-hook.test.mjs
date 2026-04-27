@@ -1,7 +1,6 @@
 /**
  * Integration tests for PostToolUse hook behavior for structured docs
  *
- * Spec: sg-structured-docs
  * Covers: AC-9.1, AC-9.2, AC-9.3
  *
  * Run with: npx vitest run --config .claude/scripts/vitest.config.mjs docs-hook

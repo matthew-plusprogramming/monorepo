@@ -14,13 +14,18 @@
  *
  * Output: Summary table of drift by field to stderr.
  *
- * Implements: REQ-016 of sg-status-obligation-enforcement
+ * Implements the status-obligation baseline audit.
  */
 
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { PHASE_OBLIGATIONS, validateObligations } from './lib/workflow-dag.mjs';
+import {
+  PHASE_OBLIGATIONS,
+  VALID_SUBSTAGES,
+  REQUIRED_SUBSTAGES_BY_WORKFLOW,
+  validateObligations,
+} from './lib/workflow-dag.mjs';
 
 // =============================================================================
 // Constants
@@ -141,6 +146,31 @@ function main() {
     process.exit(1);
   }
 
+  // Read session.json (if present) for substages_visited audit summary
+  // (ws-dag-substages / as-007c / AC7.3).
+  const sessionPath = join(claudeDir, 'context', 'session.json');
+  let sessionSubstagesSummary = null;
+  try {
+    if (existsSync(sessionPath)) {
+      const sessionRaw = JSON.parse(readFileSync(sessionPath, 'utf8'));
+      const sv = sessionRaw?.substages_visited;
+      if (sv && typeof sv === 'object' && !Array.isArray(sv)) {
+        sessionSubstagesSummary = {};
+        for (const [phase, arr] of Object.entries(sv)) {
+          if (Array.isArray(arr)) {
+            sessionSubstagesSummary[phase] = {
+              count: arr.filter(s => VALID_SUBSTAGES.includes(s)).length,
+              substages: arr.filter(s => VALID_SUBSTAGES.includes(s)),
+            };
+          }
+        }
+      }
+    }
+  } catch {
+    // Fail-open: audit script tolerates missing/malformed session.json
+    sessionSubstagesSummary = null;
+  }
+
   // Collect spec groups with manifests, sorted by most recent
   const entries = readdirSync(groupsDir, { withFileTypes: true })
     .filter(e => e.isDirectory())
@@ -251,6 +281,11 @@ function main() {
       phases_checked: g.phases_checked,
       violations: g.violations,
     })),
+    // ws-dag-substages / as-007c / AC7.3: baseline snapshot substages_visited
+    // summary. Null when session.json is absent or malformed (fail-open for
+    // the audit script — the programmatic fail-closed path lives in
+    // session-validate.mjs and workflow-dag.mjs validateSubstages()).
+    substages_visited: sessionSubstagesSummary,
   };
   console.log(JSON.stringify(summary, null, 2));
 }

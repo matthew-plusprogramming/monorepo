@@ -11,7 +11,6 @@
  *             AC-6 (Fail-Open), AC-8 (Structured Audit Logging),
  *             AC-13 (Method-Coverage Smoke Test), AC-14 (Env Hash)
  *
- * Spec: sg-deployment-verification-gaps
  */
 
 import { execFileSync } from 'node:child_process';

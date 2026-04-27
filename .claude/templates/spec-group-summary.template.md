@@ -149,7 +149,7 @@ _This section is for user review. The user reviews this summary, not individual 
 
 ### Summary for Review
 
-<Concise summary of what will be built, key design decisions, and any tradeoffs made.>
+<Summary of what will be built, key design decisions, and any tradeoffs made.>
 
 ### Questions for User
 

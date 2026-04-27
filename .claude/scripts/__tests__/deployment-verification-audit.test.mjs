@@ -1,7 +1,6 @@
 /**
  * Tests for deployment verification audit logging, schema, and atomic writes
  *
- * Spec: sg-deployment-verification-gaps
  * AC Groups: AC-7 (Atomic Writes), AC-8 (Structured Audit Logging),
  *            AC-9 (Consumer Contract Shape)
  *

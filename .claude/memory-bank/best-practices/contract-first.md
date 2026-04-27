@@ -116,7 +116,7 @@ Four YAML contract content templates define the machine-parseable contract forma
 
 ### Self-Describing Schema
 
-Each template includes a `_schema:` block listing its own required and optional fields. The validation hook reads this block to determine what is mandatory, enabling new templates without hook code changes.
+Each template includes a `_schema:` block listing its own required and optional fields. `contract-validate.mjs` reads this block to determine what is mandatory, enabling new templates without validator code changes.
 
 ### Usage in Specs
 
@@ -133,7 +133,7 @@ path: /api/v1/sessions
 
 ### Core-Over-Freeform Precedence
 
-Core structured fields are always authoritative over freeform `context:` fields. If a freeform context field contradicts a core field value, the core field is the source of truth and the validation hook will emit a warning.
+Core structured fields are always authoritative over freeform `context:` fields. If a freeform context field contradicts a core field value, the core field is the source of truth and `contract-validate.mjs` will emit a warning.
 
 ## Naming Conventions
 
@@ -151,9 +151,10 @@ Naming conventions for all four contract types are documented at `.claude/contra
 
 Contract validation operates at two levels:
 
-### 1. Structural Validation (Automated, Authoring Time)
+### 1. Structural Validation (Explicit Checkpoint)
 
-The `contract-validate.mjs` PostToolUse hook fires on spec writes (`.claude/specs/**/*.md`) and checks:
+Run `contract-validate.mjs` at spec-review or integration checkpoints for specs
+with `## Interfaces & Contracts` sections. It checks:
 
 - Required fields present (from template `_schema:` block)
 - Security field presence based on `boundary_visibility` (defaulting to "external")

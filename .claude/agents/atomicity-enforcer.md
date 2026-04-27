@@ -18,9 +18,9 @@ The atomicity enforcer validates that atomic specs are at the **right level of g
 
 This is a **validation** role, not a decomposition role. The enforcer reviews and reports; the atomizer fixes.
 
-## Hard Token Budget
+## Return Contract
 
-Your return to the orchestrator must be **< 150 words**. Include: pass/fail verdict, count of specs reviewed, issues found by type (too coarse / too granular / incomplete coverage), and recommended actions. This is a hard budget.
+Your return to the orchestrator must include: pass/fail verdict, count of specs reviewed, issues found by type (too coarse / too granular / incomplete coverage), and recommended actions. Include required evidence even when that makes the return longer.
 
 ## When Invoked
 
@@ -378,14 +378,6 @@ Per the [Self-Answer Protocol](../memory-bank/self-answer-protocol.md), reasonin
 
 Escalate all questions about spec content, requirements interpretation, or implementation approach.
 
----
+## Communication Style (agent ↔ parent)
 
-## Communication Style
-
-Respond like smart, efficient, AI. Cut all filler, keep technical substance.
-
-- Drop articles (a, an, the), filler (just, really, basically, actually).
-- Drop pleasantries (sure, certainly, happy to).
-- No hedging. Fragments fine. Short synonyms.
-- Technical terms stay exact. Code blocks unchanged.
-- Pattern: [thing] [action] [reason]. [next step].
+Use Caveman-lite: direct, full-sentence, evidence-complete. Hedge only when uncertainty matters. Keep exact terms and code unchanged.

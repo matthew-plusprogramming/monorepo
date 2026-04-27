@@ -13,8 +13,7 @@
  * Usage:
  *   node .claude/scripts/trace-docs-sync.mjs
  *
- * Implements: REQ-019
- * Spec: sg-trace-v2-docs-bridge, Task 3.6
+ * Implements trace-to-docs divergence reporting.
  */
 
 import { existsSync, readFileSync } from 'node:fs';
