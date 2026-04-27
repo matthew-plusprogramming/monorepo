@@ -1,261 +1,183 @@
 # Sync System Internals
 
-Developer reference for the sync validation pipeline. This document describes the internal architecture of the gates that protect `.claude/metaclaude-registry.json` from drift. For the operational guide (how to use the sync system), see `.claude/docs/SYNC-SYSTEM.md`.
+Developer reference for registry validation and sync safety internals. For
+operator commands, bundle behavior, deletion propagation, and common failures, see
+[SYNC-SYSTEM.md](SYNC-SYSTEM.md).
 
----
+## Pipeline
 
-## Validator Pipeline Architecture
+`compute-hashes --update` validates before writing
+`.claude/metaclaude-registry.json`. It writes only when all gates are clean, or
+when an explicit audited `--skip-gates="<reason>"` bypass is accepted.
 
-The sync validation pipeline runs inside `compute-hashes --update` before the registry is written to disk. Three gates run in sequence against a single in-memory registry object. All findings are collected; the registry is written only if the gate set is empty (or `--skip-gates` is set).
+Order:
 
-### Pipeline Stages
-
-1. Parse CLI flags and validate `--skip-gates` reason.
+1. Parse flags and validate any `--skip-gates` reason.
 2. Read `.claude/metaclaude-registry.json`.
-3. Validate registry shape via `lib/registry-schema.mjs`; schema failure emits `provenance-invalid`.
-4. Run orphan detector over sync-scoped roots.
-5. Run import-graph validator and cross-bundle closure checks over registered `.mjs` files.
-6. Aggregate findings.
-7. If clean or skipped, write registry through temp file + atomic rename; otherwise emit JSONL findings and exit without registry write.
+3. Validate registry shape.
+4. Run orphan detection over sync-scoped roots.
+5. Run import-graph validation over registered `.mjs` artifacts.
+6. Run cross-bundle closure checks on each resolved relative import.
+7. Emit JSONL findings and exit non-zero, or write by temp-file + atomic rename.
+
+`metaclaude-cli sync` runs the same drift checks in warn-only mode before the
+sync walk, then performs a second containment check immediately before each
+artifact read.
+
+## Module Map
+
+- `.claude/scripts/compute-hashes.mjs`: CLI entry, gate orchestration,
+  skip-gates audit, registry write.
+- `.claude/scripts/metaclaude-cli.mjs`: consumer status, sync, verify, and
+  sync-time warnings.
+- `.claude/scripts/lib/orphan-detector.mjs`: scoped-root walk and `orphan`
+  findings.
+- `.claude/scripts/lib/import-graph-validator.mjs`: Acorn parse, relative import
+  extraction, target resolution, closure checks.
+- `.claude/scripts/lib/path-containment.mjs`: `realpath + path.sep` containment.
+- `.claude/scripts/lib/registry-schema.mjs`: Zod schemas for registry, artifact,
+  and orphan entries.
+- `.claude/scripts/lib/sync-constants.mjs`: code-owned bundle ancestry, scoped
+  roots, whitelist, skip-gates constants, rule enum.
+- `.claude/scripts/validate-orphans.mjs`: pre-commit orphan schema wrapper.
+- `.claude/scripts/skip-gates-append-only-check.mjs`: pre-commit append-only
+  audit guard.
+- `.claude/scripts/rollout-resync.mjs`: multi-consumer rollout driver.
+
+## Code-Owned Policy
+
+Security-relevant sync decisions live in code constants, not in registry data.
+The registry describes artifacts; it must not be able to weaken the validator
+that protects it.
+
+- `BUNDLE_INHERITANCE`: owned by `lib/sync-constants.mjs`, mirrored in
+  `compute-hashes.mjs` with a parity check, and used for allowed import edges.
+- `SYNC_SCOPED_ROOTS` / `EXCLUDED_ROOTS`: define what orphan detection polices.
+- `WHITELIST_GLOBS`: keeps tests and fixtures as non-shipped leaves.
+- `SKIP_GATES_*`: prevents registry edits from hiding bypass abuse.
+- `VIOLATION_RULES`: keeps finding names closed and test-pinned.
+
+`minimal: []` is load-bearing: minimal has no ancestors; it does not mean
+"import from any bundle."
+
+## Schema Extension
+
+`artifactEntrySchema` is intentionally `.passthrough()` for additive metadata.
+Add a field to `registry-schema.mjs` only when validation matters.
+
+Rules:
+
+- Non-security optional metadata can be passthrough.
+- Validated metadata belongs in `artifactEntrySchema`.
+- Security-relevant behavior belongs in `sync-constants.mjs`, not in the
+  registry.
+- `orphansEntrySchema` accepts `reason: "legacy"` only for migrated fixtures and
+  old consumers; source migration status is tracked in
+  `.claude/audit/legacy-orphans-backlog.md`.
+
+## Import Validator
+
+The validator extracts relative specifiers from `ImportDeclaration`,
+`ExportNamedDeclaration`, `ExportAllDeclaration`, and literal dynamic
+`import()`. Bare and non-relative specifiers are skipped. Dynamic imports with a
+non-literal argument are warning-only because static resolution is impossible.
+
+Extensionless relative imports resolve in this order: `.mjs`, `.js`, `.json`.
+
+Per-edge checks:
+
+1. Missing target -> `import-target-missing`.
+2. Path escapes `.claude` containment -> `path-escape`.
+3. Target parse failed earlier -> `import-target-unresolvable`.
+4. Target matches test/fixture whitelist -> `test-leaf-violation`.
+5. Target is not registered -> `import-unregistered`.
+6. Target bundle is not same bundle or ancestor -> `cross-bundle-closure`.
+
+Parse errors emit `parse-error` with file, line, and column. The validator keeps
+scanning so one bad file does not hide other findings.
+
+Performance model: serial Acorn parse, no AST cache. If this becomes slow, add
+a worker pool first; add an mtime-keyed extracted-specifier cache only after
+parallelism is insufficient. `--verbose` prints phase timing.
+
+## Skip-Gates Audit
+
+`--skip-gates="<reason>"` is the only supported author-side gate bypass.
+
+Contracts:
+
+- Reason must meet the minimum substantive length in `SKIP_GATES_MIN_REASON_LENGTH`.
+- No environment-variable bypass is honored.
+- Each accepted bypass appends one JSONL entry to
+  `.claude/audit/skip-gates.jsonl`.
+- Five or more recent uses within `SKIP_GATES_OVERUSE_WINDOW_MS` emits a
+  non-blocking warning.
+- `.claude/audit/skip-gates.jsonl` is append-only at commit time.
+
+Archive exception: a staged empty-or-absent `skip-gates.jsonl` may be paired
+with a staged `.claude/audit/archive/skip-gates.<YYYY-MM-DD>.jsonl` whose
+content is byte-equal to the HEAD audit log. Any other deletion, mutation,
+partial rewrite, or out-of-order change is rejected.
 
-### Module Layout
+## Bundle Changes
 
-| Module                                             | Purpose                                                                                        |
-| -------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
-| `.claude/scripts/compute-hashes.mjs`               | Entry point; orchestrates pipeline, parses flags, writes registry, emits findings              |
-| `.claude/scripts/lib/orphan-detector.mjs`          | Walks the sync-scoped root list, emits `orphan` findings for unregistered files                |
-| `.claude/scripts/lib/import-graph-validator.mjs`   | Acorn AST parser, import specifier extractor, per-edge resolver + closure check                |
-| `.claude/scripts/lib/path-containment.mjs`         | TOCTOU-safe `realpath + sep-suffixed startsWith` containment helper                            |
-| `.claude/scripts/lib/registry-schema.mjs`          | Zod schemas: `artifactEntrySchema` (passthrough), `orphansEntrySchema`, `registrySchema`       |
-| `.claude/scripts/lib/sync-constants.mjs`           | Code-constants: `BUNDLE_INHERITANCE`, `WHITELIST_GLOBS`, `SKIP_GATES_OVERUSE_THRESHOLD`, roots |
-| `.claude/scripts/validate-orphans.mjs`             | Pre-commit hook wrapper that runs Zod validation against `orphans[]` only                      |
-| `.claude/scripts/skip-gates-append-only-check.mjs` | Pre-commit hook wrapper that enforces append-only semantics on `skip-gates.jsonl`              |
-| `.claude/scripts/rollout-resync.mjs`               | Opt-in → staged → default-on rollout driver, used at M4 to sync all 11 consumers               |
-| `.claude/scripts/migrate-orphans-shape.mjs`        | One-shot migration from `string[]` orphans to object form; archived after M1                   |
+New bundle:
 
----
+1. Add `bundles.<name>` to `.claude/metaclaude-registry.json`.
+2. Add the fully expanded ancestor list to `BUNDLE_INHERITANCE`.
+3. Update [SYNC-SYSTEM.md](SYNC-SYSTEM.md) and this file.
 
-## Trust Root: Code-Constants Over Registry Metadata
+The registry's `extends` field is descriptive for sync resolution; the closure
+gate reads `BUNDLE_INHERITANCE`.
 
-The validator's trust root is `lib/sync-constants.mjs`, not the registry itself. Every configurable value that affects security-sensitive decisions is a JavaScript `const` in source code, not a field in `metaclaude-registry.json`.
-
-### Why This Matters
-
-A compromised registry must not be able to silently relax its own enforcement. If `SKIP_GATES_OVERUSE_THRESHOLD` were read from the registry, an attacker with registry-write access could raise the threshold to hide abuse. If `BUNDLE_INHERITANCE` were derived from registry `bundles[].extends` links, a malicious `extends` chain could create false "allowed" edges.
-
-### Trust-Root Constants
-
-| Constant family | Why it is code-owned |
-| --- | --- |
-| `BUNDLE_INHERITANCE` | Enforces cross-bundle closure. `minimal: []` means minimal can import only minimal unless same-bundle short-circuit applies. |
-| `WHITELIST_GLOBS` | Defines non-shipped leaves: `**/__tests__/**`, `**/__fixtures__/**`, `**/.gitkeep`. |
-| `SKIP_GATES_*` | Controls skip-gates reason validation and overuse warnings outside registry control. |
-| `SYNC_SCOPED_ROOTS` | Defines roots whose files must be registered or explicitly orphaned. |
-
-Any change to these constants requires a source-code diff that is visible in code review. This is the difference between a security-relevant decision and a data-driven one.
-
----
-
-## Zod Schema Extension Points
-
-The registry schema lives at `lib/registry-schema.mjs`. It is the single source of truth for what a valid registry looks like, imported by `compute-hashes`, the pre-commit hook wrappers, and any future registry validator.
-
-### Core Schemas
-
-| Schema | Contract |
-| --- | --- |
-| `orphansEntrySchema` | Object-form orphan entries with `path`, substantive `reason`, `added_by`, and `added_date`. |
-| `artifactEntrySchema` | Semver `version`, 8-hex `hash`, `path`, optional metadata, `_sync_policy`, `_sync`, and `.passthrough()` forward compatibility. |
-
-### Adding a New Optional Artifact Field
-
-`artifactEntrySchema` uses `.passthrough()` so any new optional field flows through unvalidated. This is the **default** for forward compatibility -- per REQ-028, schema evolution is additive-only.
-
-If you want the field to be **validated**, extend the schema:
-
-```javascript
-export const artifactEntrySchema = z
-  .object({
-    // ... existing fields ...
-    my_new_field: z.string().optional(), // added here
-  })
-  .passthrough();
-```
-
-If the new field carries security-relevant semantics (affects gate decisions), **do not add it to the registry**. Add it as a code constant to `sync-constants.mjs` instead.
-
-### Legacy Sentinel Exception
-
-`orphansEntrySchema` accepts `reason: "legacy"` as a valid value, bypassing the `.min(20)` requirement, so migrated registries and test fixtures remain parseable. The source registry has resolved its legacy entries; `.claude/audit/legacy-orphans-backlog.md` is the migration record.
-
----
-
-## Import-Graph Validator Internals
-
-### AST Walk Targets
-
-The validator extracts relative import specifiers from these acorn node types:
-
-| Node type                  | Example                       | Source of specifier              |
-| -------------------------- | ----------------------------- | -------------------------------- |
-| `ImportDeclaration`        | `import x from './y.mjs'`     | `node.source.value`              |
-| `ExportNamedDeclaration`   | `export { x } from './y.mjs'` | `node.source.value` (if present) |
-| `ExportAllDeclaration`     | `export * from './y.mjs'`     | `node.source.value`              |
-| `CallExpression` (dynamic) | `await import('./y.mjs')`     | `node.arguments[0].value`        |
-
-Dynamic imports with a non-literal argument (`await import(variableName)`, template-literal-with-expression) are **skipped with a warning**. They are not errors -- static analysis cannot resolve them, and failing loudly would block legitimate runtime-resolved plugin patterns.
-
-Bare specifiers (`'node:fs'`, `'zod'`) are skipped silently. Only specifiers starting with `./` or `../` are checked.
-
-### Resolution Precedence
-
-For a relative specifier like `./helper`, the validator tries extensions in this order:
-
-1. `./helper.mjs`
-2. `./helper.js`
-3. `./helper.json`
-
-If the specifier already has an extension (`./helper.mjs`), precedence does not apply -- the literal path is used. If both `./helper.mjs` and `./helper.js` exist and the specifier is `./helper` (no extension), the `.mjs` wins.
-
-### Per-Edge Check
-
-For each resolved import target:
-
-1. Call `realpath(target)`. On `ENOENT`, emit `import-target-missing` and continue.
-2. Run `assertContainment(resolved, claudeRoot)`. On failure, emit `path-escape` and continue.
-3. Check if `resolved` is in the set of paths that failed to parse earlier. If so, emit `import-target-unresolvable` and continue.
-4. Check if `resolved` matches a whitelist glob. If so, this is a test-leaf violation (registered non-test importing test code) -- emit `test-leaf-violation` and continue.
-5. Check if `resolved` is in the set of registered paths. If not, emit `import-unregistered` and continue.
-6. Run the cross-bundle closure check. If the importee's bundle is not the importer's bundle or an ancestor, emit `cross-bundle-closure`.
-
-### Cross-Bundle Closure Check
-
-The rule is: same-bundle imports pass; imports from ancestor bundles pass; imports from descendant/sibling bundles fail with `cross-bundle-closure`. The `minimal: []` base case is critical: an empty ancestor list means "minimal can import only minimal", not "any bundle allowed".
-
-### Parse Error Handling
-
-If acorn throws a `SyntaxError` on a registered `.mjs`:
-
-1. Emit `{rule: "parse-error", file, line, column}`.
-2. Add the file's realpath to `parse_errored_files` set.
-3. Continue parsing remaining files (a single parse error does not abort the phase).
-4. At phase end, if `parse_errored_files` is non-empty, exit non-zero.
-5. Any file that imports a parse-errored file gets a distinct `import-target-unresolvable` finding (so the reader can see "this import chain is broken because its target failed to parse").
-
-### Performance Bound
-
-Serial acorn parse is used; there is no worker pool or AST cache. If registry size makes validation slow, add a worker pool first, then an mtime-keyed extracted-specifier cache. `--verbose` emits per-phase wall time.
-
----
-
-## Append-Only Check: Archive-Detection Exception
-
-`.claude/audit/skip-gates.jsonl` is append-only. The pre-commit hook (`skip-gates-append-only-check.mjs`) parses the git diff of `skip-gates.jsonl` and rejects any change that modifies an existing line -- only pure appends are allowed.
-
-### The Archive-Detection Exception
-
-Intentional rotation of the audit log is sometimes necessary (e.g., rolling to a new file at year boundary, archiving before a major refactor). The hook detects archive events by:
-
-1. Checking if the old file content is **entirely absent** from the new content (i.e., the diff is "replace file wholesale").
-2. Checking if a sibling file matching `skip-gates.jsonl.archive-YYYY-MM-DD` exists and contains the old content verbatim.
-
-If both conditions hold, the hook allows the change. Any other mutation (line modification, partial deletion, out-of-order append) is rejected.
-
-### Tamper Detection Scope
-
-The append-only check fires only at commit time. `git commit --no-verify` or out-of-band filesystem writes bypass runtime detection under the current sole-developer trust model. Use `git log -p .claude/audit/skip-gates.jsonl` for post-hoc inspection.
-
----
-
-## Rollout Driver Internals
-
-`.claude/scripts/rollout-resync.mjs` iterates projects from `.claude/projects.json` and runs `metaclaude-cli sync <project> --force`.
-
-### Lifecycle
-
-| Phase        | Behavior                                                                                             |
-| ------------ | ---------------------------------------------------------------------------------------------------- |
-| `opt-in`     | Sync only projects explicitly listed on command line                                                 |
-| `staged`     | Sync projects in a pre-defined canary set first, wait for operator confirmation, then sync remainder |
-| `default-on` | Sync all projects listed in `projects.json` in sequence                                              |
-
-### Missing Directory Detection
-
-Missing consumer directories emit `TARGET_MISSING_MARKER` and are marked skipped, distinguishing deleted/unavailable consumers from sync crashes.
-
-### Failure Capture
-
-Failures are written to `.claude/audit/rollout-failures.jsonl` as `{timestamp, project, exit_code, stderr_excerpt}`. `stderr_excerpt` uses allowlist redaction: known error codes, paths, JSON violations, and known stack frames pass; unknown content becomes `[REDACTED]`.
-
-### Consecutive-Failure Exit
-
-If the same consumer fails 3 times consecutively across rollout runs, the driver exits non-zero with `SYNC FAILED (3x): <consumer>, last error: <message>`. This prevents infinite-retry loops on a persistently broken consumer.
-
----
-
-## Adding a New Artifact to the Registry
-
-Pipeline correctness checklist:
+New syncable artifact:
 
 1. Put the file under a sync-scoped root.
-2. Add an artifact entry with `"hash": "placeholder"`.
-3. Add `category/name` to the correct bundle `includes`.
-4. Run `compute-hashes --update`; fix findings or add an explicit `orphans[]` rationale.
-5. Sync at least one consumer and diff the shipped copy.
+2. Add registry entry with `"hash": "placeholder"`.
+3. Add `category/name` to the lowest correct bundle.
+4. Run `compute-hashes --update`.
+5. Sync a consumer and diff the shipped copy.
 
-### Why Imports Can't "Just Work"
+Finding map: missing registry entry -> `orphan`; missing imported helper ->
+`import-unregistered`; wrong tier -> `cross-bundle-closure`.
 
-Missing registry entry emits `orphan`; missing imported helper emits `import-unregistered`; wrong tier emits `cross-bundle-closure`. All fail before registry write.
+## Containment Model
 
----
-
-## Adding a New Bundle
-
-Adding a bundle requires three changes:
-
-1. **`metaclaude-registry.json`** -- add a new `bundles.<name>` entry with `description`, optional `extends`, and `includes: []`.
-2. **`lib/sync-constants.mjs`** -- add the new bundle to `BUNDLE_INHERITANCE` with its fully-expanded ancestor list. The closure check reads this, not the registry's `extends` field. If you omit this step, the closure check will throw when asked to look up the new bundle's ancestors.
-3. **Documentation** -- update `SYNC-SYSTEM.md` § Bundle Definitions and this file.
-
-The registry describes bundle inheritance; `BUNDLE_INHERITANCE` enforces it.
-
----
-
-## TOCTOU Model
-
-### What Is Protected
-
-Every path resolution under `.claude/` passes through `lib/path-containment.mjs`:
+Containment checks use realpath plus a separator-suffixed prefix:
 
 ```javascript
-export function assertContainment(target, claudeRoot) {
-  const real = fs.realpathSync(target); // follows symlinks
-  if (real === claudeRoot) return real;
-  if (real.startsWith(claudeRoot + path.sep)) return real;
-  throw new PathEscapeError({ target, real, claudeRoot });
-}
+if (real === claudeRoot) return real;
+if (real.startsWith(claudeRoot + path.sep)) return real;
+throw new PathEscapeError({ target, real, claudeRoot });
 ```
 
-The `path.sep` suffix is **required**. Naive `startsWith(claudeRoot)` without the separator allows `/foo/.claude-evil/x.mjs` to pass containment (it starts with `/foo/.claude`). The prefix-collision attack is defeated by requiring `/foo/.claude/` as the prefix.
+The separator is required. A naive `startsWith(claudeRoot)` check would allow
+prefix collisions such as `/repo/.claude-evil`.
 
-### What Is NOT Protected
+Protected: symlinks resolving outside `.claude`, prefix-collision escapes, and
+source replacement before final artifact read because sync re-runs containment
+immediately before `readFileSync`.
 
-The residual time-of-check/time-of-use window between `realpathSync()` and the actual `readFileSync()` call is not eliminated. An attacker with concurrent filesystem write access could replace a file in the microsecond window.
+Not protected: a hostile concurrent writer swapping a file after final realpath
+and before read. That residual race is accepted under the sole-developer trust
+model. `fd` reuse would be the harder model, but is not implemented.
 
-`metaclaude-cli sync` mitigates this by re-running `assertContainment()` immediately before each `readFileSync()` -- so there are two checks (compute time and sync time) with a smaller window between sync-time check and sync-time read. This is **shrinking**, not eliminating, the window.
+## Rollout Driver
 
-The residual is accepted under the sole-developer trust model. `fd`-reuse (resolving path to an open file descriptor and passing the fd through to the read) is out of scope.
+`rollout-resync.mjs` runs `metaclaude-cli sync <project> --force` across
+configured consumers.
 
-### Source-Code Grep Rule
-
-`target.startsWith(claudeRoot)` without the trailing separator is prohibited in source code. An AC enforces this via grep at test time -- the literal pattern must not appear in any `.mjs` file under `.claude/scripts/`. Use `assertContainment()` from `lib/path-containment.mjs` instead.
-
----
+- Missing consumer directory emits `TARGET_MISSING_MARKER` and is counted as
+  skipped, not a sync crash.
+- Failures are appended to `.claude/audit/rollout-failures.jsonl` with
+  allowlist-redacted stderr excerpts.
+- Three consecutive failures for the same consumer exit non-zero with the last
+  error.
 
 ## See Also
 
-- `.claude/docs/SYNC-SYSTEM.md` -- Operational guide (how to use the sync system)
-- `.claude/docs/HOOKS.md` -- Live hook inventory and hook placement reference
-- `.claude/metaclaude-registry.json` and `.claude/schemas/metaclaude-registry.schema.json` -- Registry artifact model
-- `.claude/audit/legacy-orphans-backlog.md` -- Resolved legacy orphan migration record
-- `.claude/memory-bank/org-context.md` -- Trust model and multi-developer hardening triggers
+- [SYNC-SYSTEM.md](SYNC-SYSTEM.md) - operator guide
+- [HOOKS.md](HOOKS.md) - live hook inventory
+- `.claude/metaclaude-registry.json` - registry artifact model
+- `.claude/audit/legacy-orphans-backlog.md` - historical orphan migration record
+- `.claude/memory-bank/org-context.md` - trust model and hardening triggers
