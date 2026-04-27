@@ -1,405 +1,238 @@
 ---
 _source_modules: ['e2e-test-writer-lib']
 title: e2e-test-writer Library API Reference
-last_reviewed: 2026-04-21
+last_reviewed: 2026-04-27
 ---
 
 # e2e-test-writer Library API Reference
 
-API reference for `.claude/scripts/lib/e2e-test-writer/` — the pure-function library that reifies the runtime-connectivity authoring contract. The `e2e-test-writer` agent invokes these helpers deterministically; unit and contract tests import the same surface.
-
-All modules are ES-module JavaScript (`.mjs`) with JSDoc type hints. Parses under TypeScript language service with `--allowJs --checkJs`. No TypeScript runtime loader required.
+Current API reference for `.claude/scripts/lib/e2e-test-writer/`, the
+runtime-connectivity E2E emission library used by the `e2e-test-writer` agent
+and its regression tests.
 
 Barrel entry: [`.claude/scripts/lib/e2e-test-writer/index.mjs`](../scripts/lib/e2e-test-writer/index.mjs).
+All modules are ESM `.mjs` files with JSDoc types.
 
 ## Module Surface
 
-| Module                | Purpose                                                               |
-| --------------------- | --------------------------------------------------------------------- |
-| `archetype-selection` | Priority-ordered archetype selection heuristic.                       |
-| `substitution`        | Placeholder grammar, substitution engine, fail-loud unresolved check. |
-| `scaffold-tier`       | L1/L2/L3 provisioning block resolution.                               |
-| `host-discovery`      | IPv4/IPv6 `discoverHost()` snippet resolution.                        |
-| `template-loader`     | File-path template loader (archetype → `.template.mjs`).              |
-| `emit`                | End-to-end emission pipeline composing all of the above.              |
+| Module | Responsibility |
+| --- | --- |
+| `emit` | Composes the emission pipeline and returns a result object. |
+| `archetype-selection` | Chooses one runtime-connectivity archetype from spec contracts. |
+| `substitution` | Builds placeholder maps and replaces template markers. |
+| `scaffold-tier` | Resolves `runtime_env.liveness` to a provisioning snippet. |
+| `host-discovery` | Resolves `runtime_env.prefer_ipv6` to a `discoverHost()` snippet. |
+| `template-loader` | Resolves and reads archetype template files. |
 
-## emit
-
-### `emitRuntimeConnectivityTest(input)`
-
-End-to-end pipeline. Composes scope gate → archetype selection → scaffold tier + host discovery → template load → substitution. Returns the emission artifact. Does NOT write to disk.
-
-**Signature**:
+## Barrel Exports
 
 ```javascript
-/**
- * @param {EmitInput} input
- * @returns {EmitResult}
- */
-function emitRuntimeConnectivityTest(input);
-```
-
-**`EmitInput`**:
-
-| Field             | Type                             | Required | Description                                                                     |
-| ----------------- | -------------------------------- | -------- | ------------------------------------------------------------------------------- |
-| `specId`          | `string`                         | Yes      | `manifest.id`. Must match `/^[a-z0-9-]+$/`.                                     |
-| `frontmatter`     | `Record<string, unknown>`        | Yes      | Parsed spec frontmatter.                                                        |
-| `contracts`       | `Array<Record<string, unknown>>` | Yes      | Contract definitions from the spec.                                             |
-| `archetypeValues` | `Record<string, string>`         | No       | Archetype-specific placeholder substitutions.                                   |
-| `projectRoot`     | `string`                         | No       | Absolute project root for template path resolution.                             |
-| `templateDir`     | `string`                         | No       | Override template directory (default `.claude/templates/runtime-connectivity`). |
-
-**`EmitResult`**:
-
-| Field          | Type                                                          | Present when                             |
-| -------------- | ------------------------------------------------------------- | ---------------------------------------- |
-| `status`       | `'success' \| 'skipped' \| 'failed'`                          | Always.                                  |
-| `archetype`    | `string`                                                      | `success` or `failed` (after selection). |
-| `emissionPath` | `string` (`tests/e2e/<specId>.runtime-connectivity.spec.mjs`) | `success` only.                          |
-| `content`      | `string` (substituted test file contents)                     | `success` only.                          |
-| `reason`       | `string`                                                      | `skipped` or `failed`.                   |
-| `diagnostics`  | `string[]`                                                    | `failed`.                                |
-
-**Errors**:
-
-| Error           | Code                    | Cause                             |
-| --------------- | ----------------------- | --------------------------------- |
-| `EmissionError` | `E_BAD_INPUT`           | `input` is not an object.         |
-| `EmissionError` | `E_BAD_SPEC_ID`         | `specId` missing or not a string. |
-| `EmissionError` | `E_BAD_SPEC_ID_CHARSET` | `specId` fails `/^[a-z0-9-]+$/`.  |
-
-Scope-gate failures (`crosses_boundary: false`, `e2e_skip: true`) return `status: 'skipped'` — not an error.
-
-Archetype selection failures (`ambiguous`, `no-match`) and unresolved-placeholder failures return `status: 'failed'` with diagnostics — not an error. Inner errors from `resolveProvisioningBlock`, `resolveHostDiscovery`, or `loadTemplate` throw; caller handles.
-
-**Example**:
-
-```javascript
-import { emitRuntimeConnectivityTest } from '../scripts/lib/e2e-test-writer/index.mjs';
-
-const result = emitRuntimeConnectivityTest({
-  specId: 'sg-my-feature',
-  frontmatter: {
-    crosses_boundary: true,
-    runtime_env: { liveness: 'L1' },
-  },
-  contracts: [{ _template: 'rest-api', path: '/api/v1/login' }],
-  archetypeValues: {
-    HTTP_METHOD: 'const HTTP_METHOD = "POST";',
-    HTTP_PATH: 'const HTTP_PATH = "/api/v1/login";',
-    REQUEST_SHAPE: 'const REQUEST_SHAPE = { user: "x", pass: "y" };',
-    RESPONSE_ASSERTION: 'expect(parsed).toMatchObject({ ok: true });',
-  },
-});
-
-if (result.status === 'success') {
-  // result.emissionPath === 'tests/e2e/sg-my-feature.runtime-connectivity.spec.mjs'
-  // result.content is the substituted .mjs file contents
-}
-```
-
-### `EmissionError`
-
-Error class for emit-time failures.
-
-| Field     | Type     | Description                              |
-| --------- | -------- | ---------------------------------------- |
-| `name`    | `string` | `'EmissionError'`.                       |
-| `code`    | `string` | Machine-readable code (see table above). |
-| `context` | `object` | Additional context.                      |
-
-## archetype-selection
-
-### `selectArchetype(spec)`
-
-Runs the priority-ordered selection heuristic over contract definitions. Pure function.
-
-**Signature**:
-
-```javascript
-/**
- * @param {SpecInput} spec
- * @returns {{ status: 'ok', archetype: Archetype }
- *   | { status: 'ambiguous', archetype: null, matched: Archetype[] }
- *   | typeof ARCHETYPE_SELECTION_NO_MATCH}
- */
-function selectArchetype(spec);
-```
-
-**`SpecInput`**:
-
-| Field         | Type                      | Required |
-| ------------- | ------------------------- | -------- |
-| `id`          | `string`                  | Yes      |
-| `frontmatter` | `Record<string, unknown>` | No       |
-| `contracts`   | `ContractDefinition[]`    | Yes      |
-
-**`Archetype`**: `'http-smoke' | 'ws-event' | 'sse-stream' | 'cli-writes-file' | 'ipc-ping-pong'`.
-
-**Return values**:
-
-| Status        | When                                 | Shape                                                                  |
-| ------------- | ------------------------------------ | ---------------------------------------------------------------------- |
-| `'ok'`        | Exactly one paradigm group matched.  | `{ status, archetype }`                                                |
-| `'ambiguous'` | Two or more paradigm groups matched. | `{ status, archetype: null, matched: Archetype[] }`                    |
-| `'no-match'`  | No priority row matched.             | `ARCHETYPE_SELECTION_NO_MATCH` (frozen `{ status, archetype: null }`). |
-
-Within the event paradigm, `sse-stream` wins over `ws-event` per AC2.5.
-
-### Exports
-
-| Symbol                          | Type                | Description                                  |
-| ------------------------------- | ------------------- | -------------------------------------------- |
-| `ARCHETYPES`                    | `readonly string[]` | Frozen canonical archetype enum (5 entries). |
-| `ARCHETYPE_SELECTION_AMBIGUOUS` | frozen object       | Sentinel for EC-A1.                          |
-| `ARCHETYPE_SELECTION_NO_MATCH`  | frozen object       | Sentinel for EC-A6.                          |
-| `selectArchetype`               | function            | Heuristic runner.                            |
-
-## substitution
-
-### `buildSubstitutionMap(input)`
-
-Construct the canonical substitution map keyed by placeholder identifier (no braces).
-
-**Signature**:
-
-```javascript
-/**
- * @param {BuildSubstitutionMapInput} input
- * @returns {Record<string, string>}
- */
-function buildSubstitutionMap(input);
-```
-
-**`BuildSubstitutionMapInput`**:
-
-| Field               | Type                                       | Required | Default |
-| ------------------- | ------------------------------------------ | -------- | ------- |
-| `specId`            | `string`                                   | Yes      |         |
-| `livenessTier`      | `'L1' \| 'L2' \| 'L3'`                     | No       | `'L1'`  |
-| `timeoutMs`         | `number`                                   | No       | `30000` |
-| `provisioningBlock` | `string` (from `resolveProvisioningBlock`) | Yes      |         |
-| `hostDiscovery`     | `string` (from `resolveHostDiscovery`)     | Yes      |         |
-| `archetype`         | `Archetype`                                | Yes      |         |
-| `archetypeValues`   | `Record<string, string>`                   | No       | `{}`    |
-
-Throws `Error` when `archetype` is unknown.
-
-### `substitute(template, substitutionMap, archetype)`
-
-Apply the substitution map to a template string. Single-pass `String.prototype.replaceAll` per placeholder.
-
-**Signature**:
-
-```javascript
-/**
- * @param {string} template
- * @param {Record<string, string>} substitutionMap
- * @param {string} archetype
- * @returns {string}
- * @throws {UnresolvedPlaceholderError}
- */
-function substitute(template, substitutionMap, archetype);
-```
-
-**Behavior**:
-
-1. For each `[id, value]` in `substitutionMap`, replace all occurrences of `// {{<id>}}` with `value`. The `// ` prefix is part of the marker and is consumed (TECH-003 — omitting the prefix leaves declarations commented out).
-2. After the pass, scan the result for any remaining `{{[A-Z][A-Z0-9_]*}}` markers. If any remain, throw `UnresolvedPlaceholderError` with the unique marker identifiers.
-
-**Errors**:
-
-| Error                        | Code                       | Cause                                       |
-| ---------------------------- | -------------------------- | ------------------------------------------- |
-| `UnresolvedPlaceholderError` | `E_UNRESOLVED_PLACEHOLDER` | `{{…}}` marker(s) remain post-substitution. |
-
-### `UnresolvedPlaceholderError`
-
-| Field       | Type       | Description                           |
-| ----------- | ---------- | ------------------------------------- |
-| `name`      | `string`   | `'UnresolvedPlaceholderError'`.       |
-| `code`      | `string`   | `'E_UNRESOLVED_PLACEHOLDER'`.         |
-| `markers`   | `string[]` | Unresolved identifier(s) (no braces). |
-| `archetype` | `string`   | Archetype name for context.           |
-
-### Exports
-
-| Symbol                            | Type                                   | Description                                         |
-| --------------------------------- | -------------------------------------- | --------------------------------------------------- |
-| `PLACEHOLDER_GRAMMAR`             | `RegExp`                               | `/\{\{([A-Z][A-Z0-9_]*)\}\}/g` — global, capturing. |
-| `CANONICAL_PLACEHOLDERS`          | `readonly string[]`                    | 6 canonical placeholder identifiers (frozen).       |
-| `ARCHETYPE_SPECIFIC_PLACEHOLDERS` | `Record<Archetype, readonly string[]>` | Per-archetype placeholder identifiers (frozen).     |
-| `buildSubstitutionMap`            | function                               | Map builder.                                        |
-| `substitute`                      | function                               | Substitution engine.                                |
-| `UnresolvedPlaceholderError`      | class                                  | Fail-loud error.                                    |
-
-## scaffold-tier
-
-### `resolveProvisioningBlock(tier, specId)`
-
-Map `runtime_env.liveness` to the substituted `{{PROVISIONING_BLOCK}}` snippet.
-
-**Signature**:
-
-```javascript
-/**
- * @param {unknown} tier
- * @param {string} specId
- * @returns {string}
- * @throws {InvalidLivenessError}
- */
-function resolveProvisioningBlock(tier, specId);
-```
-
-**Behavior**:
-
-- `undefined` or `null` → returns L1 snippet (default).
-- `'L1'` → `// no external provisioning required (L1 in-process)`.
-- `'L2'` → `beforeAll`/`afterAll` `execSync` block referencing `tests/e2e/provisioning/<specId>.sh`.
-- `'L3'` → `beforeAll`/`afterAll` `DockerComposeEnvironment` block referencing `tests/e2e/containers/<specId>.compose.yml`.
-- Other value → throws `InvalidLivenessError` (defense-in-depth; schema validates upstream).
-
-### `InvalidLivenessError`
-
-| Field  | Type      | Description               |
-| ------ | --------- | ------------------------- |
-| `name` | `string`  | `'InvalidLivenessError'`. |
-| `code` | `string`  | `'E_INVALID_LIVENESS'`.   |
-| `tier` | `unknown` | The rejected value.       |
-
-### Exports
-
-| Symbol                     | Type                | Description                    |
-| -------------------------- | ------------------- | ------------------------------ |
-| `LIVENESS_TIERS`           | `readonly string[]` | `['L1', 'L2', 'L3']` (frozen). |
-| `resolveProvisioningBlock` | function            | Tier → snippet resolver.       |
-| `InvalidLivenessError`     | class               | Validation error.              |
-
-## host-discovery
-
-### `resolveHostDiscovery(preferIpv6)`
-
-Map `runtime_env.prefer_ipv6` to the substituted `{{HOST_DISCOVERY}}` snippet. Both branches emit an ESM `import os from 'node:os'` (TECH-001).
-
-**Signature**:
-
-```javascript
-/**
- * @param {unknown} preferIpv6
- * @returns {string}
- * @throws {InvalidPreferIpv6Error}
- */
-function resolveHostDiscovery(preferIpv6);
-```
-
-**Behavior**:
-
-- `undefined`, `null`, or `false` → IPv4-first snippet (default). Fallback: `127.0.0.1`.
-- `true` → IPv6-first snippet with link-local (`fe80::/…`) exclusion. Fallback: `::1`.
-- Other value → throws `InvalidPreferIpv6Error`.
-
-Both branches share the interface-name exclusion regex: `/^(docker0|br-|vEthernet|tailscale0|utun|tun\d|ppp)/`.
-
-### `InvalidPreferIpv6Error`
-
-| Field   | Type      | Description                 |
-| ------- | --------- | --------------------------- |
-| `name`  | `string`  | `'InvalidPreferIpv6Error'`. |
-| `code`  | `string`  | `'E_INVALID_PREFER_IPV6'`.  |
-| `value` | `unknown` | The rejected value.         |
-
-### Exports
-
-| Symbol                   | Type     | Description              |
-| ------------------------ | -------- | ------------------------ |
-| `resolveHostDiscovery`   | function | Flag → snippet resolver. |
-| `InvalidPreferIpv6Error` | class    | Validation error.        |
-
-## template-loader
-
-### `loadTemplate(archetype, opts)`
-
-Load the raw template string for an archetype by file path (D-036: templates are NOT inlined in the agent prompt).
-
-**Signature**:
-
-```javascript
-/**
- * @param {string} archetype
- * @param {{ projectRoot?: string, templateDir?: string }} [opts]
- * @returns {string}
- * @throws {TemplateNotFoundError}
- */
-function loadTemplate(archetype, opts);
-```
-
-**Resolution**:
-
-- `archetype` validated against `ARCHETYPES`. Unknown value throws generic `Error`.
-- Path: `<projectRoot>/<templateDir>/<archetype>.template.mjs`.
-- Defaults: `projectRoot = process.cwd()`, `templateDir = '.claude/templates/runtime-connectivity'`.
-- File read UTF-8 via `readFileSync`.
-- Missing file throws `TemplateNotFoundError`.
-
-### `templatePathFor(archetype, opts)`
-
-Resolve the absolute template path without reading. Same resolution rules.
-
-### `TemplateNotFoundError`
-
-| Field       | Type     | Description                     |
-| ----------- | -------- | ------------------------------- |
-| `name`      | `string` | `'TemplateNotFoundError'`.      |
-| `code`      | `string` | `'E_TEMPLATE_NOT_FOUND'`.       |
-| `archetype` | `string` | Archetype label.                |
-| `path`      | `string` | Absolute path that was missing. |
-
-### Exports
-
-| Symbol                  | Type     | Description                                 |
-| ----------------------- | -------- | ------------------------------------------- |
-| `DEFAULT_TEMPLATE_DIR`  | `string` | `'.claude/templates/runtime-connectivity'`. |
-| `loadTemplate`          | function | Read template contents.                     |
-| `templatePathFor`       | function | Resolve absolute path (no I/O).             |
-| `TemplateNotFoundError` | class    | Missing file error.                         |
-
-## Error Codes Summary
-
-| Code                       | Class                        | Where thrown                  |
-| -------------------------- | ---------------------------- | ----------------------------- |
-| `E_BAD_INPUT`              | `EmissionError`              | `emitRuntimeConnectivityTest` |
-| `E_BAD_SPEC_ID`            | `EmissionError`              | `emitRuntimeConnectivityTest` |
-| `E_BAD_SPEC_ID_CHARSET`    | `EmissionError`              | `emitRuntimeConnectivityTest` |
-| `E_UNRESOLVED_PLACEHOLDER` | `UnresolvedPlaceholderError` | `substitute`                  |
-| `E_INVALID_LIVENESS`       | `InvalidLivenessError`       | `resolveProvisioningBlock`    |
-| `E_INVALID_PREFER_IPV6`    | `InvalidPreferIpv6Error`     | `resolveHostDiscovery`        |
-| `E_TEMPLATE_NOT_FOUND`     | `TemplateNotFoundError`      | `loadTemplate`                |
-
-## Regression Coverage
-
-The production barrel (`index.mjs`) is the tested import surface. `prod-lib-smoke.test.mjs` imports it directly, emits an `http-smoke` fixture, parses the output as ESM, and dynamically imports stubbed output to catch placeholder-substitution or ESM drift.
-
-## Import Example
-
-```javascript
-import {
+export {
   emitRuntimeConnectivityTest,
   EmissionError,
   ARCHETYPES,
+  ARCHETYPE_SELECTION_AMBIGUOUS,
+  ARCHETYPE_SELECTION_NO_MATCH,
   selectArchetype,
+  CANONICAL_PLACEHOLDERS,
+  ARCHETYPE_SPECIFIC_PLACEHOLDERS,
+  PLACEHOLDER_GRAMMAR,
   buildSubstitutionMap,
   substitute,
   UnresolvedPlaceholderError,
   LIVENESS_TIERS,
   resolveProvisioningBlock,
+  InvalidLivenessError,
   resolveHostDiscovery,
+  InvalidPreferIpv6Error,
+  DEFAULT_TEMPLATE_DIR,
   loadTemplate,
-} from '../scripts/lib/e2e-test-writer/index.mjs';
+  templatePathFor,
+  TemplateNotFoundError,
+};
 ```
+
+## Emission Pipeline
+
+`emitRuntimeConnectivityTest(input)` is the top-level pure function. It does not
+write files.
+
+Input shape:
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| `specId` | `string` | Required. Uses `/^[a-z0-9-]+$/`. |
+| `frontmatter` | `Record<string, unknown>` | Required parsed spec frontmatter. |
+| `contracts` | `Array<Record<string, unknown>>` | Required contract definitions. |
+| `archetypeValues` | `Record<string, string>` | Optional archetype placeholder replacements. |
+| `projectRoot` | `string` | Optional template resolution root. |
+| `templateDir` | `string` | Optional template directory override. |
+
+Result shape:
+
+| Status | Meaning |
+| --- | --- |
+| `success` | Returns `archetype`, `emissionPath`, and substituted `content`. |
+| `skipped` | Scope gate opted out through `crosses_boundary: false` or `e2e_skip: true`. |
+| `failed` | Selection or substitution failed; returns `reason` and `diagnostics`. |
+
+Pipeline order:
+
+1. Validate `input` and `specId`.
+2. Return `skipped` for explicit scope opt-outs.
+3. Run `selectArchetype({ id, frontmatter, contracts })`.
+4. Resolve provisioning from `runtime_env.liveness`.
+5. Resolve host discovery from `runtime_env.prefer_ipv6`.
+6. Load `.claude/templates/runtime-connectivity/<archetype>.template.mjs`.
+7. Build substitutions and replace template markers.
+8. Return `tests/e2e/<specId>.runtime-connectivity.spec.mjs` plus content.
+
+Thrown emit validation errors:
+
+| Code | Cause |
+| --- | --- |
+| `E_BAD_INPUT` | `input` is not an object. |
+| `E_BAD_SPEC_ID` | `specId` is absent or not a string. |
+| `E_BAD_SPEC_ID_CHARSET` | `specId` contains unsupported characters. |
+
+`EmissionError` exposes `name`, `code`, and `context`.
+
+## Archetype Selection
+
+`selectArchetype(spec)` is pure and returns one of:
+
+| Status | Shape |
+| --- | --- |
+| `ok` | `{ status, archetype }` |
+| `ambiguous` | `{ status, archetype: null, matched }` |
+| `no-match` | Frozen `{ status, archetype: null }` sentinel. |
+
+Canonical archetypes:
+
+- `http-smoke`
+- `ws-event`
+- `sse-stream`
+- `cli-writes-file`
+- `ipc-ping-pong`
+
+Selection groups contracts by paradigm. Cross-paradigm matches are ambiguous.
+Within event contracts, SSE wins over generic websocket/event matches.
+
+Current heuristics:
+
+| Archetype | Match signal |
+| --- | --- |
+| `http-smoke` | Contract `_template: rest-api`. |
+| `sse-stream` | Event contract with SSE channel or `Accept: text/event-stream`. |
+| `ws-event` | Event contract with websocket channel/protocol, or generic event contract. |
+| `cli-writes-file` | Behavioral contract mentioning file write/create/output behavior. |
+| `ipc-ping-pong` | Behavioral contract mentioning IPC, unix socket, named pipe, or ping-pong behavior. |
+
+## Template Substitution
+
+Templates use comment-wrapped markers:
+
+```javascript
+// {{PLACEHOLDER_ID}}
+```
+
+`PLACEHOLDER_GRAMMAR` matches `{{[A-Z][A-Z0-9_]*}}`.
+
+Canonical placeholders:
+
+- `SPEC_ID`
+- `PORT`
+- `HOST_DISCOVERY`
+- `TIMEOUT_MS`
+- `LIVENESS_TIER`
+- `PROVISIONING_BLOCK`
+
+`buildSubstitutionMap(input)` adds those canonical replacements and merges
+archetype-specific replacements from `archetypeValues`. Defaults:
+
+| Field | Default |
+| --- | --- |
+| `livenessTier` | `L1` |
+| `timeoutMs` | `30000` |
+| `archetypeValues` | `{}` |
+
+`substitute(template, substitutionMap, archetype)` replaces each
+`// {{ID}}` marker with the mapped value. The `// ` prefix is consumed so
+replacement declarations execute instead of staying commented out. After the
+pass, remaining markers throw `UnresolvedPlaceholderError`.
+
+`UnresolvedPlaceholderError` exposes `name`,
+`code: E_UNRESOLVED_PLACEHOLDER`, `markers`, and `archetype`.
+
+## Provisioning
+
+`resolveProvisioningBlock(tier, specId)` maps `runtime_env.liveness` to the
+`PROVISIONING_BLOCK` replacement.
+
+| Tier | Behavior |
+| --- | --- |
+| absent, `null`, `L1` | In-process placeholder; no external provisioning. |
+| `L2` | `beforeAll`/`afterAll` shell hook at `tests/e2e/provisioning/<specId>.sh`. |
+| `L3` | `DockerComposeEnvironment` for `tests/e2e/containers/<specId>.compose.yml`. |
+
+Invalid values throw `InvalidLivenessError` with `code: E_INVALID_LIVENESS` and
+the rejected `tier`.
+
+`LIVENESS_TIERS` is the frozen enum `['L1', 'L2', 'L3']`.
+
+## Host Discovery
+
+`resolveHostDiscovery(preferIpv6)` maps `runtime_env.prefer_ipv6` to the
+`HOST_DISCOVERY` replacement.
+
+| Value | Behavior |
+| --- | --- |
+| absent, `null`, `false` | IPv4-first discovery; fallback `127.0.0.1`. |
+| `true` | IPv6-first discovery; excludes link-local IPv6; fallback `::1`. |
+
+Both branches emit an ESM `import os from 'node:os'`, sort interface names for
+stable selection, and exclude common container/VPN interfaces:
+`/^(docker0|br-|vEthernet|tailscale0|utun|tun\d|ppp)/`.
+
+Invalid values throw `InvalidPreferIpv6Error` with
+`code: E_INVALID_PREFER_IPV6` and the rejected `value`.
+
+## Template Loading
+
+`DEFAULT_TEMPLATE_DIR` is `.claude/templates/runtime-connectivity`.
+
+`templatePathFor(archetype, opts)` validates the archetype and returns:
+
+```text
+<projectRoot>/<templateDir>/<archetype>.template.mjs
+```
+
+`loadTemplate(archetype, opts)` reads that path as UTF-8. Missing files throw
+`TemplateNotFoundError` with `code: E_TEMPLATE_NOT_FOUND`, `archetype`, and
+`path`.
+
+## Error Codes
+
+| Code | Class | Source |
+| --- | --- | --- |
+| `E_BAD_INPUT` | `EmissionError` | `emitRuntimeConnectivityTest` |
+| `E_BAD_SPEC_ID` | `EmissionError` | `emitRuntimeConnectivityTest` |
+| `E_BAD_SPEC_ID_CHARSET` | `EmissionError` | `emitRuntimeConnectivityTest` |
+| `E_UNRESOLVED_PLACEHOLDER` | `UnresolvedPlaceholderError` | `substitute` |
+| `E_INVALID_LIVENESS` | `InvalidLivenessError` | `resolveProvisioningBlock` |
+| `E_INVALID_PREFER_IPV6` | `InvalidPreferIpv6Error` | `resolveHostDiscovery` |
+| `E_TEMPLATE_NOT_FOUND` | `TemplateNotFoundError` | `loadTemplate` |
+
+## Regression Coverage
+
+Focused tests live under `.claude/scripts/__tests__/e2e-test-writer/`.
+`prod-lib-smoke.test.mjs` imports the barrel, emits an `http-smoke` fixture,
+parses the output as ESM, and dynamically imports stubbed output. Other focused
+tests cover archetype selection, template contracts, substitution,
+runtime-connectivity sections, scaffold tiers, and black-box isolation.
 
 ## See Also
 
-- [RUNTIME-CONNECTIVITY-AUTHORING.md](RUNTIME-CONNECTIVITY-AUTHORING.md) — user-facing guide.
-- [RUNTIME-CONNECTIVITY-ARCHETYPES.md](RUNTIME-CONNECTIVITY-ARCHETYPES.md) — archetype reference with per-archetype placeholder sets.
-- Library sources: `.claude/scripts/lib/e2e-test-writer/*.mjs`.
+- [RUNTIME-CONNECTIVITY-AUTHORING.md](RUNTIME-CONNECTIVITY-AUTHORING.md)
+- [RUNTIME-CONNECTIVITY-ARCHETYPES.md](RUNTIME-CONNECTIVITY-ARCHETYPES.md)
+- `.claude/scripts/lib/e2e-test-writer/*.mjs`
