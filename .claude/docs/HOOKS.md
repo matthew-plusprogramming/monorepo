@@ -266,7 +266,8 @@ Operational surfaces:
 Worktree-canon is owned by [WORKTREE-CANON.md](WORKTREE-CANON.md). Hook-facing
 rule: session start captures `session.active_work.project_dir_pin`; hook entry
 or file-target logic rejects symlink components, path escapes, env mutation,
-and case-FS mismatch before acting on sensitive state.
+and case-FS mismatch before acting on sensitive state. Rejections surface as
+`WORKTREE_PATH_VIOLATION`.
 
 | Consumer | Check |
 | --- | --- |
