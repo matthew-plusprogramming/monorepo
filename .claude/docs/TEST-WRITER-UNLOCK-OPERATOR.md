@@ -1,10 +1,10 @@
 ---
-_source_modules: ['pipeline-efficiency-ws2-practice-2.4']
+_source_modules: ['session-checkpoint', 'workflow-file-protection']
 ---
 
 # Test-Writer Unlock Operator Guide
 
-Operator interaction guide for the bug-fix-mode hybrid test-writer flow shipped in `sg-pipeline-efficiency-ws2-practice-2.4`. Covers `record-test-writer-unlock` + `fire-refence-trigger` CLIs, the 5 re-fence triggers, HMAC session-secret lifecycle, audit-log event classes, and error-code remediation.
+Operator interaction guide for the bug-fix-mode hybrid test-writer flow. Covers `record-test-writer-unlock` + `fire-refence-trigger` CLIs, the 5 re-fence triggers, HMAC session-secret lifecycle, audit-log event classes, and error-code remediation.
 
 ## Quick Reference
 
@@ -283,4 +283,4 @@ Effective kill of ws-2 audit-log appends (`test_writer_unlock`, `test_writer_unl
 - `SESSION-OVERRIDE-CLI.md` — `override-enforcement` usage reference
 - `THRESHOLD-TUNING.md` — per-gate thresholds + BIZ-002 minimum-pruning floor
 - `.claude/memory-bank/testing.guidelines.md § Bug-Fix Hybrid Mode` — test-writer agent guidance
-- `.claude/specs/groups/sg-pipeline-efficiency-ws2-practice-2.4/spec.md` — authoritative spec
+- `.claude/docs/design/test-writer-unlock-state-signals.md` — current state-signal contract

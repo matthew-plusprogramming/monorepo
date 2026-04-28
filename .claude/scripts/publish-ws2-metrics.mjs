@@ -75,9 +75,6 @@
  *   3 - INSUFFICIENT_POST_SHIP_SAMPLE (fewer than 5 bug-fix workstreams
  *       post-ship). Structured exit per AC11.3.
  *
- * Implements: AC11.1, AC11.2, AC11.3, AC11.4 (as-011).
- * Spec: sg-pipeline-efficiency-ws2-practice-2.4 as-011.
- *
  * @req REQ-014
  */
 

@@ -17,8 +17,6 @@
  *             (short-form ws-id). Legacy `pipeline-efficiency-practice-2-4-*`
  *             is never written.
  *
- * Spec: sg-pipeline-efficiency-ws2-practice-2.4 (as-010)
- *
  * Canonical path (authoritative — matches ws-1 as-020 3-workstream preflight):
  *   `.claude/metrics/pipeline-efficiency-ws2-baseline.json`
  *
@@ -348,28 +346,17 @@ function deriveBaseline(entries, previous, opts) {
   const rawEndMs = latestMs !== null ? latestMs : nowMs;
   const windowEndMs = Math.max(windowStartMs, Number.isFinite(rawEndMs) ? rawEndMs : nowMs);
 
-  // False-positive / catch rates are zero at this layer — the advisory-phase
+  // False-positive / catch rates are zero at this layer. The advisory-phase
   // baseline does not have an independent oracle for the Practice-2.4 gate
-  // in this evidence run (same rationale as ws-1 as-026 scaffold; ws-2
-  // metrics publisher (as-011) will refine these rates with operator review
-  // once the sample matures). Matching ws-1 as-026 scaffold conventions
-  // keeps the two baselines structurally identical for the 3-way preflight.
+  // in this evidence run; the metrics publisher can refine these rates with
+  // operator review once the sample matures. Matching the ws-1 scaffold
+  // conventions keeps baselines structurally identical for the preflight.
   //
-  // SELF-RESOLVED(code): ws-1 as-026 scaffold establishes 0 as the baseline
-  // value until an `observed_rate` is published; refined later by as-011
-  // publisher. In-repo evidence:
-  //   - ws-1 as-026 scaffold precedent — same two fields emitted as 0 on
-  //     first publication (advisory-phase invariant shared by both
-  //     workstreams).
-  //   - Atomic spec `.claude/specs/groups/sg-pipeline-efficiency-ws2-practice-2.4/
-  //     atomic/as-011-*.md` Decision Log records that the publisher (as-011)
-  //     is the refinement owner — this accumulator's job is to emit the
-  //     schema-valid scaffold with `sample_count` monotonic.
-  //   - `baselineSchema` (lib/schemas/baseline.schema.mjs) accepts 0 as a
-  //     valid rate; `isSufficientBaseline` (same file) gates on
-  //     `sample_count >= 10 && window >= 30d`, NOT on fp/catch specifically.
-  // The rates therefore correctly default to 0 here until the publisher
-  // overrides them with operator-classified signal.
+  // The accumulator's job is to emit a schema-valid scaffold with monotonic
+  // `sample_count`. `baselineSchema` accepts 0 as a valid rate, and
+  // `isSufficientBaseline` gates on sample_count/window maturity rather than
+  // fp/catch values. Rates stay 0 here until the publisher overrides them
+  // with operator-classified signal.
   const baseline = {
     gate_name: WS2_GATE_NAME,
     false_positive_rate: 0,

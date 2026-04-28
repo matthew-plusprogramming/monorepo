@@ -44,8 +44,8 @@
  *     (keeps `appendAuditEntry` errors visible to the Stop hook's own error
  *     handler rather than swallowed here).
  *
- * Spec: sg-pipeline-efficiency-ws2-practice-2.4 / as-008
- * Parent: spec.md §Edge Cases EC-WS2-7; AC-005.9; AC8.1..AC8.4.
+ * Current contract source:
+ *   .claude/docs/design/test-writer-unlock-state-signals.md § Audit Events
  */
 
 import { execFileSync } from 'node:child_process';
@@ -55,7 +55,7 @@ import { execFileSync } from 'node:child_process';
 // =============================================================================
 
 /**
- * Test-path globs per spec description (as-008 §Description).
+ * Test-path globs for unlock misuse detection.
  *
  * A changed path qualifies as a "test file" if ANY path segment is literally
  * `__tests__`, OR the path starts with `tests/`. Matching is done on the

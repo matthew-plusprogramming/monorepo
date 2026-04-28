@@ -28,12 +28,12 @@
  *   complete-work                                 - Finalize completed work (with completion checklist)
  *   archive-incomplete                            - Archive incomplete work to history
  *   record-test-writer-unlock <sg-id> --dispatch-id <id> --first-failure-ref <ref>
- *                                                 - Record bug-fix-mode test-writer unlock (ws-2 as-003).
- *                                                   Sole-writer for session.json.test_writer_unlock;
+ *                                                 - Record bug-fix-mode test-writer unlock.
+ *                                                   Sole-writer for active_work.test_writer_unlock;
  *                                                   rejects feature-mode with UNLOCK_MODE_MISMATCH.
  *   fire-refence-trigger <sg-id> --trigger <label>
  *                                                 - Fire a re-fence trigger (version-bump, workstream-rotate)
- *                                                   that clears session.test_writer_unlock[<sg-id>] (ws-2 as-005).
+ *                                                   that clears active_work.test_writer_unlock[<sg-id>].
  *                                                   Idempotent; appends test_writer_unlock_refence audit entry.
  *   record-deployment --target <t> --method <m>    - Record deployment activity (AC-1.1)
  *   record-deployment-failure                      - Record deployment failure (AC-2.1)
@@ -251,13 +251,10 @@ try {
   }
   appendAuditEntry = sidecarUnavailable('pipeline-efficiency-audit-log.mjs', err);
 }
-// sg-pipeline-efficiency-ws2-practice-2.4 / as-003 / REQ-005 (AC-005.3, AC-005.7, AC-005.8)
 // record-test-writer-unlock CLI — sole-writer entry point for
-// session.json.test_writer_unlock[<sg-id>]. `mintMarker` (as-004) ships
-// alongside as-003 (spec §Deployment Notes). Code-review Pass 1 M3: promoted
-// from lazy `createRequire` resolve to a static ESM import now that the two
-// atomic specs land together; the `globalThis.__testWriterUnlockMarkerStub`
-// override path is retained below for test injection.
+// session.active_work.test_writer_unlock[<sg-id>]. The
+// `globalThis.__testWriterUnlockMarkerStub` override path is retained below
+// for test injection.
 import { mintMarker as _mintMarkerReal } from './lib/test-writer-unlock-marker.mjs';
 
 // sg-pipeline-efficiency-ws3-orchestrator-hygiene / as-006 (REQ-007)
@@ -1069,19 +1066,17 @@ export class SessionOverrideError extends Error {
  * `.code`; the message also carries the code as a prefix token for stderr-
  * grep parity (mirrors SessionOverrideError convention).
  *
- * Codes (stable discriminators, spec.md § Interfaces & Contracts):
+ * Codes (stable discriminators for the test_writer_unlock contract):
  *   UNLOCK_USAGE_ERROR          — missing/invalid required flag
- *   UNLOCK_MODE_MISMATCH        — spec_mode absent OR != 'bug-fix' (AC-005.7)
+ *   UNLOCK_MODE_MISMATCH        — spec_mode absent OR != 'bug-fix'
  *   UNLOCK_MANIFEST_MISSING     — manifest.json not present for sg-id
  *   UNLOCK_MANIFEST_CORRUPT     — manifest.json unreadable / invalid JSON
  *   UNLOCK_SESSION_MISSING      — session.json absent; run `init` first
  *   UNLOCK_SESSION_NO_ACTIVE_WORK — session has no active_work
  *   UNLOCK_HMAC_SECRET_ERROR    — secret file IO / mode-enforcement failure
  *   UNLOCK_AUDIT_APPEND_FAILED  — audit chain append failed (see payload)
- *   GENESIS_ANCHOR_INVALID      — hash-chain genesis anchor missing/invalid
- *                                 (as-007 AC7.3: fail-closed exit 2; unlock REJECTED)
- *
- * sg-pipeline-efficiency-ws2-practice-2.4 / as-003 / REQ-005.
+ *   GENESIS_ANCHOR_INVALID      — hash-chain genesis anchor missing/invalid;
+ *                                 fail-closed exit 2; unlock rejected
  */
 export class TestWriterUnlockError extends Error {
   constructor(code, message, details = {}) {
@@ -3367,14 +3362,12 @@ function opOverrideEnforcement(mode, rationale) {
 }
 
 // =============================================================================
-// sg-pipeline-efficiency-ws2-practice-2.4 / as-003 / REQ-005
 // record-test-writer-unlock CLI (sole-writer for test_writer_unlock)
 // =============================================================================
 
 /**
- * TTL window for a recorded unlock. Anchored at `first_failure_at` (AC-005.3,
- * spec.md § TestWriterUnlockEntry). The hook re-checks `now() < unlocked_until`
- * on every implementation-file read (AC-005.5 cooperative-check).
+ * TTL window for a recorded unlock. Anchored at `first_failure_at`. The hook
+ * re-checks `now() < unlocked_until` on every implementation-file read.
  *
  * 5 minutes ≙ 300 000 ms. Named constant, not a magic literal (code-quality.md).
  */
@@ -3705,30 +3698,23 @@ function verifyGenesisForUnlockPreflight(claudeDir) {
 /**
  * Record a test-writer unlock entry for a bug-fix-mode spec group.
  *
- * Sole-writer for `session.json.test_writer_unlock[<sg-id>]`. Preflight:
+ * Sole-writer for `session.active_work.test_writer_unlock[<sg-id>]`. Preflight:
  *   1. Validate --dispatch-id + --first-failure-ref present and non-empty.
  *   2. Validate sg-id format.
  *   3. Read manifest.spec_mode; reject with UNLOCK_MODE_MISMATCH unless
- *      `spec_mode === 'bug-fix'` (AC-005.7, AC-3.2).
+ *      `spec_mode === 'bug-fix'`.
  *   4. Load session; require active_work (UNLOCK_SESSION_NO_ACTIVE_WORK).
  *   5. Read-or-bootstrap per-session HMAC secret (mode 0600).
  *   6. Compute first_failure_at (=now()) + unlocked_until (+5min).
- *   7. Mint marker via as-004 mintMarker() using (sgId, dispatchId,
+ *   7. Mint marker via mintMarker() using (sgId, dispatchId,
  *      unlockedUntil, secret).
  *   8. Append audit entry event_class='test_writer_unlock' BEFORE session
  *      mutation (mirrors opOverrideEnforcement ordering). A failed append
  *      propagates AuditLogError → CLI exits 1 with UNLOCK_AUDIT_APPEND_FAILED
- *      and session.json is untouched (AC-005.10 / AC-005.8 invariant).
+ *      and session.json is untouched.
  *   9. Write session.active_work.test_writer_unlock[sgId] = { first_failure_at,
  *      unlocked_until, dispatch_id, marker } via saveSession (sole-writer
- *      path; existing FULL_BLOCK protects against non-checkpoint writers
- *      per AC-005.8).
- *
- * Acceptance criteria:
- *   - AC3.1: 4-field entry with unlocked_until = first_failure_at + 5min; exit 0
- *   - AC3.2: feature-mode rejects with UNLOCK_MODE_MISMATCH; session unchanged
- *   - AC3.3: direct-write blocked by existing FULL_BLOCK hook (not this handler)
- *   - AC3.4: completes <5s (no network IO, bounded local-fs work)
+ *      path; workflow-file-protection.mjs blocks non-checkpoint writers.
  *
  * @param {string} specGroupId     positional first arg
  * @param {string} dispatchId      --dispatch-id flag value
@@ -3758,14 +3744,14 @@ export function opRecordTestWriterUnlock(specGroupId, dispatchId, firstFailureRe
   const trimmedDispatchId = dispatchId.trim();
   const trimmedFirstFailureRef = firstFailureRef.trim();
 
-  // ---- Preflight: spec_mode gate (AC-005.7 / AC3.2) ----------------------
+  // ---- Preflight: spec_mode gate -----------------------------------------
   const { specMode } = readManifestSpecMode(specGroupId);
   if (specMode !== 'bug-fix') {
     throw new TestWriterUnlockError(
       'UNLOCK_MODE_MISMATCH',
       `UNLOCK_MODE_MISMATCH: spec_group '${specGroupId}' has spec_mode='${specMode}'; ` +
         `record-test-writer-unlock requires spec_mode='bug-fix'. Hybrid-mode unlock is ` +
-        `only permitted on bug-fix specs (REQ-005 fail-closed default, AC-005.7).`
+        `only permitted on bug-fix specs.`
     );
   }
 
@@ -3933,35 +3919,29 @@ export function opRecordTestWriterUnlock(specGroupId, dispatchId, firstFailureRe
 }
 
 // =============================================================================
-// as-007 audit emission helpers (consumed by as-005 predicate + as-008 stop-hook)
+// Audit emission helpers consumed by the re-fence predicate and Stop hook
 // =============================================================================
 //
 // These helpers centralize the payload shape for the three test-writer-unlock
 // event classes so the emission sites stay consistent with the Audit log entry
-// shape contract (spec.md § Interfaces & Contracts § Audit log entry shape).
+// shape contract documented in the design doc.
 //
-// AC7.1 (test_writer_unlock) — already wired inline inside opRecordTestWriterUnlock
-//        above; the helper is not used there to keep the as-003 success path
-//        atomic with the session.json write. The shape matches this helper's
-//        test_writer_unlock_refence / test_writer_unlock_misuse payloads by
-//        design (seq, prev_hash, timestamp, event_class are added by the
-//        appendAuditEntry chain helper itself).
-// AC7.2 (test_writer_unlock_refence) — consumed by as-005 5-trigger predicate.
-// Task 7.4 (test_writer_unlock_misuse) — consumed by as-008 stop-hook.
+// test_writer_unlock is wired inline inside opRecordTestWriterUnlock above;
+// the helper is not used there to keep the success path atomic with the
+// session.json write. The shape matches these refence/misuse payloads by
+// design (seq, prev_hash, timestamp, event_class are added by the chain helper).
 //
 // All three event classes are in the 9-class canonical enum (see
 // lib/schemas/audit-entry.schema.mjs EVENT_CLASSES). Genesis / chain errors
 // surface as AuditLogError with codes E_GENESIS_ANCHOR_{MISSING,INVALID} /
 // E_GENESIS_HASH_INVALID / E_WRITE_FAILED — call sites must decide whether
-// to fail-closed (as-003 reject path, AC7.3) or log-and-continue (as-008
-// misuse heartbeat is non-blocking advisory per AC-005.9).
+// to fail-closed (unlock record path) or log-and-continue (misuse heartbeat).
 
 /**
- * Canonical set of re-fence trigger labels (spec.md § AC-005.6).
+ * Canonical set of re-fence trigger labels.
  *
  * `session-end` covers both `archive-incomplete` and `complete-work` entry
- * points per Task 5.2; as-005 is responsible for narrowing to the specific
- * source at the call site.
+ * points.
  */
 export const REFENCE_TRIGGERS = Object.freeze([
   'spec-complete',
@@ -3972,9 +3952,9 @@ export const REFENCE_TRIGGERS = Object.freeze([
 ]);
 
 /**
- * Emit a `test_writer_unlock_refence` audit entry (AC7.2).
+ * Emit a `test_writer_unlock_refence` audit entry.
  *
- * Called by the as-005 re-fence predicate after it clears
+ * Called by the re-fence predicate after it clears
  * `session.json.active_work.test_writer_unlock[<sg-id>]` via the sole-writer
  * path. The `trigger` field identifies which of 5 events fired.
  *
@@ -3982,7 +3962,7 @@ export const REFENCE_TRIGGERS = Object.freeze([
  * SHOULD run this before the sole-writer clear, or SHOULD tolerate an audit
  * append failure by keeping the in-memory unlock cleared (the next dispatch
  * will fail-closed regardless). Concrete ordering is a predicate-level choice
- * in as-005 — this helper only enforces payload shape + event-class.
+ * in the predicate — this helper only enforces payload shape + event-class.
  *
  * @param {object} args
  * @param {string} args.specGroupId    spec-group-id whose unlock is being cleared
@@ -4026,17 +4006,17 @@ export function emitTestWriterUnlockRefence(args) {
 }
 
 /**
- * Emit a `test_writer_unlock_misuse` audit entry (Task 7.4; AC-005.9).
+ * Emit a `test_writer_unlock_misuse` audit entry.
  *
- * Consumed by the as-008 stop-hook when a test-writer dispatch completes
+ * Consumed by the Stop hook when a test-writer dispatch completes
  * inside an active unlock TTL window WITHOUT creating or modifying test
  * files. The emission is ADVISORY — call sites should log-and-continue on
- * AuditLogError (test-writer dispatch MUST NOT be blocked per AC-005.9).
+ * AuditLogError.
  *
- * This helper defines the contract shape so as-008 can consume it without
- * needing to hand-assemble the payload. `dispatch_id` and `first_failure_ref`
- * are REQUIRED here (unlike refence) because the stop-hook always has them
- * in scope from the just-completed dispatch.
+ * This helper defines the contract shape so callers do not hand-assemble the
+ * payload. `dispatch_id` and `first_failure_ref` are REQUIRED here (unlike
+ * refence) because the Stop hook has them in scope from the just-completed
+ * dispatch.
  *
  * @param {object} args
  * @param {string} args.specGroupId      spec-group-id whose unlock was active
@@ -4081,11 +4061,10 @@ export function emitTestWriterUnlockMisuse(args) {
 }
 
 // =============================================================================
-// sg-pipeline-efficiency-ws2-practice-2.4 / as-005 / REQ-005 (AC-005.6)
 // 5-trigger re-fence predicate — clears `test_writer_unlock[<sg-id>]` when
 // any of 5 session lifecycle events fires for that spec-group-id. Runs inside
 // the sole-writer `session-checkpoint.mjs` boundary so concurrent triggers do
-// not race (design-doc §4.2, Q2 resolution).
+// not race.
 // =============================================================================
 
 /**
@@ -4095,7 +4074,7 @@ export function emitTestWriterUnlockMisuse(args) {
  * Callers MUST be holding the session-save transaction (i.e., already inside
  * an `op*` that will call `saveSession` afterward). The predicate mutates
  * `session` in place and appends a `test_writer_unlock_refence` audit entry
- * via `emitTestWriterUnlockRefence` (as-007 helper, AC7.2) BEFORE the session
+ * via `emitTestWriterUnlockRefence` BEFORE the session
  * mutation is visible to subsequent readers. Mirrors the ordering used by
  * `opRecordTestWriterUnlock` so a failed audit append never leaves
  * session.json in an inconsistent "cleared without audit record" state.
@@ -4110,7 +4089,7 @@ export function emitTestWriterUnlockMisuse(args) {
  * @param {(typeof REFENCE_TRIGGERS)[number]} trigger  one of 5 canonical labels
  * @returns {{cleared: boolean, trigger: string|null, auditSeq: number|null}}
  *          cleared=true iff an entry existed and was removed + audit-logged;
- *          cleared=false on idempotent no-op (AC5.3, AC5.4).
+ *          cleared=false on idempotent no-op.
  */
 export function evaluateRefenceTrigger(session, specGroupId, trigger) {
   if (!session || typeof session !== 'object') {
@@ -4133,7 +4112,7 @@ export function evaluateRefenceTrigger(session, specGroupId, trigger) {
     );
   }
 
-  // AC5.3 idempotency: no active_work → no unlock map → no-op. The
+  // Idempotency: no active_work → no unlock map → no-op. The
   // complete-work / archive-incomplete code paths run the predicate BEFORE
   // nulling active_work, so this branch catches concurrency edge-cases
   // (e.g., session loaded after active_work wipe) rather than the normal
@@ -4158,8 +4137,7 @@ export function evaluateRefenceTrigger(session, specGroupId, trigger) {
   const priorDispatchId = typeof entry.dispatch_id === 'string' ? entry.dispatch_id : undefined;
   const priorUnlockedUntil = typeof entry.unlocked_until === 'string' ? entry.unlocked_until : undefined;
 
-  // AC5.1 / AC-005.10: audit append BEFORE session mutation via the as-007
-  // helper. A failed append throws (AuditLogError wrapping
+  // Audit append BEFORE session mutation. A failed append throws (AuditLogError wrapping
   // GENESIS_ANCHOR_INVALID / CHAIN_BROKEN / E_WRITE_FAILED) and leaves the
   // unlock entry intact so the caller can retry once the chain is repaired.
   // Mirror opRecordTestWriterUnlock's ordering verbatim.
@@ -7723,10 +7701,9 @@ function opInspectLock(parsed) {
 // =============================================================================
 
 /**
- * as-013 / AC13.1: Per-subcommand --help printer for record-test-writer-unlock.
+ * Per-subcommand --help printer for record-test-writer-unlock.
  *
- * AC13.1 mandates that `node session-checkpoint.mjs record-test-writer-unlock --help`
- * prints the subcommand help text. The CLI dispatcher intercepts `--help`/`-h`
+ * The CLI dispatcher intercepts `--help`/`-h`
  * as args[1] BEFORE invoking opRecordTestWriterUnlock (which would otherwise
  * treat `--help` as a missing-flag error and raise UNLOCK_USAGE_ERROR).
  *
@@ -7745,7 +7722,7 @@ Usage: node session-checkpoint.mjs record-test-writer-unlock <sg-id>
 Sole-writer CLI for session.active_work.test_writer_unlock[<sg-id>].
 TTL: 5 minutes, anchored at first_failure_at. Requires spec_mode='bug-fix'
 in the target spec-group manifest (feature-mode rejects with
-UNLOCK_MODE_MISMATCH per AC-005.7).
+UNLOCK_MODE_MISMATCH).
 
 Required arguments:
   <sg-id>                       Positional. Target spec-group id. Must exist
@@ -7773,14 +7750,13 @@ Structured errors (non-zero exit):
   GENESIS_ANCHOR_INVALID           Hash-chain genesis anchor corrupt. Exit 2.
 
 References:
-  Spec group:   sg-pipeline-efficiency-ws2-practice-2.4
-  Atomic specs: as-003 (this CLI), as-004 (marker), as-013 (wiring)
-  Requirement:  REQ-005 (AC-005.3, AC-005.7, AC-005.8, AC-005.10)
+  Design doc: .claude/docs/design/test-writer-unlock-state-signals.md
+  Operator guide: .claude/docs/TEST-WRITER-UNLOCK-OPERATOR.md
 `);
 }
 
 /**
- * as-013 / AC13.1: Per-subcommand --help printer for fire-refence-trigger.
+ * Per-subcommand --help printer for fire-refence-trigger.
  *
  * Emits to stdout (Unix convention for explicit --help) and exits 0 via the
  * surrounding case-branch fallthrough to the standard no-throw return path.
@@ -7825,9 +7801,8 @@ Structured errors (non-zero exit):
   REFENCE_SESSION_MISSING        No session.json; run 'init' first. Exit 1.
 
 References:
-  Spec group:   sg-pipeline-efficiency-ws2-practice-2.4
-  Atomic specs: as-005 (predicate), as-013 (wiring)
-  Requirement:  REQ-005 (AC-005.6, AC-005.10)
+  Design doc: .claude/docs/design/test-writer-unlock-state-signals.md
+  Operator guide: .claude/docs/TEST-WRITER-UNLOCK-OPERATOR.md
 `);
 }
 
@@ -7933,13 +7908,13 @@ Operations:
   complete-work                                   Finalize completed work
   archive-incomplete                              Archive incomplete work
   record-test-writer-unlock <sg-id>               Record bug-fix-mode test-writer unlock
-    --dispatch-id <id>                             (sg-pipeline-efficiency-ws2-practice-2.4 / as-003)
-    --first-failure-ref <ref>                      Sole-writer for session.json.test_writer_unlock.
+    --dispatch-id <id>                             Dispatch id stored in the unlock entry.
+    --first-failure-ref <ref>                      Sole-writer for active_work.test_writer_unlock.
                                                    spec_mode must be 'bug-fix'; 5-min TTL anchored at
                                                    first_failure_at. Rejects feature-mode with
-                                                   UNLOCK_MODE_MISMATCH (AC-005.7).
+                                                   UNLOCK_MODE_MISMATCH.
   fire-refence-trigger <sg-id>                    Fire re-fence trigger; clears unlock[<sg-id>]
-    --trigger <label>                              (sg-pipeline-efficiency-ws2-practice-2.4 / as-005)
+    --trigger <label>                              Re-fence trigger label.
                                                    label ∈ {spec-complete, test-pass, version-bump,
                                                    workstream-rotate, session-end}. Idempotent.
                                                    Appends test_writer_unlock_refence audit entry.
@@ -8139,18 +8114,17 @@ async function main() {
         break;
 
       case 'record-test-writer-unlock': {
-        // sg-pipeline-efficiency-ws2-practice-2.4 / as-003 / as-013 / REQ-005
         // Usage:
         //   record-test-writer-unlock <sg-id> --dispatch-id <id> --first-failure-ref <ref>
         //   record-test-writer-unlock --help
         //
-        // Sole-writer CLI for session.json.test_writer_unlock[<sg-id>].
+        // Sole-writer CLI for active_work.test_writer_unlock[<sg-id>].
         // Preflight enforces spec_mode='bug-fix' (UNLOCK_MODE_MISMATCH
-        // otherwise — AC-005.7). TTL is 5 min anchored at first_failure_at.
+        // otherwise). TTL is 5 min anchored at first_failure_at.
         //
-        // as-013 / AC13.1: intercept --help/-h as args[1] BEFORE the op
-        // handler so `record-test-writer-unlock --help` prints subcommand
-        // help to stdout and exits 0 instead of raising UNLOCK_USAGE_ERROR.
+        // Intercept --help/-h as args[1] before the op handler so the
+        // subcommand prints help to stdout and exits 0 instead of raising
+        // UNLOCK_USAGE_ERROR.
         if (args[1] === '--help' || args[1] === '-h') {
           printRecordTestWriterUnlockHelp(true);
           break;
@@ -8213,7 +8187,6 @@ async function main() {
       }
 
       case 'fire-refence-trigger': {
-        // sg-pipeline-efficiency-ws2-practice-2.4 / as-005 / as-013 / REQ-005 / AC-005.6
         // Usage:
         //   fire-refence-trigger <sg-id> --trigger <label>
         //   fire-refence-trigger --help

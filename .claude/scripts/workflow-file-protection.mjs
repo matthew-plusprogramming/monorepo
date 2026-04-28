@@ -315,13 +315,12 @@ export const PROTECTED_FILENAME_PATTERNS = [
     dirSegment: 'audit',
   },
   {
-    // sg-pipeline-efficiency-ws2-practice-2.4 / SEC-WS2-001 (security-review
-    // Pass 1): per-session HMAC secret files live at
+    // Per-session HMAC secret files live at
     // `.claude/coordination/.session-hmac-<session-id>` and are bootstrapped
     // with `O_EXCL` + mode 0600 by `readOrBootstrapSessionHmacSecret` in
     // session-checkpoint.mjs. The secret protects test-writer-unlock marker
-    // integrity (AC-005.8); agent writes MUST be blocked so a hostile
-    // dispatch cannot forge a new secret and mint markers against it. The
+    // integrity; agent writes MUST be blocked so a hostile dispatch cannot
+    // forge a new secret and mint markers against it. The
     // basename set is unbounded (one file per session-id) so a regex pattern
     // is required — exact-name enumeration is not feasible.
     //
@@ -882,9 +881,9 @@ const PROTECTED_FILE_REMEDIATION = {
       'rate-limit.state is the persistent rate-limit bucket for audit-append.mjs. Only `node .claude/scripts/audit-append.mjs` may write; forging this file collapses the rate limiter.',
     docSection: '.claude/docs/WORKFLOW-ENFORCEMENT.md § Kill Switch Audit Log',
   },
-  // sg-pipeline-efficiency-ws2-practice-2.4 / SEC-WS2-001: per-session HMAC
-  // secret file (`.claude/coordination/.session-hmac-<session-id>`). Bootstrapped
-  // with O_EXCL + mode 0600 by session-checkpoint.mjs; agent writes (Bash/Write)
+  // Per-session HMAC secret file
+  // (`.claude/coordination/.session-hmac-<session-id>`). Bootstrapped with
+  // O_EXCL + mode 0600 by session-checkpoint.mjs; agent writes (Bash/Write)
   // are FULL_BLOCK so a hostile dispatch cannot forge a secret to mint
   // test-writer-unlock markers. The file is session-scoped and regenerated on
   // first read of a new session-id.
@@ -892,7 +891,7 @@ const PROTECTED_FILE_REMEDIATION = {
     kind: 'override',
     remediation:
       '.session-hmac-<session-id> is a per-session HMAC secret used to sign test-writer-unlock markers. Bootstrapped automatically by session-checkpoint.mjs on first use (O_EXCL + mode 0600); direct agent writes are REJECTED (forging this file enables test-writer-unlock marker spoofing).',
-    docSection: '.claude/specs/groups/sg-pipeline-efficiency-ws2-practice-2.4/spec.md § REQ-005',
+    docSection: '.claude/docs/design/test-writer-unlock-state-signals.md § Marker Protocol',
   },
 };
 

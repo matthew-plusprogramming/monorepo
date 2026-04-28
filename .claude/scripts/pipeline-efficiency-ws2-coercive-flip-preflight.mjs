@@ -4,8 +4,8 @@
  * pipeline-efficiency-ws2-coercive-flip-preflight.mjs
  *
  * ws-2 Practice-2.4 coercive-flip preflight wrapper. Checks:
- *   1. Delegates the full 3-workstream preflight to ws-1 as-020
- *      (`pipeline-efficiency-coercive-flip-preflight.mjs`), which reads the
+ *   1. Delegates the full 3-workstream preflight to
+ *      `pipeline-efficiency-coercive-flip-preflight.mjs`, which reads the
  *      kill-switch sentinel, enforcement-flag, audit-log HEAD, and all three
  *      canonical per-workstream baselines including
  *      `.claude/metrics/pipeline-efficiency-ws2-baseline.json`.
@@ -16,34 +16,23 @@
  *      instead of the generic 3-way enumeration.
  *   3. Applies the per-workstream override at
  *      `.claude/metrics/sg-pipeline-efficiency-ws2-practice-2.4-baseline-override.json`
- *      — the override ONLY unblocks the "undersized ws-2 baseline" branch
- *      (AC10.3). It does NOT unblock ABSENT or SCHEMA_INVALID; it also does
- *      NOT propagate to ws-1 / ws-3 baseline problems (AC10.4 scope).
+ *      — the override ONLY unblocks the "undersized ws-2 baseline" branch.
+ *      It does NOT unblock ABSENT or SCHEMA_INVALID; it also does NOT
+ *      propagate to ws-1 / ws-3 baseline problems.
  *
- * Implements: REQ-011 ws-2 scope
- *   - AC10.2: reject with structured error + non-zero exit when ws-2
- *             baseline is absent or schema-invalid.
- *   - AC10.3: reject when ws-2 baseline sample_count < 10 AND window < 30d,
- *             unless the scoped override file is present and schema-valid.
- *   - AC10.4: override scope is this spec-group only — no cross-workstream
- *             propagation (other ws baselines still gate via the ws-1
- *             preflight; ws-2 override cannot unblock ws-1 / ws-3 problems).
- *
- * Spec: sg-pipeline-efficiency-ws2-practice-2.4 (as-010)
- *
- * Relationship to ws-1 as-020 preflight:
- *   - ws-1 as-020 is the 3-workstream gate. It owns the kill-switch sentinel
+ * Relationship to the shared preflight:
+ *   - The shared preflight is the 3-workstream gate. It owns the kill-switch sentinel
  *     check, enforcement-flag read, and audit-log HEAD read — all of which
  *     are cross-cutting concerns that are not ws-2-specific.
  *   - This wrapper is invoked when an operator specifically wants to flip
- *     the Practice-2.4 hybrid-mode gate to coercive. It consumes the ws-1
+ *     the Practice-2.4 hybrid-mode gate to coercive. It consumes the shared
  *     preflight result and re-maps rejections through the ws-2 scope lens.
  *   - If any rejection is NOT ws-2's baseline problem (sentinel / enforcement
  *     flag / audit HEAD / ws-1 baseline / ws-3 baseline), this wrapper
- *     surfaces the ws-1 preflight's rejection verbatim — the override does
+ *     surfaces the shared preflight's rejection verbatim — the override does
  *     NOT bypass those failures.
  *
- * CLI exit codes (mirrors ws-1 preflight conventions):
+ * CLI exit codes:
  *   0  — ACCEPTED
  *   2  — REJECTED (any structured failure surfaced from ws-1 preflight or
  *        from the ws-2 override validator)
@@ -78,13 +67,13 @@ import { WS2_BASELINE_RELATIVE_PATH } from './pipeline-efficiency-ws2-baseline-a
 // =============================================================================
 
 /**
- * Canonical ws-2 override path (AC10.3 / AC10.4).
+ * Canonical ws-2 override path.
  *
  * Scoped to the FULL spec-group ID `sg-pipeline-efficiency-ws2-practice-2.4`
  * — the filename pins the override to this workstream only; an override file
  * at any other path is NOT recognized and cannot unblock this preflight.
  *
- * AC10.4 scope is enforced at TWO layers:
+ * Override scope is enforced at TWO layers:
  *   (a) filename — only this exact path is read.
  *   (b) content — `validateBaselineOverride` enforces the override schema
  *       (including `workstream_id`). The wrapper additionally verifies the
@@ -94,7 +83,7 @@ import { WS2_BASELINE_RELATIVE_PATH } from './pipeline-efficiency-ws2-baseline-a
 export const WS2_BASELINE_OVERRIDE_RELATIVE_PATH =
   '.claude/metrics/sg-pipeline-efficiency-ws2-practice-2.4-baseline-override.json';
 
-/** Full spec-group ID for the ws-2 Practice-2.4 workstream (AC10.4). */
+/** Full historical workstream id for the ws-2 Practice-2.4 override. */
 export const WS2_SPEC_GROUP_ID = 'sg-pipeline-efficiency-ws2-practice-2.4';
 
 /** Short-form workstream id accepted by `workstream_id` override field. */

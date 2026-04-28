@@ -3,17 +3,14 @@
 /**
  * Test-Writer Isolation Enforcement — PreToolUse cooperative-check hook.
  *
- * Spec: sg-pipeline-efficiency-ws2-practice-2.4 / as-006 / REQ-005
- * Acceptance criteria:
- *   AC6.1: spec_mode feature OR absent → block implementation-file reads
- *          regardless of any unlock state (AC-005.2).
- *   AC6.2: spec_mode == bug-fix AND valid unlock (TTL unexpired, dispatch_id
- *          match, HMAC marker verifies) → permit implementation-file read
- *          (AC-005.4).
- *   AC6.3: Any single cooperative-check step fails → block with
- *          UNLOCK_REVOKED; a second failed attempt yields TIMEOUT (AC-005.5).
- *   AC6.4: session.json unreadable / missing → fail-closed (block).
- *   AC6.5: End-to-end cooperative-check completes in <1s on local filesystem.
+ * Current contract:
+ *   - spec_mode feature/refactor/absent blocks implementation-file reads
+ *     regardless of any unlock state.
+ *   - spec_mode == bug-fix plus valid unlock (TTL unexpired, dispatch_id
+ *     match, HMAC marker verifies) permits implementation-file reads.
+ *   - Any cooperative-check failure blocks with UNLOCK_REVOKED; a second
+ *     failed attempt yields TIMEOUT.
+ *   - session.json unreadable / missing fails closed.
  *
  * Architecture — sentinel + 5-step gate
  * -------------------------------------
@@ -32,7 +29,7 @@
  *   5. Permit-or-revoke.
  * Any failure → emit UNLOCK_REVOKED (first attempt) / TIMEOUT (retry).
  *
- * Fail-closed defaults (AC6.4):
+ * Fail-closed defaults:
  *   - session.json unreadable, absent, or malformed → block.
  *   - manifest.spec_mode != 'bug-fix' → block regardless of unlock state.
  *   - test_writer_unlock[sg-id] absent → block.
@@ -53,8 +50,7 @@
  *   hook (same isolation principle). When no unlock is active, reads outside
  *   the allowlist are blocked with UNLOCK_REVOKED.
  *
- * @req REQ-005 (AC-005.2, AC-005.4, AC-005.5)
- * @spec sg-pipeline-efficiency-ws2-practice-2.4 / atomic/as-006.md
+ * @see .claude/docs/design/test-writer-unlock-state-signals.md
  */
 
 import {

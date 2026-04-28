@@ -76,7 +76,6 @@ import {
   formatConvergenceSanityFailure,
 } from './lib/stop-hook-checks.mjs';
 import { readThresholdFromSnapshot } from './lib/snapshot-threshold-reader.mjs';
-// sg-pipeline-efficiency-ws2-practice-2.4 / as-008 / AC-005.9 (AC8.1..AC8.4)
 // Unlock-misuse heartbeat: emits advisory `UNLOCK_USED_NO_TESTS` on stderr
 // plus a `test_writer_unlock_misuse` audit-log entry when a test-writer
 // dispatch consumed an active unlock window without producing test-file
@@ -449,11 +448,10 @@ async function main() {
       }
     }
 
-    // Step 4b: Unlock-misuse heartbeat (sg-pipeline-efficiency-ws2-practice-2.4
-    // / as-008 / AC-005.9). Fires BEFORE workflow/exempt/phase gating so the
-    // heartbeat emits regardless of where the Stop hook's subsequent path
-    // lands (clean exit, obligation block, exempt bypass). Non-blocking:
-    // always falls through to normal flow.
+    // Step 4b: Unlock-misuse heartbeat. Fires BEFORE workflow/exempt/phase
+    // gating so the heartbeat emits regardless of where the Stop hook's
+    // subsequent path lands (clean exit, obligation block, exempt bypass).
+    // Non-blocking: always falls through to normal flow.
     await emitUnlockMisuseHeartbeat(session, claudeDir);
 
     // Step 5: Get workflow type
