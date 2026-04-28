@@ -10,7 +10,7 @@
  * covering the test/AC ratio on bug-fix workstreams.
  *
  * Metric contract (REQ-014 / AC11.1-AC11.4 from as-011):
- *   - baseline_ratio:  pinned 2.16 (sg-workflow-convergence-bugs observation).
+ *   - baseline_ratio:  pinned 2.16 (pipeline-efficiency PRD pre-ship evidence).
  *   - target_ratio:    pinned 1.3 (PRD-stated goal on next 5 bug-fix workstreams).
  *   - observed_ratio:  sum(tests) / sum(ACs) across the post-ship bug-fix
  *                      workstream sample. Structural (not behavioural)
