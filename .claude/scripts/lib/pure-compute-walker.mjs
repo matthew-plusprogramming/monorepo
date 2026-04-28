@@ -31,7 +31,7 @@
  *   - Sibling resolution is alphabetically sorted
  *   - Type-only imports are filtered from frontier population (AC6.10)
  *
- * Spec: sg-e2e-pure-compute-check atomic as-006 (Tasks T6 + T15)
+ * Docs: .claude/docs/PURE-COMPUTE-CHECK-API.md
  * Requirements: REQ-F-011
  */
 

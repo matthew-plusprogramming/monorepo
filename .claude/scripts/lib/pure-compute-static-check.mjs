@@ -26,11 +26,9 @@
  *   - SEC-014: reflection-obtained AsyncFunction/GeneratorFunction detection.
  *   - Fail-closed semantics: `verdict = 'fail'` iff `violations.length > 0`.
  *
- * Spec: sg-e2e-pure-compute-check (as-001..as-014)
- * Contract: contract-pure-compute-sub-check-api (owner)
+ * Docs: .claude/docs/PURE-COMPUTE-CHECK.md
+ * API: .claude/docs/PURE-COMPUTE-CHECK-API.md
  * Requirements: REQ-F-011, REQ-F-011a, REQ-NFR-020
- *
- * @see .claude/specs/groups/sg-e2e-pure-compute-check/spec.md
  */
 
 import { z } from 'zod';

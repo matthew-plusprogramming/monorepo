@@ -14,7 +14,7 @@
  * Parse failures return a structured record instead of throwing so the walker
  * can emit `<parse-error>` violations per AC6.13.
  *
- * Spec: sg-e2e-pure-compute-check atomic as-003 (Task T3; EC-PCC-7, EC-PCC-9, EC-PCC-16)
+ * Docs: .claude/docs/PURE-COMPUTE-CHECK-API.md
  * Requirements: REQ-F-011 (re-exports followed; type-only filtered; dynamic import captured)
  */
 

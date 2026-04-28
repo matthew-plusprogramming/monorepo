@@ -29,7 +29,7 @@
  * Returns `null` when no candidate resolves so the caller (walker) can emit a
  * structured `<resolution-failed>` violation per AC2.3 / AC2.7 / AC2.8.
  *
- * Spec: sg-e2e-pure-compute-check atomic as-002 (`spec.md` Task T2, Flow 4, EC-PCC-2)
+ * Docs: .claude/docs/PURE-COMPUTE-CHECK-API.md
  * Requirements: REQ-F-011 (TS path aliases; graceful degradation)
  */
 

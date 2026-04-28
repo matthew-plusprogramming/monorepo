@@ -16,7 +16,7 @@
  *
  * No ANSI escapes (AC7.6).
  *
- * Spec: sg-e2e-pure-compute-check atomic as-007 (Task T7)
+ * Docs: .claude/docs/PURE-COMPUTE-CHECK-API.md
  * Requirements: REQ-F-011
  */
 

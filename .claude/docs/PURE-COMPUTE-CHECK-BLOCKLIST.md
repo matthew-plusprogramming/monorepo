@@ -1,5 +1,4 @@
 ---
-_source_spec: sg-e2e-pure-compute-check
 _source_modules:
   ['scripts-lib/pure-compute-matcher', 'scripts-lib/pure-compute-scanner']
 title: Pure-Compute Static-Analysis Blocklist

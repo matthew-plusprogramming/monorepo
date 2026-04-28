@@ -28,7 +28,7 @@ All fields are **optional at the top level**; conditional requirements apply onl
 | `crosses_boundary`               | boolean                | `crosses_boundary_rationale` required when `false`           | `sg-e2e-gate5-enforcement`      |
 | `runtime_connectivity_budget_ms` | integer (0–60000)      | `runtime_connectivity_budget_rationale` required when set    | `sg-e2e-gate5-enforcement`      |
 | `security_surface`               | enum \| enum[] \| null | —                                                            | `sg-e2e-gate5-enforcement`      |
-| `pure_compute_entry_points`      | string[]               | required (non-empty) when `e2e_skip_rationale: pure-compute` | `sg-e2e-pure-compute-check`     |
+| `pure_compute_entry_points`      | string[]               | required (non-empty) when `e2e_skip_rationale: pure-compute` | Pure-compute verifier           |
 | `e2e_skip_rationale`             | enum                   | required when `e2e_skip: true`                               | `e2e-test-writer` dispatch gate |
 
 ---
@@ -234,7 +234,7 @@ pure_compute_entry_points:
 
 ### Downstream
 
-Consumed by the pure-compute verifier in `sg-e2e-pure-compute-check` (a Stage 2 workstream). This spec declares only the schema-level entry-point surface; verifier behaviour is documented separately when that workstream ships.
+Consumed by the pure-compute verifier documented in [PURE-COMPUTE-CHECK.md](PURE-COMPUTE-CHECK.md). This spec declares only the schema-level entry-point surface.
 
 ---
 
@@ -254,7 +254,7 @@ The `e2e_skip_rationale` enum was widened from 4 values to 5 with the addition o
 
 ### When `pure-compute` Applies
 
-Use `pure-compute` only when the implementation has zero runtime I/O (no HTTP, WS, SSE, subprocess, filesystem side effects, or external state mutation) **and** the spec declares entry points via `pure_compute_entry_points` so a downstream DFS verifier (in `sg-e2e-pure-compute-check`) can prove the claim.
+Use `pure-compute` only when the implementation has zero runtime I/O (no HTTP, WS, SSE, subprocess, filesystem side effects, or external state mutation) **and** the spec declares entry points via `pure_compute_entry_points` so the DFS verifier can prove the claim.
 
 Do not use `pure-compute` for:
 

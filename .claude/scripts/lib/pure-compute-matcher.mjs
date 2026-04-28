@@ -5,8 +5,7 @@
  * `pure-compute-scanner.mjs`) and dynamic-import records (from
  * `pure-compute-extractor.mjs`) into a single violation stream.
  *
- * Authoritative categories (verbatim from `spec.md` § Interfaces & Contracts
- * `Blocklist` yaml):
+ * Authoritative categories (see .claude/docs/PURE-COMPUTE-CHECK-BLOCKLIST.md):
  *   - network: ['net', 'http', 'https', 'dns', 'dgram', 'tls', 'http2']
  *   - fs_write: ['fs.writeFile', 'fs.writeFileSync', 'fs.appendFile',
  *                'fs.appendFileSync', 'fs.rename', 'fs.unlink'] + fs.promises variants
@@ -30,12 +29,12 @@
  *   - The intermediate matcher output includes `category` to aid diagnostics.
  *   - The walker (as-006) MUST strip `category` before aggregation (AC6.15).
  *
- * Spec: sg-e2e-pure-compute-check atomic as-005 (Task T5 + T16; EC-PCC-4, EC-PCC-5)
+ * Docs: .claude/docs/PURE-COMPUTE-CHECK-BLOCKLIST.md
  * Requirements: REQ-F-011, REQ-NFR-020
  */
 
 // =============================================================================
-// Authoritative Blocklist (verbatim from `spec.md` Interfaces & Contracts)
+// Authoritative Blocklist
 // =============================================================================
 
 /**

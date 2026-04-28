@@ -19,7 +19,7 @@
  *
  * Emits one `{symbol, importSpecifier, nodeText, span}` record per match.
  *
- * Spec: sg-e2e-pure-compute-check atomic as-004 (Task T4; EC-PCC-8/-10/-11/-12/-13/-14/-15/-17)
+ * Docs: .claude/docs/PURE-COMPUTE-CHECK-API.md
  * Requirements: REQ-F-011 (callsite-level matches); SEC-014 (reflection patterns)
  */
 

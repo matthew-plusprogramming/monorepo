@@ -24,7 +24,7 @@ Technical reference docs. CLAUDE.md is the runtime preamble loaded every session
 - [RUNTIME-CONNECTIVITY-ARCHETYPES.md](RUNTIME-CONNECTIVITY-ARCHETYPES.md) — Archetype reference (http-smoke, ws-event, sse-stream, cli-writes-file, ipc-ping-pong) + placeholder grammar
 - [RUNTIME-CONNECTIVITY-LIB-API.md](RUNTIME-CONNECTIVITY-LIB-API.md) — API reference for `.claude/scripts/lib/e2e-test-writer/` (exported symbols, error classes, input/output shapes)
 
-## Pure-Compute Static-Analysis Sub-Check (sg-e2e-pure-compute-check)
+## Pure-Compute Static-Analysis Sub-Check
 
 - [PURE-COMPUTE-CHECK.md](PURE-COMPUTE-CHECK.md) — Overview: SEC-F3 defense, Gate 5 integration, fail-closed semantics, four sentinel symbols
 - [PURE-COMPUTE-CHECK-API.md](PURE-COMPUTE-CHECK-API.md) — API reference for `.claude/scripts/lib/pure-compute-*.mjs` (7 modules + shared path-containment util)

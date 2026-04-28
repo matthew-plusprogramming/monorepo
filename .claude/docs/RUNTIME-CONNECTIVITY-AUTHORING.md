@@ -33,7 +33,7 @@ The agent emits nothing (status `skipped`) in two cases:
 | `crosses_boundary: false` | `crosses_boundary_rationale` | Spec out of scope for runtime connectivity. Rationale logged.        |
 | `e2e_skip: true`          | `e2e_skip_rationale`         | Spec opts out. Rationale enum includes `test-infra`, `pure-compute`. |
 
-Both gates short-circuit before archetype selection. If `e2e_skip_rationale: pure-compute`, the pure-compute static-analysis sub-check runs at Gate 5 (owned by `sg-e2e-pure-compute-check`).
+Both gates short-circuit before archetype selection. If `e2e_skip_rationale: pure-compute`, the pure-compute static-analysis sub-check runs at Gate 5. See [PURE-COMPUTE-CHECK.md](PURE-COMPUTE-CHECK.md).
 
 ## Archetype Selection (5 Archetypes)
 
