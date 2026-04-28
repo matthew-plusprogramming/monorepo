@@ -82,7 +82,9 @@ Route to spec group workflow for **most tasks**:
 
 ### Large (orchestrator / MasterSpec)
 
-> **Raised bar (REQ-002, `.claude/docs/ROUTING.md`)**: Orchestrator economics (fixed 2-4M token overhead + 4-5h wall-clock per workstream per the pipeline-efficiency retrospective) only pay off above ~10 atomic specs with genuine multi-domain decomposition. Below that bar, oneoff-spec is the right tool. The raised heuristic below encodes that lesson.
+> **Raised bar**: Orchestrator has high fixed overhead. Use it only above
+> roughly 10 atomic specs with genuine multi-domain decomposition. Below that
+> bar, oneoff-spec is the right tool.
 
 Route to multi-workstream orchestration with git worktrees **ONLY when ALL THREE of the following are true**:
 
@@ -304,7 +306,7 @@ If the file exists, use the module landscape, dependency graph, and export summa
 
 If the file does not exist, proceed without trace context -- no error or warning needed.
 
-### Step 1c: Trace-Informed Impact Analysis (REQ-014, REQ-015)
+### Step 1c: Trace-Informed Impact Analysis
 
 After reading `high-level.md`, perform structured impact analysis using `high-level.json` for precise dependency data.
 
@@ -424,7 +426,7 @@ required_gates:
   - <gate-name>
 skipped_gates:
   - <gate-name>: <why not required for this risk tier>
-# REQ-003 / AC-ORCH-EVIDENCE — REQUIRED when workflow=orchestrator; FORBIDDEN otherwise.
+# REQUIRED when workflow=orchestrator; FORBIDDEN otherwise.
 # Enumerate ≥2 distinct multi-domain criteria with evidence anchors. If fewer
 # than 2 criteria can be named with evidence, fall back to oneoff-spec (do NOT
 # fake a second criterion to clear the bar). Canonical criterion list lives in
@@ -451,7 +453,7 @@ workstreams:
   - <workstream 1> (for orchestrator only)
   - <workstream 2>
 investigation_scope: <spec-group-id | master-spec-id | null>
-trace_context: # (REQ-016) Include when trace data is available
+trace_context: # Include when trace data is available
   affected_modules:
     - <module-id>: <brief description of impact>
   recommended_trace_reads:
@@ -466,16 +468,16 @@ next_action: <Suggested next step>
 # Non-orchestrator workflows:
 node .claude/scripts/session-checkpoint.mjs record-route-decision <workflow> "<rationale>" --risk-tier <risk_tier>
 
-# Orchestrator workflow (justification required per REQ-003):
+# Orchestrator workflow (justification required):
 node .claude/scripts/session-checkpoint.mjs record-route-decision orchestrator "<rationale>" --risk-tier <risk_tier> \
   --multi-domain-justification '[{"criterion":"3+ services","evidence":"..."},{"criterion":"cross-runtime boundaries","evidence":"..."}]'
 ```
 
-This append-only log is consumed by `.claude/scripts/metrics/pipeline-efficiency-routing-thresholds-collect.mjs` to measure routing distribution. `--risk-tier` also writes `active_work.risk_tier` for Stop-hook dispatch requirements. Rationale is truncated to 120 chars (OQ-105). Invoke **after** the decision block and **before** any phase transition (e.g., `start-work`).
+This append-only log is consumed by `.claude/scripts/metrics/pipeline-efficiency-routing-thresholds-collect.mjs` to measure routing distribution. `--risk-tier` also writes `active_work.risk_tier` for Stop-hook dispatch requirements. Rationale is truncated to 120 chars. Invoke **after** the decision block and **before** any phase transition (e.g., `start-work`).
 
 **Orchestrator fallback enforcement**: If `/route` cannot name ≥2 criteria with evidence for a would-be orchestrator recommendation, emit `workflow: oneoff-spec` instead, with a rationale note explaining the insufficient warrant. Do NOT emit `workflow: orchestrator` without the `multi_domain_justification` field — the CLI rejects that shape with `ROUTE_DECISION_JUSTIFICATION_REQUIRED`.
 
-**Dispatch prompt enrichment (REQ-016)**:
+**Dispatch prompt enrichment**:
 
 When dispatching subagents (implementer, test-writer, etc.), include trace context in the dispatch prompt:
 
@@ -531,7 +533,8 @@ node .claude/scripts/session-checkpoint.mjs start-work "logout-button-20260121" 
 
 ### Exempt workflows (oneoff-vibe, refactor, journal-only)
 
-sg-enforcement-layer-gaps Task 18 / REQ-M2-001 / AC-8.1: all three EXEMPT_WORKFLOWS require positive-assertion registration via the `--exempt-workflow` flag-only form:
+All exempt workflows still require positive active-work registration via the
+`--exempt-workflow` flag-only form:
 
 ```bash
 # Vibe-mode, refactor, and journal-only workflows use the flag-only form.
@@ -542,14 +545,19 @@ node .claude/scripts/session-checkpoint.mjs start-work --exempt-workflow refacto
 node .claude/scripts/session-checkpoint.mjs start-work --exempt-workflow journal-only
 ```
 
-This replaces the previous "skip start-work for oneoff-vibe, refactor, journal-only" carve-out. The positive assertion lets `workflow-gate-enforcement.mjs` and `workflow-stop-enforcement.mjs` distinguish a legitimate exempt session from an uninitialized fail-open state (Flow 5; AC-8.3, AC-8.4, AC-8.5).
+The positive assertion lets `workflow-gate-enforcement.mjs` and
+`workflow-stop-enforcement.mjs` distinguish an intentional exempt session from
+missing active-work state.
 
-Environment contract (AC-8.9):
+Environment contract:
 
 - `CLAUDE_USER_PROMPT` (optional) — first line truncated to 120 chars becomes the auto-generated objective. Fallback: "ad-hoc vibe-mode task".
 - `workflow_set_by` is set to `"route-skill"` automatically when the flag form is used.
 
-Inherit semantics (AC-10.3): if the session already has `active_work.workflow === W` and `W ∈ EXEMPT_WORKFLOWS`, the call is a no-op and exits 0 with a `work_started_already_active` audit entry. Downgrade from a non-exempt workflow is rejected (use `complete-work` first).
+Inherit semantics: if the session already has `active_work.workflow === W` and
+`W ∈ EXEMPT_WORKFLOWS`, the call is a no-op and exits 0 with a
+`work_started_already_active` audit entry. Downgrade from a non-exempt workflow
+is rejected; use `complete-work` first.
 
 ## Edge Cases
 
@@ -570,13 +578,15 @@ If user explicitly requests a workflow:
 - "Write a full spec first" → oneoff-spec or orchestrator
 - User preference always wins, but default assumption is: user wants quality (specs)
 
-### In-Flight Orchestrator Work (Backwards Compatibility, REQ-004)
+### In-Flight Orchestrator Work
 
-The raised orchestrator bar (REQ-002) applies only to new `/route` invocations. Spec groups already in flight are not reclassified. New `/route` invocations apply the new heuristic; in-flight orchestrator spec groups retain their existing workflow and continue without re-evaluation.
+The raised orchestrator bar applies only to new `/route` invocations. Existing
+orchestrator spec groups retain their workflow and continue without
+re-evaluation.
 
-Rule (manifest-field-based detection per EDGE-04):
+Rule:
 
-- If `.claude/specs/groups/<spec-group-id>/manifest.json` records `workflow: orchestrator` at the time the new heuristic ships, that spec group continues under its existing workflow. No migration, no re-routing, no reclassification.
+- If `.claude/specs/groups/<spec-group-id>/manifest.json` records `workflow: orchestrator`, that spec group continues under its existing workflow. No migration, no re-routing, no reclassification.
 - Subsequent `/route` invocations apply the new heuristic and the raised bar; in-flight spec groups are not reclassified.
 - The persistent `workflow` field in manifest.json is authoritative for in-flight work; it is not re-evaluated against the raised bar.
 - Migration scope: the heuristic applies to new /route invocations only; existing orchestrator spec groups remain on the old heuristic until they complete.

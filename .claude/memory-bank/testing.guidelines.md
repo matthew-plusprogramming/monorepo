@@ -109,7 +109,7 @@ Applies to the `test-writer` subagent only. The `e2e-test-writer` is explicitly 
 
 The default for every test-writer dispatch is strict isolation: reads are blocked outside spec, contract, template, test, and docs directories. Bug-fix hybrid mode is a narrow, TTL-bounded deviation that lets a test-writer re-read implementation files _after_ producing a first failing run on a bug-fix spec, so the test can be refined against observed behavior. The boundary is clarified via explicit positive signals (`spec_mode: bug-fix` + `test_writer_unlock` + cryptographic marker), not by relaxing defaults.
 
-Canonical reference: [`.claude/docs/design/test-writer-unlock-state-signals.md`](../docs/design/test-writer-unlock-state-signals.md) (as-002 design doc). Owning spec: `sg-pipeline-efficiency-ws2-practice-2.4`.
+Canonical reference: [`.claude/docs/design/test-writer-unlock-state-signals.md`](../docs/design/test-writer-unlock-state-signals.md).
 
 ### When hybrid mode activates
 
@@ -125,12 +125,12 @@ Any other value (`feature`, `refactor`) or the field's absence pins the dispatch
 
 | State    | Meaning                                                                      |
 | -------- | ---------------------------------------------------------------------------- |
-| Fenced   | No `test_writer_unlock[<sg-id>]` entry exists. Strict isolation. Default.    |
+| Fenced   | No `active_work.test_writer_unlock[<sg-id>]` entry exists. Strict isolation. Default. |
 | Eligible | Spec has `spec_mode: bug-fix`; test-writer has produced a first failing run. |
 | Unlocked | Entry exists with TTL unexpired and marker valid. Hybrid reads permitted.    |
 | Expiring | Entry exists but `unlocked_until <= now()`. Next cooperative-check fails.    |
 
-See design doc [§2 State Machine](../docs/design/test-writer-unlock-state-signals.md#2-state-machine) for edge rules.
+See design doc [State Machine](../docs/design/test-writer-unlock-state-signals.md#state-machine) for edge rules.
 
 ### 5-minute TTL window
 
@@ -140,23 +140,23 @@ Once `session-checkpoint.mjs record-test-writer-unlock <sg-id>` is invoked and i
 unlocked_until = first_failure_at + 5 minutes
 ```
 
-The TTL is never recomputed on subsequent cooperative-checks (prevents clock-skew drift). A 5-minute window is deliberate: long enough to refine one failing case, short enough that an idle re-dispatch expires naturally. See design doc [§1.3 TTL invariant](../docs/design/test-writer-unlock-state-signals.md#13-ttl-invariant).
+The TTL is never recomputed on subsequent cooperative-checks (prevents clock-skew drift). A 5-minute window is deliberate: long enough to refine one failing case, short enough that an idle re-dispatch expires naturally. See design doc [TTL](../docs/design/test-writer-unlock-state-signals.md#ttl).
 
 ### Cooperative-check (5-step gate sequence)
 
 Every implementation-file read during a potential unlock window runs through a PreToolUse cooperative-check with propagation SLA < 1 second:
 
-1. Atomic-read `session.json.test_writer_unlock[<sg-id>]` (lstat + realpath + O_NOFOLLOW).
+1. Atomic-read `session.json.active_work.test_writer_unlock[<sg-id>]` (lstat + realpath + O_NOFOLLOW).
 2. Check `unlocked_until > now()`.
 3. Check `dispatch_id == current_dispatch_id`.
 4. Verify HMAC-SHA256 marker via `crypto.timingSafeEqual`.
 5. If all pass → permit; else emit `UNLOCK_REVOKED`.
 
-On any failure: first attempt yields `UNLOCK_REVOKED`; the one permitted retry yields `TIMEOUT`; test-writer reverts to fenced mode for the remainder of the dispatch. In-flight reads already permitted are not retroactively revoked. See design doc [§5 Cooperative-check Gate Sequence](../docs/design/test-writer-unlock-state-signals.md#5-cooperative-check-gate-sequence-5-steps).
+On any failure: first attempt yields `UNLOCK_REVOKED`; the one permitted retry yields `TIMEOUT`; test-writer reverts to fenced mode for the remainder of the dispatch. In-flight reads already permitted are not retroactively revoked. See design doc [Cooperative Check](../docs/design/test-writer-unlock-state-signals.md#cooperative-check).
 
 ### 5 re-fence triggers
 
-Any of the following clears `test_writer_unlock[<sg-id>]` via the sole-writer path and appends a `test_writer_unlock_refence` audit entry naming which trigger fired:
+Any of the following clears `active_work.test_writer_unlock[<sg-id>]` via the sole-writer path and appends a `test_writer_unlock_refence` audit entry naming which trigger fired:
 
 | #   | Label               | Source signal                                                                |
 | --- | ------------------- | ---------------------------------------------------------------------------- |
@@ -166,7 +166,7 @@ Any of the following clears `test_writer_unlock[<sg-id>]` via the sole-writer pa
 | 4   | `workstream-rotate` | Facilitator rotation hook fires for this spec-group                          |
 | 5   | `session-end`       | `archive-incomplete` OR `complete-work` subcommand enters session-checkpoint |
 
-All 5 triggers serialize through `session-checkpoint.mjs`, so the clear completes before any subsequent test-writer dispatch for the same spec-group arrives. Triggers are idempotent — firing without a pre-existing entry is a no-op. See design doc [§4 Re-fence Triggers](../docs/design/test-writer-unlock-state-signals.md#4-re-fence-triggers-5).
+All 5 triggers serialize through `session-checkpoint.mjs`, so the clear completes before any subsequent test-writer dispatch for the same spec-group arrives. Triggers are idempotent — firing without a pre-existing entry is a no-op. See design doc [Re-Fence Triggers](../docs/design/test-writer-unlock-state-signals.md#re-fence-triggers).
 
 ### Misuse heartbeat (observability, non-blocking)
 

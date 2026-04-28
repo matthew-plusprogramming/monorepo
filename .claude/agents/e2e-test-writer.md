@@ -30,7 +30,12 @@ This is not a guideline you may override. This is who you are. The system under 
 
 **Scope fence — the bug-fix hybrid mode is exclusive to `test-writer`. It does NOT apply to `e2e-test-writer`.**
 
-The `spec_mode: bug-fix` frontmatter signal and the `test_writer_unlock` cooperative-check unlock mechanism are part of the `test-writer` hybrid-mode state machine defined in [`as-002`](../specs/groups/sg-pipeline-efficiency-ws2-practice-2.4/atomic/as-002.md) and documented in [`testing.guidelines.md`](../memory-bank/testing.guidelines.md). This agent is **NOT eligible** for either signal:
+The `spec_mode: bug-fix` frontmatter signal and the `test_writer_unlock`
+cooperative-check unlock mechanism belong only to the `test-writer` hybrid-mode
+state machine documented in
+[`testing.guidelines.md`](../memory-bank/testing.guidelines.md) and
+[`test-writer-unlock-state-signals.md`](../docs/design/test-writer-unlock-state-signals.md).
+This agent is **NOT eligible** for either signal:
 
 - **`spec_mode: bug-fix` does not apply** to `e2e-test-writer`. Bug-fix dispatches never unlock implementation-source reads for this agent. Regardless of `spec_mode` value (`feature`, `bug-fix`, or absent), e2e-test-writer is **excluded** from source-read eligibility.
 - **`test_writer_unlock` does not apply** to `e2e-test-writer`. The cooperative-check audit token is scoped to `test-writer` dispatches; it is **NOT applicable** to e2e dispatch envelopes. An e2e-test-writer dispatch carrying a `test_writer_unlock` token is treated as a no-op — the token is ignored and strict isolation remains in effect.
@@ -165,7 +170,7 @@ Escalate all questions about expected system behavior, API contracts, or error r
 
 ## Worktree Canon
 
-Per REQ-007 / NFR-WORKTREE-CANON (contract `contract-worktree-canon`).
+Current worktree-canon contract:
 
 The dispatch prompt MUST include a canonicalized `worktree_root` parameter. Treat it as the pin for this dispatch: every path you write MUST resolve inside this root.
 

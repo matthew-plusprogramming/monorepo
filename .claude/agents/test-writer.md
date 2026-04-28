@@ -657,7 +657,7 @@ Hybrid-mode reads are permitted only when ALL of the following hold:
 
 1. `manifest.spec_mode == "bug-fix"` (feature-mode or absent pins dispatch to fenced).
 2. A first failing run has been produced in strict mode (the unlock is never a shortcut around writing the failing test first).
-3. `session.json.test_writer_unlock[<sg-id>]` exists AND `unlocked_until > now()`.
+3. `session.json.active_work.test_writer_unlock[<sg-id>]` exists AND `unlocked_until > now()`.
 4. The active dispatch matches the recorded `dispatch_id`.
 5. The HMAC-SHA256 marker verifies under the current session secret.
 
@@ -677,7 +677,7 @@ Treat `UNLOCK_REVOKED` and `TIMEOUT` as structured errors with defined recovery,
 
 An active unlock can be cleared mid-dispatch by any of 5 triggers: `spec-complete` (review_state → APPROVED), `test-pass` (first green), `version-bump` (spec date / content_hash change), `workstream-rotate`, `session-end` (archive-incomplete / complete-work). You do not fire these triggers; you only observe the `UNLOCK_REVOKED` → `TIMEOUT` fallback when they fire. See the testing-guidelines canonical reference above.
 
-### NEW-TESTS expectation (AC-005.9)
+### NEW-TESTS expectation
 
 When you operate in hybrid mode, you MUST add or modify test cases during the dispatch. A hybrid dispatch that completes without creating or modifying any test file is a misuse signal: the Stop hook emits `UNLOCK_USED_NO_TESTS` advisory warning and appends a `test_writer_unlock_misuse` audit entry. The warning is non-blocking, but it records that the unlock was granted without being converted into new coverage. Treat this as a correctness constraint on your dispatch: if you consume an unlock, produce tests.
 

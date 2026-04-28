@@ -108,11 +108,14 @@ sequenceDiagram
   end
 ```
 
-Pins live for the process lifetime; next invocation re-pins. The CLI ignores both kill switches (AC-2.5).
+Pins live for the process lifetime; next invocation re-pins. The CLI ignores
+both kill switches.
 
 ### Structural-Error Short-Circuit
 
-If `validate-manifest.mjs` exits >= 2 (missing file, malformed JSON), the wrapper emits `manifest-shape-lint: STRUCTURAL_ERROR` and skips shape-lint. Running shape-lint on malformed JSON would emit misleading errors (AC-3.3).
+If `validate-manifest.mjs` exits >= 2 (missing file, malformed JSON), the
+wrapper emits `manifest-shape-lint: STRUCTURAL_ERROR` and skips shape-lint.
+Running shape-lint on malformed JSON would emit misleading errors.
 
 ### Async-Mode Auto-Downgrade
 
@@ -120,11 +123,14 @@ This flow is retained for the ad-hoc shape-lint wrapper, not the live hook path.
 
 ---
 
-## Dispatch-Record Fallback Flow (M2)
+## Dispatch-Record Fallback Flow
 
 ### Why SubagentStop, Not PostToolUse+Agent
 
-The original design called for a `PostToolUse` hook with `matcher: "Agent"`. Task 22's feasibility probe (`.claude/scripts/__tests__/hook-feasibility-probe.mjs`) confirmed Claude Code does NOT support `PostToolUse+Agent`. Outcome branch: `FALLBACK_PATH_SUBAGENTSTOP`. `AC-9.9` declares this fallback path; `dispatch-record-hook.mjs` implements it on the `SubagentStop` event.
+Claude Code does not provide a `PostToolUse` event for `Agent` dispatches.
+Dispatch completion is therefore recorded from the `SubagentStop` event.
+`dispatch-record-hook.mjs` matches the pre-recorded dispatch and marks it
+`"completed"`.
 
 ### Components
 
@@ -170,15 +176,17 @@ sequenceDiagram
     alt 4th mismatch
       DR->>Sess: set enforcement_compromised=true (block all future dispatches)
     end
-    DR-->>Stop: exit 0 ("record rejected" generic; AC-11.8)
+    DR-->>Stop: exit 0 ("record rejected" generic)
   end
 ```
 
 ### Last-Write-Wins + Audit Trail
 
-Previously `session-checkpoint.mjs dispatch-subagent` threw on duplicate `task_id` (legacy line 827). That behavior is REPLACED per chk-hook-d5a23f98:
+Duplicate dispatch IDs use last-write-wins for the live entry and retain the
+prior value in history:
 
-- Overwrite the live `subagent_tasks.in_flight` / `completed_this_session` entry.
+- Overwrite the live `subagent_tasks.in_flight` / `completed_this_session`
+  entry.
 - Append to `active_work.subagent_tasks_history` (FIFO cap 500):
 
   ```json
@@ -197,9 +205,15 @@ Tool-retry scenarios legitimately re-fire dispatch. The hook must not fail-close
 
 ### Trust Channel
 
-`CLAUDE_PROJECT_DIR` is the session-identifying env var (Task 22 sub-check (b) outcome). `dispatch-record-hook` resolves `.claude/` via that variable; fallback is a realpath-walk from the script location.
+`CLAUDE_PROJECT_DIR` is the session-identifying env var. `dispatch-record-hook`
+resolves `.claude/` via that variable; fallback is a realpath-walk from the
+script location.
 
-Subagent-type integrity: the PreToolUse record is authoritative. On PostToolUse / SubagentStop type mismatch, the handler rejects the write generically (no type-hint leakage — AC-11.8) and tracks per-session mismatches. At the 4th mismatch, `enforcement_compromised: true` blocks all subsequent dispatches until operator review (SEC-015 rate limit).
+Subagent-type integrity: the PreToolUse record is authoritative. On PostToolUse
+/ SubagentStop type mismatch, the handler rejects the write generically and
+tracks per-session mismatches. At the 4th mismatch,
+`enforcement_compromised: true` blocks all subsequent dispatches until operator
+review.
 
 ### Untrusted-Agent Fallback
 
@@ -210,11 +224,13 @@ When the SubagentStop payload lacks `agent_type` or reports an unrecognized valu
 - stdin unreadable, malformed JSON, missing `session.json`, CLI subprocess crash -> exit 0 with stderr warning.
 - Goal: never block subagent completion. Dispatch-record loss is recoverable (future SubagentStop reconciles).
 
-The Stop hook's mandatory-dispatch check (satisfied by any of `dispatched`, `in_progress`, `completed`) tolerates the `in_progress` state from the PreToolUse record even if SubagentStop is lost (TECH-010, AC-9.6).
+The Stop hook's mandatory-dispatch check (satisfied by any of `dispatched`,
+`in_progress`, `completed`) tolerates the `in_progress` state from the
+PreToolUse record even if SubagentStop is lost.
 
 ---
 
-## Vibe-Mode Positive-Assertion Flow (M2)
+## Vibe-Mode Positive-Assertion Flow
 
 Complementary to dispatch-record: `/route` writes a positive assertion for exempt workflows instead of skipping `start-work`.
 
