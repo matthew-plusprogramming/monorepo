@@ -1,8 +1,8 @@
 /**
  * Hash-chained append-only enforcement audit log writer.
  *
- * Spec: sg-e2e-enforcement-flag-audit as-003 / parent spec.md
- *       §Interfaces-&-Contracts (AuditLogWriter behavioral contract)
+ * Owner doc: .claude/docs/RTC-ENFORCEMENT-AUDIT.md
+ *       (AuditLogWriter behavioral contract)
  * Requirements: REQ-NFR-015 (writer semantics), REQ-NFR-025 (tamper resistance).
  *
  * Surface:

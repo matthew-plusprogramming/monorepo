@@ -1,8 +1,8 @@
 /**
  * EnforcementModeResolver — session-over-file-over-default precedence.
  *
- * Spec: sg-e2e-enforcement-flag-audit as-007 / parent spec.md
- *       §Interfaces-&-Contracts (EnforcementModeResolver behavioral contract)
+ * Owner doc: .claude/docs/RTC-ENFORCEMENT-AUDIT.md
+ *       (EnforcementModeResolver behavioral contract)
  * Requirements: REQ-NFR-015 (enforcement-flag precedence + session discipline).
  *
  * Precedence (inv-med-9d7a1c85 codification):

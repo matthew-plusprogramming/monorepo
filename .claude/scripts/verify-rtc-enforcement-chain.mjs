@@ -3,8 +3,8 @@
 /**
  * Runtime-connectivity enforcement hash-chain verifier.
  *
- * Spec: sg-e2e-enforcement-flag-audit as-005 / parent spec.md
- *       §Interfaces-&-Contracts (VerificationResult data-model)
+ * Owner doc: .claude/docs/RTC-ENFORCEMENT-AUDIT.md
+ *       (VerificationResult data-model)
  * Requirements: REQ-NFR-025 (tamper resistance, verification HARD-FAIL).
  *
  * Basename note (2026-04-20, inv-crit-5b9a2f14): landed basename is

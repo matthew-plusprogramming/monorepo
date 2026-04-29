@@ -5,8 +5,8 @@
  * integrity in the AuditLogEntry audit log.
  *
  * Scope: Fixed-schema objects without floats requiring IEEE-754 normalization.
- * Strings are NFC-normalized per RFC 8785 section 3.2.3 (T2.X additive
- * extension, sg-e2e-enforcement-flag-audit as-002) so canonically-equivalent
+ * Strings are NFC-normalized per RFC 8785 section 3.2.3 (RTC enforcement audit
+ * additive extension) so canonically-equivalent
  * Unicode strings (decomposed vs precomposed forms) produce byte-identical
  * canonical output.
  *
@@ -24,7 +24,7 @@
  * - Numbers: shortest representation (no trailing zeros)
  * - null, true, false: literal
  *
- * NFC note (T2.X additive extension, sg-e2e-enforcement-flag-audit as-002):
+ * NFC note (RTC enforcement audit additive extension):
  *   Strings are normalized to Unicode NFC BEFORE JSON-escape so two
  *   canonically-equivalent forms (e.g., "e" + COMBINING ACUTE ACCENT vs
  *   precomposed "é") produce identical output. Non-string values (null,
@@ -73,7 +73,7 @@ export function jcsCanonicalize(value) {
  * Used by the enforcement audit log writer + verifier to compute `prev_hash`
  * over the entry body minus its own `prev_hash` field.
  *
- * Implements: sg-e2e-enforcement-flag-audit as-002 AC2.1, AC2.2, AC2.6.
+ * Owner doc: .claude/docs/RTC-ENFORCEMENT-AUDIT.md.
  *
  * @param {Record<string, unknown>} obj - Plain object.
  * @param {string} excludedKey - Name of the field to drop before canonicalize.

@@ -1,6 +1,7 @@
 ---
 title: Runtime-Connectivity Enforcement Audit System
 _source_spec: sg-e2e-enforcement-flag-audit
+_source_status: pruned-after-shipment
 last_reviewed: 2026-04-27
 ---
 
@@ -343,6 +344,5 @@ tests/e2e/sg-e2e-enforcement-flag-audit.runtime-connectivity.spec.mjs
 - [AUDIT-LOG.md](AUDIT-LOG.md)
 - [HOOKS.md](HOOKS.md)
 - [WORKFLOW-ENFORCEMENT.md](WORKFLOW-ENFORCEMENT.md)
-- `.claude/specs/groups/sg-e2e-enforcement-flag-audit/spec.md`
 - `.claude/specs/groups/sg-e2e-runtime-connectivity/spec.md`
 - `.claude/specs/groups/sg-e2e-gate5-enforcement/spec.md`

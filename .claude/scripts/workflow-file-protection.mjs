@@ -847,19 +847,19 @@ const PROTECTED_FILE_REMEDIATION = {
     kind: 'override',
     remediation:
       'runtime-connectivity-enforcement.json is operator-controlled runtime-connectivity enforcement state. Direct agent writes are REJECTED.',
-    docSection: '.claude/specs/groups/sg-e2e-enforcement-flag-audit/atomic/as-006-file-protection-extension.md',
+    docSection: '.claude/docs/RTC-ENFORCEMENT-AUDIT.md § Current Artifacts',
   },
   'rtc-enforcement-changes.log': {
     kind: 'audit-log',
     remediation:
       'rtc-enforcement-changes.log is the runtime-connectivity enforcement audit log. Direct agent writes are REJECTED; append through the owning audit path.',
-    docSection: '.claude/specs/groups/sg-e2e-enforcement-flag-audit/atomic/as-006-file-protection-extension.md',
+    docSection: '.claude/docs/RTC-ENFORCEMENT-AUDIT.md § Current Artifacts',
   },
   'verify-rtc-enforcement-chain.mjs': {
     kind: 'cli',
     remediation:
       'verify-rtc-enforcement-chain.mjs is a trust-root verifier script. Modifications require human review; direct agent writes are REJECTED.',
-    docSection: '.claude/specs/groups/sg-e2e-enforcement-flag-audit/atomic/as-006-file-protection-extension.md',
+    docSection: '.claude/docs/RTC-ENFORCEMENT-AUDIT.md § Current Artifacts',
   },
   // as-019 AC1.3 / DEC-CHK-009: pattern-matched audit log entry. The mapping
   // key is the pattern identifier (`kill-switch-log`) so regex-matched targets

@@ -1,8 +1,8 @@
 /**
  * AuditLogEntry discriminated-union Zod schema + parseEntry helper.
  *
- * Spec: sg-e2e-enforcement-flag-audit as-004 / parent spec.md
- *       §Interfaces-&-Contracts (AuditLogEntry data-model)
+ * Owner doc: .claude/docs/RTC-ENFORCEMENT-AUDIT.md
+ *       (AuditLogEntry data-model)
  * Requirements: REQ-NFR-025 (tamper resistance), REQ-NFR-015 (mode-change
  *   variant), AC-012 / BIZ-008 (reverse-governance variant).
  *

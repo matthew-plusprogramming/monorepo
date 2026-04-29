@@ -1,8 +1,8 @@
 /**
  * EnforcementFlag Zod schema + parseFlag helper.
  *
- * Spec: sg-e2e-enforcement-flag-audit as-001 / parent spec.md
- *       §Interfaces-&-Contracts (EnforcementFlag data-model)
+ * Owner doc: .claude/docs/RTC-ENFORCEMENT-AUDIT.md
+ *       (EnforcementFlag data-model)
  * Requirements: REQ-NFR-015 (enforcement-flag contract), SEC-016 (past-bound
  *   backdating resistance — effective_at >= now - 5min).
  *

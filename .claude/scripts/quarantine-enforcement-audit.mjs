@@ -4,7 +4,7 @@
  * Quarantine CLI — seal a broken rtc-enforcement audit log + start a new log
  * whose first entry cryptographically references the sealed file's bytes.
  *
- * Spec: sg-e2e-enforcement-flag-audit as-008 / parent spec.md §Core-Flows Path D.
+ * Owner doc: .claude/docs/RTC-ENFORCEMENT-AUDIT.md.
  * Requirements: REQ-NFR-025 (recovery ritual, chain-of-custody).
  *
  * CLI arguments:
