@@ -218,6 +218,6 @@ The pin and current env path differ only in case (e.g., `/Users/Me/repo` vs. `/U
 - `PIPELINE-EFFICIENCY-OPERATOR-RUNBOOK.md § Worktree-Canon Pin` — operator quick reference
 - `HOOKS.md § Worktree-canon integration points` — hook-relevant consumer summary
 - `AUDIT-LOG-INSPECTION.md § worktree_path_violation Event Class` — forensic procedures
-- `.claude/specs/groups/sg-pipeline-efficiency-ws3-orchestrator-hygiene/spec.md § Interfaces & Contracts contract-worktree-canon` — contract source
-- `.claude/specs/groups/sg-pipeline-efficiency-ws3-orchestrator-hygiene/spec.md § Core Flows Flow 2` — sequence diagram
-- `.claude/specs/groups/sg-pipeline-efficiency-ws3-orchestrator-hygiene/spec.md § Security Considerations` — SEC-001 mapping + SEC H2 closure
+- `WORKTREE-CANON.md § Library Surface` — current contract surface
+- `WORKTREE-CANON.md § The 7 Consumer Wiring` — consumer wiring and SEC H2 closure
+- `WORKTREE-CANON.md § Violation Reasons` — current failure taxonomy

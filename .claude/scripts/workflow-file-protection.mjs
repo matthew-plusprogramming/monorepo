@@ -818,7 +818,7 @@ const PROTECTED_FILE_REMEDIATION = {
     kind: 'override',
     remediation:
       'pipeline-efficiency-enforcement.json is the operator-controlled enforcement mode flag (advisory/coercive/off). Only the human operator may edit via a signed commit; direct agent writes are REJECTED. For session-scoped advisory↔coercive flips, use `session-checkpoint.mjs override-enforcement <advisory|coercive>`.',
-    docSection: '.claude/specs/groups/sg-pipeline-efficiency-ws1-convergence-pruning/spec.md § REQ-013',
+    docSection: '.claude/docs/PIPELINE-EFFICIENCY-OPERATOR-RUNBOOK.md § Enforcement Mode',
   },
   // sg-pipeline-efficiency-ws1-convergence-pruning REQ-014 / AC16.1 / AC16.2:
   // Hash-chain genesis anchor. Content `{seq: 0, hash, signed_by,
@@ -829,7 +829,7 @@ const PROTECTED_FILE_REMEDIATION = {
     kind: 'audit-log',
     remediation:
       'pipeline-efficiency-genesis.json is the hash-chain genesis anchor for the pipeline-efficiency audit log. Only the human operator may write via `git commit -S`; direct agent writes are REJECTED. An unprotected genesis defeats the entire NFR-HASH-CHAIN-VERIFY trust chain — rotation must preserve `previous_genesis_hash` linking.',
-    docSection: '.claude/specs/groups/sg-pipeline-efficiency-ws1-convergence-pruning/spec.md § REQ-014',
+    docSection: '.claude/docs/PIPELINE-EFFICIENCY-OPERATOR-RUNBOOK.md § Audit Chain',
   },
   // sg-pipeline-efficiency-ws1-convergence-pruning NFR-14 / AC16.2 / AC16.3 / AC16.5:
   // Kill-switch sentinel. Presence bypasses ALL pipeline-efficiency
@@ -1203,8 +1203,7 @@ async function main() {
           `Target path ${violation.attempted_path} resolves outside the ` +
           `session-pinned worktree root ${violation.pinned_root}.\n` +
           `Reason: ${violation.reason} (exit ${violation.exit_code}).\n\n` +
-          'See: .claude/specs/groups/sg-pipeline-efficiency-ws3-orchestrator-hygiene/' +
-          'spec.md § Interfaces & Contracts › Worktree Canonicalization Contract\n\n' +
+          'See: .claude/docs/WORKTREE-CANON.md § Library Surface\n\n' +
           '========================================\n\n';
         process.stderr.write(msg);
         process.exit(violation.exit_code);

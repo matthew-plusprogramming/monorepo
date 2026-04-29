@@ -8,8 +8,8 @@
  *
  * Scope per as-020 atomic spec:
  *   - Publish-only wrapper; emits the canonical `WorkstreamMetrics` JSON
- *     to the contract-declared path and flips the manifest convergence
- *     field `before_after_metrics_published = true` on success.
+ *     to the contract-declared path. Legacy manifest mutation is available
+ *     only when `--manifest-path` is supplied.
  *   - Delegates metrics computation to as-019 collector
  *     (`./pipeline-efficiency-ws3-collect.mjs`) when present. When
  *     the collector is not yet shipped, the publisher emits a pinned
@@ -47,12 +47,12 @@
  *   node .claude/scripts/metrics/pipeline-efficiency-ws3-publish.mjs \
  *     --run-id <id> \
  *     [--out-dir <metrics-dir>] \
- *     [--manifest-path <path>] \
+ *     [--manifest-path <path-to-update>] \
  *     [--collector-module <path>] \
  *     [--skip-manifest-update]
  *
  * Exit codes:
- *   0 - Success. Metrics file written + manifest updated.
+ *   0 - Success. Metrics file written; manifest updated only when requested.
  *   1 - Runtime error (I/O, malformed collector output).
  *   2 - Invocation error (missing --run-id, collector output fails schema).
  *
@@ -79,8 +79,6 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const DEFAULT_OUT_DIR_REL = '.claude/metrics';
-const DEFAULT_MANIFEST_REL =
-  '.claude/specs/groups/sg-pipeline-efficiency-ws3-orchestrator-hygiene/manifest.json';
 const DEFAULT_COLLECTOR_REL = './pipeline-efficiency-ws3-collect.mjs';
 
 const FILENAME_PREFIX = 'pipeline-efficiency-ws3-orchestrator-hygiene-';
@@ -173,15 +171,13 @@ function parseArgs(argv) {
     }
   }
   args.outDir = args.outDir || join(args.repoRoot, DEFAULT_OUT_DIR_REL);
-  args.manifestPath =
-    args.manifestPath || join(args.repoRoot, DEFAULT_MANIFEST_REL);
   return args;
 }
 
 function printUsage() {
   process.stderr.write(
     'Usage: node pipeline-efficiency-ws3-publish.mjs --run-id <id> \\\n' +
-      '  [--out-dir <dir>] [--manifest-path <path>] \\\n' +
+      '  [--out-dir <dir>] [--manifest-path <path-to-update>] \\\n' +
       '  [--collector-module <path>] [--skip-manifest-update]\n'
   );
 }
@@ -504,10 +500,8 @@ function atomicWriteJson(path, data) {
  * (AC20.2 idempotence + preservation tests).
  *
  * Missing manifest is treated as a soft no-op: publish must not abort
- * on a fixture lacking a manifest (the tests seed one, but the real
- * ws-3 manifest is guaranteed). If the manifest is absent AND
- * --skip-manifest-update was not passed, the caller is still notified
- * via stderr so the operator can investigate.
+ * when an explicitly requested legacy manifest update points at an absent
+ * file.
  *
  * @param {string} manifestPath
  * @param {{run_id:string, out_file:string, published_at:string}} meta
@@ -648,9 +642,10 @@ async function run(args) {
     };
   }
 
-  // AC20.2 — flip manifest convergence gate (schema-valid => field true).
+  // Legacy optional path: flip manifest convergence gate when explicitly
+  // requested by a caller that still owns a manifest fixture.
   let manifestUpdated = false;
-  if (!args.skipManifestUpdate) {
+  if (!args.skipManifestUpdate && args.manifestPath) {
     try {
       const r = updateManifestConvergence(args.manifestPath, {
         run_id: args.runId,

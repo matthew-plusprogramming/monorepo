@@ -238,18 +238,16 @@ Fallbacks are recorded in the structured log (`.claude/specs/groups/<sg>/flow-fi
 ```bash
 # Pre-computation at impl-verify with diff scope
 node .claude/scripts/flow-verify-checks.mjs \
-  --sg sg-pipeline-efficiency-ws3-orchestrator-hygiene \
+  --sg <spec-group-id> \
   --stage impl-verify \
   --scope diff \
   --diff-base main
 
 # Agent dispatch consumes pre-computed result
-/flow-verify --stage impl-verify --sg sg-pipeline-efficiency-ws3-orchestrator-hygiene --scope diff
+/flow-verify --stage impl-verify --sg <spec-group-id> --scope diff
 ```
 
 Helper library: `.claude/scripts/lib/flow-verify-diff-scope.mjs` exports `resolveDiffScope({ base, stage })` returning `{ scope, changed_files, affected_modules, fallback }`. Consumers in `flow-verify-checks.mjs` filter findings to `affected_modules` before emitting. Module resolution uses `trace.config.json` `fileGlobs` (see TRACES.md § Consumer: Flow-Verifier Diff-Scope).
-
-Cross-reference: [ws-3 spec Flow 1 sequence diagram](../specs/groups/sg-pipeline-efficiency-ws3-orchestrator-hygiene/spec.md#flow-verify-diff-scope-dispatch).
 
 ---
 
@@ -259,7 +257,6 @@ Cross-reference: [ws-3 spec Flow 1 sequence diagram](../specs/groups/sg-pipeline
 - `.claude/skills/flow-verify/SKILL.md` -- Skill file with full parameter reference
 - `.claude/scripts/flow-verify-checks.mjs` -- Pre-computation script
 - `.claude/scripts/lib/flow-verify-diff-scope.mjs` -- Diff-scope resolver helper
-- `.claude/specs/groups/sg-pipeline-efficiency-ws3-orchestrator-hygiene/spec.md` -- Diff-scope contract (REQ-006)
 - `.claude/prds/flow-verifier/prd.md` -- PRD with motivation and success metrics
 - `.claude/docs/TRACES.md` -- Trace system (fileGlobs -> module mapping consumed by diff-scope)
 - `.claude/docs/DOC-AUDIT.md` -- Doc-audit system (analogous two-layer architecture)
