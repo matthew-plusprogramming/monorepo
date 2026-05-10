@@ -14,6 +14,13 @@ implementation_status: not_started
 #   - type-only: Type-level changes with no runtime behavior
 #   - docs-only: Documentation-only changes
 
+# Runtime Manual-Test Promotion (optional)
+# Set runtime_validation_required: true for plugin/MCP/connector/browser-extension
+# work, plugin loaders, or dynamic tool/body resolution that must boot live.
+# runtime_validation_required: false
+# runtime_validation_surface:                 # Required when runtime_validation_required is true
+# runtime_validation_rationale:               # Required when runtime_validation_required is true
+
 # Supersession Metadata (optional - set when this spec is superseded)
 # status: superseded                        # Set to 'superseded' when replaced by newer spec
 # superseded_by: <spec-group-id>            # ID of the spec group that supersedes this one

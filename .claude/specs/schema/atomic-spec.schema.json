@@ -135,6 +135,28 @@
       ],
       "description": "Required when e2e_skip is true. Reason for opting out of E2E tests."
     },
+    "runtime_validation_required": {
+      "type": "boolean",
+      "default": false,
+      "description": "When true, terminal completion requires /manual-test with a structured passing result."
+    },
+    "runtime_validation_surface": {
+      "type": "string",
+      "enum": [
+        "plugin",
+        "mcp",
+        "connector",
+        "browser-extension",
+        "dynamic-tool-body",
+        "plugin-loader",
+        "other"
+      ],
+      "description": "Runtime-loaded surface that requires live manual validation."
+    },
+    "runtime_validation_rationale": {
+      "type": "string",
+      "description": "Required when runtime_validation_required is true. Explains why static/generated gates are insufficient."
+    },
     "runtime_env": {
       "type": "object",
       "description": "Runtime environment tier declaration (contract-runtime-env-frontmatter v1.0).",
@@ -229,6 +251,24 @@
   },
   "additionalProperties": false,
   "allOf": [
+    {
+      "if": {
+        "properties": { "runtime_validation_required": { "const": true } },
+        "required": ["runtime_validation_required"]
+      },
+      "then": {
+        "required": [
+          "runtime_validation_surface",
+          "runtime_validation_rationale"
+        ],
+        "properties": {
+          "runtime_validation_rationale": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
     {
       "if": {
         "properties": { "crosses_boundary": { "const": false } },

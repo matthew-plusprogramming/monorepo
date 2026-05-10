@@ -523,30 +523,40 @@ Escalate all questions about API semantics, behavioral descriptions, or accuracy
 
 ---
 
-## Convergence Response Format
+## Required Structured Output
 
-When this agent completes a convergence-loop check (investigation, challenger, unifier, code review, security review, completion verification, documentation), the response MUST end with a machine-readable fenced block in the form:
+When this agent completes a convergence-loop check, end the response with exactly one machine-readable fenced block tagged `convergence-result` with JSON matching this schema:
 
-    ```convergence-result
-    status: clean
-    findings_count: 0
-    ```
+```convergence-result
+{
+  "status": "clean",
+  "findings_count": 0,
+  "findings": [],
+  "pass": 1,
+  "gate": "<gate-name>"
+}
+```
 
-or for a dirty pass with findings:
+If findings exist:
 
-    ```convergence-result
-    status: dirty
-    findings_count: 2
-    findings:
-      - TECH-001
-      - SEC-002
-    ```
+```convergence-result
+{
+  "status": "dirty",
+  "findings_count": 1,
+  "findings": [
+    {
+      "id": "TECH-001",
+      "severity": "medium",
+      "confidence": "high",
+      "recommendation": "Action verb + specific field/section reference"
+    }
+  ],
+  "pass": 1,
+  "gate": "<gate-name>"
+}
+```
 
-The block MUST be a fenced markdown code block with the language tag `convergence-result`. `status` is `clean` or `dirty` (case-insensitive value). `findings_count` is the integer count. `findings` is an optional YAML-style list of finding IDs; if present it overrides the count.
-
-Narrative above the block may include severity tables, bulleted findings, spec citations, or any free-form analysis. Only the fenced block drives convergence classification.
-
-Legacy fallback: if the block is missing or malformed, the extractor falls back to prose heuristics (success markers like "No issues found.", structured severity tables, etc.). Always emit the block -- it is the deterministic signal.
+Rules: status/severity/confidence enums are lowercase only; unknown top-level fields cause parse_failed; emit exactly one `convergence-result` block as the final fenced block.
 
 ## Worktree Canon
 

@@ -34,10 +34,12 @@
  */
 
 import { existsSync, readFileSync, writeFileSync, unlinkSync, readdirSync, mkdirSync } from 'node:fs';
-import { join, isAbsolute, basename } from 'node:path';
+import { join, isAbsolute, basename, resolve, relative, sep } from 'node:path';
+import YAML from 'yaml';
 import {
   STOP_MANDATORY_DISPATCHES,
   VALID_E2E_SKIP_RATIONALES,
+  VALID_RUNTIME_VALIDATION_SURFACES,
   OVERRIDE_GATE_NAMES,
   getWorkflowTypeStrict,
   getStopPhaseRequirements,
@@ -149,6 +151,212 @@ const TRUST_BEARING_ALLOWLIST = [
   // Hook registration surface
   'settings.json',
 ];
+
+const RUNTIME_MANUAL_TEST_PHASES = new Set(['documenting', 'complete']);
+
+function toProjectRelativePath(claudeDir, absolutePath) {
+  const projectRoot = resolve(join(claudeDir, '..'));
+  return relative(projectRoot, absolutePath).split(sep).join('/');
+}
+
+function parseMarkdownFrontmatter(content) {
+  const match = content.match(/^---\r?\n([\s\S]*?)\r?\n---/);
+  if (!match) return null;
+  try {
+    const parsed = YAML.parse(match[1]);
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function listRuntimeValidationSpecFiles(claudeDir, specGroupId) {
+  const specFiles = [];
+  const sgDir = join(claudeDir, 'specs', 'groups', specGroupId);
+  const specPath = join(sgDir, 'spec.md');
+  if (existsSync(specPath)) {
+    specFiles.push(specPath);
+  }
+
+  const atomicDir = join(sgDir, 'atomic');
+  if (existsSync(atomicDir)) {
+    try {
+      const atomicFiles = readdirSync(atomicDir)
+        .filter((entry) => entry.endsWith('.md'))
+        .sort()
+        .map((entry) => join(atomicDir, entry));
+      specFiles.push(...atomicFiles);
+    } catch {
+      // Structural read errors fail-open for runtime marker discovery.
+    }
+  }
+
+  return specFiles;
+}
+
+function inspectRuntimeValidationRequirement(claudeDir, specGroupId) {
+  const requirement = {
+    required: false,
+    markers: [],
+    errors: [],
+  };
+
+  if (!specGroupId || !/^sg-[a-z0-9-]+$/.test(specGroupId)) {
+    return requirement;
+  }
+
+  for (const specFile of listRuntimeValidationSpecFiles(claudeDir, specGroupId)) {
+    let frontmatter = null;
+    try {
+      frontmatter = parseMarkdownFrontmatter(readFileSync(specFile, 'utf8'));
+    } catch {
+      continue;
+    }
+    if (!frontmatter || frontmatter.runtime_validation_required === undefined) {
+      continue;
+    }
+
+    const relPath = toProjectRelativePath(claudeDir, specFile);
+    const markerValue = frontmatter.runtime_validation_required;
+    if (typeof markerValue !== 'boolean') {
+      requirement.required = true;
+      requirement.errors.push(
+        `${relPath}: runtime_validation_required must be boolean true/false`
+      );
+      continue;
+    }
+    if (markerValue !== true) {
+      continue;
+    }
+
+    requirement.required = true;
+    const surface = frontmatter.runtime_validation_surface;
+    const rationale = frontmatter.runtime_validation_rationale;
+
+    if (!VALID_RUNTIME_VALIDATION_SURFACES.includes(surface)) {
+      requirement.errors.push(
+        `${relPath}: runtime_validation_surface must be one of ${VALID_RUNTIME_VALIDATION_SURFACES.join(', ')}`
+      );
+    }
+    if (typeof rationale !== 'string' || rationale.trim().length === 0) {
+      requirement.errors.push(
+        `${relPath}: runtime_validation_rationale is required when runtime_validation_required=true`
+      );
+    }
+
+    requirement.markers.push({
+      spec_file: relPath,
+      surface,
+      rationale,
+    });
+  }
+
+  return requirement;
+}
+
+function resolveManualTestEvidencePath(claudeDir, specGroupId, evidencePath) {
+  if (typeof evidencePath !== 'string' || evidencePath.trim().length === 0) {
+    return { ok: false, reason: 'evidence_path is missing' };
+  }
+
+  const projectRoot = resolve(join(claudeDir, '..'));
+  const specGroupDir = resolve(join(claudeDir, 'specs', 'groups', specGroupId));
+  const evidenceDir = resolve(join(specGroupDir, 'evidence'));
+  const rawPath = evidencePath.trim();
+
+  let candidate;
+  if (isAbsolute(rawPath)) {
+    candidate = rawPath;
+  } else if (rawPath === '.claude' || rawPath.startsWith('.claude/')) {
+    candidate = join(projectRoot, rawPath);
+  } else {
+    candidate = join(specGroupDir, rawPath);
+  }
+
+  const resolved = resolve(candidate);
+  const insideEvidenceDir =
+    resolved === evidenceDir || resolved.startsWith(evidenceDir + sep);
+  if (!insideEvidenceDir) {
+    return {
+      ok: false,
+      reason: `evidence_path must be under .claude/specs/groups/${specGroupId}/evidence/`,
+    };
+  }
+
+  return { ok: true, path: resolved };
+}
+
+function validateRuntimeManualTestGate(session, allTasks, claudeDir, specGroupId, currentPhase) {
+  const reasons = [];
+  const requirement = inspectRuntimeValidationRequirement(claudeDir, specGroupId);
+
+  if (!requirement.required) {
+    return { required: false, reasons };
+  }
+
+  if (!RUNTIME_MANUAL_TEST_PHASES.has(currentPhase)) {
+    return { required: true, reasons };
+  }
+
+  for (const markerError of requirement.errors) {
+    reasons.push(`Runtime validation marker invalid: ${markerError}`);
+  }
+
+  const hasManualTesterDispatch = allTasks.some((task) =>
+    task &&
+    task.subagent_type === 'manual-tester' &&
+    task.spec_group_id === specGroupId
+  );
+  if (!hasManualTesterDispatch) {
+    reasons.push(`Missing manual-tester dispatch record for ${specGroupId}.`);
+  }
+
+  const result = session.active_work?.manual_test_result;
+  if (!result || typeof result !== 'object' || Array.isArray(result)) {
+    reasons.push('Missing structured manual-test result at session.active_work.manual_test_result.');
+    return { required: true, reasons };
+  }
+
+  if (result.spec_group_id !== specGroupId) {
+    reasons.push(
+      `Structured manual-test result is for ${result.spec_group_id || '<missing>'}, expected ${specGroupId}.`
+    );
+  }
+
+  if (!['pass', 'fail', 'blocked'].includes(result.result)) {
+    reasons.push(`Structured manual-test result has invalid result '${result.result}'.`);
+    return { required: true, reasons };
+  }
+
+  if (result.result !== 'pass') {
+    reasons.push(`Structured manual-test result is '${result.result}', expected 'pass'.`);
+    return { required: true, reasons };
+  }
+
+  if (!Number.isInteger(result.scenario_count) || result.scenario_count <= 0) {
+    reasons.push('Passing manual-test result requires scenario_count > 0.');
+  }
+  if (!Number.isInteger(result.pass_count) || result.pass_count <= 0) {
+    reasons.push('Passing manual-test result requires pass_count > 0.');
+  }
+  if (result.fail_count !== 0) {
+    reasons.push('Passing manual-test result requires fail_count === 0.');
+  }
+
+  const evidence = resolveManualTestEvidencePath(
+    claudeDir,
+    specGroupId,
+    result.evidence_path,
+  );
+  if (!evidence.ok) {
+    reasons.push(evidence.reason);
+  } else if (!existsSync(evidence.path)) {
+    reasons.push(`Manual-test evidence_path does not exist: ${result.evidence_path}.`);
+  }
+
+  return { required: true, reasons };
+}
 
 /**
  * Detect whether the session edited any file in the trust-bearing allowlist
@@ -531,6 +739,7 @@ async function main() {
     );
 
     const allTasks = getAllTasks(session);
+    const specGroupId = session.active_work?.spec_group_id;
     const missingDispatches = [];
 
     for (const requiredType of requiredDispatches) {
@@ -546,7 +755,7 @@ async function main() {
     // Data-flow: session.json -> spec_group_id -> convention-based spec path -> frontmatter.
     const e2eIdx = missingDispatches.indexOf('e2e-test-writer');
     if (e2eIdx !== -1) {
-      const sgId = session.active_work?.spec_group_id;
+      const sgId = specGroupId;
       let e2eOptedOut = false;
 
       if (sgId && /^sg-[a-z0-9-]+$/.test(sgId)) {
@@ -690,7 +899,6 @@ async function main() {
     // Step 7.5: Shared manifest read (CR-M2: avoid redundant I/O)
     // Both obligation check and PRD staleness check use the same manifest.
     // Read it once here and reuse the parsed object in both code paths.
-    const specGroupId = session.active_work?.spec_group_id;
     let sharedManifest = null;
     let manifestReadFailed = false;
 
@@ -713,6 +921,58 @@ async function main() {
           // Fail-open on structural errors (malformed JSON, read failure)
           process.stderr.write(`Warning: Manifest read failed: ${err.message}\n`);
           manifestReadFailed = true;
+        }
+      }
+    }
+
+    // Step 7.5r: Runtime manual-test requirement.
+    //
+    // Specs may explicitly declare runtime_validation_required: true when
+    // plugin/MCP/connector/dynamic-tool behavior needs live boot validation.
+    // This is intentionally conditional; unmarked specs keep the existing
+    // advisory /manual-test behavior.
+    let runtimeManualTestBlockReasons = [];
+    let runtimeManualTestOverridden = false;
+    try {
+      const runtimeManualTestResult = validateRuntimeManualTestGate(
+        session,
+        allTasks,
+        claudeDir,
+        specGroupId,
+        currentPhase,
+      );
+      runtimeManualTestBlockReasons = runtimeManualTestResult.reasons;
+    } catch (err) {
+      process.stderr.write(
+        `[workflow-enforcement] WARNING: runtime-manual-test check error: ${err.message} -- fail-open\n`
+      );
+      runtimeManualTestBlockReasons = [];
+    }
+
+    if (runtimeManualTestBlockReasons.length > 0) {
+      const runtimeOverridePath = join(coordinationDir, OVERRIDE_FILENAME);
+      const overrides = loadOverrides(runtimeOverridePath);
+      if (overrides) {
+        const bySpecGroup = specGroupId
+          ? findMatchingOverride(overrides, OVERRIDE_GATE_NAMES.runtime_manual_test, specGroupId)
+          : null;
+        const bySession = findMatchingOverride(
+          overrides,
+          OVERRIDE_GATE_NAMES.runtime_manual_test,
+          sessionId,
+        );
+        runtimeManualTestOverridden = !!(bySpecGroup || bySession);
+      }
+
+      if (!runtimeManualTestOverridden && existsSync(runtimeOverridePath)) {
+        try {
+          const rawOverride = JSON.parse(readFileSync(runtimeOverridePath, 'utf8'));
+          const flat = rawOverride?.[OVERRIDE_GATE_NAMES.runtime_manual_test];
+          if (flat && typeof flat === 'object' && flat.rationale && flat.timestamp) {
+            runtimeManualTestOverridden = true;
+          }
+        } catch {
+          // Fail closed on runtime manual-test override parse failures.
         }
       }
     }
@@ -1107,12 +1367,16 @@ async function main() {
       );
     }
 
+    const hasRuntimeManualTestIssues =
+      runtimeManualTestBlockReasons.length > 0 && !runtimeManualTestOverridden;
+
     // If no dispatch violations, no obligation violations, no completion-invariant blocks,
     // and no deployment block, allow completion.
     if (
       missingDispatches.length === 0 &&
       obligationViolations.length === 0 &&
       checkBlockReasons.length === 0 &&
+      !hasRuntimeManualTestIssues &&
       !deploymentBlocked
     ) {
       safeDelete(sentinelPath);
@@ -1162,6 +1426,7 @@ async function main() {
       dispatchOverridden &&
       obligationViolations.length === 0 &&
       checkBlockReasons.length === 0 &&
+      !hasRuntimeManualTestIssues &&
       !deploymentBlocked
     ) {
       safeDelete(sentinelPath);
@@ -1213,7 +1478,12 @@ async function main() {
 
       // If no dispatch issues remain, no completion-invariant blocks, and no deployment block,
       // allow completion.
-      if (!hasDispatchIssues && checkBlockReasons.length === 0 && !deploymentBlocked) {
+      if (
+        !hasDispatchIssues &&
+        checkBlockReasons.length === 0 &&
+        !hasRuntimeManualTestIssues &&
+        !deploymentBlocked
+      ) {
         safeDelete(sentinelPath);
         if (prdWarning) {
           console.log(JSON.stringify({ additionalContext: prdWarning }));
@@ -1272,6 +1542,13 @@ async function main() {
       reasonParts.push(r);
     }
 
+    if (hasRuntimeManualTestIssues) {
+      const runtimeLines = runtimeManualTestBlockReasons
+        .map((reason) => `  - ${reason}`)
+        .join('\n');
+      reasonParts.push(`Runtime manual-test required:\n${runtimeLines}`);
+    }
+
     // Step 9.1: Deployment verification block
     if (deploymentBlocked) {
       reasonParts.push(deploymentBlockReason);
@@ -1297,6 +1574,15 @@ async function main() {
         .map(d => `  - ${d}: Run ${skillMap[d] || d}`)
         .join('\n');
       remediationParts.push(`Dispatch the following subagent types:\n${skillInstructions}`);
+    }
+    if (hasRuntimeManualTestIssues) {
+      remediationParts.push(
+        `Run /manual-test ${specGroupId} and record a passing structured result with ` +
+        `node .claude/scripts/session-checkpoint.mjs record-manual-test-result ${specGroupId} ` +
+        `--result pass --scenario-count <N> --pass-count <N> --fail-count 0 ` +
+        `--evidence-path .claude/specs/groups/${specGroupId}/evidence/report.md. ` +
+        `To intentionally accept the risk, create a gate override for '${OVERRIDE_GATE_NAMES.runtime_manual_test}' with a rationale.`
+      );
     }
     if (hasObligationIssues && enforcementLevel === 'graduated') {
       const convergenceFieldToGate = {

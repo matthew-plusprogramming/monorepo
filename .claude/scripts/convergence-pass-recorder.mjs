@@ -35,7 +35,7 @@
  *
  * Source values (NFR-5, AC-11):
  *   hook              -- automated SubagentStop, written via module import only
- *   parse_failed      -- all 4 extractor paths missed (streak-breaking)
+ *   parse_failed      -- all extractor paths missed (streak-breaking)
  *   manual_fallback   -- EC-7 fail-closed after log-write failure (streak-breaking)
  *   hook_manual       -- operator emergency remediation (streak-breaking, CLI-only)
  *   manual            -- operator CLI write (streak-breaking)
@@ -62,7 +62,7 @@
  */
 
 // T-08: pinned destructured named fs imports for vi.mock determinism
-import { appendFileSync, statSync, chmodSync, openSync, closeSync, existsSync, readFileSync } from 'node:fs';
+import { appendFileSync, statSync, chmodSync, openSync, closeSync, existsSync, readFileSync, mkdirSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -78,11 +78,28 @@ import { recordPass } from './session-checkpoint.mjs';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const SCRIPTS_DIR = __dirname;
-const CLAUDE_DIR = dirname(SCRIPTS_DIR);
-const CONTEXT_DIR = join(CLAUDE_DIR, 'context');
-const SESSION_LOG_PATH = join(CONTEXT_DIR, 'session.log');
-const SESSION_JSON_PATH = join(CONTEXT_DIR, 'session.json');
+const DEFAULT_CLAUDE_DIR = dirname(SCRIPTS_DIR);
 const CHECKPOINT_SCRIPT = join(SCRIPTS_DIR, 'session-checkpoint.mjs');
+
+function resolveClaudeDir() {
+  const projectRoot = process.env.CLAUDE_PROJECT_DIR;
+  if (projectRoot && typeof projectRoot === 'string' && projectRoot.length > 0) {
+    return join(projectRoot, '.claude');
+  }
+  return DEFAULT_CLAUDE_DIR;
+}
+
+function resolveContextDir() {
+  return join(resolveClaudeDir(), 'context');
+}
+
+function resolveSessionLogPath() {
+  return join(resolveContextDir(), 'session.log');
+}
+
+function resolveSessionJsonPath() {
+  return join(resolveContextDir(), 'session.json');
+}
 
 const GATE_MAP = {
   'interface-investigator': 'investigation',
@@ -128,6 +145,8 @@ const SESSION_LOG_MODE = 0o600;
 // precedence after the v1.3 Path 0 addition and path-4-before-path-2 reorder.
 const EXTRACTION_PATHS = [
   'structured_block',
+  'json_fence',
+  'bare_json',
   'severity',
   'zero_severity_breakdown',
   'success_marker',
@@ -397,85 +416,72 @@ function stripBlockquotes(text) {
  *
  * Exported for test consumption.
  */
-export function parseStructuredConvergenceBlock(text) {
-  if (!text || typeof text !== 'string') return null;
-
-  // Locate every fenced block with language tag `convergence-result`.
-  // The opening fence is `\`\`\`convergence-result` (optionally followed by
-  // whitespace / trailing content on the same line). The closing fence is a
-  // standalone `\`\`\`` line. Case-sensitive language-tag match.
-  const blockRegex = new RegExp(
-    '```' + STRUCTURED_BLOCK_LANG + '[^\\n]*\\n([\\s\\S]*?)\\n```',
-    'g'
-  );
-  const matches = [];
-  for (const m of text.matchAll(blockRegex)) {
-    matches.push(m[1]);
+function parseCanonicalConvergenceJson(parsed) {
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
+  for (const key of Object.keys(parsed)) {
+    if (!CANONICAL_ALLOWED_TOP_LEVEL_FIELDS.has(key)) return null;
   }
-  if (matches.length === 0) return null;
+  const rawStatus = parsed.status;
+  if (typeof rawStatus !== 'string') return null;
+  // Canonical schema requires lowercase status. Uppercase/mixed-case returns
+  // null so the classifier flags NON_LOWERCASE_STATUS_ENUM.
+  if (rawStatus !== rawStatus.toLowerCase()) return null;
+  const status = rawStatus;
+  if (!['clean', 'dirty'].includes(status)) return null;
+  let count;
+  let findingIds = [];
+  if (Array.isArray(parsed.findings)) {
+    for (const finding of parsed.findings) {
+      if (!finding || typeof finding !== 'object' || Array.isArray(finding)) {
+        return null;
+      }
+      if (
+        finding.severity !== undefined &&
+        (typeof finding.severity !== 'string' ||
+          !CANONICAL_VALID_SEVERITY_LOWERCASE.has(finding.severity))
+      ) {
+        return null;
+      }
+      if (
+        finding.confidence !== undefined &&
+        (typeof finding.confidence !== 'string' ||
+          !CANONICAL_VALID_CONFIDENCE_LOWERCASE.has(finding.confidence))
+      ) {
+        return null;
+      }
+    }
+    if (
+      typeof parsed.findings_count === 'number' &&
+      parsed.findings_count !== parsed.findings.length
+    ) {
+      return null;
+    }
+    findingIds = parsed.findings
+      .map(f => (f && (f.id || f.finding_id)) || null)
+      .filter(Boolean);
+    count = parsed.findings.length;
+  } else if (typeof parsed.findings_count === 'number') {
+    count = parsed.findings_count;
+  } else {
+    count = status === 'clean' ? 0 : 1;
+  }
+  return { status, count, findingIds };
+}
 
-  // Last block wins.
-  const body = matches[matches.length - 1];
-
-  // JSON-first path: handle structured JSON blocks (common from interface-investigator)
+function parseConvergenceResultBody(body, { allowYaml = true } = {}) {
   const trimmed = body.trim();
   if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
     try {
-      const parsed = JSON.parse(trimmed);
-      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-        for (const key of Object.keys(parsed)) {
-          if (!CANONICAL_ALLOWED_TOP_LEVEL_FIELDS.has(key)) return null;
-        }
-        const rawStatus = parsed.status;
-        if (typeof rawStatus !== 'string') return null;
-        // Canonical schema requires lowercase status. Uppercase/mixed-case
-        // returns null so the classifier flags NON_LOWERCASE_STATUS_ENUM.
-        if (rawStatus !== rawStatus.toLowerCase()) return null;
-        const status = rawStatus;
-        if (!['clean', 'dirty'].includes(status)) return null;
-        let count;
-        let findingIds = [];
-        if (Array.isArray(parsed.findings)) {
-          for (const finding of parsed.findings) {
-            if (!finding || typeof finding !== 'object' || Array.isArray(finding)) {
-              return null;
-            }
-            if (
-              finding.severity !== undefined &&
-              (typeof finding.severity !== 'string' ||
-                !CANONICAL_VALID_SEVERITY_LOWERCASE.has(finding.severity))
-            ) {
-              return null;
-            }
-            if (
-              finding.confidence !== undefined &&
-              (typeof finding.confidence !== 'string' ||
-                !CANONICAL_VALID_CONFIDENCE_LOWERCASE.has(finding.confidence))
-            ) {
-              return null;
-            }
-          }
-          if (
-            typeof parsed.findings_count === 'number' &&
-            parsed.findings_count !== parsed.findings.length
-          ) {
-            return null;
-          }
-          findingIds = parsed.findings
-            .map(f => (f && (f.id || f.finding_id)) || null)
-            .filter(Boolean);
-          count = parsed.findings.length;
-        } else if (typeof parsed.findings_count === 'number') {
-          count = parsed.findings_count;
-        } else {
-          count = status === 'clean' ? 0 : 1;
-        }
-        return { status, count, findingIds };
-      }
+      return parseCanonicalConvergenceJson(JSON.parse(trimmed));
     } catch {
-      // Fall through to YAML parsing
+      if (!allowYaml) return null;
+      // Fall through to YAML parsing for convergence-result fences only.
     }
+  } else if (!allowYaml) {
+    return null;
   }
+
+  if (!allowYaml) return null;
 
   const lines = body.split('\n');
 
@@ -544,6 +550,33 @@ export function parseStructuredConvergenceBlock(text) {
   return { status, count, findingIds };
 }
 
+function findFencedBodies(text, lang, flags = 'g') {
+  const blockRegex = new RegExp(
+    '```' + lang + '[^\\n]*\\n([\\s\\S]*?)\\n```',
+    flags
+  );
+  const matches = [];
+  for (const m of text.matchAll(blockRegex)) {
+    matches.push(m[1]);
+  }
+  return matches;
+}
+
+export function parseStructuredConvergenceBlock(text) {
+  if (!text || typeof text !== 'string') return null;
+
+  // Locate every fenced block with language tag `convergence-result`.
+  // The opening fence is `\`\`\`convergence-result` (optionally followed by
+  // whitespace / trailing content on the same line). The closing fence is a
+  // standalone `\`\`\`` line. Case-sensitive language-tag match.
+  const matches = findFencedBodies(text, STRUCTURED_BLOCK_LANG);
+  if (matches.length === 0) return null;
+
+  // Last block wins.
+  const body = matches[matches.length - 1];
+  return parseConvergenceResultBody(body, { allowYaml: true });
+}
+
 /**
  * Path 0 dispatcher.
  *
@@ -558,18 +591,37 @@ export function parseStructuredConvergenceBlock(text) {
 function tryPath0StructuredBlock(text) {
   if (!text || typeof text !== 'string') return { matched: false, tried: false };
   // Quick presence check (avoid full regex run when tag absent)
-  if (!text.includes('```' + STRUCTURED_BLOCK_LANG)) {
-    return { matched: false, tried: false };
-  }
-  const parsed = parseStructuredConvergenceBlock(text);
+  const structuredBlockPresent = text.includes('```' + STRUCTURED_BLOCK_LANG);
+  let parsed = structuredBlockPresent ? parseStructuredConvergenceBlock(text) : null;
+  let path = 'structured_block';
   if (!parsed) {
-    return { matched: false, tried: true };
+    const jsonBlocks = findFencedBodies(text, 'json', 'gi');
+    for (let i = jsonBlocks.length - 1; i >= 0; i--) {
+      parsed = parseConvergenceResultBody(jsonBlocks[i], { allowYaml: false });
+      if (parsed) {
+        path = 'json_fence';
+        break;
+      }
+    }
+  }
+  if (!parsed) {
+    const trimmed = text.trim();
+    if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+      parsed = parseConvergenceResultBody(trimmed, { allowYaml: false });
+      if (parsed) {
+        path = 'bare_json';
+      }
+    }
+  }
+  if (!parsed) {
+    return { matched: false, tried: structuredBlockPresent };
   }
   return {
     matched: true,
     clean: parsed.status === 'clean',
     finding_count: parsed.count,
     finding_ids: parsed.findingIds.length > 0 ? parsed.findingIds : null,
+    path,
   };
 }
 
@@ -1105,7 +1157,7 @@ function classify(text, gateName) {
       clean: p0.clean,
       finding_count: p0.finding_count,
       finding_ids: p0.finding_ids,
-      path: 'structured_block',
+      path: p0.path || 'structured_block',
     };
   }
   // Record whether a malformed block was encountered so the diagnostic log
@@ -1165,6 +1217,53 @@ function classify(text, gateName) {
   };
 }
 
+/**
+ * Build a read-only debug classification for a captured subagent response.
+ * Does not write session.json or session.log.
+ *
+ * @param {object} opts
+ * @param {string} opts.responseText
+ * @param {string} opts.agentType
+ * @param {string} [opts.gateName]
+ * @returns {object}
+ */
+export function debugClassifyResponse(opts) {
+  const responseText = opts?.responseText ?? '';
+  const agentType = opts?.agentType ?? 'unknown';
+  const gateName = opts?.gateName ?? GATE_MAP[agentType] ?? 'unknown';
+  const result = classify(responseText, gateName);
+  const parseFailedReason =
+    result.source === 'parse_failed'
+      ? classifyParseFailureReason(responseText)
+      : null;
+  const findingsHash = result.finding_ids
+    ? computeFindingsHash(result.finding_ids)
+    : result.finding_count === 0
+      ? computeFindingsHash([])
+      : null;
+
+  return {
+    agent_type: agentType,
+    gate: gateName,
+    source: result.source,
+    extraction_path: result.path || 'parse_failed',
+    clean: result.clean,
+    findings_count: result.finding_count,
+    findings_hash: findingsHash,
+    parse_failed_reason: parseFailedReason,
+    structured_block_tried: result.structured_block_tried === true,
+    evidence_record: {
+      agent_type: agentType,
+      findings_count: result.finding_count,
+      findings_hash: findingsHash,
+      clean: result.clean,
+      record_source: result.source,
+      extraction_path: result.path || 'parse_failed',
+      ...(parseFailedReason ? { parse_failed_reason: parseFailedReason } : {}),
+    },
+  };
+}
+
 // =============================================================================
 // T-08: session.log diagnostic writer + chmod 0600 enforcement (AC-8, AC-16)
 // =============================================================================
@@ -1175,24 +1274,26 @@ function classify(text, gateName) {
  * Throws on filesystem errors (caught by writeSessionLogEntry retry path).
  */
 function ensureSessionLogMode() {
-  if (existsSync(SESSION_LOG_PATH)) {
-    const st = statSync(SESSION_LOG_PATH);
+  const sessionLogPath = resolveSessionLogPath();
+  mkdirSync(dirname(sessionLogPath), { recursive: true });
+  if (existsSync(sessionLogPath)) {
+    const st = statSync(sessionLogPath);
     const mode = st.mode & 0o777;
     if (mode !== SESSION_LOG_MODE) {
       const oldMode = mode.toString(8).padStart(4, '0');
-      chmodSync(SESSION_LOG_PATH, SESSION_LOG_MODE);
+      chmodSync(sessionLogPath, SESSION_LOG_MODE);
       process.stderr.write(`SESSION_LOG_CHMOD_CORRECTED: mode 0${oldMode}->0600\n`);
     }
   } else {
     // Create file with explicit mode 0o600 via openSync, then close.
-    const fd = openSync(SESSION_LOG_PATH, 'a', SESSION_LOG_MODE);
+    const fd = openSync(sessionLogPath, 'a', SESSION_LOG_MODE);
     closeSync(fd);
     // Some platforms ignore mode arg if file already exists from a race;
     // double-check and chmod if needed.
-    const st = statSync(SESSION_LOG_PATH);
+    const st = statSync(sessionLogPath);
     const mode = st.mode & 0o777;
     if (mode !== SESSION_LOG_MODE) {
-      chmodSync(SESSION_LOG_PATH, SESSION_LOG_MODE);
+      chmodSync(sessionLogPath, SESSION_LOG_MODE);
     }
   }
 }
@@ -1212,9 +1313,10 @@ function ensureSessionLogMode() {
  */
 function writeSessionLogEntry(entry) {
   ensureSessionLogMode();
+  const sessionLogPath = resolveSessionLogPath();
   const line = JSON.stringify(entry) + '\n';
   try {
-    appendFileSync(SESSION_LOG_PATH, line);
+    appendFileSync(sessionLogPath, line);
   } catch (err) {
     // Retry once with 100ms backoff
     const start = Date.now();
@@ -1224,7 +1326,7 @@ function writeSessionLogEntry(entry) {
     try {
       // Re-ensure mode in case the failure was permission-related
       ensureSessionLogMode();
-      appendFileSync(SESSION_LOG_PATH, line);
+      appendFileSync(sessionLogPath, line);
     } catch (retryErr) {
       // Propagate the retry error with errno preserved
       const wrapped = new Error(`SESSION_LOG_WRITE_FAIL: errno=${retryErr.code || 'UNKNOWN'}`);
@@ -1244,7 +1346,7 @@ function writeSessionLogEntry(entry) {
  * raw block body is never logged.
  */
 function buildDiagnosticEntry(opts) {
-  const { gateName, agentType, agentId, responseText, normalizedLength, structuredBlockTried } = opts;
+  const { gateName, agentType, agentId, workId, workIdSource, responseText, normalizedLength, structuredBlockTried } = opts;
   const sha = createHash('sha256').update(responseText, 'utf8').digest('hex').slice(0, 16);
   const entry = {
     timestamp: new Date().toISOString(),
@@ -1255,6 +1357,10 @@ function buildDiagnosticEntry(opts) {
     extraction_paths_tried: [...EXTRACTION_PATHS],
   };
   if (agentId) entry.agent_id = agentId;
+  if (workId) {
+    entry.work_id = workId;
+    entry.work_id_source = workIdSource || 'unknown';
+  }
   // EC-13: include response_length_normalized only when normalization-to-empty
   if (normalizedLength === 0) {
     entry.response_length_normalized = 0;
@@ -1274,13 +1380,60 @@ function buildDiagnosticEntry(opts) {
  * Returns the gate state object or null if no state present.
  */
 function readCircuitBreakerState(gateName) {
-  if (!existsSync(SESSION_JSON_PATH)) return null;
+  const sessionJsonPath = resolveSessionJsonPath();
+  if (!existsSync(sessionJsonPath)) return null;
   try {
-    const session = JSON.parse(readFileSync(SESSION_JSON_PATH, 'utf8'));
+    const session = JSON.parse(readFileSync(sessionJsonPath, 'utf8'));
     return session?.convergence_log_failures?.[gateName] ?? null;
   } catch {
     return null;
   }
+}
+
+function readSessionJsonForRecorder() {
+  const sessionJsonPath = resolveSessionJsonPath();
+  if (!existsSync(sessionJsonPath)) return null;
+  try {
+    return JSON.parse(readFileSync(sessionJsonPath, 'utf8'));
+  } catch {
+    return null;
+  }
+}
+
+function resolveWorkIdFromDispatch(input) {
+  const explicit = input?.work_id || input?.workId;
+  if (typeof explicit === 'string' && explicit.trim() !== '') {
+    return { workId: explicit.trim(), source: 'payload' };
+  }
+  const agentId = input?.agent_id;
+  const session = readSessionJsonForRecorder();
+  if (!session || typeof session !== 'object') {
+    return { workId: null, source: 'unresolved' };
+  }
+  if (agentId) {
+    const indexed = session.subagent_dispatches?.[agentId];
+    const indexedWorkId = indexed?.work_id || indexed?.spec_group_id;
+    if (typeof indexedWorkId === 'string' && indexedWorkId.trim() !== '') {
+      return { workId: indexedWorkId.trim(), source: 'dispatch_metadata' };
+    }
+    const tasks = [
+      ...(session.subagent_tasks?.in_flight || []),
+      ...(session.subagent_tasks?.completed_this_session || []),
+    ];
+    const task = tasks.find((t) => t?.task_id === agentId || t?.agent_id === agentId);
+    const taskWorkId = task?.work_id || task?.spec_group_id;
+    if (typeof taskWorkId === 'string' && taskWorkId.trim() !== '') {
+      return { workId: taskWorkId.trim(), source: 'dispatch_task' };
+    }
+  }
+  if (typeof session.active_work_id === 'string' && session.active_work_id.trim() !== '') {
+    return { workId: session.active_work_id.trim(), source: 'active_work_fallback' };
+  }
+  const activeWorkId = session.active_work?.spec_group_id;
+  if (typeof activeWorkId === 'string' && activeWorkId.trim() !== '') {
+    return { workId: activeWorkId.trim(), source: 'active_work_fallback' };
+  }
+  return { workId: null, source: 'unresolved' };
 }
 
 /**
@@ -1299,11 +1452,14 @@ function readCircuitBreakerState(gateName) {
  *     This includes the null === null case, which matches duplicate
  *     parse_failed records whose hash is always null.
  */
-function isDuplicateRecentRecord(gateName, agentId, candidateHash) {
-  if (!existsSync(SESSION_JSON_PATH)) return false;
+function isDuplicateRecentRecord(gateName, agentId, candidateHash, workId = null) {
   try {
-    const session = JSON.parse(readFileSync(SESSION_JSON_PATH, 'utf8'));
-    const passes = session?.convergence_evidence?.[gateName]?.passes;
+    const session = readSessionJsonForRecorder();
+    const workScopedPasses =
+      workId && session?.work_items?.[workId]?.convergence_evidence?.[gateName]?.passes;
+    const passes = Array.isArray(workScopedPasses)
+      ? workScopedPasses
+      : session?.convergence_evidence?.[gateName]?.passes;
     if (!Array.isArray(passes) || passes.length === 0) return false;
     const last = passes[passes.length - 1];
     if (!last || !last.agent_id || !agentId) return false;
@@ -1352,9 +1508,11 @@ function invokeCircuitBreakerUpdate(gateName, event) {
  * @param {string} opts.agentType
  * @param {string} opts.gateName
  * @param {string} [opts.agentId]
+ * @param {string} [opts.workId]
+ * @param {string} [opts.workIdSource]
  */
 export async function extractAndRecord(opts) {
-  const { responseText, agentType, gateName, agentId } = opts;
+  const { responseText, agentType, gateName, agentId, workId = null, workIdSource = null } = opts;
 
   const result = classify(responseText, gateName);
 
@@ -1365,7 +1523,7 @@ export async function extractAndRecord(opts) {
 
     // Idempotency guard: suppress duplicate (gate, agent_id, findings_hash)
     // records within IDEMPOTENCY_WINDOW_MS. See isDuplicateRecentRecord().
-    if (isDuplicateRecentRecord(gateName, agentId, findingsHash)) {
+    if (isDuplicateRecentRecord(gateName, agentId, findingsHash, workId)) {
       process.stderr.write(
         `[convergence-pass-recorder] IDEMPOTENCY_SKIP: gate=${gateName} ` +
         `agent_id=${agentId} findings_hash=${findingsHash} ` +
@@ -1383,6 +1541,10 @@ export async function extractAndRecord(opts) {
       findingsHash,
       agentType,
       agentId,
+      workId,
+      workIdSource,
+      extractionPath: result.path,
+      meta: workId ? { work_id_source: workIdSource } : undefined,
     });
     return;
   }
@@ -1416,7 +1578,7 @@ export async function extractAndRecord(opts) {
 
   // Idempotency guard: suppress duplicate parse_failed records (findings_hash
   // is always null for this source) within IDEMPOTENCY_WINDOW_MS.
-  if (isDuplicateRecentRecord(gateName, agentId, null)) {
+  if (isDuplicateRecentRecord(gateName, agentId, null, workId)) {
     process.stderr.write(
       `[convergence-pass-recorder] IDEMPOTENCY_SKIP: gate=${gateName} ` +
       `agent_id=${agentId} source=parse_failed ` +
@@ -1449,6 +1611,8 @@ export async function extractAndRecord(opts) {
     gateName,
     agentType,
     agentId,
+    workId,
+    workIdSource,
     responseText,
     normalizedLength: result.normalized_length,
     structuredBlockTried: result.structured_block_tried === true,
@@ -1473,7 +1637,13 @@ export async function extractAndRecord(opts) {
       findingCount: null,
       agentType,
       agentId,
-      meta: { parse_failed_reason: parseFailedReason },
+      workId,
+      workIdSource,
+      extractionPath: result.path || 'parse_failed',
+      meta: {
+        parse_failed_reason: parseFailedReason,
+        ...(workIdSource ? { work_id_source: workIdSource } : {}),
+      },
     });
     return;
   }
@@ -1494,7 +1664,13 @@ export async function extractAndRecord(opts) {
       findingCount: null,
       agentType,
       agentId,
-      meta: { parse_failed_reason: parseFailedReason },
+      workId,
+      workIdSource,
+      extractionPath: result.path || 'parse_failed',
+      meta: {
+        parse_failed_reason: parseFailedReason,
+        ...(workIdSource ? { work_id_source: workIdSource } : {}),
+      },
     });
   } catch (logErr) {
     // EC-7 fail-closed: emit stderr, record manual_fallback, bump circuit breaker
@@ -1506,6 +1682,13 @@ export async function extractAndRecord(opts) {
       findingCount: null,
       agentType,
       agentId,
+      workId,
+      workIdSource,
+      extractionPath: result.path || 'parse_failed',
+      meta: {
+        parse_failed_reason: parseFailedReason,
+        ...(workIdSource ? { work_id_source: workIdSource } : {}),
+      },
     });
     invokeCircuitBreakerUpdate(gateName, 'failure');
   }
@@ -1615,6 +1798,7 @@ async function processSubagentStop(input) {
   }
 
   const agentId = input.agent_id;
+  const workResolution = resolveWorkIdFromDispatch(input);
 
   if (!responseText) {
     // No response text at all -- emit a parse_failed entry with empty body
@@ -1628,6 +1812,8 @@ async function processSubagentStop(input) {
       agentType,
       gateName,
       agentId,
+      workId: workResolution.workId,
+      workIdSource: workResolution.source,
     });
     return;
   }
@@ -1637,6 +1823,8 @@ async function processSubagentStop(input) {
     agentType,
     gateName,
     agentId,
+    workId: workResolution.workId,
+    workIdSource: workResolution.source,
   });
 }
 
@@ -1644,7 +1832,53 @@ async function processSubagentStop(input) {
 // CLI entry (subagent stop hook)
 // =============================================================================
 
+async function debugClassifyCli() {
+  const raw = await readStdin();
+  const args = process.argv.slice(3);
+  let agentType = 'challenger';
+  let gateName = null;
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] === '--agent-type' && i + 1 < args.length) {
+      agentType = args[i + 1];
+      i++;
+    } else if (args[i] === '--gate' && i + 1 < args.length) {
+      gateName = args[i + 1];
+      i++;
+    }
+  }
+
+  let responseText = raw;
+  try {
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed === 'object') {
+      if (typeof parsed.last_assistant_message === 'string') {
+        responseText = parsed.last_assistant_message;
+      }
+      if (typeof parsed.agent_type === 'string') {
+        agentType = parsed.agent_type;
+      }
+      if (typeof parsed.subagent_type === 'string') {
+        agentType = parsed.subagent_type;
+      }
+    }
+  } catch {
+    // Treat stdin as raw last_assistant_message text.
+  }
+
+  const debug = debugClassifyResponse({
+    responseText,
+    agentType,
+    gateName: gateName || GATE_MAP[agentType],
+  });
+  console.log(JSON.stringify(debug, null, 2));
+}
+
 async function main() {
+  if (process.argv[2] === 'debug-classify' || process.argv[2] === '--debug-classify') {
+    await debugClassifyCli();
+    process.exit(0);
+  }
+
   try {
     const raw = await readStdin();
     if (!raw || !raw.trim()) {

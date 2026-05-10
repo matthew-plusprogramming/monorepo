@@ -1,6 +1,6 @@
 ---
 name: code-review
-description: Review implementation for code quality, style consistency, and best practices. Runs before security review. READ-ONLY - reports issues but does not fix them.
+description: Review implementation for code quality with style/naming, test-quality, adversarial, and holistic passes. Runs before security review. READ-ONLY - reports issues but does not fix them.
 allowed-tools: Read, Glob, Grep
 user-invocable: true
 ---
@@ -21,9 +21,22 @@ If any question cannot be answered from available context, surface it as a findi
 
 ## Purpose
 
-Review implementation for quality issues before security review. Catch maintainability problems, style inconsistencies, and best practice violations. Produce pass/fail report with findings.
+Review implementation for quality issues before security review. Catch maintainability problems, style inconsistencies, weak tests, false-positive paths, and best practice violations. Produce pass/fail report with findings.
 
 **Key Input**: Spec group at `.claude/specs/groups/<spec-group-id>/`
+
+## Review Specialty Contract
+
+`/code-review` still owns one convergence gate: `code_review`. Inside that gate, the reviewer must run four named specialty passes:
+
+| `review_specialty` | Focus |
+| ------------------ | ----- |
+| `style_naming` | Redundancy, conventions, DRY, naming, API shape, local maintainability |
+| `test_quality` | Assertion strength, vacuous truth, tautology, weak snapshots, isolation, determinism |
+| `adversarial` | "How could this pass incorrectly?", false positives, happy-path bias, unproven invariants |
+| `holistic` | Whole-change coherence, duplicate consolidation, severity normalization, final judgment |
+
+Every report MUST contain sections named `style_naming`, `test_quality`, `adversarial`, and `holistic`, even when a section is clean. Every finding MUST include `review_specialty` in the markdown finding and in the optional `convergence-result.findings[]` object.
 
 ## Usage
 
@@ -160,7 +173,7 @@ git diff --name-only main..HEAD
 
 ### Step 3: Review Categories
 
-Check each category systematically:
+Check each category systematically under the four specialty sections. Categories A-E primarily feed `style_naming`, Category G feeds `test_quality`, spec conformance and false-positive paths feed `adversarial`, and duplicate/severity synthesis feeds `holistic`.
 
 #### A. Code Style & Consistency
 
@@ -216,6 +229,7 @@ Check each category systematically:
 - Test quality (meaningful assertions)
 - Test isolation (no shared state)
 - Tests reference correct atomic spec IDs
+- Vacuous truth, tautologies, assertion mirrors of implementation details
 
 #### H. Assumption Review
 
@@ -264,6 +278,31 @@ Check each category systematically:
 
 **Verdict**: ✅ PASS
 
+### Specialty Coverage
+
+| `review_specialty` | Result | Notes |
+| ------------------ | ------ | ----- |
+| `style_naming` | Dirty | M1, M2 |
+| `test_quality` | Clean | No weak assertion or coverage-quality findings |
+| `adversarial` | Clean | No false-positive pass paths found |
+| `holistic` | Clean | Findings deduplicated and severity normalized |
+
+### style_naming
+
+Findings from redundancy, naming, conventions, DRY, and local maintainability review.
+
+### test_quality
+
+Findings from assertion-strength, vacuous-truth, tautology, isolation, and coverage-quality review.
+
+### adversarial
+
+Findings from false-positive and "could this pass incorrectly?" review.
+
+### holistic
+
+Findings from whole-change synthesis, duplicate consolidation, and severity normalization.
+
 ### Per Atomic Spec Review
 
 #### as-001: Logout Button UI
@@ -302,6 +341,7 @@ Check each category systematically:
 
 - **File**: src/services/auth-service.ts:45-90
 - **Atomic Spec**: as-002
+- **Review specialty**: style_naming
 - **Issue**: `logout` function is 45 lines (approaching 50 line threshold)
 - **Impact**: May become harder to maintain as feature grows
 - **Suggestion**: Consider extracting token clearing logic
@@ -310,6 +350,7 @@ Check each category systematically:
 
 - **File**: src/services/auth-service.ts:95
 - **Atomic Spec**: as-004
+- **Review specialty**: style_naming
 - **Issue**: `handleLogoutError` has no return type annotation
 - **Impact**: Type safety lost for consumers
 - **Suggestion**: Add `Promise<void>` return type
@@ -481,6 +522,7 @@ Every finding should reference the atomic spec it relates to:
 
 - **File**: src/router/auth-router.ts:45
 - **Atomic Spec**: as-003 ← Always include this
+- **Review specialty**: adversarial
 - **Issue**: ...
 ```
 
@@ -544,7 +586,7 @@ For each atomic spec:
 
 1. `/security` - Security review (always)
 2. `/docs` - Documentation generation (if public API)
-3. `/manual-test` - Bounded exploratory verification (advisory, non-blocking; runs after `/docs` as the final step before commit)
+3. `/manual-test` - Bounded exploratory verification (advisory by default; mandatory for `runtime_validation_required: true`; runs after `/docs` as the final step before commit)
 4. Commit
 
 ## Constraints

@@ -284,6 +284,37 @@ e2e_skip_rationale: pure-refactor
 - When `e2e_skip` is absent or `false`, e2e-test-writer is dispatched by default
 - If the reason for skipping does not fit one of the four categories, use a gate override instead
 
+### Step 8c: Set Runtime Validation Marker (if applicable)
+
+If the spec touches runtime-loaded invocation or boot surfaces that static gates cannot fully validate, add runtime validation fields to the YAML frontmatter:
+
+```yaml
+runtime_validation_required: true
+runtime_validation_surface: plugin
+runtime_validation_rationale: plugin loader behavior must be validated by live boot
+```
+
+**Set `runtime_validation_required: true` for**:
+
+- Plugins or plugin-bearing specs
+- MCP tools
+- External connectors
+- Browser extensions
+- Plugin loaders or plugin discovery/registration
+- Dynamic tool/body resolution
+- Similar runtime-loaded surfaces where import/schema/convergence gates can pass while live boot fails
+
+**Valid `runtime_validation_surface` values**:
+
+`plugin`, `mcp`, `connector`, `browser-extension`, `dynamic-tool-body`, `plugin-loader`, `other`
+
+**Rules**:
+
+- When `runtime_validation_required: true`, both `runtime_validation_surface` and `runtime_validation_rationale` are required
+- Leave the fields absent or set `runtime_validation_required: false` for ordinary code, docs, tests, pure refactors, or static-only work
+- Do not use `risk_tier`, `runtime_env`, or `crosses_boundary` as a substitute; this marker specifically controls mandatory `/manual-test` promotion
+- Runtime-marked specs must later dispatch `manual-tester` and record a passing `record-manual-test-result` before documenting/completion can pass
+
 ### Step 9: Write spec.md
 
 Save to spec group:

@@ -286,11 +286,11 @@ Ensure:
 
 ### Step 7: Update Manifest
 
-Update manifest.json with implementation complete:
+Update manifest.json with implementation complete while still leaving the implementation phase:
 
 ```json
 {
-  "work_state": "VERIFYING",
+  "work_state": "IMPLEMENTING",
   "convergence": {
     "all_acs_implemented": true
   },
@@ -318,6 +318,18 @@ Transition to verifying phase for cross-session tracking:
 ```bash
 # Transition to verifying phase
 node .claude/scripts/session-checkpoint.mjs transition-phase verifying
+```
+
+After the transition succeeds, update manifest.json for the verifying phase:
+
+```json
+{
+  "work_state": "VERIFYING",
+  "session_ref": {
+    "checkpoint_phase": "verifying",
+    "checkpoint_state": "clean"
+  }
+}
 ```
 
 **Commit preparation**: Stage your spec group's `manifest.json` alongside implementation files in the commit. The manifest tracks convergence state and must always travel with the implementation it describes.
@@ -457,7 +469,7 @@ After implementation:
 2. `/security` - Security review (always)
 3. Completion verification - Post-completion gates via `completion-verifier` agent (always, oneoff-vibe exempt)
 4. `/docs` - Documentation generation (if public API)
-5. `/manual-test` - Bounded exploratory verification (advisory, non-blocking; runs after `/docs` as the final step before commit)
+5. `/manual-test` - Bounded exploratory verification (advisory by default; mandatory for `runtime_validation_required: true`; runs after `/docs` as the final step before commit)
 
 ## Error Handling
 

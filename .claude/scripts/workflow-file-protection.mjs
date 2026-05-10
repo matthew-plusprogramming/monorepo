@@ -27,7 +27,7 @@
  */
 
 import { resolve, basename, sep } from 'node:path';
-import { realpathSync, lstatSync, existsSync, readFileSync, writeSync } from 'node:fs';
+import { realpathSync, lstatSync, existsSync, readFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { platform } from 'node:os';
 import {
@@ -60,7 +60,6 @@ import {
 import {
   classifyBashCommandIntent as classifyBashCommandIntentStructured,
   classifyBashCommandIntentString,
-  MAX_COMMAND_BYTES,
 } from './lib/bash-intent-classifier.mjs';
 
 /**
@@ -540,17 +539,14 @@ export { classifyBashCommandIntentString };
  * Structured-classifier-driven detection of Bash writes to protected files.
  *
  * Replaces the legacy substring-scan over-matcher. Flow:
- *   1. Length guard (byte-length > MAX_COMMAND_BYTES) — fail-closed
- *      (handled in the structured classifier; it returns reason=length_exceeded).
- *   2. classifyBashCommandIntentStructured(command) returns
+ *   1. classifyBashCommandIntentStructured(command) returns
  *      {intent, targets, reason?}.
- *   3. intent='read'       -> no block (return null + emit no telemetry).
- *   4. intent='write'      -> return { classification, firstBasename }
+ *   2. intent='read'       -> no block (return null).
+ *   3. intent='write'      -> return { classification, firstBasename }
  *                            so caller can apply PPID exemption and block.
- *   5. intent='ambiguous'  -> return { classification, firstBasename } with
- *                            classification.intent='ambiguous'. Caller emits
- *                            HOOK_CLASSIFIER_FAIL_CLOSED stderr telemetry
- *                            and blocks.
+ *   4. intent='ambiguous'  -> no block. Ambiguous classifier results are
+ *                            advisory only; only concrete protected-write
+ *                            targets are blocked by this hook.
  *
  * A supplementary symlink-resolution pass (preserved from sec-cmdinj-a7c21e08)
  * runs AFTER the classifier in the write-intent branch only: if the classifier
@@ -575,15 +571,7 @@ function detectBashWriteToProtectedFile(command, claudeDir) {
     };
   }
 
-  if (classification.intent === 'ambiguous') {
-    // Fail-closed path: the classifier already sets `reason`. We do not have
-    // a concrete target basename (the classifier could not resolve one); use
-    // a sentinel label so the BLOCKED message is still meaningful.
-    return {
-      firstBasename: '<ambiguous>',
-      classification,
-    };
-  }
+  if (classification.intent === 'ambiguous') return null;
 
   // intent='read' or 'write' with no targets: fall through to symlink scan
   // as defense-in-depth. The scan detects cases the classifier's basename-
@@ -661,44 +649,6 @@ function detectBashWriteToProtectedFile(command, claudeDir) {
   }
 
   return null;
-}
-
-/**
- * Emit a single stderr telemetry line synchronously before a fail-closed exit.
- *
- * Format: `HOOK_CLASSIFIER_FAIL_CLOSED: reason=<r> verb=<v> length=<N>`
- *
- * Emitted from the caller (the hook), not the classifier — preserves the
- * library's pure/stateless invariant (SEC-008). Uses `fs.writeSync(2, ...)`
- * so the line is flushed before `process.exit(2)`.
- *
- * @param {string} reason  parse_failure | ambiguous | bypass_suspected | length_exceeded
- * @param {string} verb    best-effort first verb or 'unknown'
- * @param {number} byteLength byte length of the command
- */
-function emitFailClosedTelemetry(reason, verb, byteLength) {
-  try {
-    const line = `HOOK_CLASSIFIER_FAIL_CLOSED: reason=${reason} verb=${verb || 'unknown'} length=${byteLength}\n`;
-    writeSync(2, line);
-  } catch {
-    // Best-effort; never throw from telemetry.
-  }
-}
-
-/**
- * Best-effort first-verb extractor for telemetry labeling. Does NOT classify —
- * just returns a short identifier. Tolerant of quote state; returns 'unknown'
- * on failure.
- */
-function extractFirstVerbForTelemetry(command) {
-  if (typeof command !== 'string') return 'unknown';
-  const trimmed = command.trim();
-  const m = trimmed.match(/^(?:[A-Za-z_][A-Za-z0-9_]*=\S*\s+)*(\S+)/);
-  if (!m) return 'unknown';
-  const tok = m[1];
-  const base = tok.split(/[/\\]/).pop() || tok;
-  // Strip quotes
-  return base.replace(/^['"]|['"]$/g, '').slice(0, 32) || 'unknown';
 }
 
 /**
@@ -1102,21 +1052,11 @@ async function main() {
       }
 
       // Structured-classifier-driven detection. Returns
-      // { firstBasename, classification } on protected-write detection OR
-      // ambiguous fail-closed; null on read-intent pass-through.
+      // { firstBasename, classification } on concrete protected-write
+      // detection; null on read-intent or ambiguous pass-through.
       const detected = detectBashWriteToProtectedFile(command, claudeDir);
       if (detected) {
         const { firstBasename, classification } = detected;
-
-        // Fail-closed (ambiguous) path: emit telemetry + BLOCK (T-07, NFR-004).
-        if (classification.intent === 'ambiguous') {
-          emitFailClosedTelemetry(
-            classification.reason || 'ambiguous',
-            extractFirstVerbForTelemetry(command),
-            Buffer.byteLength(command, 'utf8')
-          );
-          blockProtectedFileWrite(firstBasename, 'Bash', { readIntent: false });
-        }
 
         // PPID exemption with mixed exact+pattern denial.
         //   exempt = ppidAttestationPass && targets.every(t => t.matchType === 'pattern')

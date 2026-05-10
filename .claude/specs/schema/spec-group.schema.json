@@ -169,7 +169,7 @@
         },
         "manual_tests_passed": {
           "type": ["boolean", "null"],
-          "description": "Advisory gate for bounded exploratory verification via manual-tester. null if not applicable. Not enforced by Stop hook."
+          "description": "Historical/advisory convergence flag for bounded exploratory verification via manual-tester. Runtime manual-test enforcement uses session.active_work.manual_test_result, not this flag."
         },
         "docs_generated": {
           "type": ["boolean", "null"],

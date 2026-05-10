@@ -298,6 +298,132 @@ describe('AC-2.1: Blocks implementer without prerequisites', () => {
   });
 });
 
+describe('Work-scoped gate enforcement', () => {
+  it('blocks implementer for current work when only another work item converged', async () => {
+    const session = {
+      ...makeSessionJson({
+        active_work: {
+          workflow: 'oneoff-spec',
+          spec_group_id: 'sg-b',
+          current_phase: 'implementing',
+          objective: 'Work B',
+        },
+        convergence: {
+          investigation: { clean_pass_count: 2 },
+          challenger: { clean_pass_count: 2 },
+        },
+      }),
+      active_work_id: 'sg-b',
+      work_items: {
+        'sg-a': {
+          active_work: {
+            workflow: 'oneoff-spec',
+            spec_group_id: 'sg-a',
+            current_phase: 'implementing',
+            objective: 'Work A',
+          },
+          convergence: {
+            investigation: { clean_pass_count: 2 },
+            challenger: { clean_pass_count: 2 },
+          },
+          convergence_evidence: {},
+        },
+        'sg-b': {
+          active_work: {
+            workflow: 'oneoff-spec',
+            spec_group_id: 'sg-b',
+            current_phase: 'implementing',
+            objective: 'Work B',
+          },
+          convergence: {},
+          convergence_evidence: {},
+        },
+      },
+    };
+    writeSessionJson(session);
+
+    const result = await runHook(makeAgentStdin('test-session', 'implementer'));
+
+    expect(result.exitCode).toBe(2);
+    expect(result.stderr).toMatch(/investigation|challenger|convergence/i);
+  });
+
+  it('allows implementer from current work item convergence even when global convergence is empty', async () => {
+    const session = {
+      ...makeSessionJson({
+        active_work: {
+          workflow: 'oneoff-spec',
+          spec_group_id: 'sg-b',
+          current_phase: 'implementing',
+          objective: 'Work B',
+        },
+        convergence: {},
+      }),
+      active_work_id: 'sg-b',
+      work_items: {
+        'sg-b': {
+          active_work: {
+            workflow: 'oneoff-spec',
+            spec_group_id: 'sg-b',
+            current_phase: 'implementing',
+            objective: 'Work B',
+          },
+          convergence: {
+            investigation: { clean_pass_count: 2 },
+            challenger: { clean_pass_count: 2 },
+          },
+          convergence_evidence: {},
+        },
+      },
+    };
+    writeSessionJson(session);
+
+    const result = await runHook(makeAgentStdin('test-session', 'implementer'));
+
+    expect(result.exitCode).toBe(0);
+  });
+
+  it('blocks code-reviewer when unifier evidence belongs to another work item', async () => {
+    const session = {
+      ...makeSessionJson({
+        active_work: {
+          workflow: 'oneoff-spec',
+          spec_group_id: 'sg-b',
+          current_phase: 'reviewing',
+          objective: 'Work B',
+        },
+        subagent_tasks: [
+          {
+            subagent_type: 'unifier',
+            status: 'completed',
+            work_id: 'sg-a',
+            spec_group_id: 'sg-a',
+          },
+        ],
+      }),
+      active_work_id: 'sg-b',
+      work_items: {
+        'sg-b': {
+          active_work: {
+            workflow: 'oneoff-spec',
+            spec_group_id: 'sg-b',
+            current_phase: 'reviewing',
+            objective: 'Work B',
+          },
+          convergence: {},
+          convergence_evidence: {},
+        },
+      },
+    };
+    writeSessionJson(session);
+
+    const result = await runHook(makeAgentStdin('test-session', 'code-reviewer'));
+
+    expect(result.exitCode).toBe(2);
+    expect(result.stderr).toMatch(/unifier/i);
+  });
+});
+
 // ============================================================
 // AC-2.2: test-writer has no coercive prerequisites (Practice 2.4)
 // ============================================================

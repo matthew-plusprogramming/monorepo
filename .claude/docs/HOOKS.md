@@ -52,7 +52,7 @@ measurement.
 | --- | --- | --- | --- | --- |
 | `workflow-gate-enforcement` | PreToolUse | damage-prevention | enforced Agent dispatches | Blocks with exit 2; structural errors fail open; missing convergence fails closed |
 | `workflow-file-protection` | PreToolUse | damage-prevention | Write to protected enforcement files | Blocks with exit 2 |
-| `workflow-file-protection-bash` | PreToolUse | damage-prevention | Bash write intent for protected files | Blocks with exit 2; ambiguous protected-file write intent fails closed |
+| `workflow-file-protection-bash` | PreToolUse | damage-prevention | Bash write intent for protected files | Blocks concrete protected writes with exit 2; ambiguous classifier results pass through |
 | `e2e-blackbox-enforcement-agent` | PreToolUse | damage-prevention | e2e-test-writer dispatch | Blocks implementation-bearing dispatches |
 | `e2e-blackbox-enforcement-read` | PreToolUse | damage-prevention | e2e-test-writer Read | Blocks reads outside allowlist |
 | `e2e-blackbox-enforcement-write` | PreToolUse | damage-prevention | e2e-test-writer Edit/Write | Blocks writes outside `tests/e2e/` |
@@ -66,7 +66,7 @@ measurement.
 | `structured-docs-validate` | PostToolUse | lightweight validation | `.claude/docs/**/*.yaml` | Blocks structured-doc schema drift |
 | `convergence-pass-recorder` | SubagentStop | state-integrity | convergence agent completions | Fail-open; parse failures record streak-breaking evidence |
 | `dispatch-record-hook` | SubagentStop | state-integrity | subagent completion payloads | Fail-open; records through `session-checkpoint.mjs` |
-| `workflow-stop-enforcement` | Stop | damage-prevention | session completion | Blocks by stdout JSON; many structural errors fail open |
+| `workflow-stop-enforcement` | Stop | damage-prevention | session completion | Blocks by stdout JSON; many structural errors fail open; runtime-validation specs require passing /manual-test evidence |
 
 ### PreToolUse Hooks (Agent)
 
@@ -120,7 +120,7 @@ script is run explicitly.
 
 | Hook ID | Script | Purpose |
 | --- | --- | --- |
-| `workflow-stop-enforcement` | `workflow-stop-enforcement.mjs` | Blocks completion when mandatory dispatches, obligations, invariants, or deploy verification are missing |
+| `workflow-stop-enforcement` | `workflow-stop-enforcement.mjs` | Blocks completion when mandatory dispatches, runtime manual-test evidence, obligations, invariants, or deploy verification are missing |
 
 ## Hook Wrapper
 
@@ -174,6 +174,15 @@ agent type from the event envelope, classifies the final response as clean or
 dirty, and writes through the `session-checkpoint.mjs` module API. It fails
 open so subagent completion is not blocked.
 
+The recorder first looks for a canonical `convergence-result` fenced block.
+For robustness it also accepts canonical convergence JSON in a `json` fence or
+as the whole assistant message. Malformed or missing machine output still
+records `parse_failed` evidence.
+
+Pass evidence is work-scoped when a stable id is available. Resolution order is
+explicit payload `work_id`, `session.subagent_dispatches[agent_id].work_id`,
+matching `subagent_tasks` metadata, then `active_work_id` as a fallback.
+
 Manual evidence contract: Legacy values `manual` and `hook_manual` are
 INVISIBLE to convergence streaks. `record-pass --source` rejects CLI-authored
 pass sources with `SOURCE_FORBIDDEN_VIA_CLI`; programmatic records use `hook`,
@@ -187,30 +196,45 @@ It creates missing prior records, completes matched in-flight records, keeps
 history for duplicate ids, rejects type mismatches without leaking expected
 types, and fails open on malformed stdin or missing state.
 
+Dispatch records carry `work_id` when the payload or explicit CLI metadata
+provides one. The hook runs before the convergence recorder so recorder routing
+can use `subagent_dispatches[agent_id].work_id` instead of whichever work item
+is active when the subagent returns.
+
 ## Workflow Enforcement Hooks
 
 `workflow-gate-enforcement.mjs` blocks enforced Agent dispatch when workflow
 prerequisites are missing. Exempt workflows must still have an explicit
 `active_work.workflow` assertion so hooks can distinguish an initialized
-one-off/refactor/journal workflow from corrupt state.
+one-off/refactor/journal workflow from corrupt state. When `active_work_id`
+matches a stored `work_items` entry, gate checks read that work item's
+convergence counters and filter subagent task prerequisites by `work_id`.
 
-`workflow-file-protection.mjs` blocks direct `Write` and destructive `Bash`
-intent against protected enforcement state, session state, and audit-log
+`workflow-file-protection.mjs` blocks direct `Write` and concrete destructive
+`Bash` intent against protected enforcement state, session state, and audit-log
 families. Bash classification uses `bash-intent-classifier.mjs`; ambiguous
-protected-file write intent fails closed. Audit-log writes are allowed only
-through the attested `audit-append.mjs` path.
+classifier results are advisory and pass through at the hook boundary.
+Audit-log writes are allowed only through the attested `audit-append.mjs` path.
 
 `workflow-stop-enforcement.mjs` blocks completion through the Stop-hook JSON
-contract when mandatory dispatches, manifest obligations, completion
-invariants, or deployment verification are missing. It checks the kill switch
-before reading `session.json`, uses a re-entry sentinel, and exits 0 because
-Claude Code reads the blocking decision from stdout JSON.
+contract when mandatory dispatches, runtime manual-test evidence, manifest
+obligations, completion invariants, or deployment verification are missing. It
+checks the kill switch before reading `session.json`, uses a re-entry sentinel,
+and exits 0 because Claude Code reads the blocking decision from stdout JSON.
 
 ### E2E Opt-Out Enforcement
 
 The Stop hook requires `e2e-test-writer` dispatch for spec workflows unless the
 spec has strict `e2e_skip: true` plus a valid rationale from
 `VALID_E2E_SKIP_RATIONALES`. Invalid or non-boolean opt-outs fail closed.
+
+### Runtime Manual-Test Enforcement
+
+The Stop hook promotes `/manual-test` to mandatory for specs whose frontmatter
+declares `runtime_validation_required: true`. It requires a `manual-tester`
+dispatch record and a structured passing result in
+`session.active_work.manual_test_result`. Narrative reports and
+`convergence.manual_tests_passed` are not enforcement sources.
 
 ### Completion-Invariant Checks
 

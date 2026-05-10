@@ -36,10 +36,13 @@ Common commands:
 ```bash
 node .claude/scripts/session-checkpoint.mjs start-work <sg-id> <workflow> "<objective>"
 node .claude/scripts/session-checkpoint.mjs start-work <sg-id> <workflow> "<objective>" --force-reset-convergence
+node .claude/scripts/session-checkpoint.mjs start-work <sg-id> <workflow> "<objective>" --switch-from-current
+node .claude/scripts/session-checkpoint.mjs switch-work <sg-id>
 node .claude/scripts/session-checkpoint.mjs transition-phase <phase>
-node .claude/scripts/session-checkpoint.mjs dispatch-subagent <id> <type> <desc> [--stage <stage>]
+node .claude/scripts/session-checkpoint.mjs dispatch-subagent <id> <type> <desc> [--stage <stage>] [--work-id <sg-id>]
 node .claude/scripts/session-checkpoint.mjs complete-subagent <task_id> "<summary>"
-node .claude/scripts/session-checkpoint.mjs update-convergence <gate_name>
+node .claude/scripts/session-checkpoint.mjs update-convergence <gate_name> [--work-id <sg-id>]
+node .claude/scripts/session-checkpoint.mjs record-manual-test-result <sg-id> --result <pass|fail|blocked> --scenario-count <N> --pass-count <N> --fail-count <N> --evidence-path .claude/specs/groups/<sg-id>/evidence/report.md
 node .claude/scripts/session-checkpoint.mjs reconcile-convergence <sg-id> [--dry-run]
 node .claude/scripts/session-checkpoint.mjs verify [--spec-group <sg-id>]
 node .claude/scripts/session-checkpoint.mjs complete-work
@@ -52,9 +55,17 @@ Rules:
 
 - `start-work` creates or resumes `session.active_work`; non-exempt workflow
   downgrades are rejected.
+- `start-work --switch-from-current` preserves the previous active work under
+  `session.work_items[active_work_id]` and makes the requested spec group the
+  current focus. Without this explicit flag, active-work collision rejection is
+  unchanged.
+- `switch-work` restores a stored work item into `active_work`,
+  `phase_checkpoint`, `convergence`, and `convergence_evidence`.
 - `transition-phase` validates the DAG and writes the active phase.
+- `dispatch-subagent --work-id` pins a dispatch to a stable work item even when
+  the facilitator later changes focus.
 - `update-convergence` derives counters from evidence. It does not accept a
-  caller-provided count.
+  caller-provided count, and `--work-id` derives from that work item's evidence.
 - `record-pass` is not a public write path. CLI attempts exit 2 with
   `SOURCE_FORBIDDEN_VIA_CLI`; `convergence-pass-recorder.mjs` calls the
   exported `recordPass()` API in-process.
@@ -131,6 +142,19 @@ The Stop hook also checks phase-aware dispatch requirements before terminal
 completion. `e2e-test-writer` is dropped only when the active spec opts out with
 `e2e_skip: true` and a valid `e2e_skip_rationale`.
 
+Runtime manual-test requirement:
+
+- Specs that declare `runtime_validation_required: true` in `spec.md` or
+  `atomic/*.md` require `/manual-test` before terminal Stop.
+- The Stop hook requires a `manual-tester` dispatch record for the active spec
+  group and a structured `session.active_work.manual_test_result` with
+  `result: "pass"`.
+- The evidence path must exist under
+  `.claude/specs/groups/<sg-id>/evidence/`.
+- `fail` and `blocked` results block unless a `runtime_manual_test` override is
+  present with rationale.
+- `convergence.manual_tests_passed` is not an enforcement source.
+
 Completion can also block on:
 
 - unsatisfied manifest status obligations;
@@ -149,7 +173,7 @@ The five completion-invariant checks run only when:
 
 | Check | Blocks when |
 | --- | --- |
-| Convergence depth | any tracked gate has `clean_pass_count < 2`; missing or non-number counts as 0. |
+| Convergence depth | any tracked gate is below its configured clean-pass threshold; missing or non-number counts as 0, and legacy no-snapshot sessions fall back to threshold 2. |
 | Challenger stage coverage | required challenger stage dispatch is missing and no matching `override_skip` exists. |
 | Phase DAG predecessors | required predecessor evidence is missing and no matching `override_skip` exists. |
 | Artifact inventory | required spec-group artifacts are missing. |
@@ -207,7 +231,7 @@ against protected enforcement state.
 | --- | --- |
 | Read-only command against protected file | Allowed. |
 | Known write verb or redirect to protected file | Blocked. |
-| Parse failure, dynamic/evasive command, non-ASCII or encoded path, glob path, oversized command | Fail-closed with `HOOK_CLASSIFIER_FAIL_CLOSED`. |
+| Parse failure, dynamic/evasive command, non-ASCII or encoded path, glob path, oversized command | Allowed by the Bash hook unless a concrete protected-write target is identified. |
 | Attested audit append touching only audit-log patterns | Allowed. |
 | Mixed audit-log and exact protected-file targets | Blocked. |
 
@@ -232,7 +256,7 @@ Fail-closed paths:
 - missing convergence counters count as 0 for dispatch and completion gates;
 - `update-convergence` exits non-zero on malformed session JSON with
   `CONVERGENCE_SESSION_PARSE_FAILED`;
-- protected-file Bash parse failures block.
+- concrete protected-file Bash writes block; ambiguous classifier results do not block by themselves.
 
 ## Two-Store Convergence Model
 
@@ -241,24 +265,39 @@ Convergence state lives in two stores:
 | Store | Scope | Holds | Main writers |
 | --- | --- | --- | --- |
 | `manifest.json:.convergence` | durable and persistent per spec group | durable booleans such as `<gate>_converged`, `<gate>_passed`, and `spec_complete` | `session-checkpoint.mjs update-convergence`, `complete-work`, spec/document writers |
-| `session.json:.convergence` | session-scoped cache | `<gate>.clean_pass_count`, iteration counters, parse-failure counters, source provenance | `session-checkpoint.mjs update-convergence`, imported `recordPass()` |
+| `session.json:.work_items[work_id].convergence` | selected work-item state | `<gate>.clean_pass_count`, iteration counters, parse-failure counters, source provenance for one work item | `session-checkpoint.mjs update-convergence`, imported `recordPass()` |
+| `session.json:.convergence` | active-work compatibility mirror | copy of the selected work item's convergence counters for legacy readers | `start-work`, `switch-work`, `update-convergence`, imported `recordPass()` |
+
+Work identity fields:
+
+- `active_work_id` names the selected/current work item.
+- `work_items[work_id]` stores that work item's `active_work`,
+  `phase_checkpoint`, `convergence`, and `convergence_evidence`.
+- `subagent_dispatches[agent_id].work_id` records where a subagent result
+  belongs. The convergence recorder prefers this dispatch metadata over the
+  current focus, so late-returning agents do not contaminate another task.
+- `subagent_tasks.*[].work_id` carries the same association for gate
+  enforcement and audit history.
 
 Authoritative source per reader:
 
 | Reader | Source |
 | --- | --- |
-| Dispatch gates | `session.json:.convergence` |
-| Stop convergence-depth check | `session.json:.convergence` |
+| Dispatch gates | selected `work_items[active_work_id].convergence`, with legacy fallback to `.convergence` |
+| Stop convergence-depth check | selected active-work session counters |
 | Stop convergence-field sanity check | both stores, cross-checked |
 | `completion-verifier` | both stores, cross-checked |
 | Phase-transition status obligations | `manifest.json:.convergence` |
 
 Drift happens when `active_work` switches, a session is interrupted between
-evidence and manifest writes, or a store is edited manually.
+evidence and manifest writes, or a store is edited manually. Work-item scoping
+prevents convergence evidence from one active task from satisfying another
+task's dispatch gates.
 
 Reconciliation rule: manifest wins. If manifest convergence is true while the
-session counter is below 2, `start-work` and `reconcile-convergence` warn, seed
-the session counter to 2, and record `manifest_seed` provenance. Intentional
+session counter is below the gate's configured threshold, `start-work` and
+`reconcile-convergence` warn, seed the session counter to that threshold, and
+record `manifest_seed` provenance. Intentional
 re-verification uses `--force-reset-convergence`, which clears manifest booleans
 and session counters for the selected work.
 
@@ -271,8 +310,12 @@ Default behavior:
 
 - manifest convergence persists across sessions;
 - `start-work` detects manifest/session drift;
+- `start-work --switch-from-current` saves the old active work to
+  `work_items` before loading the new work item;
+- `switch-work <sg-id>` restores a saved work item without moving evidence
+  between work items;
 - stderr includes a `WARN` naming the stored values and saying `manifest wins`;
-- `session.json:.convergence.<gate>.clean_pass_count` is seeded to 2;
+- `session.json:.convergence.<gate>.clean_pass_count` is seeded to the gate's configured threshold;
 - session history records `convergence_manifest_seeded`;
 - false manifest convergence fields are not seeded.
 
@@ -281,6 +324,8 @@ Useful commands:
 ```bash
 node .claude/scripts/session-checkpoint.mjs reconcile-convergence <sg-id> --dry-run
 node .claude/scripts/session-checkpoint.mjs start-work <sg-id> <workflow> "<objective>" --force-reset-convergence
+node .claude/scripts/session-checkpoint.mjs start-work <sg-id> <workflow> "<objective>" --switch-from-current
+node .claude/scripts/session-checkpoint.mjs switch-work <sg-id>
 ```
 
 ## Convergence State Reader Contract
@@ -295,7 +340,7 @@ Tracked gates:
 | `workflow-gate-enforcement.mjs` | session clean-pass counters | none |
 | `workflow-stop-enforcement.mjs` | manifest obligations and session completion checks | none |
 | `completion-verifier` | manifest and session convergence | none |
-| `convergence-pass-recorder.mjs` | SubagentStop payload | pass evidence through `recordPass()` |
+| `convergence-pass-recorder.mjs` | SubagentStop payload plus dispatch `work_id` metadata | pass evidence through `recordPass()` |
 | `session-checkpoint.mjs` | both stores | canonical session and manifest updates |
 
 After `start-work` returns for a non-exempt workflow, session counters are
@@ -304,6 +349,8 @@ coherent with manifest booleans unless a force reset is active.
 ## Evidence-Based Convergence
 
 Clean-pass counters are derived from
+`session.work_items[work_id].convergence_evidence.<gate>.passes[]` for scoped
+work. Legacy sessions without a work item use
 `session.convergence_evidence.<gate>.passes[]`.
 
 Derivation:
@@ -318,7 +365,9 @@ Derivation:
 
 `recordPass()` appends evidence by temp-file plus same-filesystem `rename()`,
 creates temp files with mode `0600`, rejects symlinked `session.json`, and does
-not edit existing records.
+not edit existing records. It mirrors scoped evidence to the legacy global
+evidence bucket for compatibility, but enforcement reads only the selected work
+item when one exists.
 
 ## State and Logs
 
@@ -328,6 +377,7 @@ Important session fields:
   `enforcement_counter`, and `_counter_checksum`;
 - `active_work.workflow`, `active_work.risk_tier`, and
   `active_work.spec_group_id`;
+- `active_work_id`, `work_items`, and `subagent_dispatches`;
 - `subagent_tasks.in_flight` and `completed_this_session`;
 - `convergence.<gate>.clean_pass_count`;
 - `convergence_evidence.<gate>.passes[]`;

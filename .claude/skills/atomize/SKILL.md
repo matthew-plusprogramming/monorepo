@@ -48,6 +48,10 @@ Before running `/atomize`:
    Task: atomizer
    Prompt: Decompose spec.md into atomic specs
    Input: <spec-group-path>
+
+   Include runtime validation frontmatter on atomic specs that inherit or own
+   plugin, MCP, connector, browser-extension, plugin-loader, or dynamic
+   tool/body resolution surfaces.
    ```
 
 3. **Review output**
@@ -173,5 +177,6 @@ After successful `/atomize`:
   - `atomic_specs.count`: N
   - `atomic_specs.coverage`: "X%"
   - `atomic_specs.enforcement_status`: "not_run"
+- Runtime validation markers preserved on atomic specs that require mandatory `/manual-test`
 - Decision log entry added
 - Spec group remains in current `review_state` (still needs `/enforce` + user approval)

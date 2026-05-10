@@ -74,6 +74,7 @@ const VALID_EVENT_TYPES = [
   'checkpoint_saved',
   'work_completed',
   'work_abandoned',
+  'work_switched',
   'error_occurred',
   'override_skip',
   'reset_enforcement',
@@ -226,6 +227,12 @@ function validateSession(data) {
   // updated_at: required ISO 8601 timestamp
   if (!isValidISOTimestamp(data.updated_at)) {
     errors.push(`updated_at: '${data.updated_at}' is not a valid ISO 8601 timestamp`);
+  }
+
+  if (data.active_work_id !== undefined && data.active_work_id !== null) {
+    if (!isValidSpecGroupId(data.active_work_id)) {
+      errors.push(`active_work_id: '${data.active_work_id}' does not match pattern sg-<slug>`);
+    }
   }
 
   // active_work: required, can be null or object with specific fields

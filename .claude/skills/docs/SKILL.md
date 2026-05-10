@@ -431,7 +431,7 @@ to the login page. Any cached credentials are cleared.
 
 **After docs**:
 
-- `/manual-test <spec-group-id>` — Bounded exploratory verification (5 happy + 3 failure + 2 adjacent, then stop). **Advisory — findings logged but not blocking. Final step before commit for spec-based workflows.** Main-agent discretion governs dispatch; no hook enforcement. See `.claude/skills/manual-test/SKILL.md`.
+- `/manual-test <spec-group-id>` — Bounded exploratory verification (5 happy + 3 failure + 2 adjacent, then stop). **Advisory by default; mandatory when any active spec declares `runtime_validation_required: true`. Final step before commit for spec-based workflows.** See `.claude/skills/manual-test/SKILL.md`.
 - Ready for commit/merge after `/manual-test` findings are reviewed.
 
 Documentation followed by `/manual-test` is the final pre-commit step for substantial changes in spec-based workflows.

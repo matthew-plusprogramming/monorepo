@@ -616,7 +616,7 @@ If findings exist:
 }
 ```
 
-Rules: status/severity/confidence enums are lowercase only; unknown top-level fields cause parse_failed; first block wins.
+Rules: status/severity/confidence enums are lowercase only; unknown top-level fields cause parse_failed; emit exactly one `convergence-result` block as the final fenced block.
 
 ## Communication Style (agent ↔ parent)
 

@@ -27,7 +27,7 @@ The library returns `{ intent, targets, reason? }`.
 | --- | --- | --- |
 | `read` | Allow | No protected target appears in a write context. |
 | `write` | Block unless PPID exemption applies | Protected target was found in a write context. |
-| `ambiguous` | Block | Static analysis could not prove safety. |
+| `ambiguous` | Allow at current Bash-hook boundary | Static analysis could not prove safety; retained as advisory classification. |
 
 Write targets include:
 

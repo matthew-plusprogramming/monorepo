@@ -468,7 +468,7 @@ Check: OWASP Top 10, input validation, auth/authz, secrets handling.
 
 ### 9a. Run Browser Test (UI Workstreams Only)
 
-After `/docs` completes for each workstream, the main agent MAY dispatch `/manual-test <spec-group-id>` as an advisory final step before merge (bounded exploratory verification — 5 happy + 3 failure + 2 adjacent, then stop). This dispatch is non-blocking: findings are logged to `session.subagent_tasks` and surfaced to the user, but do NOT block the Stop hook. See `.claude/skills/manual-test/SKILL.md` for the full process. The manual-tester subagent is advisory-only; no convergence-field flip is associated with its dispatch.
+After `/docs` completes for each workstream, the main agent MAY dispatch `/manual-test <spec-group-id>` as the final step before merge (bounded exploratory verification — 5 happy + 3 failure + 2 adjacent, then stop). This dispatch is advisory by default, but mandatory when any workstream or atomic spec declares `runtime_validation_required: true`; those specs require a structured passing result before terminal Stop. See `.claude/skills/manual-test/SKILL.md` for the full process. No convergence-field flip is associated with this dispatch.
 
 ### 10. Process Merge Queue
 
@@ -619,7 +619,7 @@ node .claude/scripts/session-checkpoint.mjs complete-subagent challenge-pre-orch
 ```javascript
 Task({
   description: 'Code review for all workstreams',
-  prompt: `Review all workstream implementations for code quality...`,
+  prompt: `Review all workstream implementations for code quality. Run the required style_naming, test_quality, adversarial, and holistic specialty sections inside the existing code_review gate...`,
   subagent_type: 'code-reviewer',
 });
 ```

@@ -1,6 +1,6 @@
 ---
 name: manual-test
-description: Bounded exploratory end-to-end verification — 5 happy paths + 3 failure injections + 2 adjacent surfaces, then stop. Runs after /docs as the final pipeline step. Advisory (non-blocking); findings logged to session.subagent_tasks and surfaced in a narrative report. Use for spec groups where generated E2E suite leaves judgment-dependent gaps.
+description: Bounded exploratory end-to-end verification — 5 happy paths + 3 failure injections + 2 adjacent surfaces, then stop. Runs after /docs as the final pipeline step. Advisory by default; mandatory for runtime-validation-required specs. Findings are logged to session.subagent_tasks, surfaced in a narrative report, and recorded as structured result data when runtime validation is required.
 user-invocable: true
 allowed-tools: Read, Grep, Bash, Write, mcp__playwright-mcp__*
 ---
@@ -20,11 +20,23 @@ Execute **bounded exploratory end-to-end verification** against the running appl
 
 This skill is NOT a replacement for `/e2e-test`. That skill generates contract-driven tests from spec interfaces. This skill explores _beyond_ those tests: judgment-dependent failure modes and adjacent regressions.
 
+For specs whose frontmatter declares `runtime_validation_required: true`, this skill is a Stop-hook gate. The main agent must record a passing structured result through `session-checkpoint.mjs` before terminal completion.
+
 ## When to Use
 
 Dispatched as the **final step after `/docs`** in spec-based workflows (oneoff-spec and orchestrator). Both `/docs/SKILL.md` § "After docs" and `/route/SKILL.md` workflow-integration rows list `/manual-test` after `/docs` and before commit.
 
-**Advisory invocation**: Findings are logged in `session.subagent_tasks.completed_this_session[]` but do NOT block the Stop hook. Main-agent discretion governs whether to dispatch.
+**Default invocation**: Advisory. Findings are logged in `session.subagent_tasks.completed_this_session[]` and surfaced to the user.
+
+**Runtime-validation invocation**: Mandatory when any `spec.md` or `atomic/*.md` frontmatter in the active spec group declares:
+
+```yaml
+runtime_validation_required: true
+runtime_validation_surface: plugin | mcp | connector | browser-extension | dynamic-tool-body | plugin-loader | other
+runtime_validation_rationale: 'Why static/generated gates are insufficient.'
+```
+
+For these specs, the Stop hook requires a `manual-tester` dispatch record plus a structured result with `result: "pass"` and an existing evidence report under `.claude/specs/groups/<sg-id>/evidence/`.
 
 **Required system prerequisites** (one-time per environment):
 
@@ -33,7 +45,7 @@ Dispatched as the **final step after `/docs`** in spec-based workflows (oneoff-s
 npx playwright install chromium
 ```
 
-**`.mcp.json`** at project root declares the MCP servers. If `.mcp.json` is absent or the MCP servers are not installed, the agent will report gracefully and the Stop hook will not block (advisory invariant).
+**`.mcp.json`** at project root declares the MCP servers. If `.mcp.json` is absent or the MCP servers are not installed, the agent reports gracefully. For runtime-validation-required specs, that is a structured `blocked` result and it blocks completion unless an explicit `runtime_manual_test` override is recorded with a rationale.
 
 ## Bounded Scope
 
@@ -199,20 +211,23 @@ Format:
 
 Write the report to `.claude/specs/groups/<sg-id>/evidence/report.md`.
 
-### Step 9: Update Manifest Decision Log
+### Step 9: Record Structured Result And Update Manifest Decision Log
 
-Append a decision_log entry to `.claude/specs/groups/<sg-id>/manifest.json`:
+After writing `.claude/specs/groups/<sg-id>/evidence/report.md`, record the structured result through the trusted writer:
 
-```json
-{
-  "timestamp": "<ISO timestamp>",
-  "actor": "agent",
-  "action": "manual_test_complete",
-  "details": "10 scenarios (5 happy, 3 failure, 2 adjacent) exercised. [Overall: N/10 pass, M/10 fail]. Report at evidence/report.md. Advisory — non-blocking."
-}
+```bash
+node .claude/scripts/session-checkpoint.mjs record-manual-test-result <sg-id> \
+  --result <pass|fail|blocked> \
+  --scenario-count <N> \
+  --pass-count <N> \
+  --fail-count <N> \
+  --evidence-path .claude/specs/groups/<sg-id>/evidence/report.md \
+  --top-residual-risk "<one-line risk>"
 ```
 
-**Do NOT** set any `convergence.manual_tests_passed` flag. This agent is advisory. The convergence flag exists for historical / schema-migration reasons; it is not auto-updated by this skill.
+This writes `session.active_work.manual_test_result` and appends the manifest `decision_log` audit entry.
+
+**Do NOT** set any `convergence.manual_tests_passed` flag. Enforcement uses `session.active_work.manual_test_result` only for runtime-validation-required specs. The convergence flag exists for historical / schema-migration reasons; it is not auto-updated by this skill.
 
 ### Step 10: Report to Main Agent
 
@@ -327,14 +342,15 @@ Use `localhost` or explicit non-production URLs. Failure-injection on production
 
 `/manual-test` is the **final step before commit** for spec-based workflows. Both `/docs/SKILL.md` "After docs" section and `/route/SKILL.md` workflow-integration rows list it in that position.
 
-## Advisory Invariant
+## Enforcement Invariant
 
-This skill is permanently advisory. Properties:
+This skill is advisory unless a spec explicitly opts into runtime validation:
 
 - `manual-tester` is NOT in `STOP_MANDATORY_DISPATCHES`.
-- Findings are LOGGED to `session.subagent_tasks.completed_this_session[]` with `subagent_type: 'manual-tester'` — but do NOT block the Stop hook.
-- No invocation counter, no cross-session state, no "after N invocations promote to mandatory" mechanism.
-- Promotion to mandatory is explicitly out of scope and deferred to a future spec group that will also specify its enforcement mechanism.
+- Findings are logged to `session.subagent_tasks.completed_this_session[]` with `subagent_type: 'manual-tester'`.
+- Unmarked specs remain advisory and do not block the Stop hook.
+- Specs with `runtime_validation_required: true` block terminal Stop until `session.active_work.manual_test_result.result === "pass"` and the evidence path exists.
+- There is no invocation counter, no cross-session state, and no "after N invocations promote to mandatory" mechanism.
 
 ## Example Invocation
 
@@ -359,7 +375,7 @@ Skill:
 - Pin the 10-scenario plan in advance.
 - Dispatch `manual-tester` with the scenario list embedded in the prompt.
 - Write all evidence to `.claude/specs/groups/<sg-id>/evidence/`.
-- Append a `manual_test_complete` entry to the manifest decision_log.
+- Record the structured result with `session-checkpoint.mjs record-manual-test-result`.
 
 ### DON'T
 
@@ -367,8 +383,8 @@ Skill:
 - Duplicate `e2e-test-writer`'s contract-driven scope.
 - Exceed 10 scenarios.
 - Write outside `evidence/`.
-- Flip any convergence field to true based on this skill's output (advisory invariant).
-- Block the Stop hook based on findings.
+- Flip any convergence field to true based on this skill's output.
+- Treat narrative-only reports as sufficient for runtime-validation-required specs.
 
 ## Success Criteria
 
@@ -377,7 +393,7 @@ Manual testing is complete when:
 - 10 scenarios exercised (or fewer, with documented reductions).
 - Evidence artifacts written to `.claude/specs/groups/<sg-id>/evidence/`.
 - Report written with Scope / Evidence / Findings / Residual Risks sections.
-- Manifest decision_log updated with `manual_test_complete` entry.
+- Structured result recorded with `record-manual-test-result`.
 - Agent summary returned to main agent with required status, evidence path, and residual risk fields.
 
-Findings are advisory. User decides next step.
+For unmarked specs, findings are advisory. For runtime-validation-required specs, `fail` and `blocked` results stop terminal completion unless explicitly overridden with rationale.

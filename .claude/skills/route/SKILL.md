@@ -419,6 +419,9 @@ Produce a routing decision with delegation plan:
 ```yaml
 workflow: oneoff-vibe | oneoff-spec | orchestrator | refactor | journal-only
 risk_tier: trust-bearing | user-visible | shared-library | local-feature | docs-prompt-metadata | mechanical-cleanup
+runtime_validation_required: true | false
+runtime_validation_surface: plugin | mcp | connector | browser-extension | dynamic-tool-body | plugin-loader | other | null
+runtime_validation_rationale: <required when runtime_validation_required=true>
 rationale: <Brief explanation of why this workflow was chosen>
 estimated_scope: small | medium | large
 estimated_files: <N>
@@ -680,6 +683,16 @@ After routing:
 ### Default E2E Dispatch
 
 The `e2e-test-writer` subagent is dispatched by default for all spec-based workflows (oneoff-spec and orchestrator). Specs opt out by setting `e2e_skip: true` with a valid `e2e_skip_rationale` in frontmatter. The stop hook enforces this: sessions cannot complete without an `e2e-test-writer` dispatch unless the spec has a valid opt-out.
+
+### Runtime Manual-Test Dispatch
+
+Set `runtime_validation_required: true` when the request touches runtime-loaded
+plugin behavior: plugins, MCP tools, connectors, browser extensions, plugin
+loaders, dynamic tool/body resolution, or similar boot/invocation surfaces. The
+spec frontmatter must include `runtime_validation_surface` and
+`runtime_validation_rationale`. The Stop hook then requires `/manual-test` with a
+structured passing result before terminal completion. For other specs, keep the
+marker absent or false and `/manual-test` remains advisory.
 
 ### Investigation Checkpoint
 

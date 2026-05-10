@@ -54,6 +54,7 @@ const CONSECUTIVE_FAILURE_THRESHOLD = 3;
 // false-success when the CLI log is reworded.
 // Spec: sg-sync-registry-gaps cr-propagation-a4b79e12.
 const TARGET_MISSING_MARKER = '[SYNC:target-missing]';
+const MANIFEST_PREFLIGHT_BLOCKED_MARKER = '[SYNC:manifest-preflight-blocked]';
 
 // Allowlist of stderr line prefixes that are safe to persist to
 // rollout-failures.jsonl. Lines not matching any entry are dropped.
@@ -65,6 +66,7 @@ const TARGET_MISSING_MARKER = '[SYNC:target-missing]';
 // secrets / paths / env values from landing in a committed file.
 const STDERR_ALLOWLIST_PATTERNS = Object.freeze([
   /^\[SYNC:target-missing\]/, // structured marker for missing target dir
+  /^\[SYNC:manifest-preflight-blocked\]/, // structured marker for blocked manifest preflight
   /^\[sync\]/i, // sync subsystem prefix
   /^FAILED:/i,
   /^Error:/i,
@@ -216,6 +218,15 @@ function syncProject(projectName) {
   };
 }
 
+export function isSyncFailure(result) {
+  const stderr = result?.stderr || '';
+  return (
+    result?.exitCode !== 0 ||
+    stderr.includes(TARGET_MISSING_MARKER) ||
+    stderr.includes(MANIFEST_PREFLIGHT_BLOCKED_MARKER)
+  );
+}
+
 function main() {
   const args = parseArgs(process.argv.slice(2));
 
@@ -258,8 +269,8 @@ function main() {
     // downstream CLI now emits `[SYNC:target-missing] <path>` whenever the
     // resolved project directory is missing. Matching on the marker prevents
     // silent false-success when the human-readable log line is reworded.
-    const targetMissing = result.stderr.includes(TARGET_MISSING_MARKER);
-    if (result.exitCode === 0 && !targetMissing) {
+    const syncFailed = isSyncFailure(result);
+    if (!syncFailed) {
       // Clear past failures for this consumer on success.
       clearFailuresFor(project);
       log(`  OK: ${project}`);
@@ -267,7 +278,11 @@ function main() {
       // Find the marker line if present; otherwise use redacted stderr head.
       const markerLine = result.stderr
         .split('\n')
-        .find((l) => l.includes(TARGET_MISSING_MARKER));
+        .find(
+          (l) =>
+            l.includes(TARGET_MISSING_MARKER) ||
+            l.includes(MANIFEST_PREFLIGHT_BLOCKED_MARKER)
+        );
       const rawMsg = markerLine || result.stderr.slice(0, 500);
       const msg = redactStderr(rawMsg) || 'redacted';
       log(`SYNC FAILED: ${project}`);

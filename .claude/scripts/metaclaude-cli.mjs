@@ -581,9 +581,10 @@ function syncTimeContainmentOk(sourceFile, artifactPath) {
  * `validate-manifest.mjs` (strict shape-lint) against each. Returns
  * `{ blocked: boolean, offenders: string[] }`.
  *
- * Blocking behavior: ANY non-zero validator exit blocks the sync push for
- * this consumer with an actionable error pointing to `migrate-manifest.mjs`.
- * The pre-flight is NON-destructive — it never writes to the consumer.
+ * Behavior: invalid consumer-local manifests are surfaced as warning-only
+ * diagnostics. Shared artifact propagation must not be stranded by unrelated
+ * in-flight spec cleanup in the consumer repo. The pre-flight is
+ * NON-destructive — it never writes to the consumer.
  *
  * Graceful degradation:
  *   - If the consumer has no `specs/groups/` directory, skip (empty corpus =
@@ -672,23 +673,22 @@ async function cmdSync(projectArg, options) {
 
     // sg-enforcement-layer-gaps Task 14 / AC-7.1, AC-7.2, AC-7.3 — pre-flight
     // manifest-shape-lint of the consumer's own spec-group manifests BEFORE
-    // pushing artifacts. Legacy-flat shape detection blocks the push here; the
-    // operator must run `migrate-manifest.mjs --all` in the consumer to clear.
+    // pushing artifacts. This is warning-only: consumer-local spec cleanup
+    // should not block propagation of shared agents/scripts/docs.
     const preflight = preflightValidateConsumerManifests(projectPath);
     if (preflight.blocked) {
       log(
-        `  [SYNC:manifest-preflight-blocked] ${projectPath} has ${preflight.offenders.length}/${preflight.scanned} unmigrated manifests`,
-        'red'
+        `  [SYNC:manifest-preflight-warning] ${projectPath} has ${preflight.offenders.length}/${preflight.scanned} invalid manifests; continuing sync`,
+        'yellow'
       );
       log(
-        '  Remediation: in the consumer repo, run `node .claude/scripts/migrate-manifest.mjs --all`,',
+        '  Remediation: clean consumer manifests separately; start with `node .claude/scripts/migrate-manifest.mjs --all`,',
         'dim'
       );
-      log('  review the git diff, commit, then re-run `metaclaude-cli.mjs sync`.', 'dim');
+      log('  then manually fix remaining schema enum/path/extra-field errors.', 'dim');
       for (const offender of preflight.offenders) {
         log(`    offender: ${offender}`, 'dim');
       }
-      continue; // Skip sync for this consumer; proceed to next.
     }
 
     const lock = loadJson(lockPath) || {

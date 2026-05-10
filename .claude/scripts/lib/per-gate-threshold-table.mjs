@@ -10,8 +10,9 @@
  *
  *   Gate                      required_clean_passes  attestation_mode   hash_input_manifest
  *   -----------------------   ---------------------  -----------------  ------------------------------------
- *   unifier                   1                      content-hash       spec.md, requirements.md,
- *                                                                       manifest.json, atomic/*.md
+ *   unifier                   1                      content-hash       .claude/specs/groups/<id>/spec.md,
+ *                                                                       requirements.md, manifest.json,
+ *                                                                       atomic/*.md
  *   completion-verifier       1                      content-hash       manifest.json, registry content,
  *                                                                       trace files
  *   code-review               2                      content-hash       git-diff descriptor
@@ -44,7 +45,7 @@
  *   - AC2.2: investigation + both challenger substages at 2/none + rationale.
  *   - AC2.3: unifier + completion-verifier at 1/content-hash; code-review
  *            + security at 2/content-hash (git-diff descriptor).
- *   - AC2.4: unifier + completion-verifier hash_input_manifest verbatim.
+ *   - AC2.4: unifier + completion-verifier hash_input_manifest populated.
  *   - AC2.6: validation at module-load (throws on invalid).
  */
 
@@ -55,16 +56,16 @@ import { validatePerGateThresholdTable } from './schemas/per-gate-threshold-tabl
 // =============================================================================
 
 /**
- * Unifier input manifest (AC2.4 verbatim).
- * Glob expands per-spec-group at attestation time (as-018..as-020, out-of-scope
- * for as-002); the table stores the logical descriptor list.
+ * Unifier input manifest (AC2.4 runtime-resolvable form).
+ * Entries are repo-root relative because recordPass() runs from the project
+ * root. The <id> placeholder resolves to session.active_work.spec_group_id.
  *
  * @type {readonly string[]}
  */
 const UNIFIER_HASH_INPUT_MANIFEST = Object.freeze([
-  'spec.md',
-  'requirements.md',
-  'manifest.json',
+  '.claude/specs/groups/<id>/spec.md',
+  '.claude/specs/groups/<id>/requirements.md',
+  '.claude/specs/groups/<id>/manifest.json',
   '.claude/specs/groups/<id>/atomic/*.md',
 ]);
 

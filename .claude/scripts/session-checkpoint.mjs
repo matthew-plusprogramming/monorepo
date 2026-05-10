@@ -10,13 +10,16 @@
  *   init                                          - Initialize session.json if it doesn't exist
  *   start-work <spec_group_id> <workflow> <obj>   - Start tracking work on a spec group (positional)
  *     [--force-reset-convergence]                 - Explicit convergence reset (REQ-001.3 / as-009)
+ *     [--switch-from-current]                     - Preserve current work item and switch focus
  *   start-work --exempt-workflow <W>              - Start tracking vibe-mode work (flag-only; auto-gen id+objective)
  *   rotate-worktree <new-root>                    - Facilitator-only re-pin of project_dir_pin (REQ-007 / as-006 / AC6.3)
  *   reconcile-convergence <spec_group_id>         - Run manifest-seed reconciliation on demand (REQ-007.3 / as-008)
  *   transition-phase <new_phase>                  - Update current phase (with DAG enforcement)
  *   complete-atomic-spec <atomic_spec_id>         - Mark an atomic spec as done
- *   dispatch-subagent <id> <type> <desc> [--stage]- Track subagent dispatch (--stage for challengers)
+ *   dispatch-subagent <id> <type> <desc> [--stage] [--work-id <id>]
+ *                                                 - Track subagent dispatch (--stage for challengers)
  *   complete-subagent <task_id> <result_summary>  - Mark subagent as complete
+ *   record-manual-test-result <sg-id> --result <r> - Record structured /manual-test result
  *   clear-async-mode                              - Delete shape-lint-async-mode sentinel (AC-6.6)
  *   journal-created <path-to-journal>             - Mark journal entry as created
  *   override-skip --phase <p> --rationale "<r>"   - Override a phase skip block (main-agent-only)
@@ -27,6 +30,7 @@
  *                                                   'off' rejected (SESSION_OVERRIDE_OFF_REJECTED).
  *   complete-work                                 - Finalize completed work (with completion checklist)
  *   archive-incomplete                            - Archive incomplete work to history
+ *   switch-work <work_id>                         - Switch current focus to a stored work item
  *   record-test-writer-unlock <sg-id> --dispatch-id <id> --first-failure-ref <ref>
  *                                                 - Record bug-fix-mode test-writer unlock.
  *                                                   Sole-writer for active_work.test_writer_unlock;
@@ -82,7 +86,7 @@ import {
 } from 'node:fs';
 import { randomUUID, createHash, randomBytes } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
-import { basename, dirname, join, resolve, sep } from 'node:path';
+import { basename, dirname, join, resolve, relative, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import {
   ORCHESTRATOR_PREDECESSORS,
@@ -461,6 +465,11 @@ function isMainAgent(session) {
  * Find the .claude directory by walking up from script location.
  */
 function findClaudeDir() {
+  const projectRoot = process.env.CLAUDE_PROJECT_DIR;
+  if (projectRoot && typeof projectRoot === 'string' && projectRoot.length > 0) {
+    return join(projectRoot, '.claude');
+  }
+
   let currentDir = dirname(resolve(import.meta.url.replace('file://', '')));
   const root = '/';
 
@@ -483,6 +492,23 @@ function findClaudeDir() {
 const CLAUDE_DIR = findClaudeDir();
 const CONTEXT_DIR = join(CLAUDE_DIR, 'context');
 const SESSION_PATH = join(CONTEXT_DIR, 'session.json');
+
+const CONVERGENCE_AGENT_GATE_MAP = {
+  'interface-investigator': 'investigation',
+  challenger: 'challenger',
+  'code-reviewer': 'code_review',
+  'security-reviewer': 'security_review',
+  unifier: 'unifier',
+  'completion-verifier': 'completion_verifier',
+};
+
+function resolveEnvSessionPath() {
+  const projectRoot = process.env.CLAUDE_PROJECT_DIR;
+  if (projectRoot && typeof projectRoot === 'string' && projectRoot.length > 0) {
+    return join(projectRoot, '.claude', 'context', 'session.json');
+  }
+  return SESSION_PATH;
+}
 
 /**
  * Get current ISO 8601 timestamp.
@@ -538,11 +564,12 @@ const LOCK_PATH = SESSION_PATH + '.lock';
  * @param {session} session - Session object to save
  * @param {object} [opts] - Options
  * @param {boolean} [opts.failOpen=false] - Lock failure behavior (default: fail-closed for CLI)
- * @param {boolean} [opts.allowSnapshotLifecycleReset=false] - Allow complete/archive/clear-dangling to clear or replace active_work after snapshot capture
+ * @param {boolean} [opts.allowSnapshotLifecycleReset=false] - Allow complete/archive/clear-dangling/concurrent-switch to clear or replace active_work after snapshot capture
  */
 function saveSession(session, opts = {}) {
   ensureContextDir();
   session.updated_at = now();
+  syncActiveWorkItem(session);
 
   const failOpen = opts.failOpen !== undefined ? opts.failOpen : false;
   const lockAcquired = acquireLock(LOCK_PATH, { failOpen });
@@ -606,6 +633,9 @@ function createEmptySession() {
   return {
     version: SESSION_VERSION,
     updated_at: now(),
+    active_work_id: null,
+    work_items: {},
+    subagent_dispatches: {},
     active_work: null,
     phase_checkpoint: null,
     subagent_tasks: {
@@ -613,6 +643,157 @@ function createEmptySession() {
       completed_this_session: []
     },
     history: []
+  };
+}
+
+function cloneJSON(value) {
+  if (value === undefined) return undefined;
+  return JSON.parse(JSON.stringify(value));
+}
+
+function ensureObjectField(parent, field) {
+  if (!parent[field] || typeof parent[field] !== 'object' || Array.isArray(parent[field])) {
+    parent[field] = {};
+  }
+  return parent[field];
+}
+
+function resolveActiveWorkId(session) {
+  if (typeof session?.active_work_id === 'string' && session.active_work_id.trim() !== '') {
+    return session.active_work_id.trim();
+  }
+  if (
+    session?.active_work &&
+    typeof session.active_work.spec_group_id === 'string' &&
+    session.active_work.spec_group_id.trim() !== ''
+  ) {
+    return session.active_work.spec_group_id.trim();
+  }
+  return null;
+}
+
+function ensureWorkItem(session, workId) {
+  if (!workId || typeof workId !== 'string') return null;
+  const workItems = ensureObjectField(session, 'work_items');
+  if (!workItems[workId] || typeof workItems[workId] !== 'object' || Array.isArray(workItems[workId])) {
+    workItems[workId] = {};
+  }
+  const item = workItems[workId];
+  if (!item.convergence || typeof item.convergence !== 'object' || Array.isArray(item.convergence)) {
+    item.convergence = {};
+  }
+  if (
+    !item.convergence_evidence ||
+    typeof item.convergence_evidence !== 'object' ||
+    Array.isArray(item.convergence_evidence)
+  ) {
+    item.convergence_evidence = {};
+  }
+  return item;
+}
+
+function syncActiveWorkItem(session, opts = {}) {
+  const workId = resolveActiveWorkId(session);
+  if (!workId || !session?.active_work || typeof session.active_work !== 'object') {
+    return null;
+  }
+  session.active_work_id = workId;
+  const item = ensureWorkItem(session, workId);
+  item.active_work = cloneJSON(session.active_work);
+  if (session.phase_checkpoint !== undefined) {
+    item.phase_checkpoint = cloneJSON(session.phase_checkpoint);
+  }
+  if (session.active_work.threshold_snapshot !== undefined) {
+    item.threshold_snapshot = cloneJSON(session.active_work.threshold_snapshot);
+  }
+  if (opts.copyConvergence === true && session.convergence && typeof session.convergence === 'object') {
+    item.convergence = cloneJSON(session.convergence);
+  }
+  if (
+    opts.copyConvergenceEvidence === true &&
+    session.convergence_evidence &&
+    typeof session.convergence_evidence === 'object'
+  ) {
+    item.convergence_evidence = cloneJSON(session.convergence_evidence);
+  }
+  return item;
+}
+
+function findSubagentDispatch(session, taskId) {
+  if (!taskId || typeof taskId !== 'string') return null;
+  const indexed = session?.subagent_dispatches?.[taskId];
+  if (indexed && typeof indexed === 'object') return indexed;
+  const tasks = [
+    ...(session?.subagent_tasks?.in_flight || []),
+    ...(session?.subagent_tasks?.completed_this_session || []),
+  ];
+  return tasks.find((task) => task?.task_id === taskId || task?.agent_id === taskId) || null;
+}
+
+function resolveWorkIdForAgent(session, agentId, explicitWorkId = null) {
+  if (typeof explicitWorkId === 'string' && explicitWorkId.trim() !== '') {
+    return { workId: explicitWorkId.trim(), source: 'explicit' };
+  }
+  const dispatch = findSubagentDispatch(session, agentId);
+  const dispatchWorkId = dispatch?.work_id || dispatch?.spec_group_id;
+  if (typeof dispatchWorkId === 'string' && dispatchWorkId.trim() !== '') {
+    return { workId: dispatchWorkId.trim(), source: 'dispatch_metadata' };
+  }
+  const activeWorkId = resolveActiveWorkId(session);
+  if (activeWorkId) {
+    return { workId: activeWorkId, source: 'active_work_fallback' };
+  }
+  return { workId: null, source: 'unresolved' };
+}
+
+function selectConvergenceScope(session, gateName, explicitWorkId = null) {
+  const requestedWorkId =
+    typeof explicitWorkId === 'string' && explicitWorkId.trim() !== ''
+      ? explicitWorkId.trim()
+      : resolveActiveWorkId(session);
+  const item = requestedWorkId ? session?.work_items?.[requestedWorkId] : null;
+  const hasWorkScopedGate = Boolean(item?.convergence_evidence?.[gateName]);
+  if (item && hasWorkScopedGate) {
+    return {
+      workId: requestedWorkId,
+      item,
+      evidenceRoot: item.convergence_evidence,
+      convergenceRoot: item.convergence || (item.convergence = {}),
+      thresholdSession: {
+        ...session,
+        active_work: item.active_work || {
+          ...(session.active_work || {}),
+          spec_group_id: requestedWorkId,
+          ...(item.threshold_snapshot ? { threshold_snapshot: item.threshold_snapshot } : {}),
+        },
+      },
+      source: 'work_item',
+    };
+  }
+  if (item) {
+    return {
+      workId: requestedWorkId,
+      item,
+      evidenceRoot: item.convergence_evidence || (item.convergence_evidence = {}),
+      convergenceRoot: item.convergence || (item.convergence = {}),
+      thresholdSession: {
+        ...session,
+        active_work: item.active_work || {
+          ...(session.active_work || {}),
+          spec_group_id: requestedWorkId,
+          ...(item.threshold_snapshot ? { threshold_snapshot: item.threshold_snapshot } : {}),
+        },
+      },
+      source: 'work_item_missing_gate',
+    };
+  }
+  return {
+    workId: requestedWorkId,
+    item: null,
+    evidenceRoot: session.convergence_evidence,
+    convergenceRoot: session.convergence || (session.convergence = {}),
+    thresholdSession: session,
+    source: item ? 'work_item_missing_gate' : 'legacy_global',
   };
 }
 
@@ -1484,6 +1665,7 @@ function opInit() {
  * Two invocation forms (sg-enforcement-layer-gaps Task 19 / chk-contract-a1f3b902):
  *   1. Positional (legacy, backward-compat per AC-8.8):
  *        start-work <spec_group_id> <workflow> <objective>
+ *        start-work <spec_group_id> <workflow> <objective> --switch-from-current
  *   2. Flag-only (for exempt workflows; AC-8.1, AC-8.9):
  *        start-work --exempt-workflow <W>
  *      where W ∈ EXEMPT_WORKFLOWS. Auto-generates spec_group_id = "vibe-<ISO>"
@@ -1495,7 +1677,8 @@ function opInit() {
  * Inherit semantics (AC-10.3): for the flag-only form, if active_work.workflow
  * already equals W AND W ∈ EXEMPT_WORKFLOWS, returns early with status
  * "already-active" and audit entry — no mutation. Positional form retains
- * the existing throw on pre-existing active_work.
+ * the existing throw on pre-existing active_work unless --switch-from-current
+ * is supplied.
  *
  * workflow_set_by: the flag-only form implicitly sets "route-skill" (the only
  * route-skill-authored entry path). Positional form retains legacy behavior
@@ -1524,6 +1707,10 @@ function opStartWork(args) {
   // active_work pointer (spec-group directory no longer exists). Without
   // the flag, the existing active-work-collision throw is preserved.
   let clearDangling = false;
+  // Operator-supplied flag for concurrent work: preserve the current active
+  // work under work_items[active_work_id] and switch focus to the requested
+  // spec group. The legacy collision rejection remains the default.
+  let switchFromCurrent = false;
   // ws-dag-substages / AC-C7 / NFR-21: probe-form flags used exclusively to
   // detect mid-session workflow-downgrade attempts. When both --workflow=<W>
   // and --spec-group=<id> are supplied with no positional/objective tail,
@@ -1543,6 +1730,8 @@ function opStartWork(args) {
       forceResetConvergence = true;
     } else if (a === '--clear-dangling') {
       clearDangling = true;
+    } else if (a === '--switch-from-current') {
+      switchFromCurrent = true;
     } else if (a.startsWith('--workflow=')) {
       probeWorkflowFlag = a.slice('--workflow='.length);
     } else if (a.startsWith('--spec-group=')) {
@@ -1612,6 +1801,11 @@ function opStartWork(args) {
         '--override-workflow is not permitted with --exempt-workflow. Use complete-work to end the current work first.'
       );
     }
+    if (switchFromCurrent) {
+      throw new Error(
+        '--switch-from-current is only supported by positional start-work. Use start-work <spec_group_id> <workflow> <objective> --switch-from-current.'
+      );
+    }
     workflow = exemptWorkflowFlag;
     if (!EXEMPT_WORKFLOWS.includes(workflow)) {
       throw new Error(
@@ -1639,6 +1833,12 @@ function opStartWork(args) {
   }
 
   validateWorkflow(workflow);
+
+  if (switchFromCurrent && overrideWorkflow) {
+    throw new Error(
+      '--switch-from-current cannot be combined with --override-workflow. Preserve the current work item or override it, not both.'
+    );
+  }
 
   // Dual-corrupt fail-closed guard. Must run BEFORE loadSession() because
   // loadSession swallows parse errors as null, which is indistinguishable
@@ -1718,90 +1918,111 @@ function opStartWork(args) {
   // --- Active-work collision handling ---
   if (session.active_work) {
     const currentWorkflow = session.active_work.workflow;
+    const currentWorkId = resolveActiveWorkId(session);
 
-    if (isFlagOnlyForm) {
-      // AC-10.3 (flag-only): exempt-workflow inherit — if already same exempt
-      // workflow, return early with audit entry, no mutation.
-      if (
-        currentWorkflow === workflow &&
-        EXEMPT_WORKFLOWS.includes(currentWorkflow)
-      ) {
-        addHistoryEntry(session, 'work_started_already_active', {
-          spec_group_id: session.active_work.spec_group_id,
-          workflow: currentWorkflow,
-          workflow_set_by: workflowSetBy,
-          status: 'already-active',
-          message: `start-work --exempt-workflow ${workflow}: already-active (inherit path)`,
-        });
-        saveSession(session);
-        console.error(
-          `start-work --exempt-workflow ${workflow}: already-active (no mutation)`
+    if (switchFromCurrent) {
+      if (currentWorkId === specGroupId || session.active_work.spec_group_id === specGroupId) {
+        throw new Error(
+          `Active work already exists for '${specGroupId}'. Requested --switch-from-current target is already active.`
         );
-        return;
       }
-      // AC-10.1 downgrade protection: non-matching workflow rejects unless
-      // override. Flag-only form prohibits --override-workflow (handled above),
-      // so this always rejects for non-matching workflows.
-      // NFR-21 / AC-C7: emit structured WORKFLOW_IMMUTABLE log BEFORE throwing
-      // so the audit trail captures the attempt. Exempt current workflows
-      // bypass per AC4.5.
-      if (currentWorkflow && currentWorkflow !== workflow && !EXEMPT_WORKFLOWS.includes(currentWorkflow)) {
-        try {
-          process.stderr.write(JSON.stringify({
-            event: WORKFLOW_IMMUTABLE_ERROR_CODE,
-            current: currentWorkflow,
-            requested: workflow,
-            session_id: hashSessionIdForAdmittedLog(session?.session_id),
-          }) + '\n');
-        } catch {
-          // Never throw from log emission.
-        }
-      }
-      throw new Error(
-        `${WORKFLOW_IMMUTABLE_ERROR_CODE}: Active work already exists for '${session.active_work.spec_group_id}' (workflow: ${currentWorkflow}). ` +
-          `Cannot downgrade to '${workflow}'. Run complete-work or archive-incomplete first.`
-      );
-    }
 
-    // Positional form: AC-8.8 backward-compat — retain the throw. Honor
-    // --override-workflow only for workflow downgrades.
-    if (overrideWorkflow) {
-      // Operator override: record in history and overwrite. This is the
-      // canonical downgrade path (AC-10.1 escape hatch).
-      addHistoryEntry(session, 'workflow_overridden', {
-        prior_workflow: currentWorkflow,
-        new_workflow: workflow,
-        spec_group_id: session.active_work.spec_group_id,
-        override: true,
-        message: `Operator overrode workflow ${currentWorkflow} -> ${workflow}`,
+      syncActiveWorkItem(session, {
+        copyConvergence: true,
+        copyConvergenceEvidence: true,
       });
-      // Fall through to the re-init path. workflow_set_by records the path.
-      workflowSetBy = 'operator-override';
+      addHistoryEntry(session, 'work_switched', {
+        from_work_id: currentWorkId || session.active_work.spec_group_id || null,
+        to_work_id: specGroupId,
+        spec_group_id: specGroupId,
+        mode: 'start-work --switch-from-current',
+        message: `Preserved current work '${currentWorkId || session.active_work.spec_group_id || '<unknown>'}' and switched focus to '${specGroupId}'`,
+      });
     } else {
-      // NFR-21 / AC-C7: when requested workflow differs from current (no
-      // override), emit WORKFLOW_IMMUTABLE structured log and throw. Exempt
-      // current workflows bypass per AC4.5.
-      if (currentWorkflow && currentWorkflow !== workflow && !EXEMPT_WORKFLOWS.includes(currentWorkflow)) {
-        try {
-          process.stderr.write(JSON.stringify({
-            event: WORKFLOW_IMMUTABLE_ERROR_CODE,
-            current: currentWorkflow,
-            requested: workflow,
-            session_id: hashSessionIdForAdmittedLog(session?.session_id),
-          }) + '\n');
-        } catch {
-          // Never throw from log emission.
+      if (isFlagOnlyForm) {
+        // AC-10.3 (flag-only): exempt-workflow inherit — if already same exempt
+        // workflow, return early with audit entry, no mutation.
+        if (
+          currentWorkflow === workflow &&
+          EXEMPT_WORKFLOWS.includes(currentWorkflow)
+        ) {
+          addHistoryEntry(session, 'work_started_already_active', {
+            spec_group_id: session.active_work.spec_group_id,
+            workflow: currentWorkflow,
+            workflow_set_by: workflowSetBy,
+            status: 'already-active',
+            message: `start-work --exempt-workflow ${workflow}: already-active (inherit path)`,
+          });
+          saveSession(session);
+          console.error(
+            `start-work --exempt-workflow ${workflow}: already-active (no mutation)`
+          );
+          return;
+        }
+        // AC-10.1 downgrade protection: non-matching workflow rejects unless
+        // override. Flag-only form prohibits --override-workflow (handled above),
+        // so this always rejects for non-matching workflows.
+        // NFR-21 / AC-C7: emit structured WORKFLOW_IMMUTABLE log BEFORE throwing
+        // so the audit trail captures the attempt. Exempt current workflows
+        // bypass per AC4.5.
+        if (currentWorkflow && currentWorkflow !== workflow && !EXEMPT_WORKFLOWS.includes(currentWorkflow)) {
+          try {
+            process.stderr.write(JSON.stringify({
+              event: WORKFLOW_IMMUTABLE_ERROR_CODE,
+              current: currentWorkflow,
+              requested: workflow,
+              session_id: hashSessionIdForAdmittedLog(session?.session_id),
+            }) + '\n');
+          } catch {
+            // Never throw from log emission.
+          }
         }
         throw new Error(
-          `${WORKFLOW_IMMUTABLE_ERROR_CODE}: cannot change workflow mid-session ` +
-          `(current: ${currentWorkflow}, requested: ${workflow}). ` +
-          `Run complete-work or archive-incomplete first, or re-invoke with --override-workflow.`
+          `${WORKFLOW_IMMUTABLE_ERROR_CODE}: Active work already exists for '${session.active_work.spec_group_id}' (workflow: ${currentWorkflow}). ` +
+            `Cannot downgrade to '${workflow}'. Run complete-work or archive-incomplete first.`
         );
       }
-      throw new Error(
-        `Active work already exists for '${session.active_work.spec_group_id}'. ` +
-          `Use 'complete-work' or 'archive-incomplete' first.`
-      );
+
+      // Positional form: AC-8.8 backward-compat — retain the throw. Honor
+      // --override-workflow only for workflow downgrades.
+      if (overrideWorkflow) {
+        // Operator override: record in history and overwrite. This is the
+        // canonical downgrade path (AC-10.1 escape hatch).
+        addHistoryEntry(session, 'workflow_overridden', {
+          prior_workflow: currentWorkflow,
+          new_workflow: workflow,
+          spec_group_id: session.active_work.spec_group_id,
+          override: true,
+          message: `Operator overrode workflow ${currentWorkflow} -> ${workflow}`,
+        });
+        // Fall through to the re-init path. workflow_set_by records the path.
+        workflowSetBy = 'operator-override';
+      } else {
+        // NFR-21 / AC-C7: when requested workflow differs from current (no
+        // override), emit WORKFLOW_IMMUTABLE structured log and throw. Exempt
+        // current workflows bypass per AC4.5.
+        if (currentWorkflow && currentWorkflow !== workflow && !EXEMPT_WORKFLOWS.includes(currentWorkflow)) {
+          try {
+            process.stderr.write(JSON.stringify({
+              event: WORKFLOW_IMMUTABLE_ERROR_CODE,
+              current: currentWorkflow,
+              requested: workflow,
+              session_id: hashSessionIdForAdmittedLog(session?.session_id),
+            }) + '\n');
+          } catch {
+            // Never throw from log emission.
+          }
+          throw new Error(
+            `${WORKFLOW_IMMUTABLE_ERROR_CODE}: cannot change workflow mid-session ` +
+            `(current: ${currentWorkflow}, requested: ${workflow}). ` +
+            `Run complete-work or archive-incomplete first, or re-invoke with --override-workflow.`
+          );
+        }
+        throw new Error(
+          `Active work already exists for '${session.active_work.spec_group_id}'. ` +
+            `Use 'complete-work' or 'archive-incomplete' first.`
+        );
+      }
     }
   }
 
@@ -1825,12 +2046,30 @@ function opStartWork(args) {
       initialPhase = 'prd_gathering';
   }
 
+  const priorActiveWorkId = resolveActiveWorkId(session);
+  if (priorActiveWorkId) {
+    syncActiveWorkItem(session, {
+      copyConvergence: true,
+      copyConvergenceEvidence: true,
+    });
+  }
+
   session.active_work = {
     spec_group_id: specGroupId,
     workflow,
     current_phase: initialPhase,
     objective,
   };
+  session.active_work_id = specGroupId;
+
+  const existingWorkItem = session.work_items?.[specGroupId];
+  if (existingWorkItem && typeof existingWorkItem === 'object') {
+    session.convergence = cloneJSON(existingWorkItem.convergence || {});
+    session.convergence_evidence = cloneJSON(existingWorkItem.convergence_evidence || {});
+  } else {
+    session.convergence = {};
+    session.convergence_evidence = {};
+  }
 
   // AC-10.2: record workflow_set_by for route-skill and operator-override paths.
   if (workflowSetBy) {
@@ -2049,6 +2288,11 @@ function opStartWork(args) {
     }
   }
 
+  syncActiveWorkItem(session, {
+    copyConvergence: true,
+    copyConvergenceEvidence: true,
+  });
+
   // Register AFTER the active_work assignment so the session carries an identity the orphan
   // scan can snapshot against itself. session_id is generated above
   // (T-05: moved earlier for force-reset-convergence ordering safety).
@@ -2142,7 +2386,7 @@ function opStartWork(args) {
   }
 
   saveSession(session, {
-    allowSnapshotLifecycleReset: clearedDanglingActiveWork,
+    allowSnapshotLifecycleReset: clearedDanglingActiveWork || switchFromCurrent,
   });
   console.error(`Started work on '${specGroupId}' with workflow '${workflow}'`);
 }
@@ -2796,17 +3040,24 @@ function opCompleteAtomicSpec(atomicSpecId) {
  * dispatch-subagent - Track subagent dispatch.
  *
  * Supports optional --stage flag for challenger subagent dispatches (DEC-004).
- * Usage: dispatch-subagent <task_id> <type> <description> [--stage <stage>]
+ * Usage: dispatch-subagent <task_id> <type> <description> [--stage <stage>] [--work-id <id>]
  */
-function opDispatchSubagent(taskId, subagentType, description, stage, stageSource) {
+function opDispatchSubagent(taskId, subagentType, description, stage, stageSource, explicitWorkId = null) {
   if (!subagentType || !description) {
-    throw new Error('Usage: dispatch-subagent <task_id> <subagent_type> <description> [--stage <stage>]');
+    throw new Error('Usage: dispatch-subagent <task_id> <subagent_type> <description> [--stage <stage>] [--work-id <id>]');
   }
 
   // If taskId not provided, generate one
   const finalTaskId = taskId || generateTaskId();
 
   validateSubagentType(subagentType);
+  const dispatchWorkId =
+    typeof explicitWorkId === 'string' && explicitWorkId.trim() !== ''
+      ? explicitWorkId.trim()
+      : null;
+  if (dispatchWorkId) {
+    validateSpecGroupId(dispatchWorkId);
+  }
 
   // Task 7 / AC-1.6: when the description looks like a standalone path (no
   // whitespace; contains a separator or parent-traversal marker), enforce the
@@ -2942,7 +3193,8 @@ function opDispatchSubagent(taskId, subagentType, description, stage, stageSourc
     completed_at: null,
     status: 'in_flight',
     result_summary: null,
-    spec_group_id: session.active_work?.spec_group_id || null,
+    work_id: dispatchWorkId || resolveActiveWorkId(session),
+    spec_group_id: dispatchWorkId || session.active_work?.spec_group_id || null,
     atomic_spec_id: null
   };
 
@@ -3010,6 +3262,21 @@ function opDispatchSubagent(taskId, subagentType, description, stage, stageSourc
     addHistoryEntry(session, 'subagent_dispatched', historyDetails);
   }
 
+  if (!session.subagent_dispatches || typeof session.subagent_dispatches !== 'object' || Array.isArray(session.subagent_dispatches)) {
+    session.subagent_dispatches = {};
+  }
+  session.subagent_dispatches[finalTaskId] = {
+    agent_id: finalTaskId,
+    task_id: finalTaskId,
+    subagent_type: subagentType,
+    gate: CONVERGENCE_AGENT_GATE_MAP[subagentType] || null,
+    stage: stage || null,
+    work_id: task.work_id || task.spec_group_id || null,
+    spec_group_id: task.spec_group_id || task.work_id || null,
+    dispatched_at: task.dispatched_at,
+    status: 'in_flight',
+  };
+
   saveSession(session);
   console.error(`Dispatched subagent '${subagentType}' with task_id '${finalTaskId}'${stage ? ` (stage: ${stage})` : ''}`);
 }
@@ -3049,6 +3316,10 @@ function opCompleteSubagent(taskId, resultSummary) {
   task.completed_at = now();
   task.status = 'completed';
   task.result_summary = resultSummary || 'Completed successfully';
+  if (session.subagent_dispatches?.[taskId]) {
+    session.subagent_dispatches[taskId].status = 'completed';
+    session.subagent_dispatches[taskId].completed_at = task.completed_at;
+  }
 
   // Add to completed
   session.subagent_tasks.completed_this_session.push(task);
@@ -3062,6 +3333,173 @@ function opCompleteSubagent(taskId, resultSummary) {
 
   saveSession(session);
   console.error(`Completed subagent task '${taskId}'`);
+}
+
+const VALID_MANUAL_TEST_RESULTS = new Set(['pass', 'fail', 'blocked']);
+
+function parseManualTestCount(value, fieldName) {
+  if (value === null || value === undefined || String(value).trim() === '') {
+    throw new Error(`${fieldName} is required`);
+  }
+  const n = Number(value);
+  if (!Number.isInteger(n) || n < 0) {
+    throw new Error(`${fieldName} must be a non-negative integer`);
+  }
+  return n;
+}
+
+function normalizeManualTestEvidencePath(specGroupId, evidencePath, required) {
+  if (!evidencePath || typeof evidencePath !== 'string') {
+    if (required) {
+      throw new Error('evidence_path is required for pass/fail manual-test results');
+    }
+    return null;
+  }
+
+  const projectRoot = resolve(CLAUDE_DIR, '..');
+  const specGroupDir = resolve(CLAUDE_DIR, 'specs', 'groups', specGroupId);
+  const evidenceDir = resolve(specGroupDir, 'evidence');
+  const rawPath = evidencePath.trim();
+  let candidate;
+
+  if (rawPath.startsWith('/')) {
+    candidate = rawPath;
+  } else if (rawPath === '.claude' || rawPath.startsWith('.claude/')) {
+    candidate = join(projectRoot, rawPath);
+  } else {
+    candidate = join(specGroupDir, rawPath);
+  }
+
+  const resolvedPath = resolve(candidate);
+  const insideEvidenceDir =
+    resolvedPath === evidenceDir || resolvedPath.startsWith(evidenceDir + sep);
+  if (!insideEvidenceDir) {
+    throw new Error(
+      `evidence_path must be under .claude/specs/groups/${specGroupId}/evidence/`
+    );
+  }
+  if (!existsSync(resolvedPath)) {
+    throw new Error(`evidence_path does not exist: ${evidencePath}`);
+  }
+
+  return relative(projectRoot, resolvedPath).split(sep).join('/');
+}
+
+/**
+ * record-manual-test-result - Trusted writer for structured /manual-test result.
+ */
+function opRecordManualTestResult(opts) {
+  const {
+    specGroupId,
+    result,
+    scenarioCount,
+    passCount,
+    failCount,
+    evidencePath,
+    topResidualRisk,
+  } = opts;
+
+  if (!specGroupId || !/^sg-[a-z0-9-]+$/.test(specGroupId)) {
+    throw new Error('Usage: record-manual-test-result <spec_group_id> --result <pass|fail|blocked> --scenario-count <N> --pass-count <N> --fail-count <N> [--evidence-path <path>] [--top-residual-risk <text>]');
+  }
+  if (!VALID_MANUAL_TEST_RESULTS.has(result)) {
+    throw new Error(`manual-test result must be one of: ${[...VALID_MANUAL_TEST_RESULTS].join(', ')}`);
+  }
+
+  const parsedScenarioCount = parseManualTestCount(scenarioCount, 'scenario_count');
+  const parsedPassCount = parseManualTestCount(passCount, 'pass_count');
+  const parsedFailCount = parseManualTestCount(failCount, 'fail_count');
+
+  if (result === 'pass') {
+    if (parsedScenarioCount <= 0) {
+      throw new Error('pass manual-test result requires scenario_count > 0');
+    }
+    if (parsedPassCount <= 0) {
+      throw new Error('pass manual-test result requires pass_count > 0');
+    }
+    if (parsedFailCount !== 0) {
+      throw new Error('pass manual-test result requires fail_count === 0');
+    }
+  }
+  if (result === 'fail') {
+    if (parsedScenarioCount <= 0) {
+      throw new Error('fail manual-test result requires scenario_count > 0');
+    }
+    if (parsedFailCount <= 0) {
+      throw new Error('fail manual-test result requires fail_count > 0');
+    }
+  }
+
+  const normalizedEvidencePath = normalizeManualTestEvidencePath(
+    specGroupId,
+    evidencePath,
+    result === 'pass' || result === 'fail',
+  );
+
+  const session = loadSession();
+  if (!session) {
+    throw new Error('No session.json exists. Run "init" first.');
+  }
+  if (!session.active_work) {
+    throw new Error('No active_work in session. Run "start-work" first.');
+  }
+  if (session.active_work.spec_group_id !== specGroupId) {
+    throw new Error(
+      `Active spec_group_id is ${session.active_work.spec_group_id || '<missing>'}, not ${specGroupId}`
+    );
+  }
+
+  const record = {
+    spec_group_id: specGroupId,
+    result,
+    scenario_count: parsedScenarioCount,
+    pass_count: parsedPassCount,
+    fail_count: parsedFailCount,
+    evidence_path: normalizedEvidencePath,
+    top_residual_risk: topResidualRisk || null,
+    recorded_at: now(),
+  };
+
+  session.active_work.manual_test_result = record;
+  if (!Array.isArray(session.history)) {
+    session.history = [];
+  }
+  addHistoryEntry(session, 'manual_test_result_recorded', {
+    spec_group_id: specGroupId,
+    result,
+    scenario_count: parsedScenarioCount,
+    pass_count: parsedPassCount,
+    fail_count: parsedFailCount,
+    evidence_path: normalizedEvidencePath,
+    message: `Recorded structured manual-test result for ${specGroupId}: ${result}`,
+  });
+  saveSession(session);
+
+  const manifestPath = join(CLAUDE_DIR, 'specs', 'groups', specGroupId, 'manifest.json');
+  if (existsSync(manifestPath)) {
+    try {
+      atomicModifyJSON(manifestPath, (manifest) => {
+        const m = manifest || {};
+        m.decision_log = Array.isArray(m.decision_log) ? m.decision_log : [];
+        m.decision_log.push({
+          timestamp: record.recorded_at,
+          actor: 'agent',
+          action: 'manual_test_result_recorded',
+          details:
+            `${parsedScenarioCount} scenarios, ${parsedPassCount} pass, ` +
+            `${parsedFailCount} fail. Result=${result}. ` +
+            `Evidence=${normalizedEvidencePath || '<none>'}.`,
+        });
+        return m;
+      });
+    } catch (err) {
+      console.error(
+        `[session-checkpoint] WARNING: failed to append manifest manual-test decision_log entry: ${err.message}`
+      );
+    }
+  }
+
+  console.log(JSON.stringify({ recorded: true, manual_test_result: record }, null, 2));
 }
 
 /**
@@ -5009,8 +5447,14 @@ function opCompleteWork() {
     );
   }
 
+  syncActiveWorkItem(session, {
+    copyConvergence: true,
+    copyConvergenceEvidence: true,
+  });
+
   // Clear active state
   session.active_work = null;
+  session.active_work_id = null;
   session.phase_checkpoint = null;
 
   // Unregister this session from the active-sessions registry.
@@ -5078,8 +5522,14 @@ function opArchiveIncomplete() {
     );
   }
 
+  syncActiveWorkItem(session, {
+    copyConvergence: true,
+    copyConvergenceEvidence: true,
+  });
+
   // Clear active state
   session.active_work = null;
+  session.active_work_id = null;
   session.phase_checkpoint = null;
 
   // Cancel in_flight tasks
@@ -5093,6 +5543,66 @@ function opArchiveIncomplete() {
 
   saveSession(session, { allowSnapshotLifecycleReset: true });
   console.error(`Archived incomplete work on '${specGroupId}' (was at phase '${currentPhase}')`);
+}
+
+/**
+ * switch-work - Change current focus to an existing work item without moving
+ * evidence between work items.
+ */
+function opSwitchWork(workId) {
+  if (!workId || typeof workId !== 'string') {
+    throw new Error('Usage: switch-work <work_id>');
+  }
+
+  const session = loadSession();
+  if (!session) {
+    throw new Error('No session.json exists. Run "init" first.');
+  }
+
+  if (session.active_work) {
+    syncActiveWorkItem(session, {
+      copyConvergence: true,
+      copyConvergenceEvidence: true,
+    });
+  }
+
+  const item = session.work_items?.[workId];
+  if (!item || typeof item !== 'object') {
+    throw new Error(`Unknown work_id '${workId}'. Known work ids: ${Object.keys(session.work_items || {}).join(', ') || '<none>'}`);
+  }
+
+  const nextActiveWork =
+    item.active_work && typeof item.active_work === 'object'
+      ? cloneJSON(item.active_work)
+      : { spec_group_id: workId, workflow: 'oneoff-spec', current_phase: 'prd_gathering', objective: workId };
+  if (!nextActiveWork.spec_group_id) {
+    nextActiveWork.spec_group_id = workId;
+  }
+  if (!nextActiveWork.threshold_snapshot && item.threshold_snapshot) {
+    nextActiveWork.threshold_snapshot = cloneJSON(item.threshold_snapshot);
+  }
+
+  session.active_work_id = workId;
+  session.active_work = nextActiveWork;
+  session.phase_checkpoint =
+    item.phase_checkpoint && typeof item.phase_checkpoint === 'object'
+      ? cloneJSON(item.phase_checkpoint)
+      : null;
+  if (item.convergence && typeof item.convergence === 'object') {
+    session.convergence = cloneJSON(item.convergence);
+  }
+  if (item.convergence_evidence && typeof item.convergence_evidence === 'object') {
+    session.convergence_evidence = cloneJSON(item.convergence_evidence);
+  }
+
+  addHistoryEntry(session, 'work_switched', {
+    work_id: workId,
+    spec_group_id: nextActiveWork.spec_group_id || workId,
+    message: `Switched active work to '${workId}'`,
+  });
+
+  saveSession(session, { allowSnapshotLifecycleReset: true });
+  console.error(`Switched active work to '${workId}'`);
 }
 
 /**
@@ -5891,7 +6401,7 @@ function countConsecutiveCleanFromTail(passes, gateName) {
  *
  * Implements: REQ-002, REQ-004, REQ-017, REQ-019, REQ-022
  */
-function opUpdateConvergence(gateName, countStr) {
+function opUpdateConvergence(gateName, countStr, opts = {}) {
   // Required clean passes threshold (matches CLAUDE.md convergence loop protocol).
   // Named per EC-13 fallback convention (spec.md:418) so the grep-lock at
   // ci/grep-lock-thresholds.mjs:177-184 allowlists this declaration via
@@ -5927,6 +6437,8 @@ function opUpdateConvergence(gateName, countStr) {
   ensureContextDir();
   let reportCleanPassCount = null;
   let reportEvidenceCount = null;
+  let verifiedWorkId = null;
+  let usedWorkScopedState = false;
 
   // as-006 (sg-workflow-convergence-bugs): session.json parse-failure recovery
   // (EDGE-103 / AC-A-SESSION-PARSE-FAIL). When session.json is absent or cannot
@@ -5988,14 +6500,23 @@ function opUpdateConvergence(gateName, countStr) {
       session.convergence[gateName] = {};
     }
 
+    const scope = selectConvergenceScope(session, gateName, opts.workId);
+    verifiedWorkId = scope.workId || null;
+    usedWorkScopedState = scope.source === 'work_item';
+    const convergenceTarget = scope.convergenceRoot;
+    if (!convergenceTarget[gateName]) {
+      convergenceTarget[gateName] = {};
+    }
+
     // Legacy session detection.
     // Check BEFORE the || [] fallback -- the fallback collapses "key missing" (legacy)
     // and "key present, empty array" (new session) into the same value.
     // Legacy sessions must fail-closed with a distinct error message.
-    const evidenceForGate = session.convergence_evidence?.[gateName]?.passes;
+    const evidenceForGate = scope.evidenceRoot?.[gateName]?.passes;
     if (evidenceForGate == null) {
       throw new Error(
-        `CONVERGENCE_VERIFY_FAILED: cannot verify convergence: no evidence records found for gate ${gateName}. ` +
+        `CONVERGENCE_VERIFY_FAILED: cannot verify convergence: no evidence records found for gate ${gateName}` +
+        (scope.workId ? ` in work_id ${scope.workId}` : '') + `. ` +
         `Record passes via record-pass before calling update-convergence.`
       );
     }
@@ -6010,7 +6531,7 @@ function opUpdateConvergence(gateName, countStr) {
     // Convergence recorder tolerance AC-7: pass gateName for bound-hit
     // stderr label (preserved via the shim countConsecutiveCleanFromTail).
     const evidence = evidenceForGate;
-    const sessionIdForLog = session.session_id ?? session.active_work?.spec_group_id ?? null;
+    const sessionIdForLog = session.session_id ?? scope.workId ?? session.active_work?.spec_group_id ?? null;
     const derived = deriveConvergenceFromEvidence(evidence, gateName, sessionIdForLog);
     const cleanPassCount = derived.clean_pass_count;
     const derivedIterationCount = derived.iteration_count;
@@ -6047,7 +6568,7 @@ function opUpdateConvergence(gateName, countStr) {
       }
     }
 
-    session.convergence[gateName].clean_pass_count = cleanPassCount;
+    convergenceTarget[gateName].clean_pass_count = cleanPassCount;
 
     // parse_failed_count surfacing semantics:
     //   - READ the existing stored value (AC1.1: "reflecting
@@ -6061,13 +6582,13 @@ function opUpdateConvergence(gateName, countStr) {
     const derivedParseFailedCount = evidence.filter(
       p => p.record_source === 'parse_failed'
     ).length;
-    const existingStoredPfc = session.convergence[gateName].parse_failed_count;
+    const existingStoredPfc = convergenceTarget[gateName].parse_failed_count;
     const hasExistingField = typeof existingStoredPfc === 'number';
     const parseFailedCount = hasExistingField
       ? Math.max(existingStoredPfc, derivedParseFailedCount)
       : derivedParseFailedCount;
     if (hasExistingField || derivedParseFailedCount > 0) {
-      session.convergence[gateName].parse_failed_count = parseFailedCount;
+      convergenceTarget[gateName].parse_failed_count = parseFailedCount;
     }
 
     // sg-workflow-convergence-bugs (Bug A fix): iteration_count is DERIVED from
@@ -6083,7 +6604,7 @@ function opUpdateConvergence(gateName, countStr) {
     // comparison shape (clean_pass_count >= threshold) is unchanged; only
     // the source of `threshold` moved.
     const requiredCleanPasses = readThresholdFromSnapshot(
-      session,
+      scope.thresholdSession,
       gateName,
       DEFAULT_REQUIRED_CLEAN_PASSES
     );
@@ -6138,9 +6659,9 @@ function opUpdateConvergence(gateName, countStr) {
       // convergence loops start fresh. Preserves the prior "reset on
       // convergence" contract tested by convergence-iteration-tracking.test.mjs
       // and consumed by auto-decision downstream.
-      session.convergence[gateName].iteration_count = 0;
+      convergenceTarget[gateName].iteration_count = 0;
     } else {
-      session.convergence[gateName].iteration_count = derivedIterationCount;
+      convergenceTarget[gateName].iteration_count = derivedIterationCount;
 
       // Advisory cap warning when iterations reach the limit. Uses the
       // derived count so adversary-crafted legacy records cannot force
@@ -6158,26 +6679,33 @@ function opUpdateConvergence(gateName, countStr) {
     // the gate's convergence object rather than the session root to
     // keep scope narrow; field is additive (NFR-3 tolerant readers).
     if (attestationSkip) {
-      session.convergence[gateName].attestation_skip = {
+      convergenceTarget[gateName].attestation_skip = {
         decided_at: now(),
         matched_hash: attestationDecision.matched_hash,
       };
-    } else if (session.convergence[gateName].attestation_skip) {
+    } else if (convergenceTarget[gateName].attestation_skip) {
       // Clear stale attestation marker if the current pass history no
       // longer supports skip -- prevents a past SKIP from masking a
       // later EC-7 fallback.
-      delete session.convergence[gateName].attestation_skip;
+      delete convergenceTarget[gateName].attestation_skip;
+    }
+
+    const activeWorkId = resolveActiveWorkId(session);
+    if (!usedWorkScopedState || scope.workId === activeWorkId) {
+      session.convergence[gateName] = cloneJSON(convergenceTarget[gateName]);
     }
 
     addHistoryEntry(session, 'convergence_update', {
       gate_name: gateName,
+      work_id: scope.workId || null,
+      convergence_scope: scope.source,
       clean_pass_count: cleanPassCount,
       parse_failed_count: parseFailedCount,
-      iteration_count: session.convergence[gateName].iteration_count,
+      iteration_count: convergenceTarget[gateName].iteration_count,
       evidence_count: evidence.length,
-      spec_group_id: session.active_work?.spec_group_id,
+      spec_group_id: scope.workId || session.active_work?.spec_group_id,
       attestation_skip: attestationSkip,
-      message: `Updated convergence: ${gateName}.clean_pass_count = ${cleanPassCount}, parse_failed_count = ${parseFailedCount}, iteration_count = ${session.convergence[gateName].iteration_count} (derived from ${evidence.length} evidence records${attestationSkip ? ', attestation-skip applied' : ''})`
+      message: `Updated convergence: ${gateName}.clean_pass_count = ${cleanPassCount}, parse_failed_count = ${parseFailedCount}, iteration_count = ${convergenceTarget[gateName].iteration_count} (derived from ${evidence.length} evidence records${attestationSkip ? ', attestation-skip applied' : ''})`
     });
 
     session.updated_at = now();
@@ -6197,11 +6725,25 @@ function opUpdateConvergence(gateName, countStr) {
   // Re-read session.json from disk (fresh read, not cached reportCleanPassCount)
   // to verify the write actually persisted.
   const verifyData = JSON.parse(readFileSync(SESSION_PATH, 'utf8'));
-  const verifiedCount = verifyData?.convergence?.[gateName]?.clean_pass_count ?? 0;
+  const verifyWorkItem = usedWorkScopedState && verifiedWorkId
+    ? verifyData?.work_items?.[verifiedWorkId]
+    : null;
+  const verifyConvergence = verifyWorkItem?.convergence || verifyData?.convergence || {};
+  const verifiedCount = verifyConvergence?.[gateName]?.clean_pass_count ?? 0;
   // Surface parse_failed_count in CLI output. Legacy sessions without the field
   // default to 0 on read.
   const verifiedParseFailedCount =
-    verifyData?.convergence?.[gateName]?.parse_failed_count ?? 0;
+    verifyConvergence?.[gateName]?.parse_failed_count ?? 0;
+  const verifyThresholdSession = verifyWorkItem
+    ? {
+        ...verifyData,
+        active_work: verifyWorkItem.active_work || {
+          ...(verifyData.active_work || {}),
+          spec_group_id: verifiedWorkId,
+          ...(verifyWorkItem.threshold_snapshot ? { threshold_snapshot: verifyWorkItem.threshold_snapshot } : {}),
+        },
+      }
+    : verifyData;
 
   // as-007 / REQ-012 / AC7.1: post-write verification threshold is also
   // snapshot-derived. `verifyData` is a fresh disk read, so we feed it into
@@ -6209,7 +6751,7 @@ function opUpdateConvergence(gateName, countStr) {
   // start-work. AC7.4: absent snapshot → fall back to DEFAULT_REQUIRED_CLEAN_PASSES
   // so legacy sessions behave byte-identically.
   const verifyRequiredCleanPasses = readThresholdFromSnapshot(
-    verifyData,
+    verifyThresholdSession,
     gateName,
     DEFAULT_REQUIRED_CLEAN_PASSES
   );
@@ -6222,7 +6764,7 @@ function opUpdateConvergence(gateName, countStr) {
   // branch already validated the hash equality and the threshold collapse
   // is safe to honor here.
   const verifiedAttestationSkip = Boolean(
-    verifyData?.convergence?.[gateName]?.attestation_skip
+    verifyConvergence?.[gateName]?.attestation_skip
   );
   const verifyEffectiveThreshold = verifiedAttestationSkip
     ? 1
@@ -6236,15 +6778,17 @@ function opUpdateConvergence(gateName, countStr) {
     console.error(message);
     console.log(message);
 
-    const mirrorResult = mirrorVerifiedConvergenceToManifest(
-      verifyData,
-      gateName,
-      verifiedCount
-    );
-    if (!mirrorResult.ok) {
-      process.stderr.write(
-        `[session-checkpoint] WARNING: verified convergence manifest mirror skipped for gate='${gateName}': ${mirrorResult.reason}\n`
+    if (!usedWorkScopedState || verifiedWorkId === resolveActiveWorkId(verifyData)) {
+      const mirrorResult = mirrorVerifiedConvergenceToManifest(
+        verifyData,
+        gateName,
+        verifiedCount
       );
+      if (!mirrorResult.ok) {
+        process.stderr.write(
+          `[session-checkpoint] WARNING: verified convergence manifest mirror skipped for gate='${gateName}': ${mirrorResult.reason}\n`
+        );
+      }
     }
 
     // as-005 / REQ-005 / AC-005.6 trigger 2 (test-pass): when the unifier
@@ -6689,7 +7233,7 @@ function recordPassAtomicWrite(targetPath, modifier) {
  * @param {Object} opts
  * @param {('hook'|'parse_failed'|'manual_fallback')} opts.source
  *   Source of the pass. The recorder module writes three legitimate values --
- *     - 'hook'            normal subagent output (all 4 extractor paths hit)
+ *     - 'hook'            normal subagent output (an extractor path hit)
  *     - 'parse_failed'    extractor could not parse subagent output
  *                         (convergence-pass-recorder.mjs:1301, :1322)
  *     - 'manual_fallback' hook fell back to manual annotation after
@@ -6706,8 +7250,11 @@ function recordPassAtomicWrite(targetPath, modifier) {
  * @param {string} [opts.findingsHash] - Optional 64-char hex hash of finding IDs.
  * @param {string} [opts.agentType] - Optional agent type (e.g. 'code-reviewer').
  * @param {string} [opts.agentId] - Optional agent instance id.
- * @param {Object} [opts.meta] - Optional additional metadata (currently ignored
- *   by the persistence layer; reserved for future audit fields).
+ * @param {string} [opts.extractionPath] - Extractor path selected by convergence-pass-recorder.
+ * @param {string} [opts.workId] - Stable work item id for work-scoped evidence.
+ * @param {string} [opts.workIdSource] - How workId was resolved.
+ * @param {Object} [opts.meta] - Optional additional metadata mirrored onto
+ *   evidence records for supported diagnostic fields.
  *
  * @returns {Promise<void>}
  * @throws {Error} On invalid source / gate / atomic-write failure.
@@ -6723,6 +7270,9 @@ export async function recordPass(opts) {
     findingsHash = null,
     agentType = 'unknown',
     agentId = undefined,
+    extractionPath = undefined,
+    workId = undefined,
+    workIdSource = undefined,
     meta = undefined,
   } = opts || {};
 
@@ -6759,10 +7309,22 @@ export async function recordPass(opts) {
   // deterministically preserves the order and structure of existing entries.
   // NFR-21 immutability: this path does NOT read or write the session workflow field.
   try {
-    recordPassAtomicWrite(SESSION_PATH, (currentData) => {
+    const recordPassSessionPath = resolveEnvSessionPath();
+    recordPassAtomicWrite(recordPassSessionPath, (currentData) => {
       let session = currentData;
       if (!session) {
         session = createEmptySession();
+      }
+      const resolvedWork = resolveWorkIdForAgent(session, agentId, workId);
+      if (typeof workIdSource === 'string' && workIdSource.trim() !== '' && resolvedWork.workId) {
+        resolvedWork.source = workIdSource.trim();
+      }
+      const scopedItem = resolvedWork.workId ? ensureWorkItem(session, resolvedWork.workId) : null;
+      if (scopedItem && session.active_work?.spec_group_id === resolvedWork.workId) {
+        scopedItem.active_work = cloneJSON(session.active_work);
+      }
+      if (scopedItem && session.phase_checkpoint !== undefined) {
+        scopedItem.phase_checkpoint = cloneJSON(session.phase_checkpoint);
       }
       if (!session.convergence_evidence) {
         session.convergence_evidence = {};
@@ -6770,45 +7332,68 @@ export async function recordPass(opts) {
       if (!session.convergence_evidence[gate]) {
         session.convergence_evidence[gate] = { passes: [] };
       }
-      const passes = session.convergence_evidence[gate].passes;
+      if (scopedItem && !scopedItem.convergence_evidence[gate]) {
+        scopedItem.convergence_evidence[gate] = { passes: [] };
+      }
+      const scopedPasses = scopedItem?.convergence_evidence?.[gate]?.passes || null;
+      const passes = scopedPasses || session.convergence_evidence[gate].passes;
 
       const nextPassNumber = passes.length > 0
         ? passes[passes.length - 1].pass_number + 1
         : 1;
 
-      const record = {
-        pass_number: nextPassNumber,
-        timestamp: now(),
-        agent_type: agentType,
-        findings_count: findingCount,
-        findings_hash: findingsHash,
-        clean,
-        record_source: source,
-      };
-      if (agentId !== undefined) record.agent_id = agentId;
-      if (meta !== undefined) record.meta = meta;
-
-      // as-013 / AC13.2: persist content_hash on content-hash-attested
-      // gates so the attestation-skip branch at derive time can compare
-      // Pass N vs Pass N-1 (AC13.1) or fall back to consecutive counting
-      // (EC-7, AC13.3). The module-export recordPass() path is the one
-      // exercised by the SubagentStop hook in production; the CLI handler
-      // opRecordPass is the manual/debug entry point. Both paths must
-      // persist the field identically so operator-invoked traces are
-      // interchangeable with hook-emitted traces.
+      let contentHashForRecord = null;
       if (gateUsesContentHashAttestation(gate)) {
         const contentHash = computeGateContentHashOrNull(gate, session);
         if (typeof contentHash === 'string' && contentHash.length > 0) {
-          record.content_hash = contentHash;
+          contentHashForRecord = contentHash;
         }
       }
 
+      const buildRecord = (passNumber) => {
+        const record = {
+          pass_number: passNumber,
+          timestamp: now(),
+          agent_type: agentType,
+          findings_count: findingCount,
+          findings_hash: findingsHash,
+          clean,
+          record_source: source,
+        };
+        if (agentId !== undefined) record.agent_id = agentId;
+        if (extractionPath !== undefined) record.extraction_path = extractionPath;
+        if (resolvedWork.workId) {
+          record.work_id = resolvedWork.workId;
+          record.work_id_source = resolvedWork.source;
+        }
+        if (contentHashForRecord) record.content_hash = contentHashForRecord;
+        if (meta && typeof meta === 'object' && meta.parse_failed_reason !== undefined) {
+          record.parse_failed_reason = meta.parse_failed_reason;
+        }
+        if (meta !== undefined) record.meta = meta;
+        return record;
+      };
+
+      const record = buildRecord(nextPassNumber);
+
       passes.push(record);
+      if (scopedPasses) {
+        const globalPasses = session.convergence_evidence[gate].passes;
+        const globalNextPassNumber = globalPasses.length > 0
+          ? globalPasses[globalPasses.length - 1].pass_number + 1
+          : 1;
+        globalPasses.push(buildRecord(globalNextPassNumber));
+      }
 
       if (!session.convergence) session.convergence = {};
       if (!session.convergence[gate]) session.convergence[gate] = { clean_pass_count: 0 };
       const currentIterations = session.convergence[gate].iteration_count || 0;
       session.convergence[gate].iteration_count = currentIterations + 1;
+      if (scopedItem) {
+        if (!scopedItem.convergence[gate]) scopedItem.convergence[gate] = { clean_pass_count: 0 };
+        const scopedIterations = scopedItem.convergence[gate].iteration_count || 0;
+        scopedItem.convergence[gate].iteration_count = scopedIterations + 1;
+      }
 
       // Append to sources[] whenever meta carries a parse_failed_reason (or any record_source we track
       // in the two-store convergence model). Entries are additive; readers that
@@ -6817,18 +7402,28 @@ export async function recordPass(opts) {
         if (!Array.isArray(session.convergence[gate].sources)) {
           session.convergence[gate].sources = [];
         }
-        session.convergence[gate].sources.push({
+        const sourceRecord = {
           record_source: source === 'hook' ? 'hook' : source,
           parse_failed: source === 'parse_failed',
           parse_failed_reason: meta.parse_failed_reason,
           timestamp: now(),
           pass_number: nextPassNumber,
-        });
+        };
+        if (resolvedWork.workId) sourceRecord.work_id = resolvedWork.workId;
+        session.convergence[gate].sources.push(sourceRecord);
+        if (scopedItem) {
+          if (!Array.isArray(scopedItem.convergence[gate].sources)) {
+            scopedItem.convergence[gate].sources = [];
+          }
+          scopedItem.convergence[gate].sources.push(sourceRecord);
+        }
       }
 
       addHistoryEntry(session, 'convergence_pass_recorded', {
         gate_name: gate,
         pass_number: nextPassNumber,
+        work_id: resolvedWork.workId,
+        work_id_source: resolvedWork.source,
         clean,
         record_source: source,
         agent_type: agentType,
@@ -6848,6 +7443,9 @@ export async function recordPass(opts) {
       // This is intentional safe-default degradation; EC-14 is additive protection
       // that only activates when recent pass evidence is actually recorded.
       session.convergence[gate].last_pass_history_index = session.history.length - 1;
+      if (scopedItem?.convergence?.[gate]) {
+        scopedItem.convergence[gate].last_pass_history_index = session.history.length - 1;
+      }
 
       session.updated_at = now();
       return session;
@@ -7883,6 +8481,7 @@ Operations:
   init                                            Initialize session.json
   start-work <spec_group_id> <workflow> <obj>     Start tracking work (positional)
     Optional: --force-reset-convergence            Explicit convergence reset (REQ-001.3)
+              --switch-from-current                Preserve current work item and switch focus
   start-work --exempt-workflow <workflow>         Start vibe-mode work (flag-only; auto-gen id+objective)
   rotate-worktree <new-root>                       Facilitator-only re-pin of session.active_work.project_dir_pin
                                                    (ws-3 REQ-007 / AC6.3). Canonicalizes <new-root> via
@@ -7891,8 +8490,16 @@ Operations:
   reconcile-convergence <spec_group_id>           Run manifest-seed reconciliation on demand (REQ-007.3)
   transition-phase <new_phase>                    Update current phase
   complete-atomic-spec <atomic_spec_id>           Mark atomic spec as done
-  dispatch-subagent <id> <type> <desc> [--stage]  Track subagent dispatch
+  dispatch-subagent <id> <type> <desc> [--stage] [--work-id <id>]
+                                                   Track subagent dispatch
   complete-subagent <task_id> <result_summary>    Mark subagent complete
+  record-manual-test-result <sg-id>               Record structured /manual-test result
+    --result <pass|fail|blocked>                   Required.
+    --scenario-count <N>                           Required. Number of scenarios attempted.
+    --pass-count <N>                               Required.
+    --fail-count <N>                               Required.
+    --evidence-path <path>                         Required for pass/fail; must be under evidence/.
+    --top-residual-risk "<text>"                   Optional one-line risk summary.
   clear-async-mode                                Delete shape-lint-async-mode sentinel
   journal-created <path-to-journal>               Mark journal entry as created
   override-skip --phase <p> --rationale "<r>"     Override a phase skip block
@@ -7925,7 +8532,7 @@ Operations:
                                                    workflow=orchestrator (REQ-003). Rationale
                                                    truncated to 120 chars (OQ-105).
   record-pass <gate> --findings-count <N> ...      Record convergence pass evidence
-  update-convergence <gate_name>                   Derive convergence count from evidence
+  update-convergence <gate_name> [--work-id <id>]  Derive convergence count from evidence
   record-deployment --target <t> --method <m>     Record deployment activity
     Flags: --target (required), --method (pipeline|manual), --manual (shorthand)
     Optional: --service <name>                     Look up manifest for env hash
@@ -8035,6 +8642,7 @@ async function main() {
         const dispatchArgs = args.slice(1);
         let dispatchStage = null;
         let dispatchStageSource = null;
+        let dispatchWorkId = null;
         const filteredArgs = [];
 
         for (let i = 0; i < dispatchArgs.length; i++) {
@@ -8043,6 +8651,9 @@ async function main() {
             i++;
           } else if (dispatchArgs[i] === '--stage-source' && i + 1 < dispatchArgs.length) {
             dispatchStageSource = dispatchArgs[i + 1];
+            i++;
+          } else if (dispatchArgs[i] === '--work-id' && i + 1 < dispatchArgs.length) {
+            dispatchWorkId = dispatchArgs[i + 1];
             i++;
           } else {
             filteredArgs.push(dispatchArgs[i]);
@@ -8055,6 +8666,7 @@ async function main() {
           filteredArgs.slice(2).join(' '),
           dispatchStage,
           dispatchStageSource,
+          dispatchWorkId,
         );
         break;
       }
@@ -8062,6 +8674,56 @@ async function main() {
       case 'complete-subagent':
         opCompleteSubagent(args[1], args.slice(2).join(' '));
         break;
+
+      case 'record-manual-test-result': {
+        const rmtArgs = args.slice(1);
+        let rmtSpecGroupId = null;
+        let rmtResult = null;
+        let rmtScenarioCount = null;
+        let rmtPassCount = null;
+        let rmtFailCount = null;
+        let rmtEvidencePath = null;
+        let rmtTopResidualRisk = null;
+
+        for (let i = 0; i < rmtArgs.length; i++) {
+          const arg = rmtArgs[i];
+          if (arg === '--result' && i + 1 < rmtArgs.length) {
+            rmtResult = rmtArgs[i + 1];
+            i++;
+          } else if (arg === '--scenario-count' && i + 1 < rmtArgs.length) {
+            rmtScenarioCount = rmtArgs[i + 1];
+            i++;
+          } else if (arg === '--pass-count' && i + 1 < rmtArgs.length) {
+            rmtPassCount = rmtArgs[i + 1];
+            i++;
+          } else if (arg === '--fail-count' && i + 1 < rmtArgs.length) {
+            rmtFailCount = rmtArgs[i + 1];
+            i++;
+          } else if (arg === '--evidence-path' && i + 1 < rmtArgs.length) {
+            rmtEvidencePath = rmtArgs[i + 1];
+            i++;
+          } else if (
+            (arg === '--top-residual-risk' || arg === '--residual-risk') &&
+            i + 1 < rmtArgs.length
+          ) {
+            rmtTopResidualRisk = rmtArgs.slice(i + 1).join(' ');
+            break;
+          } else if (rmtSpecGroupId === null && !arg.startsWith('--')) {
+            rmtSpecGroupId = arg;
+          }
+        }
+
+        opRecordManualTestResult({
+          specGroupId: rmtSpecGroupId,
+          result: rmtResult,
+          scenarioCount: rmtScenarioCount,
+          passCount: rmtPassCount,
+          failCount: rmtFailCount,
+          evidencePath: rmtEvidencePath,
+          topResidualRisk: rmtTopResidualRisk,
+        });
+        break;
+      }
 
       case 'clear-async-mode':
         opClearAsyncMode();
@@ -8111,6 +8773,10 @@ async function main() {
 
       case 'archive-incomplete':
         opArchiveIncomplete();
+        break;
+
+      case 'switch-work':
+        opSwitchWork(args[1]);
         break;
 
       case 'record-test-writer-unlock': {
@@ -8263,9 +8929,24 @@ async function main() {
         opRecordPass(args.slice(1));
         break;
 
-      case 'update-convergence':
-        opUpdateConvergence(args[1], args[2]);
+      case 'update-convergence': {
+        const ucArgs = args.slice(1);
+        let ucGateName = null;
+        let ucWorkId = null;
+        let legacyCountArg = null;
+        for (let i = 0; i < ucArgs.length; i++) {
+          if (ucArgs[i] === '--work-id' && i + 1 < ucArgs.length) {
+            ucWorkId = ucArgs[i + 1];
+            i++;
+          } else if (ucGateName === null) {
+            ucGateName = ucArgs[i];
+          } else if (legacyCountArg === null) {
+            legacyCountArg = ucArgs[i];
+          }
+        }
+        opUpdateConvergence(ucGateName, legacyCountArg, { workId: ucWorkId });
         break;
+      }
 
       case 'update-circuit-breaker':
         // Convergence circuit-breaker AC-14

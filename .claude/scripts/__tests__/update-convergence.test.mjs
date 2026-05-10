@@ -236,6 +236,116 @@ describe('AC-2.1: Derives count from evidence', () => {
   });
 });
 
+describe('Work-scoped convergence derivation', () => {
+  const cleanPass = (passNumber, workId) => ({
+    pass_number: passNumber,
+    timestamp: new Date().toISOString(),
+    agent_type: 'interface-investigator',
+    findings_count: 0,
+    findings_hash: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+    clean: true,
+    record_source: 'hook',
+    work_id: workId,
+  });
+
+  it('derives from the active work item instead of polluted global evidence', () => {
+    const session = {
+      ...makeSessionJson({
+        active_work: {
+          spec_group_id: 'sg-b',
+          objective: 'Work B',
+        },
+        convergence: {
+          investigation: { clean_pass_count: 2 },
+        },
+        convergence_evidence: {
+          investigation: {
+            passes: [cleanPass(1, 'sg-a'), cleanPass(2, 'sg-a')],
+          },
+        },
+      }),
+      active_work_id: 'sg-b',
+      work_items: {
+        'sg-a': {
+          active_work: {
+            workflow: 'oneoff-spec',
+            spec_group_id: 'sg-a',
+            current_phase: 'implementing',
+            objective: 'Work A',
+          },
+          convergence: {
+            investigation: { clean_pass_count: 2 },
+          },
+          convergence_evidence: {
+            investigation: {
+              passes: [cleanPass(1, 'sg-a'), cleanPass(2, 'sg-a')],
+            },
+          },
+        },
+        'sg-b': {
+          active_work: {
+            workflow: 'oneoff-spec',
+            spec_group_id: 'sg-b',
+            current_phase: 'implementing',
+            objective: 'Work B',
+          },
+          convergence: {},
+          convergence_evidence: {
+            investigation: { passes: [] },
+          },
+        },
+      },
+    };
+    writeSessionJson(session);
+
+    const result = runCheckpoint(['update-convergence', 'investigation'], true);
+
+    expect(result.exitCode).not.toBe(0);
+    const updated = readSessionJson();
+    expect(updated.work_items['sg-b'].convergence.investigation.clean_pass_count).toBe(0);
+    expect(updated.convergence.investigation.clean_pass_count).toBe(0);
+    expect(updated.work_items['sg-a'].convergence.investigation.clean_pass_count).toBe(2);
+  });
+
+  it('can converge from active work item evidence when global evidence is empty', () => {
+    const session = {
+      ...makeSessionJson({
+        active_work: {
+          spec_group_id: 'sg-b',
+          objective: 'Work B',
+        },
+        convergence: {},
+        convergence_evidence: {},
+      }),
+      active_work_id: 'sg-b',
+      work_items: {
+        'sg-b': {
+          active_work: {
+            workflow: 'oneoff-spec',
+            spec_group_id: 'sg-b',
+            current_phase: 'implementing',
+            objective: 'Work B',
+          },
+          convergence: {},
+          convergence_evidence: {
+            investigation: {
+              passes: [cleanPass(1, 'sg-b'), cleanPass(2, 'sg-b')],
+            },
+          },
+        },
+      },
+    };
+    writeSessionJson(session);
+
+    const result = runCheckpoint(['update-convergence', 'investigation'], true);
+
+    expect(result.exitCode).toBe(0);
+    const updated = readSessionJson();
+    expect(updated.work_items['sg-b'].convergence.investigation.clean_pass_count).toBe(2);
+    expect(updated.convergence.investigation.clean_pass_count).toBe(2);
+  });
+});
+
 // ============================================================
 // AC-2.2: Rejects old API with numeric second argument
 // ============================================================

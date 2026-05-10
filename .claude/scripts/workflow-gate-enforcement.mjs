@@ -149,6 +149,43 @@ function blockDispatch(subagentType, missing, sessionId, missingSubstages = []) 
   process.exit(2);
 }
 
+function resolveActiveWorkId(session) {
+  if (typeof session?.active_work_id === 'string' && session.active_work_id.trim() !== '') {
+    return session.active_work_id.trim();
+  }
+  if (typeof session?.active_work?.spec_group_id === 'string' && session.active_work.spec_group_id.trim() !== '') {
+    return session.active_work.spec_group_id.trim();
+  }
+  return null;
+}
+
+function buildWorkScopedSessionView(session) {
+  const workId = resolveActiveWorkId(session);
+  const item = workId ? session?.work_items?.[workId] : null;
+  if (!item || typeof item !== 'object') {
+    return session;
+  }
+
+  const filteredTasks = (tasks) => {
+    if (!Array.isArray(tasks)) return [];
+    return tasks.filter((task) => {
+      const taskWorkId = task?.work_id || task?.spec_group_id || null;
+      return taskWorkId === workId;
+    });
+  };
+
+  return {
+    ...session,
+    active_work: item.active_work || session.active_work,
+    convergence: item.convergence || {},
+    convergence_evidence: item.convergence_evidence || {},
+    subagent_tasks: {
+      in_flight: filteredTasks(session.subagent_tasks?.in_flight),
+      completed_this_session: filteredTasks(session.subagent_tasks?.completed_this_session),
+    },
+  };
+}
+
 // =============================================================================
 // Evidence Integrity Verification (AC-4.1 through AC-4.5)
 // =============================================================================
@@ -401,6 +438,7 @@ async function main() {
       );
       process.exit(0); // AC-2.10: Missing active_work -- fail-open
     }
+    session = buildWorkScopedSessionView(session);
 
     // Step 4b: Worktree-canon env-parity check (sg-pipeline-efficiency-ws3
     // / as-007 / REQ-007 / AC7.1).

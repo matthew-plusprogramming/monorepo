@@ -43,6 +43,33 @@ You're dispatched when:
 1. **Workstream spec needed**: Main agent identified a workstream requiring formal spec
 2. **Part of MasterSpec**: Orchestrator needs parallel workstream specs for large effort
 3. **Spec refinement**: Existing spec has gaps that need filling
+4. **Accepted amendment**: Investigation or challenger convergence accepted a finding that requires spec changes
+
+## Amendment Mode: Propagation Sweep
+
+When applying accepted findings from `/investigate` or `/challenge`, fix the corrected belief globally, not only the line or section named in the recommendation.
+
+For each accepted finding:
+
+1. State the **canonical invariant** being restored in one sentence.
+2. Generate 3-8 targeted search terms from the stale claim, including old field names, task IDs, section names, service names, and likely synonyms.
+3. Search the active spec group and relevant downstream docs with `Grep`, covering at minimum:
+   - Task List
+   - Interfaces & Contracts
+   - Security Considerations
+   - Additional Considerations or Implementation Notes
+   - Open Questions and resolved OQ entries
+   - Decision & Work Log
+   - Memory-bank references when the finding explicitly affected persistent guidance
+4. Update every stale reference, or leave intentional historical references only when they are clearly marked as historical and no longer normative.
+5. Record the sweep in `## Decision & Work Log` with:
+   - accepted finding ID
+   - canonical invariant
+   - search terms used
+   - sections changed
+   - intentional historical references left in place, if any
+
+This sweep is required for `carry-over` and `regression` findings, and recommended for `new` findings whose recommendation changes a repeated assumption.
 
 ## Your Responsibilities
 
@@ -140,6 +167,20 @@ error_sanitization: safe-message-only
 context:
   description: "Create a new authenticated session"
 ```
+
+### 3b. Set Runtime Validation Marker
+
+For specs that touch runtime-loaded invocation or boot surfaces, set the manual-test promotion marker in YAML frontmatter:
+
+```yaml
+runtime_validation_required: true
+runtime_validation_surface: <plugin | mcp | connector | browser-extension | dynamic-tool-body | plugin-loader | other>
+runtime_validation_rationale: <why static gates are insufficient and live boot/manual validation is required>
+```
+
+Set the marker for plugins or plugin-bearing specs, MCP tools, external connectors, browser extensions, plugin loaders/discovery/registration, dynamic tool/body resolution, or similar runtime-loaded surfaces where schema/import/convergence gates can pass while live boot fails. Leave it absent or `false` for ordinary code, docs, tests, pure refactors, or static-only work.
+
+Do not use `risk_tier`, `runtime_env`, or `crosses_boundary` as a substitute; `runtime_validation_required` is the field that promotes `/manual-test` from advisory to mandatory.
 
 ### 4. Create Sequence Diagrams
 
@@ -239,6 +280,7 @@ node .claude/scripts/spec-schema-validate.mjs <spec-file-path>
 **Required elements checklist** (14 sections from template):
 
 - [ ] YAML frontmatter with required fields: `id`, `title`, `owner`, `scope`, `dependencies`, `contracts`, `status`, `implementation_status`
+- [ ] Runtime validation marker set when the spec touches plugins, MCP tools, connectors, browser extensions, plugin loaders, or dynamic tool/body resolution
 - [ ] `id` follows pattern `ws-<id>` for workstream specs
 - [ ] `status` is `draft` (initial state)
 - [ ] All 14 template sections present:
@@ -532,6 +574,7 @@ This rule exists because tests often run with `NODE_ENV=development` while produ
 ### DO:
 
 - Fill all required sections
+- Set runtime validation frontmatter for runtime-loaded surfaces
 - Create at least one sequence diagram
 - Define atomic requirements
 - Register contracts
@@ -555,6 +598,7 @@ Your spec is complete when:
 - Requirements are atomic and testable (EARS format)
 - At least one sequence diagram present
 - Task list complete with dependencies
+- Runtime validation frontmatter is present when `/manual-test` must be mandatory
 - Contracts defined and registered
 - Open questions documented
 - No blocking unknowns

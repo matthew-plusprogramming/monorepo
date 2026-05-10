@@ -128,16 +128,16 @@
         "hooks": [
           {
             "_source": "metaclaude",
-            "_id": "convergence-pass-recorder",
-            "type": "command",
-            "command": "cd \"$CLAUDE_PROJECT_DIR\" && node .claude/scripts/convergence-pass-recorder.mjs"
-          },
-          {
-            "_source": "metaclaude",
             "_id": "dispatch-record-hook",
             "_comment": "sg-enforcement-layer-gaps Task 23/24/32. Records Task-tool dispatches via session-checkpoint.mjs (sole writer). Uses SubagentStop per Task 22 fallback path (PostToolUse+Agent unsupported in Claude Code). Fail-open: any error -> exit 0 with stderr warning.",
             "type": "command",
             "command": "cd \"$CLAUDE_PROJECT_DIR\" && node .claude/scripts/dispatch-record-hook.mjs"
+          },
+          {
+            "_source": "metaclaude",
+            "_id": "convergence-pass-recorder",
+            "type": "command",
+            "command": "cd \"$CLAUDE_PROJECT_DIR\" && node .claude/scripts/convergence-pass-recorder.mjs"
           }
         ]
       }

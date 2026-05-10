@@ -256,6 +256,10 @@ async function main() {
   const agentId = payload.agent_id;
   const sessionId = payload.session_id;
   const lastMessage = payload.last_assistant_message || '';
+  const payloadWorkId =
+    typeof payload.work_id === 'string'
+      ? payload.work_id.trim()
+      : (typeof payload.workId === 'string' ? payload.workId.trim() : '');
 
   // AC-9.5 implicit: if payload lacks required fields, exit without writing.
   if (!agentType || !agentId) {
@@ -333,6 +337,7 @@ async function main() {
     taskId,
     UNTRUSTED_AGENT_TYPE_SENTINEL,
     desc,
+    ...(payloadWorkId ? ['--work-id', payloadWorkId] : []),
   ]);
 
   if (dispatchResult.status !== 0) {

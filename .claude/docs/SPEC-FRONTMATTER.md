@@ -6,7 +6,7 @@ last_reviewed: 2026-04-19
 
 # Spec Frontmatter Reference — Runtime Connectivity Fields
 
-Reference for the five runtime-connectivity frontmatter fields plus the widened `e2e_skip_rationale` enum. All fields live in markdown spec frontmatter (WorkstreamSpec + AtomicSpec). `e2e_skip_rationale` additionally lives on manifest.json (SpecGroup).
+Reference for runtime frontmatter fields plus the widened `e2e_skip_rationale` enum. All fields live in markdown spec frontmatter (WorkstreamSpec + AtomicSpec). `e2e_skip_rationale` additionally lives on manifest.json (SpecGroup).
 
 Source schemas:
 
@@ -30,6 +30,36 @@ All fields are **optional at the top level**; conditional requirements apply onl
 | `security_surface`               | enum \| enum[] \| null | —                                                            | `sg-e2e-gate5-enforcement`      |
 | `pure_compute_entry_points`      | string[]               | required (non-empty) when `e2e_skip_rationale: pure-compute` | Pure-compute verifier           |
 | `e2e_skip_rationale`             | enum                   | required when `e2e_skip: true`                               | `e2e-test-writer` dispatch gate |
+| `runtime_validation_required`    | boolean                | surface + rationale required when true                       | Stop-hook `/manual-test` gate   |
+
+---
+
+## runtime_validation_required
+
+Declares that the spec depends on a runtime-loaded surface that static review,
+generated tests, and convergence gates cannot fully prove.
+
+### Shape
+
+```yaml
+runtime_validation_required: true
+runtime_validation_surface: plugin | mcp | connector | browser-extension | dynamic-tool-body | plugin-loader | other
+runtime_validation_rationale: 'Short reason live validation is required.'
+```
+
+### Semantics
+
+- Absent or `false`: `/manual-test` stays advisory.
+- `true`: terminal Stop requires a `manual-tester` dispatch record and a structured passing result in `session.active_work.manual_test_result`.
+- `fail` and `blocked` structured results block completion unless a `runtime_manual_test` override is recorded with rationale.
+- Enforcement does not use `convergence.manual_tests_passed`.
+
+### Validation
+
+- `runtime_validation_required: true` without `runtime_validation_surface` — rejected.
+- `runtime_validation_required: true` without non-empty `runtime_validation_rationale` — rejected.
+- Out-of-enum `runtime_validation_surface` — rejected.
+- `"true"` as a string — rejected by schema/type validation.
 
 ---
 

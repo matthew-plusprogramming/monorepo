@@ -108,6 +108,7 @@ Prompt: |
   Spec groups: <list>
   Mode: <single-spec | cross | master>
   Pass: <iteration_count + 1>
+  Prior finding context: <accepted findings, amended invariants, and amendment notes from earlier passes, if any>
 
   Focus on:
   1. Environment variable naming consistency
@@ -115,6 +116,8 @@ Prompt: |
   3. Data shape consistency (field names, types, required/optional)
   4. Deployment assumption consistency (infra, secrets management)
   5. Cross-spec dependencies and their assumptions
+  6. On Pass 2+, classify each Medium+ finding as new, carry-over, regression,
+     or false-positive by comparing it to prior finding context.
 
   Include structured confidence enum (high/medium/low) and deterministic finding IDs
   in format inv-{category}-{hash} for each finding.
@@ -132,6 +135,7 @@ Prompt: |
 
 5. **Check convergence**:
    - If `clean_pass_count >= 2`: **Converged**. Record convergence (see Step 3 below).
+   - If `iteration_count >= 5` and remaining Medium+ findings are only `carry-over` narrative drift with no implementation consequence: **Escalate concise summary** instead of continuing mechanically. Include the original accepted finding, stale sections still carrying it, and why it is non-blocking or still risky.
    - If `iteration_count >= 5`: **Escalate** to human with iteration history.
    - Otherwise: Back to step 1.
 

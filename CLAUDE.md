@@ -292,7 +292,7 @@ Every response must include:
 | `/test`        | Write tests for acceptance criteria                                                                            | Parallel with implementation or after                                                                               |
 | `/e2e-test`    | Generate E2E tests from spec contracts                                                                         | Parallel with implementation (opt-out via e2e_skip)                                                                 |
 | `/unify`       | Validate spec-impl-test alignment                                                                              | After implementation and tests complete                                                                             |
-| `/code-review` | Code quality and best practices review                                                                         | After convergence, before security                                                                                  |
+| `/code-review` | Code quality review with style/naming, test-quality, adversarial, and holistic passes                          | After convergence, before security                                                                                  |
 | `/security`    | Security review of implementation                                                                              | After code review, before merge                                                                                     |
 | `/docs`        | Generate documentation from implementation                                                                     | After security review                                                                                               |
 | `/doc-audit`   | Diagnose documentation health (staleness, coverage gaps, broken refs)                                          | On-demand, post-documenter, or PRD-time                                                                             |
@@ -315,7 +315,7 @@ Full workflow sequences (oneoff-vibe, oneoff-spec, orchestrator) are documented 
 
 - Multiple `spec-author` subagents for workstreams
 - `implementer`, `test-writer`, and `e2e-test-writer` run in parallel (no ordering constraint — test-writer and e2e-test-writer work from spec only; e2e-test-writer dispatched by default with opt-out via `e2e_skip: true` in spec frontmatter)
-- `code-reviewer` and `security-reviewer` run in parallel after unifier and reviewer-focus metadata prerequisites
+- `code-reviewer` (four quality specialties inside the `code_review` gate) and `security-reviewer` run in parallel after unifier and reviewer-focus metadata prerequisites
 - Both reviewers converge independently; `documenter` waits for both convergences
 - Main agent handles integration and synthesis
 

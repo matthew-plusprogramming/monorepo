@@ -28,12 +28,12 @@ node .claude/scripts/metaclaude-cli.mjs remove <name>
 
 Useful flags:
 
-| Flag | Use |
-| --- | --- |
-| `--force` | Overwrite local modifications and force-delete locally modified obsolete artifacts. |
-| `--resolve-conflicts` | Accept upstream only for artifacts currently in conflict. |
-| `--ack-drift` | For `never-overwrite` artifacts, advance the lock hash without touching the consumer file. |
-| `--base-dir=<path>` | Override the default sibling-repo base directory. |
+| Flag                  | Use                                                                                        |
+| --------------------- | ------------------------------------------------------------------------------------------ |
+| `--force`             | Overwrite local modifications and force-delete locally modified obsolete artifacts.        |
+| `--resolve-conflicts` | Accept upstream only for artifacts currently in conflict.                                  |
+| `--ack-drift`         | For `never-overwrite` artifacts, advance the lock hash without touching the consumer file. |
+| `--base-dir=<path>`   | Override the default sibling-repo base directory.                                          |
 
 Run hash commands directly:
 
@@ -49,13 +49,13 @@ writing `.claude/metaclaude-registry.json`.
 
 ## Files
 
-| File | Role |
-| --- | --- |
-| `.claude/metaclaude-registry.json` | Canonical artifact metadata, hashes, bundles, and orphan records. |
-| `.claude/projects.json` | Consumer list, default bundle, and per-project overrides. |
-| `.claude/locks/<project>.lock.json` | Last synced artifact versions and hashes for each consumer. |
-| `.claude/scripts/metaclaude-cli.mjs` | Sync/status/verify/project-management CLI. |
-| `.claude/scripts/compute-hashes.mjs` | Registry hash updater and validation-gate entry point. |
+| File                                     | Role                                                                   |
+| ---------------------------------------- | ---------------------------------------------------------------------- |
+| `.claude/metaclaude-registry.json`       | Canonical artifact metadata, hashes, bundles, and orphan records.      |
+| `.claude/projects.json`                  | Consumer list, default bundle, and per-project overrides.              |
+| `.claude/locks/<project>.lock.json`      | Last synced artifact versions and hashes for each consumer.            |
+| `.claude/scripts/metaclaude-cli.mjs`     | Sync/status/verify/project-management CLI.                             |
+| `.claude/scripts/compute-hashes.mjs`     | Registry hash updater and validation-gate entry point.                 |
 | `.claude/scripts/lib/sync-constants.mjs` | Code-owned bundle ancestry, roots, whitelist, and skip-gate constants. |
 
 Not everything in the registry is synced. `compute-hashes.mjs` is hash-tracked
@@ -79,16 +79,16 @@ Current registry categories include `agents`, `config`, `core`, `docs`,
 
 Each artifact entry needs:
 
-| Field | Required | Meaning |
-| --- | --- | --- |
-| `version` | Yes | Semver string. |
-| `hash` | Yes | First 8 chars of the SHA-256 hash of UTF-8 file content. |
-| `path` | Yes | Source path relative to this repo. |
-| `description` | Yes | Human description. |
-| `target_path` | No | Destination path in the consumer; defaults to `path`. |
-| `dependencies` | No | Informational dependency list. |
-| `merge_strategy` | No | Special merge behavior. Current live values: `settings-merge`, `gitignore-merge`. |
-| `_sync_policy` | No | Per-artifact sync policy: `agent-assisted`, `never-overwrite`, or `never-sync`. |
+| Field            | Required | Meaning                                                                           |
+| ---------------- | -------- | --------------------------------------------------------------------------------- |
+| `version`        | Yes      | Semver string.                                                                    |
+| `hash`           | Yes      | First 8 chars of the SHA-256 hash of UTF-8 file content.                          |
+| `path`           | Yes      | Source path relative to this repo.                                                |
+| `description`    | Yes      | Human description.                                                                |
+| `target_path`    | No       | Destination path in the consumer; defaults to `path`.                             |
+| `dependencies`   | No       | Informational dependency list.                                                    |
+| `merge_strategy` | No       | Special merge behavior. Current live values: `settings-merge`, `gitignore-merge`. |
+| `_sync_policy`   | No       | Per-artifact sync policy: `agent-assisted`, `never-overwrite`, or `never-sync`.   |
 
 `target_path` is load-bearing for root files. `core/claude-md-base` sources from
 `.claude/templates/claude-md-base.md` and installs to `CLAUDE.md`.
@@ -105,10 +105,10 @@ minimal -> core-workflow -> full-workflow
 
 `projects.json` defaults all consumers to `full-workflow`.
 
-| Bundle | Purpose |
-| --- | --- |
-| `minimal` | Core config, scripts, schemas, hooks, infrastructure, and base prompt. |
-| `core-workflow` | Adds implement/test/unify/atomize/enforce agents, skills, templates, and docs. |
+| Bundle          | Purpose                                                                                               |
+| --------------- | ----------------------------------------------------------------------------------------------------- |
+| `minimal`       | Core config, scripts, schemas, hooks, infrastructure, and base prompt.                                |
+| `core-workflow` | Adds implement/test/unify/atomize/enforce agents, skills, templates, and docs.                        |
 | `full-workflow` | Adds review, routing, docs, PRD, security, trace, structured-docs, and specialist workflow artifacts. |
 
 Child bundles inherit parent artifacts. Put each artifact in the lowest bundle
@@ -133,11 +133,11 @@ Per-project config:
 }
 ```
 
-| Key | Effect |
-| --- | --- |
-| `additional` | Adds artifacts outside the bundle. |
-| `excluded` | Removes artifacts from the resolved target set. |
-| `protected` | Prevents overwrite and automatic deletion. |
+| Key              | Effect                                                 |
+| ---------------- | ------------------------------------------------------ |
+| `additional`     | Adds artifacts outside the bundle.                     |
+| `excluded`       | Removes artifacts from the resolved target set.        |
+| `protected`      | Prevents overwrite and automatic deletion.             |
 | `sync_overrides` | Per-project policy override, usually `agent-assisted`. |
 
 Cross-bundle closure is enforced: a script in bundle `X` may import only files
@@ -157,23 +157,23 @@ For each target artifact, sync compares:
 
 Default behavior:
 
-| State | Result |
-| --- | --- |
-| Missing consumer file | Copy source and record lock. |
-| Registry hash changed, local file still matches lock | Copy source and update lock. |
-| Local file differs from lock | Conflict unless `--force` or `--resolve-conflicts` is used. |
-| Artifact is protected | Skip overwrite and deletion. |
-| Source path fails containment | Skip artifact and report conflict/warning. |
+| State                                                | Result                                                      |
+| ---------------------------------------------------- | ----------------------------------------------------------- |
+| Missing consumer file                                | Copy source and record lock.                                |
+| Registry hash changed, local file still matches lock | Copy source and update lock.                                |
+| Local file differs from lock                         | Conflict unless `--force` or `--resolve-conflicts` is used. |
+| Artifact is protected                                | Skip overwrite and deletion.                                |
+| Source path fails containment                        | Skip artifact and report conflict/warning.                  |
 
 Special policies:
 
-| Policy | Behavior |
-| --- | --- |
-| `settings-merge` | Replaces metaclaude-owned hooks in settings and preserves project-owned hooks. |
-| `gitignore-merge` | Maintains the metaclaude-managed `.gitignore` block without replacing local content. |
+| Policy            | Behavior                                                                                                                      |
+| ----------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `settings-merge`  | Replaces metaclaude-owned hooks in settings and preserves project-owned hooks.                                                |
+| `gitignore-merge` | Maintains the metaclaude-managed `.gitignore` block without replacing local content.                                          |
 | `never-overwrite` | Copies only when absent; later local content is preserved. If upstream hash changes, sync warns about shadow-file divergence. |
-| `never-sync` | Registry hash is tracked, but the artifact is never copied to consumers. |
-| `agent-assisted` | Stages upstream into `.claude/sync-pending/<target_path>` for manual merge and records the seen upstream hash. |
+| `never-sync`      | Registry hash is tracked, but the artifact is never copied to consumers.                                                      |
+| `agent-assisted`  | Stages upstream into `.claude/sync-pending/<target_path>` for manual merge and records the seen upstream hash.                |
 
 After resolving an agent-assisted merge, delete `.claude/sync-pending/` in the
 consumer and commit the merged target file.
@@ -198,13 +198,13 @@ modified, sync reports a deletion conflict and leaves the file in place unless
 
 Deletion cases:
 
-| Case | Result |
-| --- | --- |
-| Locked artifact removed from bundle/registry target set | `sync` deletes if local hash matches lock. |
-| Consumer file already absent | `sync` prunes the obsolete lock entry. |
-| Locked artifact locally modified | Conflict; `--force` deletes and prunes. |
-| Protected artifact | Deletion skipped. |
-| Artifact has no target path in lock | Lock entry pruned; no file delete attempted. |
+| Case                                                    | Result                                       |
+| ------------------------------------------------------- | -------------------------------------------- |
+| Locked artifact removed from bundle/registry target set | `sync` deletes if local hash matches lock.   |
+| Consumer file already absent                            | `sync` prunes the obsolete lock entry.       |
+| Locked artifact locally modified                        | Conflict; `--force` deletes and prunes.      |
+| Protected artifact                                      | Deletion skipped.                            |
+| Artifact has no target path in lock                     | Lock entry pruned; no file delete attempted. |
 
 Manually copied files that were never locked are not deletion candidates. Do not
 use `clean` for normal upstream deletions; the supported propagation path is
@@ -255,11 +255,11 @@ not stranded by an upstream authoring mistake.
 
 Author-side gates:
 
-| Gate | Blocks |
-| --- | --- |
-| Orphan detector | Sync-scoped files that are neither registered, whitelisted, nor in `orphans[]`. |
-| Import-graph validator | Registered `.mjs` files importing missing or unregistered relative modules. |
-| Cross-bundle closure | Imports from descendant or sibling bundle tiers. |
+| Gate                   | Blocks                                                                          |
+| ---------------------- | ------------------------------------------------------------------------------- |
+| Orphan detector        | Sync-scoped files that are neither registered, whitelisted, nor in `orphans[]`. |
+| Import-graph validator | Registered `.mjs` files importing missing or unregistered relative modules.     |
+| Cross-bundle closure   | Imports from descendant or sibling bundle tiers.                                |
 
 Sync-scoped roots:
 
@@ -305,7 +305,7 @@ pre-commit hook rejects mutation of existing lines.
 Artifact hashes are:
 
 ```javascript
-createHash('sha256').update(content).digest('hex').slice(0, 8)
+createHash('sha256').update(content).digest('hex').slice(0, 8);
 ```
 
 Lock entries record `version`, `hash`, `path`, and `installed_at`. The sync CLI
@@ -341,15 +341,74 @@ security boundary.
 
 ## Common Failures
 
-| Symptom | Cause | Fix |
-| --- | --- | --- |
-| Artifact never appears in consumers | Missing bundle membership | Add `category/name` to the lowest correct bundle. |
-| `ERR_MODULE_NOT_FOUND` in a consumer | Imported helper was not registered or not in the same/ancestor bundle | Register helper and place it in the right bundle tier. |
-| Local edits overwritten | Used `--force` or file lacked protection/policy | Restore from git; add `protected`, `never-overwrite`, or `agent-assisted` where appropriate. |
-| `compute-hashes --verify` mismatch | Artifact changed without hash refresh | Run `compute-hashes --update`. |
-| `settings.json` hooks duplicate/disappear | Hook ownership marker wrong | Only sync-owned hooks use `"_source": "metaclaude"`. |
-| Deleted source file remains in consumer | File is locally modified, protected, or never locked | Check `status`; resolve conflict, use `--force`, or delete manual local copy intentionally. |
-| `never-overwrite` warning repeats | Consumer has intentionally diverged from upstream | Review local file, then use `sync --ack-drift` if divergence is accepted. |
+| Symptom                                   | Cause                                                                 | Fix                                                                                          |
+| ----------------------------------------- | --------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| Artifact never appears in consumers       | Missing bundle membership                                             | Add `category/name` to the lowest correct bundle.                                            |
+| `ERR_MODULE_NOT_FOUND` in a consumer      | Imported helper was not registered or not in the same/ancestor bundle | Register helper and place it in the right bundle tier.                                       |
+| Local edits overwritten                   | Used `--force` or file lacked protection/policy                       | Restore from git; add `protected`, `never-overwrite`, or `agent-assisted` where appropriate. |
+| `compute-hashes --verify` mismatch        | Artifact changed without hash refresh                                 | Run `compute-hashes --update`.                                                               |
+| `settings.json` hooks duplicate/disappear | Hook ownership marker wrong                                           | Only sync-owned hooks use `"_source": "metaclaude"`.                                         |
+| Deleted source file remains in consumer   | File is locally modified, protected, or never locked                  | Check `status`; resolve conflict, use `--force`, or delete manual local copy intentionally.  |
+| `never-overwrite` warning repeats         | Consumer has intentionally diverged from upstream                     | Review local file, then use `sync --ack-drift` if divergence is accepted.                    |
+
+---
+
+## Notable Artifacts
+
+Most artifacts are routine and need no specific note. The artifacts listed here
+have operator-visible behavior worth calling out separately.
+
+### `config/mcp` (Playwright MCP server config)
+
+Propagates the project-scoped MCP server configuration to consumer projects so
+Claude Code sessions there can use the Playwright MCP for browser automation.
+
+| Field              | Value                                                                    |
+| ------------------ | ------------------------------------------------------------------------ |
+| Source             | `.claude/templates/mcp.json`                                             |
+| Target             | `.mcp.json` (consumer repo root)                                         |
+| Sync policy        | `never-overwrite`                                                        |
+| Bundle             | `minimal` (inherits to `core-workflow` and `full-workflow`)              |
+| Underlying package | `@playwright/mcp@0.0.70` (pinned, fetched via `npx -y` at session start) |
+
+The hub keeps two byte-identical copies: `.mcp.json` at repo root (used by the
+hub's own Claude Code sessions) and `.claude/templates/mcp.json` (the sync
+source, located under `.claude/` so it satisfies the cli's TOCTOU containment
+guard). Byte equality between the two files is enforced by an invariant test
+at `.claude/scripts/__tests__/mcp-registry-sync.test.mjs`. When updating the
+Playwright pin, update both files in lockstep, run `compute-hashes --update`,
+and let sync propagate.
+
+#### First-rollout behavior
+
+On the first sync after `config/mcp` is registered, two distinct outcomes are
+expected per consumer, depending on whether the consumer already has an
+`.mcp.json` at its repo root:
+
+| Consumer state              | First-sync outcome                                                                                                                                                                                   |
+| --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| No pre-existing `.mcp.json` | Receives a byte-identical copy from the hub source. Lock records the install.                                                                                                                        |
+| Pre-existing `.mcp.json`    | File is preserved unchanged. Stderr contains one `Skip config/mcp: never-overwrite` line and, if the local content's hash differs from the registry hash, one `shadow-file divergence` WARNING line. |
+
+Both outcomes are designed `never-overwrite` behavior, not defects. See `metaclaude-cli.mjs` lines 756-787 for the enforcement source.
+
+#### Opting out
+
+Consumers that do not want Playwright MCP have two options:
+
+1. **Pre-create** `.mcp.json` at the consumer repo root before first sync. The
+   `never-overwrite` policy preserves it.
+2. **Mark protected**: add `protected: ['.mcp.json']` for that project in
+   `.claude/projects.json`. Sync skips overwrite and deletion for protected
+   targets unconditionally.
+
+#### Supply-chain note
+
+`@playwright/mcp@0.0.70` is fetched at session startup from the public npm
+registry. The version pin is exact and is verified by the SEC-001 test in
+`.claude/scripts/__tests__/mcp-json-shape.test.mjs`. Bumping the pin is a
+hub-side edit followed by a sync; existing consumers with locally customized
+`.mcp.json` files retain their version under the `never-overwrite` policy.
 
 ---
 

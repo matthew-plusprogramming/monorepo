@@ -392,6 +392,25 @@ describe("Bash tool: Allows safe commands", () => {
     expect(result.exitCode).toBe(0);
   });
 
+  it("should allow ambiguous Bash commands without protected-write targets", async () => {
+    const result = await runHook(
+      makeBashStdin(
+        "test-session",
+        "launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.secretary-assistant.node-server.plist 2>&1 | head -5",
+      ),
+    );
+    expect(result.exitCode).toBe(0);
+    expect(result.stderr).toBe("");
+  });
+
+  it("should allow oversized ambiguous Bash commands", async () => {
+    const result = await runHook(
+      makeBashStdin("test-session", "echo " + "a".repeat(70000)),
+    );
+    expect(result.exitCode).toBe(0);
+    expect(result.stderr).toBe("");
+  });
+
   it("should fail-open on malformed input", async () => {
     const result = await runHook("not-json");
     expect(result.exitCode).toBe(0);

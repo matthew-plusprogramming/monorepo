@@ -18,7 +18,7 @@ Per-gate rationale: `.claude/prds/pipeline-efficiency/threshold-decisions.md` (a
 
 | Gate                  | `required_clean_passes` | `attestation_mode` | `hash_input_manifest`                                        | Relaxed |
 | --------------------- | ----------------------- | ------------------ | ------------------------------------------------------------ | ------- |
-| `unifier`             | 1                       | `content-hash`     | `spec.md`, `requirements.md`, `manifest.json`, `atomic/*.md` | YES     |
+| `unifier`             | 1                       | `content-hash`     | `.claude/specs/groups/<id>/{spec.md,requirements.md,manifest.json,atomic/*.md}` | YES     |
 | `completion-verifier` | 1                       | `content-hash`     | `manifest.json`, registry content, trace files               | YES     |
 | `code-review`         | 2                       | `content-hash`     | `git-diff:<branch-base>..HEAD` descriptor                    | No      |
 | `security`            | 2                       | `content-hash`     | `git-diff:<branch-base>..HEAD` descriptor                    | No      |
@@ -121,7 +121,7 @@ Validator enforces presence of all four entries when no gate is relaxed. Missing
 
 Entries in `hash_input_manifest` are logical descriptors expanded at attestation time:
 
-- Literal paths: `spec.md`, `manifest.json`
+- Literal paths: `.claude/specs/groups/<id>/spec.md`, `.claude/specs/groups/<id>/requirements.md`, `.claude/specs/groups/<id>/manifest.json`
 - Glob descriptors: `.claude/specs/groups/<id>/atomic/*.md`
 - Synthetic descriptors: `git-diff:<branch-base>..HEAD`, `registry content`, `trace files`
 

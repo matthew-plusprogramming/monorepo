@@ -124,8 +124,9 @@ export const VALID_WORKFLOWS = [
  * Single source of truth — consumed by session-validate.mjs and verified
  * against session.schema.json by enum-sync.test.mjs.
  *
- * NOTE: `manual-test` is intentionally excluded — it's advisory (non-blocking)
- * per CLAUDE.md § Convergence Gates, not a DAG phase.
+ * NOTE: `manual-test` is intentionally excluded from DAG phases. It is
+ * advisory by default and conditionally enforced by the Stop hook when spec
+ * frontmatter declares runtime_validation_required: true.
  * @type {string[]}
  */
 export const VALID_PHASES = [
@@ -176,7 +177,8 @@ export const VALID_SUBAGENT_TYPES = [
   'prd-amender',
   'challenger',
   'completion-verifier',
-  'flow-verifier'
+  'flow-verifier',
+  'unknown_fallback'
 ];
 
 /**
@@ -398,6 +400,23 @@ export const VALID_E2E_SKIP_RATIONALES = [
 ];
 
 /**
+ * Valid runtime validation surfaces for specs that require a live manual-test
+ * gate. This marker is intentionally separate from risk_tier and runtime_env:
+ * it asks whether static/generated gates are insufficient for the changed
+ * runtime-loaded surface.
+ * @type {readonly string[]}
+ */
+export const VALID_RUNTIME_VALIDATION_SURFACES = Object.freeze([
+  'plugin',
+  'mcp',
+  'connector',
+  'browser-extension',
+  'dynamic-tool-body',
+  'plugin-loader',
+  'other',
+]);
+
+/**
  * Override gate name mapping.
  * Maps prerequisite conditions to canonical gate names for gate-override.json.
  */
@@ -414,6 +433,7 @@ export const OVERRIDE_GATE_NAMES = {
   security_review_convergence: 'security_review_convergence',
   documenter_dispatch: 'documenter_dispatch',
   stop_mandatory_dispatches: 'stop_mandatory_dispatches',
+  runtime_manual_test: 'runtime_manual_test',
   status_obligations: 'status_obligations',
 };
 

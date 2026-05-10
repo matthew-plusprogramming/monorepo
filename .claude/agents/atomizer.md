@@ -136,6 +136,10 @@ title: <Title>
 spec_group: <group-id>
 requirements_refs: [REQ-001, REQ-002]
 status: pending
+# Add when this atomic owns runtime-loaded work requiring live validation:
+# runtime_validation_required: true
+# runtime_validation_surface: <plugin | mcp | connector | browser-extension | dynamic-tool-body | plugin-loader | other>
+# runtime_validation_rationale: <why this atomic runtime-loaded surface requires live validation>
 ---
 
 # <Title>
@@ -174,6 +178,12 @@ status: pending
 | Independently Reviewable | <why>         |
 | Independently Reversible | <why>         |
 ```
+
+### Runtime Validation Inheritance
+
+When the parent `spec.md` has `runtime_validation_required: true`, every atomic spec that owns part of that runtime-loaded surface must carry the marker too. Atomic specs that do not touch the live runtime surface may omit it, but only when their scope is clearly static or supporting work.
+
+Set `runtime_validation_required: true` directly on any atomic spec that touches plugins, MCP tools, external connectors, browser extensions, plugin loaders/discovery/registration, dynamic tool/body resolution, or similar runtime-loaded invocation/boot paths. Include one of the valid surfaces (`plugin`, `mcp`, `connector`, `browser-extension`, `dynamic-tool-body`, `plugin-loader`, `other`) and a rationale explaining why live `/manual-test` validation is required.
 
 ## Handling Enforcement Feedback
 
@@ -216,6 +226,7 @@ node .claude/scripts/spec-schema-validate.mjs <file-path>
 **Required elements checklist**:
 
 - [ ] YAML frontmatter with required fields: `id`, `title`, `spec_group`, `requirements_refs`, `status`
+- [ ] Runtime validation marker inherited or set when the atomic spec touches plugins, MCP tools, connectors, browser extensions, plugin loaders, or dynamic tool/body resolution
 - [ ] `id` follows pattern `as-NNN-<slug>`
 - [ ] `status` is `pending` (initial state)
 - [ ] All template sections present:

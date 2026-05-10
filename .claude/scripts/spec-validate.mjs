@@ -28,13 +28,24 @@ const REQUIRED_FRONTMATTER_FIELDS = ['id', 'title', 'date', 'status'];
 // Import VALID_E2E_SKIP_RATIONALES from workflow-dag.mjs for defense-in-depth
 // Falls back to inline constant if import fails (fail-open)
 let VALID_E2E_SKIP_RATIONALES;
+let VALID_RUNTIME_VALIDATION_SURFACES;
 try {
   const __filename = fileURLToPath(import.meta.url);
   const __dirname = dirname(__filename);
   const dagModule = await import(join(__dirname, 'lib', 'workflow-dag.mjs'));
   VALID_E2E_SKIP_RATIONALES = dagModule.VALID_E2E_SKIP_RATIONALES;
+  VALID_RUNTIME_VALIDATION_SURFACES = dagModule.VALID_RUNTIME_VALIDATION_SURFACES;
 } catch {
   VALID_E2E_SKIP_RATIONALES = ['pure-refactor', 'test-infra', 'type-only', 'docs-only', 'pure-compute'];
+  VALID_RUNTIME_VALIDATION_SURFACES = [
+    'plugin',
+    'mcp',
+    'connector',
+    'browser-extension',
+    'dynamic-tool-body',
+    'plugin-loader',
+    'other',
+  ];
 }
 
 // Sections that must be present (case-insensitive match)
@@ -199,6 +210,49 @@ function validateSpecFile(filePath) {
     if (!VALID_E2E_SKIP_RATIONALES.includes(frontmatter.e2e_skip_rationale)) {
       errors.push(`e2e_skip_rationale '${frontmatter.e2e_skip_rationale}' is not valid (must be one of: ${VALID_E2E_SKIP_RATIONALES.join(', ')})`);
     }
+  }
+
+  // Validate runtime manual-test marker fields.
+  if (frontmatter.runtime_validation_required !== undefined) {
+    if (typeof frontmatter.runtime_validation_required !== 'boolean') {
+      errors.push(
+        `runtime_validation_required must be a boolean (true or false), got '${frontmatter.runtime_validation_required}'`
+      );
+    }
+
+    if (frontmatter.runtime_validation_required === true) {
+      if (!frontmatter.runtime_validation_surface) {
+        errors.push(
+          `runtime_validation_required: true requires runtime_validation_surface (one of: ${VALID_RUNTIME_VALIDATION_SURFACES.join(', ')})`
+        );
+      } else if (!VALID_RUNTIME_VALIDATION_SURFACES.includes(frontmatter.runtime_validation_surface)) {
+        errors.push(
+          `runtime_validation_surface '${frontmatter.runtime_validation_surface}' is not valid (must be one of: ${VALID_RUNTIME_VALIDATION_SURFACES.join(', ')})`
+        );
+      }
+
+      if (!frontmatter.runtime_validation_rationale) {
+        errors.push('runtime_validation_required: true requires runtime_validation_rationale');
+      }
+    }
+  }
+
+  if (
+    frontmatter.runtime_validation_surface &&
+    typeof frontmatter.runtime_validation_surface === 'string' &&
+    frontmatter.runtime_validation_required !== true &&
+    !VALID_RUNTIME_VALIDATION_SURFACES.includes(frontmatter.runtime_validation_surface)
+  ) {
+    errors.push(
+      `runtime_validation_surface '${frontmatter.runtime_validation_surface}' is not valid (must be one of: ${VALID_RUNTIME_VALIDATION_SURFACES.join(', ')})`
+    );
+  }
+
+  if (
+    (frontmatter.runtime_validation_surface || frontmatter.runtime_validation_rationale) &&
+    frontmatter.runtime_validation_required !== true
+  ) {
+    warnings.push('runtime_validation_surface/runtime_validation_rationale are present but runtime_validation_required is not true -- marker has no effect');
   }
 
   // Validate required sections (only for files under .claude/specs/)

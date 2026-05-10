@@ -566,7 +566,7 @@ After fixes, re-run `/unify <spec-group-id>` to validate.
 
 ## Convergence Loop
 
-This gate runs under the Convergence Loop Protocol: **check → fix → recheck** until 2 consecutive clean passes or 5 iterations (escalate after 5).
+This gate runs under the Convergence Loop Protocol: **check → fix → recheck** until the gate's configured clean-pass threshold is met or 5 iterations (escalate after 5). The unifier gate is configured as `required_clean_passes: 1` with `attestation_mode: content-hash`; legacy sessions without a threshold snapshot fall back to 2.
 
 - **Check agent**: `unifier`
 - **Fix agent**: `implementer` (code issues) or `test-writer` (test issues)
@@ -578,7 +578,7 @@ After each clean pass, record via:
 node .claude/scripts/session-checkpoint.mjs update-convergence unifier
 ```
 
-Coercive enforcement: `workflow-gate-enforcement.mjs` blocks downstream dispatches when `clean_pass_count < 2`. See `/challenge` SKILL.md for full loop mechanics (state schema, fix agent input contract, escalation format).
+Coercive enforcement: `workflow-gate-enforcement.mjs` blocks downstream dispatches when the gate-specific clean-pass threshold is not met. See `/challenge` SKILL.md for full loop mechanics (state schema, fix agent input contract, escalation format).
 
 ## Convergence Gates
 
@@ -612,7 +612,7 @@ After convergence, the review chain is:
 2. `/security <spec-group-id>` - Security review (always)
 3. Completion verification - Post-completion gates via `completion-verifier` agent (always, oneoff-vibe exempt)
 4. `/docs <spec-group-id>` - Documentation generation (if public API)
-5. `/manual-test <spec-group-id>` - Bounded exploratory verification (advisory, non-blocking; runs after `/docs` as the final step before commit)
+5. `/manual-test <spec-group-id>` - Bounded exploratory verification (advisory by default; mandatory for `runtime_validation_required: true`; runs after `/docs` as the final step before commit)
 6. Commit
 
 **Next step after unify passes**: Dispatch `/code-review`

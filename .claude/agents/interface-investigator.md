@@ -182,6 +182,23 @@ Each finding MUST include the following structured fields for auto-decision engi
 - **field_reference**: The specific field or section the recommendation targets (aids criterion 2 validation)
 - **action_verb**: The primary action verb in the recommendation (aids criterion 1 validation)
 
+### Finding Lineage Fields
+
+On Pass 2 and later, classify each Medium+ finding against prior finding context from the orchestrator:
+
+- **new**: A distinct spec/code or spec/spec drift not previously surfaced.
+- **carry-over**: The same corrected belief remains stale in another section after an accepted amendment.
+- **regression**: A previously fixed contradiction reappeared or the amendment introduced a new contradiction.
+- **false-positive**: The apparent contradiction is resolved by stronger evidence in code, contract, or the canonical spec section.
+
+Include these optional fields in the narrative report body for each finding when prior context is available:
+
+- **lineage**: `new`, `carry-over`, `regression`, or `false-positive`
+- **related_prior_finding**: Prior finding ID or `null`
+- **canonical_invariant**: Short statement of the corrected belief that should hold across the spec
+
+Do not add these fields as top-level fields in the strict `convergence-result` block. That block is parsed by a narrow schema and must remain limited to `status`, `findings_count`, `findings`, `pass`, and `gate`.
+
 ## Finding Presentation Format
 
 When producing findings, use the **action-first** format:
@@ -490,7 +507,7 @@ If findings exist:
 }
 ```
 
-Rules: status/severity/confidence enums are lowercase only; unknown top-level fields cause parse_failed; first block wins.
+Rules: status/severity/confidence enums are lowercase only; unknown top-level fields cause parse_failed; emit exactly one `convergence-result` block as the final fenced block.
 
 ## Communication Style (agent ↔ parent)
 

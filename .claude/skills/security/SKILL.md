@@ -565,7 +565,7 @@ Coercive enforcement: `workflow-gate-enforcement.mjs` blocks downstream dispatch
 **After security review**:
 
 - If PASS → Trigger `/docs` for documentation (mandatory for all spec-based workflows)
-- If PASS → After `/docs` completes, dispatch `/manual-test` as the advisory final step before commit (bounded exploratory verification, non-blocking)
+- If PASS → After `/docs` completes, dispatch `/manual-test` as the final step before commit (advisory by default; mandatory for `runtime_validation_required: true`)
 - If FAIL → Use `/implement` to fix issues, then re-run `/security`
 
 **Documentation trigger**: Documentation is mandatory for all spec-based workflows (oneoff-spec and orchestrator). Dispatch the documenter subagent after security passes.

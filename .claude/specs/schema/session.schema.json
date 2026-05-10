@@ -22,6 +22,25 @@
       "format": "date-time",
       "description": "ISO 8601 timestamp of last session update"
     },
+    "active_work_id": {
+      "type": ["string", "null"],
+      "pattern": "^sg-[a-z0-9-]+$",
+      "description": "Stable id of the selected/current work item. Mirrors active_work.spec_group_id when work is active."
+    },
+    "work_items": {
+      "type": "object",
+      "description": "Per-work-item state for concurrent or resumable work. Each key is a work id, usually the spec_group_id.",
+      "additionalProperties": {
+        "type": "object"
+      }
+    },
+    "subagent_dispatches": {
+      "type": "object",
+      "description": "Index of dispatched subagents keyed by task/agent id, including the work_id they belong to.",
+      "additionalProperties": {
+        "type": "object"
+      }
+    },
     "active_work": {
       "type": ["object", "null"],
       "description": "Currently active work context. Null when no work is in progress.",
@@ -67,6 +86,52 @@
         "objective": {
           "type": "string",
           "description": "Human-readable description of the work objective"
+        },
+        "manual_test_result": {
+          "type": "object",
+          "description": "Structured /manual-test result for runtime-validation-required specs. Written only by session-checkpoint.mjs.",
+          "additionalProperties": false,
+          "properties": {
+            "spec_group_id": {
+              "type": "string",
+              "pattern": "^sg-[a-z0-9-]+$"
+            },
+            "result": {
+              "type": "string",
+              "enum": ["pass", "fail", "blocked"]
+            },
+            "scenario_count": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "pass_count": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "fail_count": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "evidence_path": {
+              "type": ["string", "null"],
+              "description": "Project-relative path under .claude/specs/groups/<sg-id>/evidence/."
+            },
+            "top_residual_risk": {
+              "type": ["string", "null"]
+            },
+            "recorded_at": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          "required": [
+            "spec_group_id",
+            "result",
+            "scenario_count",
+            "pass_count",
+            "fail_count",
+            "recorded_at"
+          ]
         }
       },
       "required": ["spec_group_id", "workflow", "current_phase", "objective"]
@@ -375,7 +440,8 @@
             "challenger",
             "completion-verifier",
             "doc-auditor",
-            "flow-verifier"
+            "flow-verifier",
+            "unknown_fallback"
           ],
           "description": "Type of subagent dispatched"
         },
@@ -470,7 +536,15 @@
         "record_source": {
           "type": "string",
           "enum": ["hook", "parse_failed", "manual_fallback"],
-          "description": "How this record was created: hook (automated SubagentStop -- only source that counts toward clean_pass_count), parse_failed (extractor missed all 4 paths -- streak-breaking diagnostic), manual_fallback (EC-7 fail-closed after log-write failure -- streak-breaking). Narrowed by sg-convergence-manual-pass-removal (AC-10): legacy values `manual` and `hook_manual` are no longer written but remain parseable in pre-existing session.json files."
+          "description": "How this record was created: hook (automated SubagentStop -- only source that counts toward clean_pass_count), parse_failed (extractor missed all configured paths -- streak-breaking diagnostic), manual_fallback (EC-7 fail-closed after log-write failure -- streak-breaking). Narrowed by sg-convergence-manual-pass-removal (AC-10): legacy values `manual` and `hook_manual` are no longer written but remain parseable in pre-existing session.json files."
+        },
+        "extraction_path": {
+          "type": ["string", "null"],
+          "description": "Extractor path selected by convergence-pass-recorder.mjs, e.g. structured_block, json_fence, bare_json, success_marker, finding_list, or parse_failed."
+        },
+        "parse_failed_reason": {
+          "type": ["string", "null"],
+          "description": "Parse failure classifier reason when record_source is parse_failed."
         },
         "auto_decision_batch_id": {
           "type": ["string", "null"],
@@ -512,11 +586,13 @@
             "checkpoint_saved",
             "work_completed",
             "work_abandoned",
+            "work_switched",
             "error_occurred",
             "override_skip",
             "reset_enforcement",
             "enforcement_level_change",
             "completion_checklist",
+            "manual_test_result_recorded",
             "convergence_update",
             "convergence_pass_recorded"
           ],
