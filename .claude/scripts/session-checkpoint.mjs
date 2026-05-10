@@ -20,6 +20,26 @@
  *                                                 - Track subagent dispatch (--stage for challengers)
  *   complete-subagent <task_id> <result_summary>  - Mark subagent as complete
  *   record-manual-test-result <sg-id> --result <r> - Record structured /manual-test result
+ *   clear-manual-test-result <sg-id> [--reason "<t>"]
+ *                                                 - Clear manual_test_result + infra_blocked counter
+ *                                                   (operator escape hatch for infra_blocked terminal
+ *                                                   block; sg-manual-tester-infra-blocked-20260508)
+ *   record-pre-merge-verify-result <sg-id> --status <s> --reason <r> [--evidence-path <p>] [--dispatch-id <d>] [--audit-seq <n>] [--cumulative-ms <n>]
+ *                                                 - Record structured pre-merge-verify gate result
+ *                                                   (sg-pre-merge-verify-20260508 / AS-6 / AC-7.1).
+ *   clear-pre-merge-quarantine <sg-id> [--reason "<t>"]
+ *                                                 - Clear pre_merge_verify.quarantine_until_acknowledged
+ *                                                   (operator escape hatch; sg-pre-merge-verify-20260508 / AS-6).
+ *   record-audit-event <event-name> [--payload '<json>']
+ *                                                 - Atomic audit-chain emission (DEC-006). Also exported
+ *                                                   as `recordAuditEvent` named export for in-process use.
+ *   repair-audit-chain <sg-id> [--reason "<t>"]
+ *                                                 - Operator recovery for `audit_chain_tamper_detected`
+ *                                                   (resets session.audit.next_seq; AC-9.7).
+ *   validate-pre-merge-verify-config <pkg-json-path>
+ *                                                 - TECH-104 Zod-style validator for consumer
+ *                                                   pre_merge_verify_timeout_ms / port allowlist /
+ *                                                   readiness path config in package.json.
  *   clear-async-mode                              - Delete shape-lint-async-mode sentinel (AC-6.6)
  *   journal-created <path-to-journal>             - Mark journal entry as created
  *   override-skip --phase <p> --rationale "<r>"   - Override a phase skip block (main-agent-only)
@@ -2932,6 +2952,23 @@ function opTransitionPhase(newPhase, substage = null, requestedWorkflow = null) 
   }
   // --- End obligation validation ---
 
+  // sg-manual-tester-infra-blocked-20260508 / AS-2 / DEC-005 / DEC-007 / DEC-008.
+  // Phase-scoped reset of `dispatch_infra_blocked_count`: when transitioning
+  // OUT of `documenting` (the phase where /manual-test runs after /docs per
+  // CLAUDE.md), delete the entire counter map so a new phase starts from
+  // empty. Within `documenting`, repeated dispatches sharing a dispatch_id
+  // accumulate the counter (resolves the dispatch_id-constancy contradiction
+  // across halt-then-resume cycles within the same phase).
+  //
+  // NFR-1 sole-writer invariant preserved: opTransitionPhase is the canonical
+  // mutation site for active_work.current_phase, so co-locating the counter
+  // delete here means every phase-out write goes through this single path.
+  // The deletion uses `delete` (not assignment to {}) so the field is fully
+  // absent — matching the JSON-Schema where the counter map is optional.
+  if (oldPhase === 'documenting' && newPhase !== 'documenting') {
+    delete session.active_work.dispatch_infra_blocked_count;
+  }
+
   session.active_work.current_phase = newPhase;
   session.phase_checkpoint.phase = newPhase;
 
@@ -3335,7 +3372,71 @@ function opCompleteSubagent(taskId, resultSummary) {
   console.error(`Completed subagent task '${taskId}'`);
 }
 
-const VALID_MANUAL_TEST_RESULTS = new Set(['pass', 'fail', 'blocked']);
+const VALID_MANUAL_TEST_RESULTS = new Set(['pass', 'fail', 'blocked', 'infra_blocked']);
+
+// Required fields for the structured InfraBlockedEvidence payload (REQ-005).
+// Matches contract-infra-blocked-evidence in
+// .claude/specs/groups/sg-manual-tester-infra-blocked-20260508/spec.md.
+// `exception_trace` is optional and intentionally omitted from this list.
+const INFRA_BLOCKED_EVIDENCE_REQUIRED_FIELDS = Object.freeze([
+  'timestamp',
+  'narrative',
+  'dispatch_id',
+  'session_id',
+]);
+// SEC-001 (defense-in-depth): allowlist of permitted top-level keys on the
+// InfraBlockedEvidence payload. Mirrors `additionalProperties: false` in the
+// JSON-Schema at .claude/specs/schema/session.schema.json:129. The CLI
+// validator enforces the allowlist BEFORE any session-state mutation so a
+// mismatched payload is rejected at the boundary even when persisted bytes
+// would later trip the JSON-Schema layer.
+const INFRA_BLOCKED_EVIDENCE_ALLOWED_FIELDS = Object.freeze([
+  'timestamp',
+  'narrative',
+  'exception_trace',
+  'dispatch_id',
+  'session_id',
+]);
+// SEC-001: prototype-pollution sentinel keys. Reject the parsed payload if any
+// of these appear as own keys (defense against `__proto__`-style prototype
+// pollution from operator-supplied --evidence JSON).
+const INFRA_BLOCKED_EVIDENCE_FORBIDDEN_KEYS = Object.freeze([
+  '__proto__',
+  'constructor',
+  'prototype',
+]);
+const INFRA_BLOCKED_NARRATIVE_MIN_LENGTH = 10;
+// SEC-002 size caps mirror `maxLength` declarations on the JSON-Schema
+// `evidence.narrative` (4 KB) and `evidence.exception_trace` (16 KB). The
+// CLI validator caps writes at the same boundary so over-large payloads are
+// rejected before any session-state mutation lands.
+const INFRA_BLOCKED_NARRATIVE_MAX_LENGTH = 4096;
+const INFRA_BLOCKED_EXCEPTION_TRACE_MAX_LENGTH = 16384;
+
+/**
+ * SEC-006 (defense-in-depth, hoisted from SEC-003): strip ASCII control
+ * characters (U+0000..U+001F and U+007F) from operator-supplied evidence
+ * strings BEFORE they land in any session-state, manifest decision_log, or
+ * stdout sink. Single-source-of-truth defense: applied at the validator
+ * boundary so all downstream sinks (history.details.evidence, manifest
+ * decision_log details, stdout JSON echo, Stop-hook formatters) inherit
+ * sanitized data.
+ *
+ * Replaces (does not drop) so the visible-character boundary survives
+ * substring assertions in test fixtures.
+ *
+ * KEEP IN SYNC with the duplicate at `workflow-stop-enforcement.mjs:185`.
+ * The helper is duplicated rather than shared to avoid cross-module wiring;
+ * the two implementations MUST behave identically. If you change one, change
+ * the other.
+ *
+ * @param {string} value already-trimmed string
+ * @returns {string} value with control chars replaced by spaces
+ */
+function stripControlChars(value) {
+  // eslint-disable-next-line no-control-regex
+  return value.replace(/[\x00-\x1f\x7f]/g, ' ');
+}
 
 function parseManualTestCount(value, fieldName) {
   if (value === null || value === undefined || String(value).trim() === '') {
@@ -3386,7 +3487,150 @@ function normalizeManualTestEvidencePath(specGroupId, evidencePath, required) {
 }
 
 /**
+ * Parse and validate the --evidence JSON payload for an `infra_blocked`
+ * record-manual-test-result invocation.
+ *
+ * Defense-in-depth (REQ-007): the JSON-Schema at
+ * `.claude/specs/schema/session.schema.json` is the structural contract for
+ * the persisted shape; this in-process validator enforces required-field
+ * presence at the CLI boundary so the operator gets a structured rejection
+ * BEFORE any session-state mutation lands.
+ *
+ * @param {string} rawEvidenceJson Raw JSON string from `--evidence`.
+ * @returns {object} Parsed evidence object, validated for required fields.
+ * @throws {Error} On parse failure or missing/invalid required fields.
+ */
+function parseAndValidateInfraBlockedEvidence(rawEvidenceJson) {
+  if (typeof rawEvidenceJson !== 'string' || rawEvidenceJson.trim().length === 0) {
+    throw new Error(
+      "infra_blocked manual-test result requires --evidence <json> (got empty or missing payload)"
+    );
+  }
+  let evidence;
+  try {
+    evidence = JSON.parse(rawEvidenceJson);
+  } catch (err) {
+    throw new Error(`infra_blocked --evidence is not valid JSON: ${err.message}`);
+  }
+  if (!evidence || typeof evidence !== 'object' || Array.isArray(evidence)) {
+    throw new Error('infra_blocked --evidence must be a JSON object');
+  }
+
+  // SEC-001 (defense-in-depth, prototype-pollution): reject the payload when
+  // any of the forbidden sentinel keys (__proto__, constructor, prototype)
+  // appear as own keys. JSON.parse can produce these as own keys when the
+  // raw bytes contain them literally; the JSON-Schema allowlist
+  // (additionalProperties: false) would catch the persisted shape later, but
+  // the CLI rejects at the boundary so no proto-polluted object ever reaches
+  // session-state.
+  for (const forbidden of INFRA_BLOCKED_EVIDENCE_FORBIDDEN_KEYS) {
+    if (Object.prototype.hasOwnProperty.call(evidence, forbidden)) {
+      throw new Error(
+        `infra_blocked --evidence contains forbidden key '${forbidden}' (prototype-pollution defense)`
+      );
+    }
+  }
+
+  // SEC-001: reject keys outside the allowlist. Mirrors
+  // `additionalProperties: false` on the JSON-Schema evidence sub-object so
+  // the two layers agree at write-time. Listing every unknown key in the
+  // error so the operator sees the full surface, not just the first one.
+  const allowedSet = new Set(INFRA_BLOCKED_EVIDENCE_ALLOWED_FIELDS);
+  const unknownKeys = Object.keys(evidence).filter((k) => !allowedSet.has(k));
+  if (unknownKeys.length > 0) {
+    throw new Error(
+      `infra_blocked --evidence contains unknown fields: ${unknownKeys.join(', ')} ` +
+        `(allowed: ${INFRA_BLOCKED_EVIDENCE_ALLOWED_FIELDS.join(', ')})`
+    );
+  }
+
+  const missing = [];
+  for (const field of INFRA_BLOCKED_EVIDENCE_REQUIRED_FIELDS) {
+    const value = evidence[field];
+    if (typeof value !== 'string' || value.trim().length === 0) {
+      missing.push(field);
+    }
+  }
+  if (missing.length > 0) {
+    throw new Error(
+      `infra_blocked --evidence missing required fields: ${missing.join(', ')} ` +
+        `(required: ${INFRA_BLOCKED_EVIDENCE_REQUIRED_FIELDS.join(', ')})`
+    );
+  }
+  if (typeof evidence.narrative !== 'string' ||
+      evidence.narrative.trim().length < INFRA_BLOCKED_NARRATIVE_MIN_LENGTH) {
+    throw new Error(
+      `infra_blocked --evidence.narrative must be at least ${INFRA_BLOCKED_NARRATIVE_MIN_LENGTH} characters`
+    );
+  }
+  // SEC-002: cap narrative length. Aligns with JSON-Schema
+  // properties.evidence.properties.narrative.maxLength.
+  if (evidence.narrative.length > INFRA_BLOCKED_NARRATIVE_MAX_LENGTH) {
+    throw new Error(
+      `infra_blocked --evidence.narrative exceeds maximum length: ` +
+        `${evidence.narrative.length} > ${INFRA_BLOCKED_NARRATIVE_MAX_LENGTH}`
+    );
+  }
+  if (evidence.exception_trace !== undefined && typeof evidence.exception_trace !== 'string') {
+    throw new Error('infra_blocked --evidence.exception_trace must be a string when present');
+  }
+  // SEC-002: cap exception_trace length when supplied. Aligns with
+  // JSON-Schema properties.evidence.properties.exception_trace.maxLength.
+  if (typeof evidence.exception_trace === 'string'
+      && evidence.exception_trace.length > INFRA_BLOCKED_EXCEPTION_TRACE_MAX_LENGTH) {
+    throw new Error(
+      `infra_blocked --evidence.exception_trace exceeds maximum length: ` +
+        `${evidence.exception_trace.length} > ${INFRA_BLOCKED_EXCEPTION_TRACE_MAX_LENGTH}`
+    );
+  }
+  // SEC-006 (DEC-025): hoist control-char stripping from Stop-hook
+  // formatters to the validator boundary. SEC-003 (Pass 1) only sanitized
+  // narrative/dispatch_id at the Stop-hook formatter sinks, leaving
+  // manifest.decision_log details (session-checkpoint.mjs ~3735) and
+  // session.history.details.evidence (~3715) holding raw control bytes.
+  // Sanitizing here mutates the validated evidence object so EVERY downstream
+  // sink inherits clean data:
+  //   - session.active_work.manual_test_result.evidence (record assignment)
+  //   - session.history.details.evidence (history entry)
+  //   - manifest.json decision_log details (narrative interpolation)
+  //   - stdout JSON echo (lower risk — JSON escapes — but sanitized anyway)
+  //   - Stop-hook formatters (defense-in-depth: keep their stripControlChars
+  //     calls so data flowing in from any future writer remains sanitized).
+  // Sanitize ONLY operator-supplied strings:
+  //   - narrative: free-form operator text, primary injection vector
+  //   - dispatch_id: operator-supplied identifier, can carry control bytes
+  //   - exception_trace: optional operator-supplied stack-trace text
+  // Do NOT sanitize:
+  //   - timestamp: ISO-8601 format, no control chars expected
+  //   - session_id: server-generated UUID, trusted source
+  evidence.narrative = stripControlChars(evidence.narrative);
+  evidence.dispatch_id = stripControlChars(evidence.dispatch_id);
+  if (typeof evidence.exception_trace === 'string') {
+    evidence.exception_trace = stripControlChars(evidence.exception_trace);
+  }
+  return evidence;
+}
+
+/**
  * record-manual-test-result - Trusted writer for structured /manual-test result.
+ *
+ * Extended for sg-manual-tester-infra-blocked-20260508:
+ *   - Accepts the four-value enum `pass | fail | blocked | infra_blocked`.
+ *   - Accepts `--evidence <json>` (REQUIRED for `infra_blocked`; optional
+ *     otherwise) — structured InfraBlockedEvidence payload.
+ *   - Accepts `--dispatch-id <id>` (REQUIRED for `infra_blocked`; optional
+ *     otherwise) — top-level CLI flag mirroring `record-test-writer-unlock`.
+ *   - When both `--dispatch-id` and `evidence.dispatch_id` are present, they
+ *     MUST agree; the validator emits a structured "dispatch_id mismatch"
+ *     error naming both values verbatim and rejects the invocation (AC-7.6).
+ *   - When `result === 'infra_blocked'`, increments
+ *     `session.active_work.dispatch_infra_blocked_count[dispatch_id]`
+ *     immediately AFTER the manual_test_result write and BEFORE the history
+ *     append, so counter and result land in the same atomic saveSession
+ *     write (DEC-012). Counter map is cleared on phase transition out of
+ *     `documenting` (handled by opTransitionPhase, DEC-007 / DEC-008).
+ *   - `--evidence-path` remains OPTIONAL for `infra_blocked` (DEC-014;
+ *     structured `--evidence` JSON is canonical).
  */
 function opRecordManualTestResult(opts) {
   const {
@@ -3397,10 +3641,12 @@ function opRecordManualTestResult(opts) {
     failCount,
     evidencePath,
     topResidualRisk,
+    evidence: rawEvidenceJson,
+    dispatchId,
   } = opts;
 
   if (!specGroupId || !/^sg-[a-z0-9-]+$/.test(specGroupId)) {
-    throw new Error('Usage: record-manual-test-result <spec_group_id> --result <pass|fail|blocked> --scenario-count <N> --pass-count <N> --fail-count <N> [--evidence-path <path>] [--top-residual-risk <text>]');
+    throw new Error('Usage: record-manual-test-result <spec_group_id> --result <pass|fail|blocked|infra_blocked> --scenario-count <N> --pass-count <N> --fail-count <N> [--evidence-path <path>] [--top-residual-risk <text>] [--evidence <json>] [--dispatch-id <id>]');
   }
   if (!VALID_MANUAL_TEST_RESULTS.has(result)) {
     throw new Error(`manual-test result must be one of: ${[...VALID_MANUAL_TEST_RESULTS].join(', ')}`);
@@ -3430,9 +3676,55 @@ function opRecordManualTestResult(opts) {
     }
   }
 
+  // --- infra_blocked branch (REQ-005, REQ-007) -----------------------------
+  // Parse evidence + dispatch_id BEFORE any session mutation so a rejected
+  // invocation leaves session-state untouched (NFR-1 sole-writer + EC-1
+  // capture-then-halt ordering).
+  let parsedEvidence = null;
+  let canonicalDispatchId = null;
+  if (result === 'infra_blocked') {
+    if (!dispatchId || typeof dispatchId !== 'string' || dispatchId.trim().length === 0) {
+      throw new Error(
+        'infra_blocked manual-test result requires --dispatch-id <id> at the top level'
+      );
+    }
+    parsedEvidence = parseAndValidateInfraBlockedEvidence(rawEvidenceJson);
+    // AC-7.6: top-level --dispatch-id MUST agree with evidence.dispatch_id.
+    // Structured rejection: both values verbatim, substring "dispatch_id mismatch".
+    // SEC-006 (DEC-025): sanitize the top-level --dispatch-id for the same
+    // reason as evidence.dispatch_id (operator-supplied untrusted input).
+    // parsedEvidence.dispatch_id is already sanitized by the validator; we
+    // sanitize topDispatchId here so the equality check compares like for
+    // like AND so canonicalDispatchId (which is persisted to session,
+    // history, manifest, and stdout) is sanitized.
+    const topDispatchId = stripControlChars(dispatchId.trim());
+    const evidenceDispatchId = parsedEvidence.dispatch_id;
+    if (topDispatchId !== evidenceDispatchId) {
+      throw new Error(
+        `dispatch_id mismatch: --dispatch-id=${topDispatchId} vs evidence.dispatch_id=${evidenceDispatchId}`
+      );
+    }
+    canonicalDispatchId = topDispatchId;
+  } else if (rawEvidenceJson !== null && rawEvidenceJson !== undefined) {
+    // For legacy three-value invocations, --evidence is optional and silently
+    // ignored when supplied without infra_blocked. We do NOT validate or
+    // persist it (preserves NFR-3 backward compatibility).
+    //
+    // M5 (review finding): emit a stderr WARNING so the operator notices the
+    // discard rather than discovering it via missing audit-chain evidence.
+    // Continues execution — the warning replaces the silent-discard surprise
+    // without breaking NFR-3's backward-compat acceptance.
+    process.stderr.write(
+      '[record-manual-test-result] WARNING: --evidence is only used with --result infra_blocked; ignoring\n'
+    );
+    parsedEvidence = null;
+  }
+
   const normalizedEvidencePath = normalizeManualTestEvidencePath(
     specGroupId,
     evidencePath,
+    // DEC-014: --evidence-path remains OPTIONAL for `infra_blocked`. The
+    // boolean intentionally does NOT include `result === 'infra_blocked'`.
     result === 'pass' || result === 'fail',
   );
 
@@ -3459,12 +3751,30 @@ function opRecordManualTestResult(opts) {
     top_residual_risk: topResidualRisk || null,
     recorded_at: now(),
   };
+  if (result === 'infra_blocked') {
+    record.evidence = parsedEvidence;
+    record.dispatch_id = canonicalDispatchId;
+  }
 
+  // DEC-012: counter increment ordering — write `manual_test_result` first,
+  // then increment `dispatch_infra_blocked_count[dispatch_id]`, then
+  // addHistoryEntry, then saveSession. All three mutations land in the same
+  // atomic saveSession write (NFR-1 sole-writer preserved).
   session.active_work.manual_test_result = record;
+  if (result === 'infra_blocked') {
+    if (!session.active_work.dispatch_infra_blocked_count
+        || typeof session.active_work.dispatch_infra_blocked_count !== 'object'
+        || Array.isArray(session.active_work.dispatch_infra_blocked_count)) {
+      session.active_work.dispatch_infra_blocked_count = {};
+    }
+    const prior = session.active_work.dispatch_infra_blocked_count[canonicalDispatchId];
+    session.active_work.dispatch_infra_blocked_count[canonicalDispatchId] =
+      (Number.isInteger(prior) && prior >= 0 ? prior : 0) + 1;
+  }
   if (!Array.isArray(session.history)) {
     session.history = [];
   }
-  addHistoryEntry(session, 'manual_test_result_recorded', {
+  const historyDetails = {
     spec_group_id: specGroupId,
     result,
     scenario_count: parsedScenarioCount,
@@ -3472,7 +3782,12 @@ function opRecordManualTestResult(opts) {
     fail_count: parsedFailCount,
     evidence_path: normalizedEvidencePath,
     message: `Recorded structured manual-test result for ${specGroupId}: ${result}`,
-  });
+  };
+  if (result === 'infra_blocked') {
+    historyDetails.evidence = parsedEvidence;
+    historyDetails.dispatch_id = canonicalDispatchId;
+  }
+  addHistoryEntry(session, 'manual_test_result_recorded', historyDetails);
   saveSession(session);
 
   const manifestPath = join(CLAUDE_DIR, 'specs', 'groups', specGroupId, 'manifest.json');
@@ -3481,14 +3796,24 @@ function opRecordManualTestResult(opts) {
       atomicModifyJSON(manifestPath, (manifest) => {
         const m = manifest || {};
         m.decision_log = Array.isArray(m.decision_log) ? m.decision_log : [];
+        let details =
+          `${parsedScenarioCount} scenarios, ${parsedPassCount} pass, ` +
+          `${parsedFailCount} fail. Result=${result}. ` +
+          `Evidence=${normalizedEvidencePath || '<none>'}.`;
+        if (result === 'infra_blocked' && parsedEvidence) {
+          // Surface the structured trigger narrative + dispatch_id in the
+          // manifest decision_log so audit-chain readers see the trigger
+          // without having to crack open session.history.
+          const narrativeStr = String(parsedEvidence.narrative || '').slice(0, 280);
+          details +=
+            ` Dispatch=${canonicalDispatchId}.` +
+            ` Narrative=${narrativeStr}.`;
+        }
         m.decision_log.push({
           timestamp: record.recorded_at,
           actor: 'agent',
           action: 'manual_test_result_recorded',
-          details:
-            `${parsedScenarioCount} scenarios, ${parsedPassCount} pass, ` +
-            `${parsedFailCount} fail. Result=${result}. ` +
-            `Evidence=${normalizedEvidencePath || '<none>'}.`,
+          details,
         });
         return m;
       });
@@ -3500,6 +3825,1186 @@ function opRecordManualTestResult(opts) {
   }
 
   console.log(JSON.stringify({ recorded: true, manual_test_result: record }, null, 2));
+}
+
+/**
+ * clear-manual-test-result <sg-id> - Operator escape hatch for clearing an
+ * infra_blocked terminal block.
+ *
+ * Spec: sg-manual-tester-infra-blocked-20260508 / AS-3 / AC-4.2a / DEC-016.
+ *
+ * Atomically deletes:
+ *   - session.active_work.manual_test_result (the entire field, not just .result)
+ *   - session.active_work.dispatch_infra_blocked_count (the entire counter map)
+ *
+ * Atomically appends:
+ *   - session.history `manual_test_result_cleared` entry with timestamp
+ *   - manifest.json decision_log mirrored entry
+ *
+ * Single saveSession write (NFR-1 sole-writer preserved). The Stop-hook
+ * `infra_blocked_terminal` block-reason is derived from session state — no
+ * separate signal is needed; clearing the state clears the block.
+ *
+ * Idempotent: invoking on a session with no manual_test_result is a no-op
+ * for the session-state mutation but still records the audit-chain entry.
+ *
+ * @param {string} specGroupId Positional first argument; must match
+ *   session.active_work.spec_group_id.
+ * @param {string|null} reason Optional --reason flag value for audit narrative.
+ */
+function opClearManualTestResult(specGroupId, reason) {
+  if (!specGroupId || !/^sg-[a-z0-9-]+$/.test(specGroupId)) {
+    throw new Error(
+      'Usage: clear-manual-test-result <spec_group_id> [--reason "<text>"]'
+    );
+  }
+
+  // SEC-005 (review finding, promoted Low → Medium): emit a stderr WARNING
+  // when invoked without --reason. We do NOT make --reason mandatory (the
+  // operator escape hatch must remain available even in degraded contexts);
+  // the warning surfaces an audit-chain hint so a human-readable resolution
+  // narrative can be supplied inline rather than reconstructed later from
+  // session.history. Continues execution unchanged.
+  if (typeof reason !== 'string' || reason.trim().length === 0) {
+    process.stderr.write(
+      '[clear-manual-test-result] WARNING: invoked without --reason; consider documenting the resolution narrative inline for audit-chain clarity\n'
+    );
+  }
+
+  const session = loadSession();
+  if (!session) {
+    throw new Error('No session.json exists. Run "init" first.');
+  }
+  if (!session.active_work) {
+    throw new Error('No active_work in session. Run "start-work" first.');
+  }
+  if (session.active_work.spec_group_id !== specGroupId) {
+    throw new Error(
+      `Active spec_group_id is ${session.active_work.spec_group_id || '<missing>'}, not ${specGroupId}`
+    );
+  }
+
+  const priorResult = session.active_work.manual_test_result;
+  const priorCounter = session.active_work.dispatch_infra_blocked_count;
+  const hadResult = priorResult !== undefined;
+  const hadCounter = priorCounter !== undefined;
+
+  // Atomic delete. Use `delete` (not assignment to undefined) so the field is
+  // absent from JSON output, matching the schema contract: the JSON-Schema
+  // does not include `manual_test_result` in `required`, so absence is valid.
+  delete session.active_work.manual_test_result;
+  delete session.active_work.dispatch_infra_blocked_count;
+
+  if (!Array.isArray(session.history)) {
+    session.history = [];
+  }
+  const clearedAt = now();
+  const historyDetails = {
+    spec_group_id: specGroupId,
+    cleared_manual_test_result: hadResult,
+    cleared_dispatch_infra_blocked_count: hadCounter,
+    prior_result: hadResult && priorResult && typeof priorResult === 'object'
+      ? priorResult.result || null
+      : null,
+    message: `Cleared manual-test result and infra_blocked counter for ${specGroupId}`,
+  };
+  if (typeof reason === 'string' && reason.trim().length > 0) {
+    historyDetails.reason = reason.trim();
+  }
+  addHistoryEntry(session, 'manual_test_result_cleared', historyDetails);
+  saveSession(session);
+
+  const manifestPath = join(CLAUDE_DIR, 'specs', 'groups', specGroupId, 'manifest.json');
+  if (existsSync(manifestPath)) {
+    try {
+      atomicModifyJSON(manifestPath, (manifest) => {
+        const m = manifest || {};
+        m.decision_log = Array.isArray(m.decision_log) ? m.decision_log : [];
+        let details =
+          `Cleared manual_test_result (had_result=${hadResult}, had_counter=${hadCounter}).`;
+        if (hadResult && priorResult && typeof priorResult === 'object' && priorResult.result) {
+          details += ` PriorResult=${priorResult.result}.`;
+        }
+        if (typeof reason === 'string' && reason.trim().length > 0) {
+          details += ` Reason=${reason.trim().slice(0, 280)}.`;
+        }
+        m.decision_log.push({
+          timestamp: clearedAt,
+          actor: 'agent',
+          action: 'manual_test_result_cleared',
+          details,
+        });
+        return m;
+      });
+    } catch (err) {
+      console.error(
+        `[session-checkpoint] WARNING: failed to append manifest manual-test-clear decision_log entry: ${err.message}`
+      );
+    }
+  }
+
+  console.log(
+    JSON.stringify(
+      {
+        cleared: true,
+        spec_group_id: specGroupId,
+        cleared_manual_test_result: hadResult,
+        cleared_dispatch_infra_blocked_count: hadCounter,
+        cleared_at: clearedAt,
+      },
+      null,
+      2,
+    ),
+  );
+}
+
+// =============================================================================
+// pre-merge-verify CLI ops (sg-pre-merge-verify-20260508 / AS-6)
+// =============================================================================
+
+/**
+ * Closed 22-value reason enum for `session.pre_merge_verify.reason`
+ * (REQ-007 / NFR-12). Order-preserving and KEPT IN SYNC with
+ * `PRE_MERGE_REASON_ENUM` at `.claude/scripts/lib/pre-merge-verify.mjs:97`
+ * and the JSON-Schema enum at
+ * `.claude/specs/schema/session.schema.json:pre_merge_verify.reason`.
+ *
+ * Per AC-7.1: future reasons require PRD amendment per NFR-12.
+ */
+const PRE_MERGE_VERIFY_REASON_ENUM = Object.freeze([
+  // INFRA_BLOCKED bucket (10)
+  'fixture_setup_failed',
+  'fixture_setup_failed_no_script',
+  'boot_failed',
+  'boot_failed_url_invalid',
+  'boot_failed_port_static',
+  'boot_failed_port_conflict',
+  'boot_failed_not_ready',
+  'boot_killed_clean',
+  'boot_killed_force',
+  'boot_kill_failed',
+  // CODE_DEFECT bucket (1)
+  'health_check_failed',
+  // ADVISORY bucket (3)
+  'teardown_failed',
+  'teardown_skipped',
+  'teardown_orphan_kill_failed',
+  // SKIP bucket (5)
+  'no_contract_declared',
+  'no_manifest',
+  'no_routes_for_phase',
+  'no_service_name',
+  'vibe_mode_no_active_work',
+  // SYSTEM_ERROR bucket (3)
+  'pre_merge_verify_lock_timeout',
+  'audit_chain_tamper_detected',
+  'config_invalid_timeout',
+]);
+const PRE_MERGE_VERIFY_REASON_SET = new Set(PRE_MERGE_VERIFY_REASON_ENUM);
+const PRE_MERGE_VERIFY_STATUS_ENUM = Object.freeze(['passed', 'failed', 'skipped']);
+const PRE_MERGE_VERIFY_STATUS_SET = new Set(PRE_MERGE_VERIFY_STATUS_ENUM);
+/**
+ * TECH-104 timeout cap (5 minutes). Matches `PRE_MERGE_MAX_STEP_TIMEOUT_MS`
+ * at `.claude/scripts/lib/pre-merge-verify.mjs:68`.
+ */
+const PRE_MERGE_VERIFY_TIMEOUT_MAX_MS = 300_000;
+
+/**
+ * Path-canonicalization helper for `--evidence-path` under the spec group's
+ * `evidence/` directory. Mirrors `normalizeManualTestEvidencePath`'s discipline
+ * (project-relative, must stay inside `evidence/`).
+ *
+ * @param {string} specGroupId - e.g. `sg-foo-bar`.
+ * @param {string|null|undefined} evidencePath - operator-supplied path
+ *   (project-relative or absolute). Optional.
+ * @returns {string|null} project-relative POSIX path under
+ *   `.claude/specs/groups/<sg>/evidence/`, or null when absent.
+ * @throws {Error} when the path escapes the evidence directory.
+ */
+function normalizePreMergeVerifyEvidencePath(specGroupId, evidencePath) {
+  if (evidencePath === null || evidencePath === undefined || evidencePath === '') {
+    return null;
+  }
+  if (typeof evidencePath !== 'string') {
+    throw new Error('--evidence-path must be a string');
+  }
+  // Reuse manual-tester's helper (it's general-purpose project-root + sg-id +
+  // evidence-dir containment). Pass `requireForResult=false` so an absent
+  // value short-circuits — but we already returned above when absent.
+  return normalizeManualTestEvidencePath(specGroupId, evidencePath, false);
+}
+
+/**
+ * Parse and lightly validate the `--evidence <json>` payload for
+ * record-pre-merge-verify-result. Mirrors the manual-tester
+ * `parseAndValidateInfraBlockedEvidence` discipline (prototype-pollution
+ * defense + length caps + control-char stripping) but is intentionally more
+ * permissive on required-field presence: the orchestrator's `buildEvidence`
+ * helper supplies all four required fields (timestamp, narrative,
+ * dispatch_id, session_id), but operator-driven invocations or pre-Item-A
+ * call sites may supply partial payloads. This validator enforces:
+ *   - Valid JSON object (not array, not primitive)
+ *   - No prototype-pollution sentinel keys
+ *   - No keys outside the documented allow-list (`additionalProperties: false`
+ *     mirror)
+ *   - String typing on textual fields (when present)
+ *   - SEC-002 length caps on narrative + exception_trace
+ *
+ * Returns the parsed-and-sanitized object on success, throws on any
+ * structural rejection. Empty/missing payload returns null (caller decides
+ * whether to throw). Allows callers to omit `--evidence` for non-INFRA_BLOCKED
+ * outcomes without breaking existing invocations.
+ *
+ * @param {string|null|undefined} rawEvidenceJson
+ * @returns {object|null}
+ */
+function parseAndValidatePreMergeVerifyEvidence(rawEvidenceJson) {
+  if (
+    rawEvidenceJson === null ||
+    rawEvidenceJson === undefined ||
+    (typeof rawEvidenceJson === 'string' && rawEvidenceJson.trim().length === 0)
+  ) {
+    return null;
+  }
+  if (typeof rawEvidenceJson !== 'string') {
+    throw new Error('pre-merge-verify --evidence must be a JSON string');
+  }
+
+  let evidence;
+  try {
+    evidence = JSON.parse(rawEvidenceJson);
+  } catch (err) {
+    throw new Error(`pre-merge-verify --evidence is not valid JSON: ${err.message}`);
+  }
+  if (!evidence || typeof evidence !== 'object' || Array.isArray(evidence)) {
+    throw new Error('pre-merge-verify --evidence must be a JSON object');
+  }
+
+  // SEC-001: prototype-pollution sentinel keys (mirror manual-tester defense).
+  for (const forbidden of INFRA_BLOCKED_EVIDENCE_FORBIDDEN_KEYS) {
+    if (Object.prototype.hasOwnProperty.call(evidence, forbidden)) {
+      throw new Error(
+        `pre-merge-verify --evidence contains forbidden key '${forbidden}' (prototype-pollution defense)`
+      );
+    }
+  }
+
+  // SEC-001: allow-list mirror — same shape as InfraBlockedEvidence (5 fields).
+  const allowedSet = new Set(INFRA_BLOCKED_EVIDENCE_ALLOWED_FIELDS);
+  const unknownKeys = Object.keys(evidence).filter((k) => !allowedSet.has(k));
+  if (unknownKeys.length > 0) {
+    throw new Error(
+      `pre-merge-verify --evidence contains unknown fields: ${unknownKeys.join(', ')} ` +
+        `(allowed: ${INFRA_BLOCKED_EVIDENCE_ALLOWED_FIELDS.join(', ')})`
+    );
+  }
+
+  // String-typing checks for textual fields when present.
+  for (const field of ['timestamp', 'narrative', 'dispatch_id', 'session_id']) {
+    if (
+      Object.prototype.hasOwnProperty.call(evidence, field) &&
+      evidence[field] !== null &&
+      evidence[field] !== undefined &&
+      typeof evidence[field] !== 'string'
+    ) {
+      throw new Error(`pre-merge-verify --evidence.${field} must be a string when present`);
+    }
+  }
+  if (
+    Object.prototype.hasOwnProperty.call(evidence, 'exception_trace') &&
+    evidence.exception_trace !== null &&
+    evidence.exception_trace !== undefined &&
+    typeof evidence.exception_trace !== 'string'
+  ) {
+    throw new Error('pre-merge-verify --evidence.exception_trace must be a string when present');
+  }
+
+  // SEC-002: length caps mirror JSON-Schema maxLength on the same sub-object.
+  if (typeof evidence.narrative === 'string' &&
+      evidence.narrative.length > INFRA_BLOCKED_NARRATIVE_MAX_LENGTH) {
+    throw new Error(
+      `pre-merge-verify --evidence.narrative exceeds maximum length: ` +
+        `${evidence.narrative.length} > ${INFRA_BLOCKED_NARRATIVE_MAX_LENGTH}`
+    );
+  }
+  if (typeof evidence.exception_trace === 'string'
+      && evidence.exception_trace.length > INFRA_BLOCKED_EXCEPTION_TRACE_MAX_LENGTH) {
+    throw new Error(
+      `pre-merge-verify --evidence.exception_trace exceeds maximum length: ` +
+        `${evidence.exception_trace.length} > ${INFRA_BLOCKED_EXCEPTION_TRACE_MAX_LENGTH}`
+    );
+  }
+
+  // SEC-006: sanitize operator-supplied strings (control-char strip) for parity
+  // with manual-tester. Pure data fields (timestamp ISO-8601, session_id UUID)
+  // are trusted and not mutated.
+  if (typeof evidence.narrative === 'string') {
+    evidence.narrative = stripControlChars(evidence.narrative);
+  }
+  if (typeof evidence.dispatch_id === 'string') {
+    evidence.dispatch_id = stripControlChars(evidence.dispatch_id);
+  }
+  if (typeof evidence.exception_trace === 'string') {
+    evidence.exception_trace = stripControlChars(evidence.exception_trace);
+  }
+
+  return evidence;
+}
+
+/**
+ * record-pre-merge-verify-result - Trusted writer for `session.pre_merge_verify`.
+ *
+ * Spec: sg-pre-merge-verify-20260508 / AS-6 / AC-7.1.
+ *
+ * Argv:
+ *   record-pre-merge-verify-result <sg-id>
+ *     --status <passed|failed|skipped>
+ *     --reason <enum-from-NFR-12|null>
+ *     [--evidence-path <path>]
+ *     [--evidence <json>]            # OPTIONAL inline structured evidence
+ *                                    # (mirrors InfraBlockedEvidence shape;
+ *                                    # populated by the orchestrator on
+ *                                    # INFRA_BLOCKED-bucket emissions per
+ *                                    # AC-13.1/AC-13.2)
+ *     [--dispatch-id <id>]
+ *     [--audit-seq <int>]
+ *     [--cumulative-ms <int>]
+ *
+ * Per AC-6.1..AC-6.4: the Stop-hook reads `session.pre_merge_verify.status`
+ * and blocks completion when `status === 'failed'`. Writes here are atomic
+ * via `saveSession` (NFR-2 sole-writer). Quarantine and counter writes are
+ * NOT performed by this op — the orchestrator owns them via dedicated CLIs.
+ *
+ * `reason` may be `null` only when `status === 'passed'`. Otherwise the value
+ * MUST be in the closed 22-value enum.
+ *
+ * @param {object} opts
+ * @param {string} opts.specGroupId
+ * @param {string} opts.status
+ * @param {string|null} opts.reason
+ * @param {string|null} [opts.evidencePath]
+ * @param {string|null} [opts.evidenceJson]   Raw JSON string from --evidence
+ * @param {string|null} [opts.dispatchId]
+ * @param {string|null} [opts.auditSeq]
+ * @param {string|null} [opts.cumulativeMs]
+ */
+function opRecordPreMergeVerifyResult(opts) {
+  const {
+    specGroupId,
+    status,
+    reason,
+    evidencePath,
+    evidenceJson,
+    dispatchId,
+    auditSeq,
+    cumulativeMs,
+  } = opts;
+
+  if (!specGroupId || !/^sg-[a-z0-9-]+$/.test(specGroupId)) {
+    throw new Error(
+      'Usage: record-pre-merge-verify-result <spec_group_id> --status <passed|failed|skipped> ' +
+        '--reason <enum|null> [--evidence-path <path>] [--dispatch-id <id>] ' +
+        '[--audit-seq <int>] [--cumulative-ms <int>]'
+    );
+  }
+  if (!PRE_MERGE_VERIFY_STATUS_SET.has(status)) {
+    throw new Error(
+      `pre-merge-verify status must be one of: ${PRE_MERGE_VERIFY_STATUS_ENUM.join(', ')}`
+    );
+  }
+
+  // Reason validation: 'null' string and absent both decode to null. Otherwise
+  // must be in the closed enum.
+  let canonicalReason = null;
+  if (reason !== null && reason !== undefined && reason !== '' && reason !== 'null') {
+    if (typeof reason !== 'string' || !PRE_MERGE_VERIFY_REASON_SET.has(reason)) {
+      throw new Error(
+        `pre-merge-verify reason must be in the closed 22-value enum (REQ-007 / NFR-12) or 'null'; ` +
+          `got '${reason}'`
+      );
+    }
+    canonicalReason = reason;
+  }
+  if (status === 'failed' && canonicalReason === null) {
+    throw new Error("pre-merge-verify status='failed' requires a non-null --reason");
+  }
+
+  // M5 fix (code-review Pass 1): cross-validate (status, reason) bucket
+  // coherence. The closed 22-value reason enum is partitioned into five
+  // buckets (INFRA_BLOCKED, CODE_DEFECT, ADVISORY, SKIP, SYSTEM_ERROR) and
+  // each bucket is wired to a specific status:
+  //   passed  ←  null | ADVISORY-bucket | SKIP-bucket
+  //   failed  ←  INFRA_BLOCKED | CODE_DEFECT | SYSTEM_ERROR
+  //   skipped ←  SKIP-bucket
+  // Without this gate, an orchestrator bug could persist incoherent combos
+  // such as (passed, health_check_failed) or (skipped, boot_failed) — both
+  // of which would mislead the Stop-hook decision (and audit). This map
+  // mirrors PRE_MERGE_REASON_BUCKET in .claude/scripts/lib/pre-merge-verify.mjs:136.
+  const PRE_MERGE_VERIFY_REASON_BUCKET_LOCAL = Object.freeze({
+    fixture_setup_failed: 'INFRA_BLOCKED',
+    fixture_setup_failed_no_script: 'INFRA_BLOCKED',
+    boot_failed: 'INFRA_BLOCKED',
+    boot_failed_url_invalid: 'INFRA_BLOCKED',
+    boot_failed_port_static: 'INFRA_BLOCKED',
+    boot_failed_port_conflict: 'INFRA_BLOCKED',
+    boot_failed_not_ready: 'INFRA_BLOCKED',
+    boot_killed_clean: 'INFRA_BLOCKED',
+    boot_killed_force: 'INFRA_BLOCKED',
+    boot_kill_failed: 'INFRA_BLOCKED',
+    health_check_failed: 'CODE_DEFECT',
+    teardown_failed: 'ADVISORY',
+    teardown_skipped: 'ADVISORY',
+    teardown_orphan_kill_failed: 'ADVISORY',
+    no_contract_declared: 'SKIP',
+    no_manifest: 'SKIP',
+    no_routes_for_phase: 'SKIP',
+    no_service_name: 'SKIP',
+    vibe_mode_no_active_work: 'SKIP',
+    pre_merge_verify_lock_timeout: 'SYSTEM_ERROR',
+    audit_chain_tamper_detected: 'SYSTEM_ERROR',
+    config_invalid_timeout: 'SYSTEM_ERROR',
+  });
+  if (canonicalReason !== null) {
+    const bucket = PRE_MERGE_VERIFY_REASON_BUCKET_LOCAL[canonicalReason];
+    // Defensive: every enum entry must be in the bucket map. If a future
+    // PRD amendment adds an enum value but forgets the bucket map, this
+    // surfaces immediately rather than silently passing.
+    if (!bucket) {
+      throw new Error(
+        `pre-merge-verify bucket map is missing reason '${canonicalReason}'; ` +
+          'PRD amendment must update both PRE_MERGE_VERIFY_REASON_ENUM and the bucket map.'
+      );
+    }
+    if (status === 'passed') {
+      if (bucket !== 'ADVISORY' && bucket !== 'SKIP') {
+        throw new Error(
+          `pre-merge-verify incoherent (status, reason): status='passed' requires reason ` +
+            `in {null, ADVISORY-bucket, SKIP-bucket}; got reason='${canonicalReason}' (bucket=${bucket}).`
+        );
+      }
+    } else if (status === 'failed') {
+      if (bucket !== 'INFRA_BLOCKED' && bucket !== 'CODE_DEFECT' && bucket !== 'SYSTEM_ERROR') {
+        throw new Error(
+          `pre-merge-verify incoherent (status, reason): status='failed' requires reason ` +
+            `in {INFRA_BLOCKED, CODE_DEFECT, SYSTEM_ERROR}; got reason='${canonicalReason}' (bucket=${bucket}).`
+        );
+      }
+    } else if (status === 'skipped') {
+      if (bucket !== 'SKIP') {
+        throw new Error(
+          `pre-merge-verify incoherent (status, reason): status='skipped' requires reason ` +
+            `in SKIP-bucket; got reason='${canonicalReason}' (bucket=${bucket}).`
+        );
+      }
+    }
+  }
+
+  const normalizedEvidencePath = normalizePreMergeVerifyEvidencePath(specGroupId, evidencePath);
+  const canonicalDispatchId =
+    dispatchId !== null && dispatchId !== undefined && String(dispatchId).trim() !== ''
+      ? stripControlChars(String(dispatchId).trim())
+      : null;
+
+  let canonicalAuditSeq = null;
+  if (auditSeq !== null && auditSeq !== undefined && String(auditSeq).trim() !== '') {
+    const parsed = Number(auditSeq);
+    if (!Number.isInteger(parsed) || parsed < 0) {
+      throw new Error('--audit-seq must be a non-negative integer');
+    }
+    canonicalAuditSeq = parsed;
+  }
+  let canonicalCumulativeMs = null;
+  if (cumulativeMs !== null && cumulativeMs !== undefined && String(cumulativeMs).trim() !== '') {
+    const parsed = Number(cumulativeMs);
+    if (!Number.isInteger(parsed) || parsed < 0) {
+      throw new Error('--cumulative-ms must be a non-negative integer');
+    }
+    canonicalCumulativeMs = parsed;
+  }
+
+  const session = loadSession();
+  if (!session) {
+    throw new Error('No session.json exists. Run "init" first.');
+  }
+  if (!session.active_work) {
+    throw new Error('No active_work in session. Run "start-work" first.');
+  }
+  if (session.active_work.spec_group_id !== specGroupId) {
+    throw new Error(
+      `Active spec_group_id is ${session.active_work.spec_group_id || '<missing>'}, not ${specGroupId}`
+    );
+  }
+
+  // BUG-FIX-2026-05-09 (Bug 2): parse + validate the inline `--evidence` JSON
+  // payload (when supplied) and persist it as `session.pre_merge_verify.evidence`.
+  // The orchestrator passes structured trigger evidence for INFRA_BLOCKED-bucket
+  // emissions per AC-13.1/AC-13.2; the persisted shape mirrors Item A's
+  // InfraBlockedEvidence (timestamp, narrative, exception_trace?, dispatch_id,
+  // session_id) and feeds the Stop-hook block-reason audit-chain inheritance.
+  const canonicalEvidence = parseAndValidatePreMergeVerifyEvidence(evidenceJson);
+
+  const recordedAt = now();
+  const record = {
+    status,
+    reason: canonicalReason,
+    timestamp: recordedAt,
+  };
+  if (canonicalAuditSeq !== null) record.audit_seq = canonicalAuditSeq;
+  if (canonicalDispatchId !== null) record.dispatch_id = canonicalDispatchId;
+  if (canonicalCumulativeMs !== null) record.cumulative_ms = canonicalCumulativeMs;
+  if (normalizedEvidencePath !== null) record.evidence_path = normalizedEvidencePath;
+  if (canonicalEvidence !== null) record.evidence = canonicalEvidence;
+  // Preserve quarantine flag across writes — orchestrator owns the field.
+  const priorRecord = session.pre_merge_verify;
+  if (priorRecord && priorRecord.quarantine_until_acknowledged === true) {
+    record.quarantine_until_acknowledged = true;
+  }
+
+  session.pre_merge_verify = record;
+
+  if (!Array.isArray(session.history)) {
+    session.history = [];
+  }
+  addHistoryEntry(session, 'pre_merge_verify_recorded', {
+    spec_group_id: specGroupId,
+    status,
+    reason: canonicalReason,
+    audit_seq: canonicalAuditSeq,
+    dispatch_id: canonicalDispatchId,
+    evidence_path: normalizedEvidencePath,
+    // AC-13.2: capture evidence in audit chain BEFORE downstream Stop-hook
+    // emits its block decision. Inline evidence is written to history so
+    // operators can reconstruct the trigger context post-hoc.
+    evidence: canonicalEvidence,
+    cumulative_ms: canonicalCumulativeMs,
+    message: `Recorded pre-merge-verify result for ${specGroupId}: status=${status} reason=${canonicalReason || '<none>'}`,
+  });
+  saveSession(session);
+
+  const manifestPath = join(CLAUDE_DIR, 'specs', 'groups', specGroupId, 'manifest.json');
+  if (existsSync(manifestPath)) {
+    try {
+      atomicModifyJSON(manifestPath, (manifest) => {
+        const m = manifest || {};
+        m.decision_log = Array.isArray(m.decision_log) ? m.decision_log : [];
+        let details =
+          `pre-merge-verify status=${status}, reason=${canonicalReason || '<none>'}.`;
+        if (canonicalDispatchId) details += ` Dispatch=${canonicalDispatchId}.`;
+        if (Number.isInteger(canonicalAuditSeq)) details += ` AuditSeq=${canonicalAuditSeq}.`;
+        if (Number.isInteger(canonicalCumulativeMs)) {
+          details += ` CumulativeMs=${canonicalCumulativeMs}.`;
+        }
+        m.decision_log.push({
+          timestamp: recordedAt,
+          actor: 'agent',
+          action: 'pre_merge_verify_recorded',
+          details,
+        });
+        return m;
+      });
+    } catch (err) {
+      console.error(
+        `[session-checkpoint] WARNING: failed to append manifest pre-merge-verify decision_log entry: ${err.message}`
+      );
+    }
+  }
+
+  console.log(JSON.stringify({ recorded: true, pre_merge_verify: record }, null, 2));
+}
+
+/**
+ * clear-pre-merge-quarantine - Operator escape hatch for clearing the
+ * `quarantine_until_acknowledged` flag on `session.pre_merge_verify`.
+ *
+ * Spec: sg-pre-merge-verify-20260508 / AS-6 / AC-9.5 / NFR-25.
+ *
+ * Atomically deletes:
+ *   - session.pre_merge_verify.quarantine_until_acknowledged
+ *
+ * Atomically appends:
+ *   - session.history `pre_merge_verify_quarantine_cleared` entry
+ *   - manifest.json decision_log mirrored entry
+ *
+ * Mirrors `opClearManualTestResult`'s pattern (single saveSession,
+ * idempotent). Per spec § Advisory clarifications #5: the operator is
+ * expected to coordinate with any in-flight gate run via the lock at
+ * `.claude/coordination/pre-merge-verify.lock`. This op does NOT acquire the
+ * lock — it manipulates session-state only. The orchestrator's lock
+ * acquisition is concurrency-safe with this CLI because saveSession is
+ * read-modify-write atomic per NFR-2.
+ *
+ * @param {string} specGroupId Positional first argument.
+ * @param {string|null} reason Optional --reason flag for audit narrative.
+ */
+function opClearPreMergeQuarantine(specGroupId, reason) {
+  if (!specGroupId || !/^sg-[a-z0-9-]+$/.test(specGroupId)) {
+    throw new Error(
+      'Usage: clear-pre-merge-quarantine <spec_group_id> [--reason "<text>"]'
+    );
+  }
+  if (typeof reason !== 'string' || reason.trim().length === 0) {
+    process.stderr.write(
+      '[clear-pre-merge-quarantine] WARNING: invoked without --reason; consider documenting the resolution narrative inline for audit-chain clarity\n'
+    );
+  }
+
+  const session = loadSession();
+  if (!session) {
+    throw new Error('No session.json exists. Run "init" first.');
+  }
+  if (!session.active_work) {
+    throw new Error('No active_work in session. Run "start-work" first.');
+  }
+  if (session.active_work.spec_group_id !== specGroupId) {
+    throw new Error(
+      `Active spec_group_id is ${session.active_work.spec_group_id || '<missing>'}, not ${specGroupId}`
+    );
+  }
+
+  const prior = session.pre_merge_verify;
+  const hadQuarantine =
+    !!prior && typeof prior === 'object' && prior.quarantine_until_acknowledged === true;
+  const priorReason = prior && typeof prior === 'object' ? prior.reason : null;
+  const priorStatus = prior && typeof prior === 'object' ? prior.status : null;
+
+  if (hadQuarantine) {
+    delete session.pre_merge_verify.quarantine_until_acknowledged;
+  }
+
+  if (!Array.isArray(session.history)) {
+    session.history = [];
+  }
+  const clearedAt = now();
+  const historyDetails = {
+    spec_group_id: specGroupId,
+    cleared_quarantine: hadQuarantine,
+    prior_status: priorStatus,
+    prior_reason: priorReason,
+    message: `Cleared pre-merge-verify quarantine for ${specGroupId} (had_quarantine=${hadQuarantine})`,
+  };
+  if (typeof reason === 'string' && reason.trim().length > 0) {
+    historyDetails.reason = reason.trim();
+  }
+  addHistoryEntry(session, 'pre_merge_verify_quarantine_cleared', historyDetails);
+  saveSession(session);
+
+  const manifestPath = join(CLAUDE_DIR, 'specs', 'groups', specGroupId, 'manifest.json');
+  if (existsSync(manifestPath)) {
+    try {
+      atomicModifyJSON(manifestPath, (manifest) => {
+        const m = manifest || {};
+        m.decision_log = Array.isArray(m.decision_log) ? m.decision_log : [];
+        let details = `Cleared pre-merge-verify quarantine (had_quarantine=${hadQuarantine}).`;
+        if (priorStatus) details += ` PriorStatus=${priorStatus}.`;
+        if (priorReason) details += ` PriorReason=${priorReason}.`;
+        if (typeof reason === 'string' && reason.trim().length > 0) {
+          details += ` Reason=${reason.trim().slice(0, 280)}.`;
+        }
+        m.decision_log.push({
+          timestamp: clearedAt,
+          actor: 'agent',
+          action: 'pre_merge_verify_quarantine_cleared',
+          details,
+        });
+        return m;
+      });
+    } catch (err) {
+      console.error(
+        `[session-checkpoint] WARNING: failed to append manifest clear-pre-merge-quarantine decision_log entry: ${err.message}`
+      );
+    }
+  }
+
+  console.log(
+    JSON.stringify(
+      {
+        cleared: true,
+        spec_group_id: specGroupId,
+        cleared_quarantine: hadQuarantine,
+        cleared_at: clearedAt,
+      },
+      null,
+      2
+    )
+  );
+}
+
+/**
+ * recordAuditEvent - In-process audit-event emitter for the pre-merge-verify
+ * orchestrator (DEC-006).
+ *
+ * The AS-5 orchestrator runs five pipeline steps and emits one audit event
+ * per step (≈10 emissions per gate run when including bracket/teardown
+ * advisories). Spawning the CLI 10× per run is unacceptable; per DEC-006 the
+ * orchestrator imports this named export and writes through it directly.
+ * The `record-audit-event` CLI subcommand routes through this same function
+ * so the two entry points share the same atomic read-assert-write logic.
+ *
+ * Audit-chain monotonicity (NFR-22+SEC-107):
+ *   - Bootstrap: `session.audit.next_seq = 0` (lazy on first call). Per
+ *     DEC-009 the `audit` field is OPTIONAL on the session root; pre-Item-B
+ *     sessions are migrated lazily here.
+ *   - First emission writes `audit_seq: 0` (no monotonicity assertion).
+ *   - Subsequent emissions assert `new_seq === prior_seq + 1`.
+ *
+ * Sole-writer: this function is the only writer of `session.audit.next_seq`
+ * (and the only writer of `session.history` audit entries with the
+ * `audit_seq` field set by us). Callers SHOULD pass through this entry
+ * point rather than mutating session state directly.
+ *
+ * @param {object} args
+ * @param {string} args.eventName - Event class label, e.g. `pre_merge_verify_step_start`.
+ * @param {object} [args.payload] - Structured event payload (will be redacted of
+ *   raw bytes by `stripControlChars` for any string values that look operator-supplied).
+ * @returns {{audit_seq: number, recorded_at: string}} the assigned audit_seq
+ *   and ISO timestamp.
+ */
+export function recordAuditEvent(args) {
+  const { eventName, payload } = args || {};
+  if (typeof eventName !== 'string' || eventName.trim().length === 0) {
+    throw new Error('recordAuditEvent: eventName must be a non-empty string');
+  }
+  if (payload !== undefined && (typeof payload !== 'object' || Array.isArray(payload))) {
+    throw new Error('recordAuditEvent: payload must be an object when present');
+  }
+
+  const session = loadSession();
+  if (!session) {
+    throw new Error('recordAuditEvent: no session.json exists. Run "init" first.');
+  }
+
+  // DEC-009: lazy bootstrap of session.audit. Pre-Item-B sessions lack the
+  // field; migrate to {next_seq: 0} on first call. NO explicit migration
+  // step required.
+  if (
+    !session.audit
+    || typeof session.audit !== 'object'
+    || Array.isArray(session.audit)
+  ) {
+    session.audit = { next_seq: 0 };
+  }
+  // H2 fix (sg-pre-merge-verify-20260508 code-review Pass 1):
+  // Previously this branch silently reset `next_seq` to 0 when the field was
+  // non-integer or negative. That made `audit_chain_tamper_detected`
+  // unreachable in practice — every tampered chain quietly recovered, and
+  // the SYSTEM_ERROR-bucket reason existed in the enum but could never fire
+  // (NFR-22+SEC-107 was not enforced). Now we throw a typed
+  // `audit_chain_tamper_detected` error so the orchestrator's outer
+  // try/catch can map it to a 'failed' result and the operator can recover
+  // via `repair-audit-chain`. Monotonicity is also asserted against the
+  // highest history seq so injection of a smaller `next_seq` after a real
+  // emission is also detected.
+  if (!Number.isInteger(session.audit.next_seq) || session.audit.next_seq < 0) {
+    const err = new Error(
+      `audit_chain_tamper_detected: session.audit.next_seq is non-integer or negative ` +
+        `(got ${JSON.stringify(session.audit.next_seq)}). ` +
+        `Recover via: node .claude/scripts/session-checkpoint.mjs repair-audit-chain <sg-id>.`
+    );
+    err.code = 'AUDIT_CHAIN_TAMPER';
+    throw err;
+  }
+  // Monotonicity defense: if a previous audit history entry exists with a
+  // larger seq than `next_seq`, the chain was rewound. Detect and surface.
+  if (Array.isArray(session.history)) {
+    let highestSeen = -1;
+    for (const entry of session.history) {
+      const seq = entry?.details?.audit_seq;
+      if (Number.isInteger(seq) && seq > highestSeen) highestSeen = seq;
+    }
+    if (highestSeen >= 0 && session.audit.next_seq <= highestSeen) {
+      const err = new Error(
+        `audit_chain_tamper_detected: session.audit.next_seq (${session.audit.next_seq}) ` +
+          `is not greater than the highest existing audit_seq in history (${highestSeen}). ` +
+          `Recover via: node .claude/scripts/session-checkpoint.mjs repair-audit-chain <sg-id>.`
+      );
+      err.code = 'AUDIT_CHAIN_TAMPER';
+      throw err;
+    }
+  }
+
+  const assignedSeq = session.audit.next_seq;
+  session.audit.next_seq = assignedSeq + 1;
+
+  const recordedAt = now();
+  if (!Array.isArray(session.history)) {
+    session.history = [];
+  }
+  addHistoryEntry(session, eventName, {
+    audit_seq: assignedSeq,
+    payload: payload || {},
+    message: `audit_event ${eventName} (seq=${assignedSeq})`,
+  });
+  saveSession(session);
+
+  return { audit_seq: assignedSeq, recorded_at: recordedAt };
+}
+
+/**
+ * setPreMergeQuarantineFlag - In-process quarantine-flag writer for the
+ * pre-merge-verify orchestrator (H1 code-review Pass 1).
+ *
+ * Spec: sg-pre-merge-verify-20260508 / AS-6 / AC-9.5 / NFR-25.
+ *
+ * The orchestrator's teardown step exits non-zero when consumer cleanup
+ * fails. Per AC-9.5 / NFR-25 a teardown failure (or teardown_orphan_kill_failed)
+ * MUST set `session.pre_merge_verify.quarantine_until_acknowledged = true`
+ * so the next gate run halts at NFR-26 step 3 until the operator acknowledges
+ * via `clear-pre-merge-quarantine`. The orchestrator previously had no
+ * named-export to set this flag in-process, so the field was never written
+ * even on advisory teardown failures — quarantine semantics existed only on
+ * paper.
+ *
+ * This function is the dedicated writer. It mirrors the discipline of
+ * `recordAuditEvent` (sole-writer for `session.audit.next_seq`) and
+ * `opRecordPreMergeVerifyResult` (sole-writer for `session.pre_merge_verify`):
+ * read-modify-write atomic via `saveSession`, history entry appended for
+ * audit-chain replay, manifest decision_log mirrored. Idempotent: setting
+ * the flag a second time leaves it true; clearing via
+ * `clear-pre-merge-quarantine` is the operator-facing reverse.
+ *
+ * Sole-writer: this function is the only writer that creates the
+ * `quarantine_until_acknowledged` field on `session.pre_merge_verify`.
+ * `opRecordPreMergeVerifyResult` PRESERVES the flag across writes (lines
+ * 4288-4291) but does not create it.
+ *
+ * @param {string} specGroupId - Spec group id; must match
+ *   session.active_work.spec_group_id (defense against cross-group writes).
+ * @param {boolean} flagValue - True to set the flag; false to clear it
+ *   (operators should prefer `clear-pre-merge-quarantine` for the clear path
+ *   so audit-chain narrative is captured — this seam exists primarily for
+ *   the orchestrator's teardown-failed write).
+ * @returns {{set: boolean, prior_status: string|null, prior_reason: string|null,
+ *   recorded_at: string}} the operation result.
+ */
+export function setPreMergeQuarantineFlag(specGroupId, flagValue) {
+  if (!specGroupId || typeof specGroupId !== 'string' || !/^sg-[a-z0-9-]+$/.test(specGroupId)) {
+    throw new Error(
+      'setPreMergeQuarantineFlag: specGroupId must match /^sg-[a-z0-9-]+$/'
+    );
+  }
+  if (typeof flagValue !== 'boolean') {
+    throw new Error('setPreMergeQuarantineFlag: flagValue must be a boolean');
+  }
+
+  const session = loadSession();
+  if (!session) {
+    throw new Error('setPreMergeQuarantineFlag: no session.json exists. Run "init" first.');
+  }
+  if (!session.active_work) {
+    throw new Error('setPreMergeQuarantineFlag: no active_work in session. Run "start-work" first.');
+  }
+  if (session.active_work.spec_group_id !== specGroupId) {
+    throw new Error(
+      `setPreMergeQuarantineFlag: active spec_group_id is ${session.active_work.spec_group_id || '<missing>'}, not ${specGroupId}`
+    );
+  }
+
+  const prior = session.pre_merge_verify;
+  const priorStatus = prior && typeof prior === 'object' ? prior.status ?? null : null;
+  const priorReason = prior && typeof prior === 'object' ? prior.reason ?? null : null;
+
+  // The orchestrator may invoke this BEFORE record-pre-merge-verify-result has
+  // persisted the result envelope. Initialize a minimal record so the flag
+  // has somewhere to live, then let the result-writer overlay status/reason
+  // (which preserves the flag per its existing logic).
+  if (!prior || typeof prior !== 'object' || Array.isArray(prior)) {
+    session.pre_merge_verify = {};
+  }
+
+  if (flagValue) {
+    session.pre_merge_verify.quarantine_until_acknowledged = true;
+  } else if (
+    Object.prototype.hasOwnProperty.call(session.pre_merge_verify, 'quarantine_until_acknowledged')
+  ) {
+    delete session.pre_merge_verify.quarantine_until_acknowledged;
+  }
+
+  if (!Array.isArray(session.history)) {
+    session.history = [];
+  }
+  const recordedAt = now();
+  addHistoryEntry(
+    session,
+    flagValue ? 'pre_merge_verify_quarantine_set' : 'pre_merge_verify_quarantine_cleared',
+    {
+      spec_group_id: specGroupId,
+      flag_value: flagValue,
+      prior_status: priorStatus,
+      prior_reason: priorReason,
+      message:
+        `${flagValue ? 'Set' : 'Cleared'} pre-merge-verify quarantine flag for ${specGroupId}`,
+    }
+  );
+  saveSession(session);
+
+  return {
+    set: flagValue,
+    prior_status: priorStatus,
+    prior_reason: priorReason,
+    recorded_at: recordedAt,
+  };
+}
+
+/**
+ * record-audit-event CLI op — delegates to `recordAuditEvent` named export.
+ *
+ * Argv:
+ *   record-audit-event <event-name> --payload '<json>'
+ *
+ * Per DEC-006: this CLI exists for operator/test invocation; the AS-5
+ * orchestrator uses the in-process `recordAuditEvent` named export to avoid
+ * 10× CLI spawn per gate run.
+ *
+ * @param {string} eventName
+ * @param {string|null} rawPayloadJson
+ */
+function opRecordAuditEvent(eventName, rawPayloadJson) {
+  if (typeof eventName !== 'string' || eventName.trim().length === 0) {
+    throw new Error(
+      "Usage: record-audit-event <event-name> [--payload '<json>']"
+    );
+  }
+  let payload = {};
+  if (rawPayloadJson !== null && rawPayloadJson !== undefined && rawPayloadJson !== '') {
+    if (typeof rawPayloadJson !== 'string') {
+      throw new Error('--payload must be a JSON string');
+    }
+    try {
+      payload = JSON.parse(rawPayloadJson);
+    } catch (err) {
+      throw new Error(`--payload is not valid JSON: ${err.message}`);
+    }
+    if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+      throw new Error('--payload must be a JSON object');
+    }
+  }
+
+  const result = recordAuditEvent({ eventName: eventName.trim(), payload });
+  console.log(JSON.stringify({ recorded: true, ...result }, null, 2));
+}
+
+/**
+ * repair-audit-chain - Operator escape hatch for `audit_chain_tamper_detected`.
+ *
+ * Spec: sg-pre-merge-verify-20260508 / AS-6 / AC-9.7.
+ *
+ * Resets `session.audit.next_seq` to 0 and clears any orchestrator-set
+ * `pre_merge_verify` state with `reason === 'audit_chain_tamper_detected'`.
+ * Appends an `audit_chain_repaired` history entry and mirrored manifest
+ * decision_log entry. Subsequent `recordAuditEvent` calls bootstrap from 0
+ * (no monotonicity assertion on first emission).
+ *
+ * @param {string} specGroupId
+ * @param {string|null} reason Optional --reason for audit narrative.
+ */
+function opRepairAuditChain(specGroupId, reason) {
+  if (!specGroupId || !/^sg-[a-z0-9-]+$/.test(specGroupId)) {
+    throw new Error(
+      'Usage: repair-audit-chain <spec_group_id> [--reason "<text>"]'
+    );
+  }
+  if (typeof reason !== 'string' || reason.trim().length === 0) {
+    process.stderr.write(
+      '[repair-audit-chain] WARNING: invoked without --reason; consider documenting the resolution narrative inline for audit-chain clarity\n'
+    );
+  }
+
+  const session = loadSession();
+  if (!session) {
+    throw new Error('No session.json exists. Run "init" first.');
+  }
+  if (!session.active_work) {
+    throw new Error('No active_work in session. Run "start-work" first.');
+  }
+  if (session.active_work.spec_group_id !== specGroupId) {
+    throw new Error(
+      `Active spec_group_id is ${session.active_work.spec_group_id || '<missing>'}, not ${specGroupId}`
+    );
+  }
+
+  const priorAudit = session.audit;
+  const priorNextSeq =
+    priorAudit && typeof priorAudit === 'object' && Number.isInteger(priorAudit.next_seq)
+      ? priorAudit.next_seq
+      : null;
+  session.audit = { next_seq: 0 };
+
+  // Clear any tamper-failed pre_merge_verify result so the next gate run is
+  // not blocked by stale state. Quarantine flag (separate field per spec) is
+  // intentionally NOT cleared here — operator must run clear-pre-merge-quarantine
+  // separately if needed.
+  let clearedTamperResult = false;
+  const priorPMV = session.pre_merge_verify;
+  if (
+    priorPMV
+    && typeof priorPMV === 'object'
+    && priorPMV.reason === 'audit_chain_tamper_detected'
+  ) {
+    delete session.pre_merge_verify;
+    clearedTamperResult = true;
+  }
+
+  if (!Array.isArray(session.history)) {
+    session.history = [];
+  }
+  const repairedAt = now();
+  const historyDetails = {
+    spec_group_id: specGroupId,
+    prior_next_seq: priorNextSeq,
+    reset_next_seq: 0,
+    cleared_tamper_result: clearedTamperResult,
+    message: `Repaired audit chain for ${specGroupId} (prior_next_seq=${priorNextSeq})`,
+  };
+  if (typeof reason === 'string' && reason.trim().length > 0) {
+    historyDetails.reason = reason.trim();
+  }
+  addHistoryEntry(session, 'audit_chain_repaired', historyDetails);
+  saveSession(session);
+
+  const manifestPath = join(CLAUDE_DIR, 'specs', 'groups', specGroupId, 'manifest.json');
+  if (existsSync(manifestPath)) {
+    try {
+      atomicModifyJSON(manifestPath, (manifest) => {
+        const m = manifest || {};
+        m.decision_log = Array.isArray(m.decision_log) ? m.decision_log : [];
+        let details =
+          `Repaired audit chain (prior_next_seq=${priorNextSeq}, reset_next_seq=0, ` +
+          `cleared_tamper_result=${clearedTamperResult}).`;
+        if (typeof reason === 'string' && reason.trim().length > 0) {
+          details += ` Reason=${reason.trim().slice(0, 280)}.`;
+        }
+        m.decision_log.push({
+          timestamp: repairedAt,
+          actor: 'agent',
+          action: 'audit_chain_repaired',
+          details,
+        });
+        return m;
+      });
+    } catch (err) {
+      console.error(
+        `[session-checkpoint] WARNING: failed to append manifest repair-audit-chain decision_log entry: ${err.message}`
+      );
+    }
+  }
+
+  console.log(
+    JSON.stringify(
+      {
+        repaired: true,
+        spec_group_id: specGroupId,
+        prior_next_seq: priorNextSeq,
+        cleared_tamper_result: clearedTamperResult,
+        repaired_at: repairedAt,
+      },
+      null,
+      2
+    )
+  );
+}
+
+/**
+ * validate-pre-merge-verify-config - TECH-104 Zod validator for the
+ * consumer's `package.json`-level pre-merge-verify config fields.
+ *
+ * Spec: sg-pre-merge-verify-20260508 / AS-6 / AC-3.3 / TECH-104 / DEC-010.
+ *
+ * Validates:
+ *   - `pre_merge_verify_timeout_ms` (optional, integer, > 0, <= 300000ms).
+ *   - `pre_merge_verify_port_allowlist` (optional, array of integers, each > 1024).
+ *   - `pre_merge_readiness_path` (optional, string starting with `/`).
+ *
+ * Failure surfaces structured `config_invalid_timeout` (or related) rejection
+ * with exit code 1.
+ *
+ * @param {string} packageJsonPath - Path to consumer's package.json.
+ */
+function opValidatePreMergeVerifyConfig(packageJsonPath) {
+  if (typeof packageJsonPath !== 'string' || packageJsonPath.trim().length === 0) {
+    throw new Error('Usage: validate-pre-merge-verify-config <path-to-package.json>');
+  }
+  const resolvedPath = resolve(packageJsonPath);
+  if (!existsSync(resolvedPath)) {
+    throw new Error(`package.json not found at ${resolvedPath}`);
+  }
+  let parsed;
+  try {
+    parsed = JSON.parse(readFileSync(resolvedPath, 'utf8'));
+  } catch (err) {
+    throw new Error(`package.json at ${resolvedPath} is not valid JSON: ${err.message}`);
+  }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    throw new Error(`package.json at ${resolvedPath} must be a JSON object`);
+  }
+
+  const errors = [];
+
+  // pre_merge_verify_timeout_ms (TECH-104).
+  const timeout = parsed.pre_merge_verify_timeout_ms;
+  if (timeout !== undefined && timeout !== null) {
+    if (!Number.isInteger(timeout)) {
+      errors.push(
+        'config_invalid_timeout: pre_merge_verify_timeout_ms must be an integer'
+      );
+    } else if (timeout <= 0) {
+      errors.push(
+        'config_invalid_timeout: pre_merge_verify_timeout_ms must be positive'
+      );
+    } else if (timeout > PRE_MERGE_VERIFY_TIMEOUT_MAX_MS) {
+      errors.push(
+        `config_invalid_timeout: pre_merge_verify_timeout_ms must be <= ${PRE_MERGE_VERIFY_TIMEOUT_MAX_MS}ms (5 minutes); got ${timeout}`
+      );
+    }
+  }
+
+  // pre_merge_verify_port_allowlist (NFR-18).
+  const portAllowlist = parsed.pre_merge_verify_port_allowlist;
+  if (portAllowlist !== undefined && portAllowlist !== null) {
+    if (!Array.isArray(portAllowlist)) {
+      errors.push(
+        'config_invalid: pre_merge_verify_port_allowlist must be an array of integers'
+      );
+    } else {
+      for (let i = 0; i < portAllowlist.length; i++) {
+        const p = portAllowlist[i];
+        if (!Number.isInteger(p) || p <= 1024 || p > 65535) {
+          errors.push(
+            `config_invalid: pre_merge_verify_port_allowlist[${i}]=${p} must be an integer in (1024, 65535]`
+          );
+        }
+      }
+    }
+  }
+
+  // pre_merge_readiness_path (defaults to /healthz when absent).
+  const readinessPath = parsed.pre_merge_readiness_path;
+  if (readinessPath !== undefined && readinessPath !== null) {
+    if (typeof readinessPath !== 'string' || !readinessPath.startsWith('/')) {
+      errors.push(
+        "config_invalid: pre_merge_readiness_path must be a string starting with '/'"
+      );
+    }
+  }
+
+  if (errors.length > 0) {
+    process.stderr.write(
+      `[validate-pre-merge-verify-config] FAIL: ${errors.length} error(s)\n`
+    );
+    for (const e of errors) process.stderr.write(`  - ${e}\n`);
+    console.log(
+      JSON.stringify({ valid: false, errors, package_json_path: resolvedPath }, null, 2)
+    );
+    process.exit(1);
+  }
+
+  const result = {
+    valid: true,
+    package_json_path: resolvedPath,
+    pre_merge_verify_timeout_ms: timeout ?? null,
+    pre_merge_verify_port_allowlist: Array.isArray(portAllowlist) ? portAllowlist : null,
+    pre_merge_readiness_path: typeof readinessPath === 'string' ? readinessPath : null,
+  };
+  console.log(JSON.stringify(result, null, 2));
 }
 
 /**
@@ -8494,12 +9999,43 @@ Operations:
                                                    Track subagent dispatch
   complete-subagent <task_id> <result_summary>    Mark subagent complete
   record-manual-test-result <sg-id>               Record structured /manual-test result
-    --result <pass|fail|blocked>                   Required.
+    --result <pass|fail|blocked|infra_blocked>     Required.
     --scenario-count <N>                           Required. Number of scenarios attempted.
     --pass-count <N>                               Required.
     --fail-count <N>                               Required.
-    --evidence-path <path>                         Required for pass/fail; must be under evidence/.
+    --evidence-path <path>                         Required for pass/fail; optional for
+                                                   blocked / infra_blocked. Must be under evidence/.
     --top-residual-risk "<text>"                   Optional one-line risk summary.
+    --evidence <json>                              Required for infra_blocked; structured
+                                                   InfraBlockedEvidence payload (timestamp,
+                                                   narrative, dispatch_id, session_id;
+                                                   exception_trace optional). Ignored for
+                                                   pass|fail|blocked.
+    --dispatch-id <id>                             Required for infra_blocked; MUST match
+                                                   evidence.dispatch_id (mismatch rejected
+                                                   with structured 'dispatch_id mismatch').
+                                                   Optional for pass|fail|blocked.
+  clear-manual-test-result <sg-id>                Operator escape hatch: atomically clear
+    [--reason "<text>"]                            session.active_work.manual_test_result and
+                                                   dispatch_infra_blocked_count. Required to
+                                                   resume after an infra_blocked terminal block.
+                                                   Optional --reason captured in audit chain.
+  record-pre-merge-verify-result <sg-id>          Sole-writer for session.pre_merge_verify
+    --status <passed|failed|skipped>               (sg-pre-merge-verify-20260508 / AS-6 / AC-7.1).
+    --reason <enum-from-NFR-12|null>               Closed 22-value enum; required when status=failed.
+    [--evidence-path <path>]                       Project-relative; under .claude/specs/groups/<sg>/evidence/.
+    [--dispatch-id <id>]                           Verifier dispatch_id (counter-map key).
+    [--audit-seq <int>]                            Audit-chain monotonic sequence anchor.
+    [--cumulative-ms <int>]                        Cumulative wall-clock for the gate run.
+  clear-pre-merge-quarantine <sg-id>              Atomically clear quarantine_until_acknowledged.
+    [--reason "<text>"]                            Operator escape hatch (sg-pre-merge-verify-20260508 / AS-6).
+  record-audit-event <event-name>                 Atomic monotonic audit-chain emission (DEC-006).
+    [--payload '<json>']                           Structured event payload.
+  repair-audit-chain <sg-id>                      Operator recovery for audit_chain_tamper_detected.
+    [--reason "<text>"]                            Resets session.audit.next_seq=0 (AC-9.7).
+  validate-pre-merge-verify-config <pkg-json>     TECH-104 validator for consumer config:
+                                                   pre_merge_verify_timeout_ms (<= 300000ms),
+                                                   pre_merge_verify_port_allowlist, pre_merge_readiness_path.
   clear-async-mode                                Delete shape-lint-async-mode sentinel
   journal-created <path-to-journal>               Mark journal entry as created
   override-skip --phase <p> --rationale "<r>"     Override a phase skip block
@@ -8684,6 +10220,10 @@ async function main() {
         let rmtFailCount = null;
         let rmtEvidencePath = null;
         let rmtTopResidualRisk = null;
+        // sg-manual-tester-infra-blocked-20260508 / AS-2 / DEC-011: new fields
+        // for the four-value enum extension.
+        let rmtEvidence = null;
+        let rmtDispatchId = null;
 
         for (let i = 0; i < rmtArgs.length; i++) {
           const arg = rmtArgs[i];
@@ -8701,6 +10241,17 @@ async function main() {
             i++;
           } else if (arg === '--evidence-path' && i + 1 < rmtArgs.length) {
             rmtEvidencePath = rmtArgs[i + 1];
+            i++;
+          } else if (arg === '--evidence' && i + 1 < rmtArgs.length) {
+            // DEC-011: structured InfraBlockedEvidence JSON payload. Required
+            // when --result is infra_blocked; ignored otherwise.
+            rmtEvidence = rmtArgs[i + 1];
+            i++;
+          } else if (arg === '--dispatch-id' && i + 1 < rmtArgs.length) {
+            // DEC-011: top-level dispatch id. Required when --result is
+            // infra_blocked; optional otherwise. Parallel precedent at
+            // record-test-writer-unlock.
+            rmtDispatchId = rmtArgs[i + 1];
             i++;
           } else if (
             (arg === '--top-residual-risk' || arg === '--residual-risk') &&
@@ -8721,7 +10272,161 @@ async function main() {
           failCount: rmtFailCount,
           evidencePath: rmtEvidencePath,
           topResidualRisk: rmtTopResidualRisk,
+          evidence: rmtEvidence,
+          dispatchId: rmtDispatchId,
         });
+        break;
+      }
+
+      case 'clear-manual-test-result': {
+        // sg-manual-tester-infra-blocked-20260508 / AS-3 / AC-4.2a / DEC-016
+        // Operator-only escape hatch for clearing an infra_blocked terminal
+        // block. Argv: clear-manual-test-result <sg-id> [--reason "<text>"]
+        //
+        // M1 (review finding): step-wise i++ matching mirrors the legacy
+        // parser pattern at lines 9000-9024 (`record-manual-test-result`
+        // argv). The previous greedy `slice/join/break` consumed every
+        // subsequent token as part of `reason` AND terminated the loop on
+        // the first `--reason`, so flag/positional ordering was broken
+        // (e.g., `--reason "x" sg-id` would never bind sg-id). Step-wise
+        // matching consumes exactly one token after `--reason` and
+        // continues iterating, allowing flag/positional ordering
+        // flexibility.
+        const cmtArgs = args.slice(1);
+        let cmtSpecGroupId = null;
+        let cmtReason = null;
+        for (let i = 0; i < cmtArgs.length; i++) {
+          const arg = cmtArgs[i];
+          if (arg === '--reason' && i + 1 < cmtArgs.length) {
+            cmtReason = cmtArgs[i + 1];
+            i++;
+          } else if (cmtSpecGroupId === null && !arg.startsWith('--')) {
+            cmtSpecGroupId = arg;
+          }
+        }
+        opClearManualTestResult(cmtSpecGroupId, cmtReason);
+        break;
+      }
+
+      case 'record-pre-merge-verify-result': {
+        // sg-pre-merge-verify-20260508 / AS-6 / AC-7.1
+        // Argv: record-pre-merge-verify-result <sg-id> --status <s> --reason <r>
+        //         [--evidence-path <path>] [--evidence <json>]
+        //         [--dispatch-id <id>] [--audit-seq <int>] [--cumulative-ms <int>]
+        const rpmvArgs = args.slice(1);
+        let rpmvSpecGroupId = null;
+        let rpmvStatus = null;
+        let rpmvReason = null;
+        let rpmvEvidencePath = null;
+        let rpmvEvidenceJson = null;
+        let rpmvDispatchId = null;
+        let rpmvAuditSeq = null;
+        let rpmvCumulativeMs = null;
+        for (let i = 0; i < rpmvArgs.length; i++) {
+          const arg = rpmvArgs[i];
+          if (arg === '--status' && i + 1 < rpmvArgs.length) {
+            rpmvStatus = rpmvArgs[i + 1];
+            i++;
+          } else if (arg === '--reason' && i + 1 < rpmvArgs.length) {
+            rpmvReason = rpmvArgs[i + 1];
+            i++;
+          } else if (arg === '--evidence-path' && i + 1 < rpmvArgs.length) {
+            rpmvEvidencePath = rpmvArgs[i + 1];
+            i++;
+          } else if (arg === '--evidence' && i + 1 < rpmvArgs.length) {
+            // BUG-FIX-2026-05-09 (Bug 2): inline structured evidence flag,
+            // mirroring the manual-tester `--evidence` JSON discipline.
+            rpmvEvidenceJson = rpmvArgs[i + 1];
+            i++;
+          } else if (arg === '--dispatch-id' && i + 1 < rpmvArgs.length) {
+            rpmvDispatchId = rpmvArgs[i + 1];
+            i++;
+          } else if (arg === '--audit-seq' && i + 1 < rpmvArgs.length) {
+            rpmvAuditSeq = rpmvArgs[i + 1];
+            i++;
+          } else if (arg === '--cumulative-ms' && i + 1 < rpmvArgs.length) {
+            rpmvCumulativeMs = rpmvArgs[i + 1];
+            i++;
+          } else if (rpmvSpecGroupId === null && !arg.startsWith('--')) {
+            rpmvSpecGroupId = arg;
+          }
+        }
+        opRecordPreMergeVerifyResult({
+          specGroupId: rpmvSpecGroupId,
+          status: rpmvStatus,
+          reason: rpmvReason,
+          evidencePath: rpmvEvidencePath,
+          evidenceJson: rpmvEvidenceJson,
+          dispatchId: rpmvDispatchId,
+          auditSeq: rpmvAuditSeq,
+          cumulativeMs: rpmvCumulativeMs,
+        });
+        break;
+      }
+
+      case 'clear-pre-merge-quarantine': {
+        // sg-pre-merge-verify-20260508 / AS-6 / AC-9.5 / NFR-25
+        // Argv: clear-pre-merge-quarantine <sg-id> [--reason "<text>"]
+        const cpmqArgs = args.slice(1);
+        let cpmqSpecGroupId = null;
+        let cpmqReason = null;
+        for (let i = 0; i < cpmqArgs.length; i++) {
+          const arg = cpmqArgs[i];
+          if (arg === '--reason' && i + 1 < cpmqArgs.length) {
+            cpmqReason = cpmqArgs[i + 1];
+            i++;
+          } else if (cpmqSpecGroupId === null && !arg.startsWith('--')) {
+            cpmqSpecGroupId = arg;
+          }
+        }
+        opClearPreMergeQuarantine(cpmqSpecGroupId, cpmqReason);
+        break;
+      }
+
+      case 'record-audit-event': {
+        // sg-pre-merge-verify-20260508 / AS-6 / DEC-006
+        // Argv: record-audit-event <event-name> [--payload '<json>']
+        const raeArgs = args.slice(1);
+        let raeEventName = null;
+        let raePayload = null;
+        for (let i = 0; i < raeArgs.length; i++) {
+          const arg = raeArgs[i];
+          if (arg === '--payload' && i + 1 < raeArgs.length) {
+            raePayload = raeArgs[i + 1];
+            i++;
+          } else if (raeEventName === null && !arg.startsWith('--')) {
+            raeEventName = arg;
+          }
+        }
+        opRecordAuditEvent(raeEventName, raePayload);
+        break;
+      }
+
+      case 'repair-audit-chain': {
+        // sg-pre-merge-verify-20260508 / AS-6 / AC-9.7
+        // Argv: repair-audit-chain <sg-id> [--reason "<text>"]
+        const racArgs = args.slice(1);
+        let racSpecGroupId = null;
+        let racReason = null;
+        for (let i = 0; i < racArgs.length; i++) {
+          const arg = racArgs[i];
+          if (arg === '--reason' && i + 1 < racArgs.length) {
+            racReason = racArgs[i + 1];
+            i++;
+          } else if (racSpecGroupId === null && !arg.startsWith('--')) {
+            racSpecGroupId = arg;
+          }
+        }
+        opRepairAuditChain(racSpecGroupId, racReason);
+        break;
+      }
+
+      case 'validate-pre-merge-verify-config': {
+        // sg-pre-merge-verify-20260508 / AS-6 / AC-3.3 / TECH-104
+        // Argv: validate-pre-merge-verify-config <path-to-package.json>
+        const vpmcArgs = args.slice(1);
+        const vpmcPackageJsonPath = vpmcArgs.find((a) => !a.startsWith('--')) || null;
+        opValidatePreMergeVerifyConfig(vpmcPackageJsonPath);
         break;
       }
 

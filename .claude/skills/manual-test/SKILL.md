@@ -217,13 +217,19 @@ After writing `.claude/specs/groups/<sg-id>/evidence/report.md`, record the stru
 
 ```bash
 node .claude/scripts/session-checkpoint.mjs record-manual-test-result <sg-id> \
-  --result <pass|fail|blocked> \
+  --result <pass|fail|blocked|infra_blocked> \
   --scenario-count <N> \
   --pass-count <N> \
   --fail-count <N> \
   --evidence-path .claude/specs/groups/<sg-id>/evidence/report.md \
-  --top-residual-risk "<one-line risk>"
+  --top-residual-risk "<one-line risk>" \
+  [--evidence <json>] \           # REQUIRED when --result is infra_blocked
+  [--dispatch-id <id>]            # REQUIRED when --result is infra_blocked
 ```
+
+For `--result infra_blocked` invocations, both `--evidence <json>` (the structured `InfraBlockedEvidence` payload — see § INFRA_BLOCKED Workflow below) and `--dispatch-id <id>` (the manual-tester dispatch id) are REQUIRED. The validator rejects the invocation if either is missing, and additionally rejects the invocation when the top-level `--dispatch-id` value disagrees with `evidence.dispatch_id` (a structured "dispatch_id mismatch" error naming both values is emitted to stderr and `session.active_work.manual_test_result` is NOT mutated).
+
+For `--result pass | fail | blocked`, `--evidence` and `--dispatch-id` are OPTIONAL (preserves backward compatibility with the prior three-value contract).
 
 This writes `session.active_work.manual_test_result` and appends the manifest `decision_log` audit entry.
 
@@ -242,6 +248,98 @@ top_residual_risk: [one-line]
 ```
 
 Main agent presents findings to user. User decides merge vs re-invoke `/implement`.
+
+## INFRA_BLOCKED Workflow
+
+The `manual-tester` agent emits `result: "infra_blocked"` when scenario execution is interrupted by a mid-run infrastructure failure (NOT a static precondition — those remain `blocked`). Three documented mid-run triggers cover every observed case:
+
+1. **Browser-open timeout >30s** — Playwright `browser_navigate` exceeds 30 seconds opening the browser window.
+2. **Dev-server `ECONNREFUSED` or `EAI_AGAIN` mid-run** — Transport-layer failure on a previously-reachable dev-server endpoint.
+3. **MCP tool ≥3 consecutive failures** — Any MCP tool fails three times in a row during scenario execution.
+
+Contrast with `blocked` (static preconditions only): missing `mcp.json`, missing browser binaries, missing MCP servers — all detectable BEFORE scenarios begin.
+
+### Flow A: Manual-tester emits `infra_blocked` mid-run
+
+When one of the three triggers fires, the manual-tester:
+
+1. Captures the trigger as a structured `InfraBlockedEvidence` payload:
+
+   ```json
+   {
+     "timestamp": "<ISO 8601>",
+     "narrative": "<human-readable trigger description, ≥10 chars>",
+     "exception_trace": "<optional — present for transport/MCP triggers>",
+     "dispatch_id": "<the manual-tester dispatch id>",
+     "session_id": "<the current session id>"
+   }
+   ```
+
+2. Returns `{result: "infra_blocked", scenario_count: <N>, pass_count: <N>, fail_count: 0, evidence_path: "<report path>", evidence: <payload>, top_residual_risk: "<one-line>"}` to the main agent.
+
+### Flow B: Main-agent halt + audit-chain evidence + user surface
+
+On receiving `result: "infra_blocked"`, the main agent:
+
+1. Records the evidence atomically via:
+
+   ```bash
+   node .claude/scripts/session-checkpoint.mjs record-manual-test-result <sg-id> \
+     --result infra_blocked \
+     --scenario-count <N> --pass-count <N> --fail-count <N> \
+     --evidence '<JSON payload from manual-tester>' \
+     --dispatch-id '<dispatch id from manual-tester>'
+   ```
+
+   The validator (a) verifies the four-value enum admits `infra_blocked`, (b) verifies the structured evidence payload contains `timestamp`, `narrative`, `dispatch_id`, `session_id`, (c) verifies top-level `--dispatch-id` matches `evidence.dispatch_id` (rejects mismatch with a structured "dispatch_id mismatch" error), then (d) atomically writes `session.active_work.manual_test_result`, increments `session.active_work.dispatch_infra_blocked_count[dispatch_id]`, and appends the `manual_test_result_recorded` history entry plus the manifest `decision_log` entry — all in a single `saveSession` write.
+
+2. Surfaces the `narrative`, `dispatch_id`, and `timestamp` to the operator with a pointer to the `evidence_path` for the full report.
+
+3. Does NOT proceed to commit. The Stop-hook (which runs at session-completion attempt) reads `session.active_work.manual_test_result.result === "infra_blocked"` and emits a block reason `infra_blocked_terminal` containing the structured narrative.
+
+4. Treats the halt as TERMINAL regardless of `runtime_validation_required`. Whereas `blocked` only blocks completion when `runtime_validation_required: true`, `infra_blocked` always blocks. This is the load-bearing distinction between the two values.
+
+### Retry-bypass discipline
+
+The first `infra_blocked` emission is terminal. The main agent does NOT silently retry per CLAUDE.md "Error Escalation Protocol" — infra failures are rarely transient at gate timescales (a 30-second browser-open window, a transport-level `ECONNREFUSED`, or three consecutive MCP failures are not noise that clears on retry).
+
+Re-running `manual-tester` does NOT clear the `infra_blocked_terminal` block-reason. To resume after operator action (e.g., restart the dev server, reinstall Playwright browser binaries, fix the MCP plumbing), the operator MUST run:
+
+```bash
+node .claude/scripts/session-checkpoint.mjs clear-manual-test-result <sg-id>
+```
+
+This atomically deletes `session.active_work.manual_test_result` AND `session.active_work.dispatch_infra_blocked_count`, appends a `manual_test_result_cleared` history entry, mirrors the entry into the manifest `decision_log`, and clears the active `infra_blocked_terminal` Stop-hook block-reason (the block-reason is derived from session state, so clearing the state clears the block).
+
+### ≥2-emission human-confirmation gate
+
+When the same dispatch emits `infra_blocked` twice (the counter `session.active_work.dispatch_infra_blocked_count[dispatch_id] >= 2`), the Stop-hook adds an `infra_blocked_human_confirmation_required` block-reason ON TOP OF `infra_blocked_terminal`. The main agent surfaces BOTH narratives to the operator and MUST receive an explicit operator-typed acknowledgment before honoring the second halt.
+
+The counter is keyed by `dispatch_id` AND scoped to the current phase. It is cleared (deleted, not zeroed) when the workflow transitions OUT of the `documenting` phase (the phase where `/manual-test` runs after `/docs`). Within `documenting`, halt-then-resume cycles sharing a `dispatch_id` accumulate the counter — the counter survives across re-dispatches in the same phase, so a second emission from a fixed-up infra issue still trips the gate.
+
+### Operator-facing example
+
+A complete halt-then-resume flow:
+
+```
+$ /manual-test sg-foo
+[main-agent] dispatching manual-tester (dispatch_id=D1)
+[manual-tester] scenario 3/10 — Playwright browser_navigate timed out after 30s
+[manual-tester] returning result=infra_blocked, dispatch_id=D1, narrative="..."
+[main-agent] recording evidence...
+[main-agent] HALT: infra_blocked (D1, 2026-05-09T12:34:56Z)
+[main-agent] narrative: "Playwright browser_navigate timed out at 30s on /dashboard scenario"
+[main-agent] evidence_path: .claude/specs/groups/sg-foo/evidence/report.md
+[main-agent] To resume: fix infra, then run `node .claude/scripts/session-checkpoint.mjs clear-manual-test-result sg-foo`
+
+# Operator restarts dev server, reinstalls browser, then:
+$ node .claude/scripts/session-checkpoint.mjs clear-manual-test-result sg-foo
+[session-checkpoint] cleared manual_test_result and dispatch_infra_blocked_count for sg-foo
+
+$ /manual-test sg-foo  # re-dispatch (operator may keep the same dispatch_id within the phase)
+```
+
+If the second dispatch ALSO returns `infra_blocked` with the same `dispatch_id=D1`, the counter increments to 2 and the human-confirmation gate trips on the next Stop-hook check.
 
 ## Report Format Summary
 

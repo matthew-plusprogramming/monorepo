@@ -116,6 +116,27 @@ When an E2E test fails:
 - **E2E and unit tests contradict**: Surface both results with discrepancy flagged; do not silently prefer either
 - **Spec defect discovered**: Escalate to human; spec amendment may be needed
 
+## Alternate Response Branches
+
+When a contract says the same request may return alternate acceptable response branches, do not write one permissive test that accepts any branch as success. Generate separate tests for the distinct contract branches.
+
+Classify a contract as an alternate-branch contract when any of these appear in the spec or contract text:
+
+- Multiple success/degraded status codes for the same request, such as `200 | 503` or `200 OR 503`
+- Language such as "canonical OR degraded", "either canonical or degraded", "fallback envelope", or "degraded response"
+- A documented degraded, fallback, unavailable, offline, or service-unavailable branch that is not the normal healthy response
+
+Required test structure:
+
+1. **Canonical-path test**: Exercise the healthy/default fixture or environment. Assert only the canonical healthy branch. A degraded/fallback/unavailable branch is a failure in this test.
+2. **Alternate-branch test**: Exercise the degraded/fallback branch using only a spec-defined black-box trigger, fixture, configuration, or external dependency state. Assert only that alternate branch.
+
+Forbidden pattern: a single combined test that accepts either canonical or degraded/fallback output as a pass. That pattern can hide persistent runtime degradation behind a "valid alternate" envelope.
+
+If the spec documents an alternate branch but does not define a black-box way to trigger it, report a blocker or request a spec amendment. Do not inspect implementation internals to manufacture the trigger.
+
+Ordinary negative/error cases are still separate tests. This rule applies when a degraded/fallback branch could be mistaken for a healthy-path success.
+
 ## Missing Contract Handling
 
 If a contract template referenced by a spec is missing or unparseable:

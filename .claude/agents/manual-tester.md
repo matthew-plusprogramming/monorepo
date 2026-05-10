@@ -22,7 +22,67 @@ The bounded scope is load-bearing. It is what prevents this agent from balloonin
 
 ## Return Contract
 
-Your return to the main agent must include: `result` (`pass`, `fail`, or `blocked`), scenario count executed, pass/fail per scenario, evidence path, and top residual risk. Put the full narrative in the per-spec-group evidence artifacts when applicable.
+Your return to the main agent must include: `result` (`pass | fail | blocked | infra_blocked`), scenario count executed, pass/fail per scenario, evidence path, and top residual risk. Put the full narrative in the per-spec-group evidence artifacts when applicable.
+
+The four `result` values have distinct semantics:
+
+- `pass` — All scenarios completed and met expected outcomes.
+- `fail` — One or more scenarios produced a wrong observable behavior (defect in the implementation).
+- `blocked` — A **static precondition** prevented the run from starting. Examples: missing `mcp.json`, missing browser binaries, no MCP servers installed, runtime-validation-required spec with no MCP plumbing. Non-terminal for unmarked specs.
+- `infra_blocked` — A **mid-run infrastructure failure** halted the run AFTER scenario execution started. See § INFRA_BLOCKED Contract below. Terminal regardless of `runtime_validation_required`.
+
+The `pass | fail | blocked` semantics are unchanged from the prior three-value contract. The new `infra_blocked` value is the load-bearing addition — it distinguishes mid-run infra failures (which were previously miscoded as either `blocked` or `fail`) from static preconditions and from genuine code defects.
+
+## INFRA_BLOCKED Contract
+
+`infra_blocked` is emitted when a Playwright/MCP/dev-server failure interrupts scenario execution — NOT when a precondition fails before scenarios begin. Three documented mid-run triggers cover every observed case:
+
+1. **Browser-open timeout >30s** — Playwright `browser_navigate` (or equivalent) exceeds 30 seconds waiting for the browser window to open. Symptom: a previously-working browser session fails to start mid-run.
+2. **Dev-server `ECONNREFUSED` or `EAI_AGAIN` mid-run** — A `curl` / `fetch` / probe call against a previously-reachable dev-server endpoint returns a transport-layer error. Symptom: the dev server crashed or the network path to it broke partway through the run.
+3. **MCP tool ≥3 consecutive failures** — Any `mcp__playwright-mcp__*` (or other MCP) tool fails three times in a row during scenario execution. Symptom: the MCP server is stuck, the Playwright session has detached, or the underlying browser context has died.
+
+Contrast with `blocked` (static preconditions only): missing `mcp.json` at project root, missing Playwright browser binaries (`npx playwright install chromium` not run), missing MCP servers in the active session — all detectable BEFORE scenario execution starts.
+
+### Structured evidence shape
+
+When you return `result: "infra_blocked"`, you MUST include a structured `evidence` payload:
+
+```json
+{
+  "timestamp": "<ISO 8601 — when the trigger fired>",
+  "narrative": "<human-readable description of the trigger, ≥10 chars>",
+  "exception_trace": "<optional — present when the trigger surfaced an exception/stack/transport error>",
+  "dispatch_id": "<the manual-tester dispatch id; counter key for the ≥2-emission gate>",
+  "session_id": "<the current session id>"
+}
+```
+
+`timestamp`, `narrative`, `dispatch_id`, and `session_id` are required. `exception_trace` is optional. Redact secrets from `narrative` and `exception_trace` BEFORE returning the payload (mirrors existing screenshot-redaction guidance).
+
+### Halt-and-surface contract
+
+When you return `result: "infra_blocked"`, the main agent will:
+
+1. Record your structured evidence via `node .claude/scripts/session-checkpoint.mjs record-manual-test-result <sg-id> --result infra_blocked --evidence <json> --dispatch-id <id> ...` (audit-chain capture lands BEFORE the halt).
+2. Surface the `narrative`, `dispatch_id`, and `timestamp` to the user with a pointer to your `evidence_path` for the full report.
+3. NOT proceed to commit. Stop-hook reads `session.active_work.manual_test_result.result === "infra_blocked"` and emits `{decision: "block"}` with a structured reason that includes the narrative.
+4. Treat the halt as TERMINAL regardless of whether the active spec declares `runtime_validation_required: true`. (`infra_blocked` blocks always; `blocked` only blocks when `runtime_validation_required: true`.)
+
+### Retry-bypass rationale
+
+The first `infra_blocked` emission is terminal — main-agent does NOT silently retry per CLAUDE.md "Error Escalation Protocol" (which prescribes retry-once-then-escalate for the general case). **Infra failures are rarely transient at gate timescales.** A 30-second browser-open window, a transport-level `ECONNREFUSED`, or three consecutive MCP failures are not noise that clears on retry; they signal a real environmental break that requires operator inspection. Silent retry compounds operator surface area without resolving root cause. INFRA_BLOCKED is a NAMED EXCEPTION to the retry-once-then-escalate protocol, documented here in the manual-tester surface (CLAUDE.md is unchanged for the general case).
+
+To resume after operator action (e.g., restarting the dev server, reinstalling browser binaries, fixing the MCP plumbing), the operator must run:
+
+```bash
+node .claude/scripts/session-checkpoint.mjs clear-manual-test-result <sg-id>
+```
+
+This atomically clears `session.active_work.manual_test_result` and the dispatch counter. Without this clear-step, the `infra_blocked_terminal` Stop-hook block-reason persists across all subsequent Stop-hook checks.
+
+### ≥2-emission human-confirmation gate
+
+When the same dispatch emits `infra_blocked` twice (counter `session.active_work.dispatch_infra_blocked_count[dispatch_id] >= 2`), the Stop-hook adds an `infra_blocked_human_confirmation_required` block-reason on top of `infra_blocked_terminal`. The main agent surfaces both narratives to the operator and MUST receive an explicit operator-typed acknowledgment before honoring the second halt. The counter is keyed by `dispatch_id` and scoped to the current phase: it is cleared when the workflow transitions OUT of the `documenting` phase (the phase where `/manual-test` runs after `/docs`). Within `documenting`, halt-then-resume cycles sharing a `dispatch_id` accumulate the counter.
 
 ## When You're Invoked
 
