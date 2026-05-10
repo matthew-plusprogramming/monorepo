@@ -178,6 +178,11 @@ Special policies:
 After resolving an agent-assisted merge, delete `.claude/sync-pending/` in the
 consumer and commit the merged target file.
 
+`verify` treats `agent-assisted` and `never-overwrite` artifacts as local-owned
+after the lock has seen the current upstream hash. For `agent-assisted`
+artifacts, any remaining `.claude/sync-pending/` file is still a verification
+failure.
+
 ---
 
 ## Deletions

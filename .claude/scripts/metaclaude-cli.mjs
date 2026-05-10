@@ -169,6 +169,12 @@ function getArtifact(registry, artifactPath) {
   return registry.artifacts[category]?.[artifactPath];
 }
 
+function getEffectiveSyncPolicy(registry, artifactPath, artifact) {
+  const [category] = artifactPath.split('/');
+  const categoryMeta = registry.artifacts[category];
+  return artifact?._sync_policy || categoryMeta?._sync_policy;
+}
+
 function resolveTargetArtifactsForProject(registry, projectConfig, defaults) {
   const bundleName = projectConfig.bundle || defaults?.bundle;
   if (!bundleName) return null;
@@ -1063,6 +1069,36 @@ async function cmdVerify(projectArg, options) {
       if (!existsSync(localPath)) {
         log(`✗ ${artifactPath}: missing`, 'red');
         failed++;
+        continue;
+      }
+
+      const effectivePolicy = getEffectiveSyncPolicy(registry, artifactPath, artifact);
+      const isAgentAssisted = projectConfig.sync_overrides?.[artifactPath] === 'agent-assisted'
+        || effectivePolicy === 'agent-assisted';
+      const isNeverOverwrite = effectivePolicy === 'never-overwrite';
+
+      // Local-owned policies intentionally preserve consumer edits. Their lock
+      // hash records the upstream version seen by sync, not the local file
+      // bytes, so strict local-vs-lock drift detection would be a false alarm.
+      if (isAgentAssisted || isNeverOverwrite) {
+        if (installed.hash !== artifact.hash) {
+          log(`✗ ${artifactPath}: lock stale (expected upstream ${artifact.hash}, got ${installed.hash})`, 'red');
+          failed++;
+          continue;
+        }
+
+        if (isAgentAssisted) {
+          const pendingPath = join(projectPath, '.claude', 'sync-pending', targetPath);
+          if (existsSync(pendingPath)) {
+            log(`✗ ${artifactPath}: agent-assisted merge pending`, 'red');
+            failed++;
+            continue;
+          }
+        }
+
+        const label = isAgentAssisted ? 'agent-assisted' : 'never-overwrite';
+        log(`✓ ${artifactPath}: ${installed.version}@${installed.hash} (${label}, local-owned)`, 'green');
+        passed++;
         continue;
       }
 

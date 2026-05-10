@@ -65,33 +65,27 @@ Use `.claude/traces/high-level.md` when routing or dispatching work that touches
 
 ## Advanced Orchestration Patterns
 
+These are runtime invariants. Detailed examples and mechanics live in `.claude/memory-bank/delegation.guidelines.md`, `.claude/docs/WORKFLOW-ENFORCEMENT.md`, `.claude/docs/AUTO-DECISION.md`, and `.claude/docs/HOOKS.md`.
+
 ### Recursive Conductor (Practice 1.4)
 
-Workstream agents are themselves conductors, not just executors. An implementer dispatches its own Explore and Test-writer subagents. This creates a delegation tree: **main agent -> workstream conductor -> leaf executor**. Maximum depth: 3 levels. Each level returns structured summaries and artifact pointers to its parent, never raw data.
-
-**Mental model**: Context is RAM — every token read directly is permanently allocated. Subagent dispatches are disk reads — the data stays in the subagent's context and only a summary (pointer) lands in yours.
+Workstream agents are conductors, not just executors: **main agent -> workstream conductor -> leaf executor**. Maximum depth: 3 levels. Each level returns structured summaries and artifact pointers, never raw data. Treat main-agent context as RAM; subagent context is the cheap read path.
 
 ### Pre-Computed Structure (Practice 1.5)
 
-When the human provides explicit decomposition, **use it directly** — do not re-decompose via the atomizer. The atomizer is a **fallback for ambiguous scope**, not the default. `/route` should detect human-provided structure and skip atomization.
+When the human provides explicit decomposition, **use it directly**. The atomizer is a fallback for ambiguous scope, not the default.
 
 ### File-Based Coordination (Practice 1.6)
 
-For trivially simple inter-agent coordination, use sentinel files (`.claude/coordination/<workstream-id>.done`, `.status`) instead of subagent dispatch.
-
-This is a **deliberate exception** to delegation-first. The rule: if the check is a single `ls` or a tiny status-file read, do it directly. If it requires investigation, delegate.
+For trivial inter-agent coordination, sentinel files (`.claude/coordination/<workstream-id>.done`, `.status`) are allowed. A single `ls` or tiny status read may be direct; anything investigative is delegated.
 
 ### Error Escalation Protocol
 
-Every subagent return must include: `status` (success | partial | failed), `summary`, `blockers` (list), `artifacts` (files modified).
-
-**Escalation rules**: `success` -> proceed. `partial` -> review, retry incomplete portion or escalate. `failed` -> retry **once** silently; after 1 failed retry, escalate to human with full context.
-
-At recursive depth > 1, the intermediate conductor must surface sub-subagent failures in its own return — never swallow them.
+Every subagent return includes `status` (`success` | `partial` | `failed`), `summary`, `blockers`, and `artifacts`. Proceed on `success`; review/retry or escalate `partial`; retry `failed` once silently, then escalate with context. Intermediate conductors must surface sub-subagent failures.
 
 ### Convergence Loop Protocol
 
-Quality gates run iteratively: **check → fix → recheck** until 2 consecutive clean passes or 5 iterations (escalate after 5 with `CONVERGENCE FAILURE` report).
+Quality gates run iteratively: **check → fix → recheck** until the gate's configured clean-pass threshold is met or 5 iterations (escalate after 5 with `CONVERGENCE FAILURE` report). Thresholds come from `SessionThresholdSnapshot`; legacy sessions without a snapshot fall back to 2 consecutive clean passes.
 
 **Applicable gates**: `investigation`, `challenger`, `unifier`, `code_review`, `security_review`, `completion_verifier`.
 
@@ -101,43 +95,26 @@ Quality gates run iteratively: **check → fix → recheck** until 2 consecutive
 node .claude/scripts/session-checkpoint.mjs update-convergence <gate_name>
 ```
 
-Do NOT write to `session.json` manually. Each gate skill (`/investigate`, `/challenge`, `/unify`, `/code-review`, `/security`) and the `completion-verifier` agent document their own check agent, fix agent, and loop mechanics. Coercive enforcement (`workflow-gate-enforcement.mjs`) blocks downstream dispatches when `clean_pass_count < 2`.
+Do NOT write to `session.json` manually. Each gate skill (`/investigate`, `/challenge`, `/unify`, `/code-review`, `/security`) and the `completion-verifier` agent document their own check agent, fix agent, and loop mechanics. Coercive enforcement (`workflow-gate-enforcement.mjs`) blocks downstream dispatches when the gate-specific clean-pass threshold is not met; legacy no-snapshot sessions preserve the historical `clean_pass_count < 2` behavior.
 
 ### Autonomous Convergence
 
-The workflow from spec authoring to implementation is fully autonomous for the common case (zero escalations). The `awaiting_approval` phase has been replaced by convergence-based quality gates:
+Common-case spec-to-implementation work proceeds without human approval after investigation and challenger convergence.
 
-1. **Investigation convergence loop**: Interface investigator runs iteratively until 2 consecutive clean passes (no Medium+ findings). Auto-decision engine evaluates findings between passes.
-2. **Challenger convergence loop**: Challenger runs iteratively for `pre-implementation` and `pre-orchestration` stages until 2 consecutive clean passes. Fix agents: implementer (pre-impl), spec-author (pre-orch).
-3. **Auto-approval**: After both convergence loops complete, a passthrough `auto_approval` phase is recorded for audit purposes. No human gate required.
+**Auto-Decision Engine**: May accept qualifying investigation/challenger findings; safety rails include oscillation detection, 90%/95% circuit breaker, 5-iteration cap, security escalation, and all-or-nothing batches. See `.claude/docs/AUTO-DECISION.md`.
 
-**Auto-Decision Engine** (`.claude/scripts/auto-decision.mjs`): evaluates investigation + challenger convergence findings against three criteria (action verb, field/section reference, structured confidence enum) and auto-accepts qualifying findings. Applies to investigation and challenger (pre-impl/pre-orch) convergence loops only — NOT the PRD loop. Safety rails (oscillation detection, circuit breaker 90%/95%, 5-iteration cap, cross-stage 3-round-trip advisory, security escalation, all-or-nothing batch) gate the engine. See `.claude/docs/AUTO-DECISION.md` for full protocol, audit-trail schema, and graceful-degradation behavior.
-
-**PRD Loop Unchanged**: The PRD gather-criticize loop remains fully human-in-the-loop. Auto-decision logic does NOT apply to PRD critic findings.
+**PRD Loop Unchanged**: The PRD gather-criticize loop remains fully human-in-the-loop. Auto-decision logic does **not** apply to PRD critic findings.
 
 ### Workflow Enforcement (Practice 4.3)
 
-Mandatory workflow stages (challenger dispatches, completion verification, documentation) are enforced at three levels: cooperative (phase transition DAG), coercive (PreToolUse/Stop hooks that physically block tool execution), and obligation (manifest status field validation at phase exits).
+Workflow stages are enforced cooperatively by phase-DAG transitions, coercively by PreToolUse/Stop hooks, and structurally by manifest obligation validation.
 
-**Cooperative enforcement** (session-checkpoint.mjs) uses a DAG-based predecessor model. Each phase declares its valid predecessors; transitions to phases with unvisited mandatory predecessors are rejected at the `graduated` enforcement level and warned at the `warn-only` level. The enforcement level is configurable per session:
-
-- **off**: No enforcement; all transitions allowed (informational checklist only)
-- **warn-only**: Log warnings for skipped mandatory stages but allow transitions
-- **graduated**: Block transitions that skip mandatory predecessors; require explicit override
-
-**Override mechanism**: When enforcement blocks a transition, agents may use `override-skip` (with rationale) to bypass a specific phase, or `reset-enforcement` to clear accumulated skip warnings. All overrides are recorded in session history for audit.
-
-**Coercive enforcement** (PreToolUse/Stop hooks) physically blocks tool execution when prerequisites are not met:
-
-- **PreToolUse Agent hook** (`workflow-gate-enforcement.mjs`): Blocks dispatch of 7 enforced subagent types (implementer, test-writer, e2e-test-writer, code-reviewer, security-reviewer, documenter, completion-verifier) when their workflow prerequisites are not met. Implementer requires convergence-type prerequisites (investigation and challenger gates with clean_pass_count >= 2). Uses stderr + exit 2 for blocking.
-- **Stop hook** (`workflow-stop-enforcement.mjs`): Blocks session completion when mandatory dispatches (code-reviewer, security-reviewer, completion-verifier, documenter) have not occurred. Uses stdout JSON `{"decision": "block"}` for blocking.
-- **Write protection** (`workflow-file-protection.mjs`): Blocks agent writes to `gate-override.json` and `gate-enforcement-disabled`. Not disabled by the kill switch.
-
-**Obligation enforcement**: Phase transitions validate manifest status fields via `validateObligations()` in `workflow-dag.mjs`. See HOOKS.md § Status Obligation Enforcement for the full mapping (9 phases → 14 obligations) and phase-scoped override syntax.
-
-**Exempt workflows**: `oneoff-vibe`, `refactor`, and `journal-only` workflows bypass all enforcement.
-
-**Fail-open**: Structural errors exit 0. Exception: missing convergence fields default to 0 (fail-closed). See HOOKS.md § Fail-Open Behavior.
+- `session-checkpoint.mjs` supports `off`, `warn-only`, and `graduated` enforcement; overrides require rationale and are recorded.
+- `workflow-gate-enforcement.mjs` blocks implementer, test-writer, e2e-test-writer, code-reviewer, security-reviewer, documenter, and completion-verifier dispatches when prerequisites are missing. Implementer requires investigation and challenger convergence at the session's configured threshold (legacy fallback: 2).
+- `workflow-stop-enforcement.mjs` blocks completion when risk-tier-required dispatches are missing. Trust-bearing sessions require code-reviewer, security-reviewer, completion-verifier, documenter, and e2e-test-writer unless the spec has a valid e2e opt-out. Runtime-validation specs additionally require passing manual-test.
+- `workflow-file-protection.mjs` blocks writes to enforcement override files and is not disabled by the kill switch.
+- Exempt workflows (`oneoff-vibe`, `refactor`, `journal-only`) bypass normal dispatch/completion enforcement, but Stop still fails closed if they edit trust-bearing files such as hooks, settings, registries, agents, skills, memory-bank files, or `CLAUDE.md`.
+- Structural hook errors generally fail open; missing convergence fields fail closed. See `.claude/docs/HOOKS.md`.
 
 ---
 
@@ -177,54 +154,27 @@ Agents must consult the four-tier assumption hierarchy (code > spec > memory > r
 
 The memory-bank provides persistent project knowledge that survives across sessions.
 
-### Directory Structure
-
-```
-.claude/memory-bank/
-├── project.brief.md        # Project overview, purpose, success criteria
-├── tech.context.md         # Architecture, subagents, workflows, key locations
-├── delegation.guidelines.md # Conductor philosophy, tool diet, context economics
-├── testing.guidelines.md   # Testing boundaries, mocking rules, AAA conventions
-├── practice-index.md       # Practice number -> canonical file/line mapping
-└── best-practices/
-    ├── code-quality.md     # Error handling, DI, validation patterns
-    ├── contract-first.md   # Contract-first development practices
-    ├── ears-format.md      # EARS format for security requirements
-    ├── logging.md          # Log design, structured logs, correlation, observability
-    ├── software-principles.md # Core software engineering principles
-    ├── spec-authoring.md   # How to write good specs
-    ├── subagent-design.md  # How to design effective subagents
-    └── typescript.md       # TypeScript best practices
-```
-
 ### Retrieval Policy
 
-Load memory-bank files based on task context:
+Load memory-bank files based on task context; this is the canonical agent-to-file mapping:
 
-| File                                    | Load Trigger                                                                      | Consumers                                                               |
-| --------------------------------------- | --------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
-| `project.brief.md`                      | Session start (always)                                                            | Main agent                                                              |
-| `org-context.md`                        | PRD work dispatched                                                               | PRD-writer                                                              |
-| `tech.context.md`                       | Implementation routed                                                             | Implementer, Spec-author                                                |
-| `testing.guidelines.md`                 | Test work dispatched                                                              | Test-writer, Implementer                                                |
-| `best-practices/code-quality.md`        | Implementation routed                                                             | Implementer, Code-reviewer                                              |
-| `best-practices/spec-authoring.md`      | Spec work dispatched                                                              | Spec-author, Atomizer                                                   |
-| `best-practices/ears-format.md`         | Security requirements work                                                        | Spec-author (Required Context); Security-reviewer (source ref only)     |
-| `best-practices/contract-first.md`      | Implementation routed                                                             | Implementer, Code-reviewer                                              |
-| `best-practices/logging.md`             | Implementation routed                                                             | Implementer, Code-reviewer                                              |
-| `best-practices/software-principles.md` | Implementation routed                                                             | Implementer, Code-reviewer                                              |
-| `best-practices/typescript.md`          | TypeScript work dispatched                                                        | Implementer                                                             |
-| `best-practices/subagent-design.md`     | Subagent dispatch                                                                 | route/SKILL.md, implement/SKILL.md, orchestrate/SKILL.md, spec/SKILL.md |
-| `self-answer-protocol.md`               | All agent dispatches                                                              | All 23 agents                                                           |
-| `traces/low-level/*.json`               | Implementation routed, Test dispatched, Review dispatched, Exploration dispatched | Implementer, Test-writer, Code-reviewer, Security-reviewer, Explore     |
-| `traces/high-level.json`                | Dispatch planning (main agent)                                                    | Main agent                                                              |
-| `traces/high-level.md`                  | Routing, dispatch planning                                                        | Main agent, Route                                                       |
+| Context file                             | Load trigger / consumers                                                          |
+| ---------------------------------------- | --------------------------------------------------------------------------------- |
+| `project.brief.md`                       | Session start / main agent                                                        |
+| `org-context.md`                         | PRD work / PRD-writer                                                             |
+| `tech.context.md`                        | Implementation or spec routing / Implementer, Spec-author                         |
+| `testing.guidelines.md`                  | Test work / Test-writer, Implementer                                              |
+| `best-practices/{code-quality,contract-first,logging,software-principles}.md` | Implementation and review / Implementer, Code-reviewer |
+| `best-practices/{spec-authoring,ears-format}.md` | Spec or security requirements work / Spec-author, Atomizer, Security-reviewer |
+| `best-practices/{subagent-design,typescript}.md` | Subagent or TypeScript work / route, implement, orchestrate, spec, Implementer |
+| `self-answer-protocol.md`                | All agent dispatches / all agents                                                 |
+| `traces/high-level.md` and `.json`       | Routing and dispatch planning / main agent, Route                                 |
+| `traces/low-level/*.json` or `.summary.json` | Implementation, test, review, exploration / relevant subagents                |
 
 ### Usage & Maintenance
 
 - **Main agent**: Reference `delegation.guidelines.md` when uncertain about tool usage
 - **Subagents**: Receive relevant memory-bank content in dispatch prompts
-- **New contributors**: Start with `project.brief.md` for orientation
 - **Updates**: Review content against actual state, then commit with `docs(memory-bank): update <filename>`
 - **Do not duplicate**: Memory-bank summarizes; CLAUDE.md is authoritative for constraints
 
@@ -279,78 +229,57 @@ Every response must include:
 
 ### Core Skills
 
-| Skill          | Purpose                                                                                                        | When to Use                                                                                                         |
-| -------------- | -------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| `/route`       | Analyze task complexity and route to workflow                                                                  | Start of any new task                                                                                               |
-| `/prd`         | Create PRDs through gather-criticize loop, sync existing PRDs, push amendments                                 | Before spec authoring                                                                                               |
-| `/spec`        | Author specifications (TaskSpec, WorkstreamSpec, MasterSpec)                                                   | After requirements gathering                                                                                        |
-| `/atomize`     | Decompose high-level specs into atomic specs                                                                   | Orchestrator workflows only (after spec authoring)                                                                  |
-| `/enforce`     | Validate atomic specs meet atomicity criteria                                                                  | Orchestrator workflows only (after atomization)                                                                     |
-| `/investigate` | Surface cross-spec inconsistencies                                                                             | MANDATORY for oneoff-spec and orchestrator before implementation                                                    |
-| `/challenge`   | Operational feasibility scrutiny before implementation or orchestration                                         | Required for oneoff-spec before implementation and orchestrator before orchestration                                |
-| `/implement`   | Implement from approved specs                                                                                  | After spec approval                                                                                                 |
-| `/test`        | Write tests for acceptance criteria                                                                            | Parallel with implementation or after                                                                               |
-| `/e2e-test`    | Generate E2E tests from spec contracts                                                                         | Parallel with implementation (opt-out via e2e_skip)                                                                 |
-| `/unify`       | Validate spec-impl-test alignment                                                                              | After implementation and tests complete                                                                             |
-| `/code-review` | Code quality review with style/naming, test-quality, adversarial, and holistic passes                          | After convergence, before security                                                                                  |
-| `/security`    | Security review of implementation                                                                              | After code review, before merge                                                                                     |
-| `/docs`        | Generate documentation from implementation                                                                     | After security review                                                                                               |
-| `/doc-audit`   | Diagnose documentation health (staleness, coverage gaps, broken refs)                                          | On-demand, post-documenter, or PRD-time                                                                             |
-| `/refactor`    | Behavior-preserving code quality improvements (dispatches refactorer subagent)                                 | Tech debt sprints, post-merge cleanup                                                                               |
-| `/orchestrate` | Coordinate multi-workstream projects                                                                           | For large tasks with 3+ workstreams                                                                                 |
-| `/flow-verify` | Verify wiring correctness across systems                                                                       | MANDATORY at 4 stages: prd-review (parallel), spec-review (parallel), impl-verify (serial gate), post-impl (serial) |
-| `/manual-test` | Bounded exploratory end-to-end verification (5 happy + 3 failure + 2 adjacent, then stop)                      | Advisory final step after `/docs`; non-blocking                                                                     |
+- **Routing/spec gates**: `/route` starts new tasks; `/prd` gathers requirements; `/spec` authors TaskSpec/WorkstreamSpec/MasterSpec; `/atomize` and `/enforce` apply to orchestrator workflows.
+- **Pre-implementation scrutiny**: `/investigate` is MANDATORY for oneoff-spec and orchestrator before implementation; `/challenge` runs before oneoff-spec implementation or orchestrator orchestration.
+- **Build/test/review**: `/implement`, `/test`, and `/e2e-test` run from specs; E2E Test runs parallel with implementation with opt-out via `e2e_skip`; `/unify` validates spec/impl/test alignment.
+- **Release gates**: `/code-review` and `/security` run after unifier and reviewer-focus metadata; `/docs` runs after security; `/manual-test` runs after `/docs`, advisory by default and mandatory for `runtime_validation_required: true` specs.
+- **Operations**: `/doc-audit` diagnoses docs health; `/refactor` dispatches refactorer for behavior-preserving cleanup; `/orchestrate` coordinates large multi-workstream projects; `/flow-verify` checks prd-review, spec-review, impl-verify, and post-impl flows.
 
 See `.claude/memory-bank/tech.context.md` for the full subagent list, directory structure, branch naming convention, and spec-is-contract principle.
 
-PostToolUse hooks enforce type checking, linting, JSON/spec validation automatically. See `.claude/docs/HOOKS.md`.
+PostToolUse hooks run scoped validators for JSON, templates, agent/skill frontmatter, spec schemas, spec structure, and structured docs. See `.claude/docs/HOOKS.md`.
 
 For the `/doc-audit` skill internals, see `.claude/docs/DOC-AUDIT.md`. For the `/flow-verify` skill internals, see `.claude/docs/FLOW-VERIFIER.md`.
 
 ### Iteration Cycles
 
-Full workflow sequences (oneoff-vibe, oneoff-spec, orchestrator) are documented in `/route` SKILL.md § Integration with Other Skills. Convergence mechanics (2 consecutive clean passes, cross-stage resolution cap of 3) live in `/challenge` and `/investigate` SKILL.md. Dedicated `/challenge` dispatches are required only at `pre-implementation` for oneoff-spec and `pre-orchestration` for orchestrator. Former `pre-test` and `pre-review` challenger dispatches were deleted; `/unify` preflight and reviewer-focus metadata carry those signals. Investigation is MANDATORY before implementation for oneoff-spec and orchestrator workflows. Security-category overrides must be tagged as "security-risk acknowledgment" in the Decisions Log — see `/security` SKILL.md.
+Full workflow sequences live in `/route` SKILL.md § Integration with Other Skills. Investigation is MANDATORY before implementation for oneoff-spec and orchestrator workflows. Dedicated `/challenge` dispatches are required only at `pre-implementation` and `pre-orchestration`; former `pre-test` and `pre-review` challenger dispatches were replaced by `/unify` preflight and reviewer-focus metadata. Security-category overrides must be tagged as "security-risk acknowledgment" in the Decisions Log.
 
 ### Parallel Execution
 
 - Multiple `spec-author` subagents for workstreams
 - `implementer`, `test-writer`, and `e2e-test-writer` run in parallel (no ordering constraint — test-writer and e2e-test-writer work from spec only; e2e-test-writer dispatched by default with opt-out via `e2e_skip: true` in spec frontmatter)
-- `code-reviewer` (four quality specialties inside the `code_review` gate) and `security-reviewer` run in parallel after unifier and reviewer-focus metadata prerequisites
+- `code-reviewer` and `security-reviewer` may run in parallel after unifier and reviewer-focus metadata prerequisites
 - Both reviewers converge independently; `documenter` waits for both convergences
 - Main agent handles integration and synthesis
 
 ### Independent Verification (Practice 2.4)
 
-When `implementer`, `test-writer`, and `e2e-test-writer` run in parallel, neither the test-writer nor the e2e-test-writer **may see the implementation**. Both receive only the **spec** (acceptance criteria, task list, evidence table, contract definitions) — never implementation file paths or code. This ensures tests verify the _contract_, not the _implementation_. The e2e-test-writer is dispatched by default for all spec-based workflows (opt-out via `e2e_skip: true` with rationale in spec frontmatter). Its isolation is additionally enforced by a PreToolUse hook that blocks all reads outside spec/contract/template/test/docs directories and all writes outside `tests/e2e/`. If either agent needs interface/type information, provide it from the spec's evidence table or contract definitions.
+Default test generation is contract-first and isolated from implementation. `e2e-test-writer` **must never see implementation** and receives only specs/contracts; hooks restrict its reads and writes to its allowed surfaces. `test-writer` also defaults to strict isolation, with one narrow bug-fix hybrid exception: `spec_mode: bug-fix` plus a valid `test_writer_unlock` after a first failing strict-mode run. Do not provide implementation paths to test-writer for normal feature work, and never provide them to e2e-test-writer.
 
 ### Assumption Tracking (Practice 1.10)
 
-When multiple agents implement in parallel, each agent's `TODO(assumption)` comments create a distributed assumption graph. After parallel implementation and before the review gate, the orchestrator MUST scan modified files for `TODO(assumption)` markers, group by topic, and flag conflicts (two agents assumed different values for the same integration point). A single agent's assumption is a local decision; multiple agents' assumptions about the same topic are a distributed consensus problem.
+After parallel implementation and before review, scan modified files for `TODO(assumption)` markers, group them by topic, and flag conflicts where agents assumed different values for the same integration point.
 
 ### Convergence Gates
 
-Before merge, all gates must pass. Each gate marked with **(loop)** runs under the Convergence Loop Protocol. Per-gate thresholds and `attestation_mode` are read from the `PerGateThresholdTable` (exported by `workflow-dag.mjs`) via the `SessionThresholdSnapshot` captured at session start (`session.active_work.threshold_snapshot`). Pipeline-efficiency ws-1 introduces **content-hash attestation-skip** for content-stable gates: when the gate's `hash_input_manifest` content-hash is byte-identical between Pass N and Pass N-1, the gate MAY converge at **1 clean pass + attestation** (instead of 2 consecutive). Investigation and challenger retain 2-consecutive-clean with `attestation_mode: "none"` — distinct findings per pass observed in evidence runs make content-hash attestation unsafe for these gates.
+Before merge, all workflow/risk-tier-required gates must pass. Per-gate thresholds and `attestation_mode` come from `PerGateThresholdTable` through the `SessionThresholdSnapshot`.
 
-- Spec complete
-- Investigation convergence **(loop)** — 2 consecutive clean passes, `attestation_mode: none`, auto-decision engine
-- Challenger convergence **(loop)** — 2 consecutive clean passes, `attestation_mode: none`, auto-decision engine (pre-impl/pre-orch stages only)
-- All ACs implemented
-- All tests passing (100% AC coverage)
-- Unifier validation passed **(loop)** — `required_clean_passes: 1`, `attestation_mode: content-hash` (may skip on stable-state attestation; EC-7 conservative fallback if hash differs)
-- Code review passed (no High/Critical issues) **(loop)** — `required_clean_passes: 2`, `attestation_mode: content-hash` (this ship; REQ-001 relaxation to 1 pending baseline accrual)
-- Security review passed **(loop)** — `required_clean_passes: 2`, `attestation_mode: content-hash` (this ship; REQ-001 relaxation to 1 pending baseline accrual)
-- Completion verification passed **(loop)** — `required_clean_passes: 1`, `attestation_mode: content-hash` (may skip on stable-state attestation)
-- E2E tests passed (unless e2e_skip)
-- Documentation generated
-- Manual test (advisory) — `/manual-test` dispatched after `/docs`; findings reviewed but non-blocking
+| Gate / requirement | Required state |
+| ------------------ | -------------- |
+| Spec, ACs, tests | Spec complete; all ACs implemented; all tests passing with 100% AC coverage |
+| Investigation (Interface investigator) and challenger **(loop)** | 2 consecutive clean passes, `attestation_mode: none`, auto-decision for investigation and pre-impl/pre-orch challenger only |
+| Unifier and completion-verifier **(loop)** | `required_clean_passes: 1`, `attestation_mode: content-hash`; content-hash attestation-skip may converge at 1 clean pass + attestation when inputs are stable |
+| Code-review and security **(loop)** | No High/Critical issues; `required_clean_passes: 2`, `attestation_mode: content-hash` pending baseline-backed relaxation |
+| E2E, docs, manual test | E2E tests passed (unless e2e_skip); documentation generated; `/manual-test` is advisory by default but blocks terminal Stop for `runtime_validation_required: true` until passing |
 
-**Minimum-pruning floor (BIZ-002)**: At least one of `{unifier, code-review, security, completion-verifier}` MUST be configured at `(required_clean_passes: 1, attestation_mode: "content-hash")` unless `.claude/prds/pipeline-efficiency/threshold-decisions.md` documents ≥10% Medium+ 2nd-pass rate for all four gates. Enforced at `/enforce` time via `minimum-pruning-floor.mjs` (AC14.1–AC14.4). Per-gate rationale and baseline evidence live in `.claude/prds/pipeline-efficiency/threshold-decisions.md`.
+**Minimum-pruning floor (BIZ-002)**: At least one of `{unifier, code-review, security, completion-verifier}` must remain configured at `(required_clean_passes: 1, attestation_mode: "content-hash")` unless `.claude/prds/pipeline-efficiency/threshold-decisions.md` documents the zero-relax evidence required by `minimum-pruning-floor.mjs`.
 
-**compute-hashes gate ordering (REQ-009 / SC-9)**: Registry hash verification runs as a phase-transition hook at `post-impl → pre-unify` ONLY — pre-impl dispatch removed (dead code). The hook is wired into `.claude/scripts/lib/workflow-dag.mjs` (exports `COMPUTE_HASHES_HOOK_SOURCE_PHASE`, `COMPUTE_HASHES_HOOK_TARGET_PHASE`, `COMPUTE_HASHES_HOOK_PHASE_TRANSITION` = `testing→verifying`, `COMPUTE_HASHES_VERIFY_FLAG`, `COMPUTE_HASHES_DRIFT`, `shouldRunComputeHashesHook()`, `runComputeHashesGate()`) and invokes `node .claude/scripts/compute-hashes.mjs --verify` synchronously via `execFileSync`. The synchronous invocation is load-bearing: on non-zero exit, `runComputeHashesGate()` throws `COMPUTE_HASHES_DRIFT` inline on the caller's stack, allowing the facilitator to `process.exit(err.exitCode)` BEFORE the Node event loop drains any queued `SubagentStop` convergence-recorder — the ordering contract prevents a drift-failing pass from producing a ritual clean-pass append. On exit 0, the transition proceeds to `verifying` and the unifier dispatches against fresh hashes; on exit 2, the session aborts with the recorder skipped. Advisory lock at `.claude/coordination/compute-hashes.lock` (30s timeout) serializes concurrent ws-1/ws-2/ws-3 orchestrators; timeout emits `COMPUTE_HASHES_LOCK_TIMEOUT` + exit 2. Late-stage completion-verifier retains a secondary `registry-hash-verify` drift check. See `.claude/docs/HOOKS.md` §compute-hashes post-impl → pre-unify gate and §Worktree-canon integration points for full error shapes, audit payload schema, and consumer wiring.
+**compute-hashes gate ordering (REQ-009 / SC-9)**: Registry hash verification runs only at `post-impl -> pre-unify` / `testing -> verifying` via `node .claude/scripts/compute-hashes.mjs --verify`. Drift aborts before convergence recording; success lets unifier dispatch against fresh hashes. The advisory lock, error shapes, audit payloads, and secondary completion-verifier drift check are documented in `.claude/docs/HOOKS.md`.
 
 ### Integration Verification Gate (Practice 4.5)
 
-**Subsumed by flow-verifier.** The flow-verifier agent (`/flow-verify`) performs comprehensive wiring verification at 4 stages (prd-review, spec-review, impl-verify, post-impl), covering all checks previously described here plus additional flow types (user, data, event, control) and carry-forward findings across stages. See `.claude/agents/flow-verifier.md` and `.claude/skills/flow-verify/SKILL.md`.
+**Subsumed by flow-verifier.** `/flow-verify` checks wiring at prd-review, spec-review, impl-verify, and post-impl across user, data, event, and control flows. See `.claude/docs/FLOW-VERIFIER.md`.
 
 ---
 
@@ -360,37 +289,21 @@ Agents must prove symbols exist before referencing them (Evidence-Before-Edit). 
 
 ### Wire Protocol Contracts (Practice 1.8)
 
-Every cross-boundary integration point must have an explicit wire protocol contract defining: HTTP method, path, request/response shapes, error codes, and authentication requirements. See `.claude/memory-bank/best-practices/contract-first.md` for full details.
+Every cross-boundary integration point needs an explicit protocol contract: method/path, request/response shape, error codes, and auth requirements.
 
 ### Boundary Ownership Assignment (Practice 1.9)
 
-Each integration boundary has exactly one owning spec: SSE/WebSocket routes are owned by the relay spec, REST routes are owned by the server spec, shared database schemas are owned by the schema-owner spec. When in doubt, the spec that defines the data shape owns the boundary.
+Each integration boundary has exactly one owning spec. When ownership is unclear, the spec that defines the data shape owns the boundary.
 
 ### Contract Stratification (Practice 2.5)
 
-Contracts exist at four layers — each must be explicitly verified:
-
-1. **Type contracts** — TypeScript interfaces, Zod schemas
-2. **Symbol contracts** — exported names, import paths
-3. **Wire protocol contracts** — HTTP/SSE/WS request/response shapes
-4. **Behavioral contracts** — expected side effects, ordering guarantees, error semantics
-
-For full practices, see `.claude/memory-bank/best-practices/contract-first.md`.
+Verify all four contract layers: type contracts, symbol contracts, wire protocol contracts, and behavioral contracts. Full practices live in `.claude/memory-bank/best-practices/contract-first.md`.
 
 ---
 
 ## Code Quality Foundations
 
-These practices apply to all implementation work. See `.claude/memory-bank/best-practices/code-quality.md` for full details.
-
-- **Structured error handling** — Use typed error classes with error codes, not string messages
-- **Dependency injection** — Pass dependencies explicitly; no hidden singletons or global state
-- **Zod validation at boundaries** — Validate all external input (API requests, file reads, env vars) with Zod schemas
-- **Module boundary enforcement** — Export only the public API; keep internals private
-- **Named constants over magic values** — No unexplained literals in logic; use descriptive constant names
-- **Contract-generated types** — Types are derived from schemas (Zod, OpenAPI), not hand-written
-
-For code quality standards, see `.claude/memory-bank/best-practices/code-quality.md`. For contract-first practices, see `.claude/memory-bank/best-practices/contract-first.md`.
+Implementation work follows structured errors, explicit dependency injection, Zod validation at external boundaries, narrow module exports, named constants over magic values, and contract-generated types. Full standards live in `.claude/memory-bank/best-practices/code-quality.md`.
 
 ---
 
