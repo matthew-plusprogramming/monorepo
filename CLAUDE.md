@@ -271,7 +271,7 @@ Every response must include:
 
 **Every new user request MUST begin with `/route`** (except follow-ups and clarifications). Route determines: (1) workflow (oneoff-vibe | oneoff-spec | orchestrator), (2) delegation plan, (3) exploration needs.
 
-- **Small tasks (oneoff-vibe)**: Delegate to single subagent
+- **Small tasks (oneoff-vibe)**: Truly trivial work, clear bounded low-risk edits, or explicit vibe/skip-spec override
 - **Medium tasks (oneoff-spec)**: TaskSpec + parallel delegation (implement + test)
 - **Large tasks (orchestrator)**: MasterSpec + full parallel workstream delegation
 

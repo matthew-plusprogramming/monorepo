@@ -14,13 +14,25 @@ This document defines the current **raised orchestrator bar** and the multi-doma
 
 | Workflow       | When                                                                                                            |
 | -------------- | --------------------------------------------------------------------------------------------------------------- |
-| `oneoff-vibe`  | Truly trivial changes (typo fix, missing import) OR explicit user override ("just do it", "skip spec")          |
+| `oneoff-vibe`  | Truly trivial work, clear bounded low-risk edits, OR explicit user override ("just do it", "skip spec")         |
 | `refactor`     | Explicit behavior-preserving refactor — no feature or behavior change                                           |
 | `journal-only` | Documenting completed work, decisions, investigations                                                           |
 | `orchestrator` | **Raised bar**: 10+ atomic specs AND ≥2 multi-domain criteria (with evidence) AND tight parallelization benefit |
 | `oneoff-spec`  | **DEFAULT** — everything else                                                                                   |
 
-**Key change from the prior heuristic**: the orchestrator bar moved from "5+ files, 4+ hours" (triggered on almost every feature) to the three-condition gate above. Most medium-complexity work that formerly routed to orchestrator now routes to oneoff-spec.
+**Key changes from the prior heuristic**: the orchestrator bar moved from "5+ files, 4+ hours" (triggered on almost every feature) to the three-condition gate above, and the vibe bar now admits clear bounded low-risk edits instead of only typo-class changes. Most medium-complexity work that formerly routed to orchestrator still routes to oneoff-spec.
+
+## Vibe Threshold
+
+`/route` may recommend `workflow: oneoff-vibe` when the request is small enough that a formal spec would add more ceremony than clarity.
+
+Use `oneoff-vibe` for:
+
+- Truly trivial changes: typo fixes, missing imports, obvious syntax fixes, version bumps, or comment clarification.
+- Bounded low-risk edits: clear outcome, typically 1-3 files, one concern, and direct validation by diff review, static check, affected test, or docs/prompt review.
+- Explicit operator override: "just do it", "vibe", "quick fix", "skip spec", or similar.
+
+Do **not** use `oneoff-vibe` by default when the request touches auth, permissions, credentials, hooks, session state, registry/hash/sync/audit, filesystem/worktree safety, deployment, CI, public API contracts, schemas, shared-library behavior, or cross-runtime integration. Documentation and prompt changes that alter policy, workflow obligations, or operator behavior should route to `oneoff-spec` unless the operator explicitly asks to skip the spec.
 
 ## The Three-Condition Gate
 

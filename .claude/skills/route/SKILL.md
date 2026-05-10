@@ -1,6 +1,6 @@
 ---
 name: route
-description: Analyze task complexity and route to appropriate workflow. Defaults to oneoff-spec (specs are cheap, bugs are expensive). Use oneoff-vibe only for truly trivial changes or explicit user override. Use orchestrator for large multi-workstream efforts. Use journal-only for non-spec work that needs documentation.
+description: Analyze task complexity and route to appropriate workflow. Use oneoff-vibe for truly trivial work, clear bounded low-risk edits, or explicit user override. Default to oneoff-spec when the request has behavior, policy, integration, or verification risk. Use orchestrator for large multi-workstream efforts. Use journal-only for non-spec work that needs documentation.
 user-invocable: true
 allowed-tools: Read, Glob, Grep
 ---
@@ -32,11 +32,11 @@ Route MUST emit `risk_tier`, `required_gates`, and `skipped_gates`. Stop-hook di
 
 ## Complexity Heuristics
 
-> **Default to specs.** Use oneoff-spec unless the task is truly trivial OR the user explicitly requests to skip specs.
+> **Lower vibe barrier for low-risk work.** Use oneoff-vibe when the request is clear, bounded, and low-risk. Use oneoff-spec when the request needs acceptance criteria, has meaningful behavior/policy risk, or leaves open questions.
 
-### Trivial (oneoff-vibe)
+### Lightweight (oneoff-vibe)
 
-Route to quick execution **only when**:
+Route to quick execution when any of these apply:
 
 **Truly trivial changes** (all must apply):
 
@@ -45,6 +45,14 @@ Route to quick execution **only when**:
 - No behavioral impact beyond the obvious fix
 - No tests needed or test change is equally trivial
 
+**Bounded low-risk edits** (all must apply):
+
+- Clear requested outcome with no unresolved product, design, security, or architecture decision
+- Small scope, typically 1-3 files and one concern
+- No trust-bearing surface: auth, permissions, credentials, hooks, session state, registry/hash/sync/audit, filesystem/worktree safety, deployment, or CI
+- No public API contract, schema, cross-runtime integration, or shared-library behavior change
+- Validation is direct and targeted: static check, affected test, diff inspection, or docs/prompt review
+
 **Examples of truly trivial**:
 
 - Fix typo in README: "teh" → "the"
@@ -52,6 +60,14 @@ Route to quick execution **only when**:
 - Update version number in config
 - Add missing import that's causing a build error
 - Comment clarification
+
+**Examples of bounded low-risk**:
+
+- Tighten README wording or fix a broken docs link
+- Adjust non-policy prompt wording or agent instructions for clarity
+- Rename an internal label in one local fixture
+- Add or remove a temporary debug log at the user's request
+- Update a small test fixture where expected behavior is unchanged
 
 **User explicitly requests vibe**:
 
@@ -62,7 +78,7 @@ Route to quick execution **only when**:
 
 - Bug fix requiring investigation
 - "Simple" feature additions (even small ones have edge cases)
-- Documentation updates with new content (not just typo fixes)
+- Documentation or prompt updates that change policy, workflow obligations, or operator behavior
 - Configuration changes affecting behavior
 - Any change where you'd want to verify acceptance criteria
 
@@ -236,11 +252,45 @@ Would you like to resume this work? [Y/n]
 
 **If user declines (n, no, or "work on something else")**:
 
-1. Archive the incomplete work:
-   ```bash
-   node .claude/scripts/session-checkpoint.mjs archive-incomplete
-   ```
-2. Proceed with normal routing (Step 1 onwards)
+1. Do **not** archive the existing work unless the operator explicitly wants to
+   abandon it.
+2. For unrelated work that should progress concurrently, create a lightweight
+   git worktree and continue routing from inside that worktree. This gives the
+   new foreground task its own worktree-local `session.json`, `active_work`, and
+   hooks.
+3. For a same-checkout focus change where only one foreground task will run,
+   use `switch-work <work_id>` for an existing stored work item or positional
+   `start-work ... --switch-from-current` for a new spec workflow.
+
+Archive only when the operator explicitly wants to abandon the current work:
+
+```bash
+node .claude/scripts/session-checkpoint.mjs archive-incomplete
+```
+
+**Concurrent foreground worktree pattern**:
+
+```bash
+repo_root="$(git rev-parse --show-toplevel)"
+repo_name="$(basename "$repo_root")"
+slug="<short-task-slug>"
+git worktree add "../${repo_name}-${slug}" -b "work/${slug}"
+cd "../${repo_name}-${slug}"
+wt_root="$(git rev-parse --show-toplevel)"
+cd "$wt_root"
+export CLAUDE_PROJECT_DIR="$wt_root"
+test -f .claude/scripts/session-checkpoint.mjs
+```
+
+After this point, every checkpoint command in the new task MUST use the
+worktree-local relative path:
+
+```bash
+node .claude/scripts/session-checkpoint.mjs <operation> ...
+```
+
+Do not call an absolute `session-checkpoint.mjs` path from another checkout and
+do not leave `CLAUDE_PROJECT_DIR` pointing at the parent worktree.
 
 **Check for handoff documents**:
 
@@ -352,7 +402,7 @@ Map the user's request (file paths, keywords, module names) to modules in `high-
 
 | Affected Modules                    | Suggested Workflow                  |
 | ----------------------------------- | ----------------------------------- |
-| 1 module, simple change             | oneoff-vibe (if truly trivial)      |
+| 1 module, simple change             | oneoff-vibe (if bounded low-risk)   |
 | 1-2 modules                         | oneoff-spec                         |
 | 3+ modules or deep dependency chain | oneoff-spec (consider orchestrator) |
 | 4+ modules across multiple layers   | orchestrator                        |
@@ -408,7 +458,7 @@ Count impacted files and assess complexity:
 
 **Do NOT delegate only when**:
 
-- Single-file typo/config fix (oneoff-vibe)
+- Single-file typo/config fix or bounded low-risk edit (oneoff-vibe)
 - Task requires tight coordination that subagents can't provide
 - User explicitly requests direct execution
 
@@ -465,7 +515,7 @@ trace_context: # Include when trace data is available
 next_action: <Suggested next step>
 ```
 
-**Record the decision (MANDATORY)**: After producing the decision block above, the main-agent MUST persist the decision to `session.json.active_work.route_decisions[]` via the sole-writer CLI:
+**Record the decision (MANDATORY)**: After producing the decision block above, first initialize or switch to the target active work item in Step 6, then persist the decision to `session.json.active_work.route_decisions[]` via the sole-writer CLI:
 
 ```bash
 # Non-orchestrator workflows:
@@ -476,7 +526,7 @@ node .claude/scripts/session-checkpoint.mjs record-route-decision orchestrator "
   --multi-domain-justification '[{"criterion":"3+ services","evidence":"..."},{"criterion":"cross-runtime boundaries","evidence":"..."}]'
 ```
 
-This append-only log is consumed by `.claude/scripts/metrics/pipeline-efficiency-routing-thresholds-collect.mjs` to measure routing distribution. `--risk-tier` also writes `active_work.risk_tier` for Stop-hook dispatch requirements. Rationale is truncated to 120 chars. Invoke **after** the decision block and **before** any phase transition (e.g., `start-work`).
+This append-only log is consumed by `.claude/scripts/metrics/pipeline-efficiency-routing-thresholds-collect.mjs` to measure routing distribution. `--risk-tier` also writes `active_work.risk_tier` for Stop-hook dispatch requirements. Rationale is truncated to 120 chars. Invoke **after** `start-work`/`switch-work` has selected the target active work item and **before** later phase transitions.
 
 **Orchestrator fallback enforcement**: If `/route` cannot name ≥2 criteria with evidence for a would-be orchestrator recommendation, emit `workflow: oneoff-spec` instead, with a rationale note explaining the insufficient warrant. Do NOT emit `workflow: orchestrator` without the `multi_domain_justification` field — the CLI rejects that shape with `ROUTE_DECISION_JUSTIFICATION_REQUIRED`.
 
@@ -526,6 +576,17 @@ If trace data is unavailable or integrity validation failed, omit the `trace_con
 node .claude/scripts/session-checkpoint.mjs start-work <spec_group_id> <workflow> "<objective>"
 ```
 
+If another work item is already active in this checkout and the new work should
+run concurrently, first create a lightweight worktree using the Step 0 pattern,
+then run `start-work` from that worktree root.
+
+For a same-checkout focus change where only one foreground task will run,
+preserve the current spec workflow and switch focus atomically:
+
+```bash
+node .claude/scripts/session-checkpoint.mjs start-work <spec_group_id> <workflow> "<objective>" --switch-from-current
+```
+
 This enables resume detection (Step 0) if the session is interrupted.
 
 **Example**:
@@ -548,6 +609,10 @@ node .claude/scripts/session-checkpoint.mjs start-work --exempt-workflow refacto
 node .claude/scripts/session-checkpoint.mjs start-work --exempt-workflow journal-only
 ```
 
+If another work item is already active and exempt work should run concurrently,
+create a lightweight git worktree first, then run the flag-only command from the
+new worktree root. Do not archive the original work to make room.
+
 The positive assertion lets `workflow-gate-enforcement.mjs` and
 `workflow-stop-enforcement.mjs` distinguish an intentional exempt session from
 missing active-work state.
@@ -559,8 +624,9 @@ Environment contract:
 
 Inherit semantics: if the session already has `active_work.workflow === W` and
 `W ∈ EXEMPT_WORKFLOWS`, the call is a no-op and exits 0 with a
-`work_started_already_active` audit entry. Downgrade from a non-exempt workflow
-is rejected; use `complete-work` first.
+`work_started_already_active` audit entry. Starting exempt work while a
+different workflow is active should use a separate lightweight worktree unless
+the operator is intentionally ending or switching the current checkout's focus.
 
 ## Edge Cases
 
@@ -568,10 +634,10 @@ is rejected; use `complete-work` first.
 
 When uncertain about task size:
 
-- **Default to oneoff-spec** — specs are cheap, debugging without specs is expensive
-- If task seems trivial but has any ambiguity → oneoff-spec
+- **Use oneoff-vibe for clear bounded low-risk tasks** — avoid spec ceremony when the scope and validation are obvious
+- If task seems lightweight but has ambiguity, behavior risk, or policy risk → oneoff-spec
 - Can escalate to orchestrator if spec reveals hidden complexity
-- Better to "over-spec" a simple task than "under-spec" a complex one
+- Better to "over-spec" a risky task than "under-spec" a complex one
 
 ### User Override
 

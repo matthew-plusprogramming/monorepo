@@ -323,12 +323,23 @@ Common triggers:
 
 To work under a different workflow:
 
-1. Complete or abandon the current active-work window via `complete-work` (or `start-work` on a different `sg-id`, which clears active-work).
-2. Start fresh with the desired workflow:
+1. For unrelated work that should progress concurrently, create a lightweight
+   git worktree and run that task's `session-checkpoint.mjs` from the new
+   worktree root. See `.claude/docs/WORKFLOW-ENFORCEMENT.md#concurrent-foreground-work`.
+2. If switching focus within this same checkout, use:
    ```bash
-   node .claude/scripts/session-checkpoint.mjs start-work <sg-id> <workflow> "<objective>"
+   node .claude/scripts/session-checkpoint.mjs switch-work <sg-id>
    ```
-3. If you intended to resume under the current workflow, omit `--workflow` on `transition-phase`.
+   or, for a new spec workflow in the same checkout:
+   ```bash
+   node .claude/scripts/session-checkpoint.mjs start-work <sg-id> <workflow> "<objective>" --switch-from-current
+   ```
+3. Complete or abandon only when the current work is actually ending:
+   ```bash
+   node .claude/scripts/session-checkpoint.mjs complete-work
+   node .claude/scripts/session-checkpoint.mjs archive-incomplete
+   ```
+4. If you intended to resume under the current workflow, omit `--workflow` on `transition-phase`.
 
 Exempt workflows (`oneoff-vibe`, `refactor`, `journal-only`) do not participate in workflow-immutability checks.
 

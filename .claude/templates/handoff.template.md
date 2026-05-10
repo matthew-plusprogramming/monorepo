@@ -18,8 +18,11 @@ Use this template to capture interrupted work session state when:
 
 1. Copy this template to `.claude/context/archive/<descriptive-slug>-handoff.md`
 2. Fill in all sections below (remove placeholder guidance text)
-3. Also run `node .claude/scripts/session-checkpoint.mjs archive-incomplete` for machine state
-4. The next session's `/route` Step 0 will detect this handoff document automatically
+3. Do not run `archive-incomplete` unless the operator explicitly wants to abandon the work.
+   Leaving `active_work` in place is the normal resume path.
+4. For concurrent continuation in another checkout, create a lightweight git worktree and run
+   that worktree's relative `node .claude/scripts/session-checkpoint.mjs ...` from its root.
+5. The next session's `/route` Step 0 will detect this handoff document automatically
 -->
 
 # Handoff: <Descriptive Title>

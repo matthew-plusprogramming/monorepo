@@ -37,6 +37,7 @@ Common commands:
 node .claude/scripts/session-checkpoint.mjs start-work <sg-id> <workflow> "<objective>"
 node .claude/scripts/session-checkpoint.mjs start-work <sg-id> <workflow> "<objective>" --force-reset-convergence
 node .claude/scripts/session-checkpoint.mjs start-work <sg-id> <workflow> "<objective>" --switch-from-current
+node .claude/scripts/session-checkpoint.mjs start-work --exempt-workflow oneoff-vibe
 node .claude/scripts/session-checkpoint.mjs switch-work <sg-id>
 node .claude/scripts/session-checkpoint.mjs transition-phase <phase>
 node .claude/scripts/session-checkpoint.mjs dispatch-subagent <id> <type> <desc> [--stage <stage>] [--work-id <sg-id>]
@@ -70,6 +71,46 @@ Rules:
   `SOURCE_FORBIDDEN_VIA_CLI`; `convergence-pass-recorder.mjs` calls the
   exported `recordPass()` API in-process.
 - `verify` runs the same completion-invariant library as the Stop hook.
+
+## Concurrent Foreground Work
+
+One checkout has one focused `session.active_work`. Stored `work_items` preserve
+state for switching, but they do not give every stored spec an independently
+enforced foreground hook context.
+
+For unrelated work that should progress concurrently, create a lightweight git
+worktree and run that task inside it:
+
+```bash
+repo_root="$(git rev-parse --show-toplevel)"
+repo_name="$(basename "$repo_root")"
+slug="<short-task-slug>"
+git worktree add "../${repo_name}-${slug}" -b "work/${slug}"
+cd "../${repo_name}-${slug}"
+wt_root="$(git rev-parse --show-toplevel)"
+cd "$wt_root"
+export CLAUDE_PROJECT_DIR="$wt_root"
+test -f .claude/scripts/session-checkpoint.mjs
+node .claude/scripts/session-checkpoint.mjs start-work <sg-id> <workflow> "<objective>"
+```
+
+For exempt work:
+
+```bash
+node .claude/scripts/session-checkpoint.mjs start-work --exempt-workflow oneoff-vibe
+```
+
+Checkpoint-path rule:
+
+- Always `cd "$(git rev-parse --show-toplevel)"` in the target worktree before
+  calling `session-checkpoint.mjs`.
+- Always invoke the worktree-local relative path:
+  `node .claude/scripts/session-checkpoint.mjs ...`.
+- Set `CLAUDE_PROJECT_DIR` to that same worktree root when invoking checkpoint
+  commands from shell snippets.
+- Never call an absolute `session-checkpoint.mjs` path from a different
+  checkout, and never reuse a parent worktree's `CLAUDE_PROJECT_DIR` in a child
+  worktree.
 
 ## DAG Rules
 
