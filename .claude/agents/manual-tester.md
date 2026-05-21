@@ -1,7 +1,9 @@
 ---
 name: manual-tester
 description: Bounded exploratory end-to-end verification agent. Runs 5 happy paths + 3 failure injections + 2 adjacent surfaces against a running app, then stops. Captures narrative evidence (screenshots, logs, probes) under the spec group's evidence/ directory. Advisory by default; mandatory for runtime-validation-required specs.
-tools: Read, Grep, Bash, Write, mcp__playwright-mcp__*
+tools: Read, Grep, Bash, Write, mcp__playwright__*
+mcpServers:
+  - playwright
 model: opus
 skills: manual-test
 ---
@@ -39,7 +41,7 @@ The `pass | fail | blocked` semantics are unchanged from the prior three-value c
 
 1. **Browser-open timeout >30s** — Playwright `browser_navigate` (or equivalent) exceeds 30 seconds waiting for the browser window to open. Symptom: a previously-working browser session fails to start mid-run.
 2. **Dev-server `ECONNREFUSED` or `EAI_AGAIN` mid-run** — A `curl` / `fetch` / probe call against a previously-reachable dev-server endpoint returns a transport-layer error. Symptom: the dev server crashed or the network path to it broke partway through the run.
-3. **MCP tool ≥3 consecutive failures** — Any `mcp__playwright-mcp__*` (or other MCP) tool fails three times in a row during scenario execution. Symptom: the MCP server is stuck, the Playwright session has detached, or the underlying browser context has died.
+3. **MCP tool ≥3 consecutive failures** — Any `mcp__playwright__*` (or other MCP) tool fails three times in a row during scenario execution. Symptom: the MCP server is stuck, the Playwright session has detached, or the underlying browser context has died.
 
 Contrast with `blocked` (static preconditions only): missing `mcp.json` at project root, missing Playwright browser binaries (`npx playwright install chromium` not run), missing MCP servers in the active session — all detectable BEFORE scenario execution starts.
 
@@ -86,7 +88,7 @@ When the same dispatch emits `infra_blocked` twice (counter `session.active_work
 
 ## When You're Invoked
 
-You're dispatched by the `/manual-test` skill, which is listed as the final step after `/docs` in both `oneoff-spec` and `orchestrator` workflows. Invocation is advisory by default. If any active spec frontmatter declares `runtime_validation_required: true`, the Stop hook requires your dispatch plus a structured passing result recorded by the main agent.
+You're dispatched by the `/manual-test` skill, which is listed as the final step after `/docs` in oneoff-spec workflows. Invocation is advisory by default. If any active spec frontmatter declares `runtime_validation_required: true`, the Stop hook requires your dispatch plus a structured passing result recorded by the main agent.
 
 Typical invocation:
 
@@ -142,7 +144,7 @@ For each of the 10 scenarios:
 2. Exercise the path using Playwright MCP primarily
 3. Observe outcome — visual, DOM, console, network, logs
 4. Capture evidence:
-   - Screenshot via `mcp__playwright-mcp__browser_take_screenshot`
+   - Screenshot via `mcp__playwright__browser_take_screenshot`
    - Relevant log excerpt via `Read` + `Grep`
    - Probe results via `Bash` (`curl`, `jq`)
 5. Write evidence to `.claude/specs/groups/<sg-id>/evidence/<scenario-id>-<timestamp>.{png,txt,json}`

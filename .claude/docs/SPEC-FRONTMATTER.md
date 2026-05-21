@@ -6,15 +6,15 @@ last_reviewed: 2026-04-19
 
 # Spec Frontmatter Reference — Runtime Connectivity Fields
 
-Reference for runtime frontmatter fields plus the widened `e2e_skip_rationale` enum. All fields live in markdown spec frontmatter (WorkstreamSpec + AtomicSpec). `e2e_skip_rationale` additionally lives on manifest.json (SpecGroup).
+Reference for runtime frontmatter fields plus the widened `e2e_skip_rationale` enum. Active markdown fields live in `spec.md` frontmatter. `e2e_skip_rationale` additionally lives on `manifest.json` for spec groups.
 
-Source schemas:
+Source validators:
 
-- `.claude/specs/schema/workstream-spec.schema.json`
-- `.claude/specs/schema/atomic-spec.schema.json`
-- `.claude/specs/schema/spec-group.schema.json` (`e2e_skip_rationale` enum only)
+- `.claude/scripts/spec-validate.mjs` validates active markdown spec frontmatter.
+- `.claude/scripts/lib/workflow-dag.mjs` owns the shared enum constants used by runtime validators.
+- `.claude/specs/schema/spec-group.schema.json` validates `manifest.json`.
 
-The source of truth is the schema files above, the validator in `.claude/scripts/spec-schema-validate.mjs`, and the focused schema regression tests in `.claude/scripts/__tests__/`.
+`spec-schema-validate.mjs` delegates active JSON-schema validation to Ajv for manifests; legacy decomposed markdown schemas are not active workflow sources.
 
 All fields are **optional at the top level**; conditional requirements apply only when a gating field is set (see each field below). Schema is additive — legacy specs without these fields continue to validate.
 
@@ -310,7 +310,7 @@ Downstream consumers updated to accept `pure-compute`:
 - `.claude/scripts/workflow-stop-enforcement.mjs` — imports from workflow-dag.
 - Test suites covering the enum length / membership.
 
-All three JSON Schemas (workstream, atomic, spec-group) accept the widened enum.
+The active markdown validator and spec-group schema accept the widened enum.
 
 ---
 
@@ -333,6 +333,6 @@ All three JSON Schemas (workstream, atomic, spec-group) accept the widened enum.
 
 - Schema validator architecture: [SCHEMA-VALIDATION.md](./SCHEMA-VALIDATION.md).
 - Hook registration: [HOOKS.md § spec-schema-validate.mjs](./HOOKS.md#spec-schema-validatemjs).
-- Source schemas: `.claude/specs/schema/{workstream-spec,atomic-spec,spec-group}.schema.json`.
-- Parent MasterSpec: [`sg-e2e-runtime-connectivity/spec.md`](../specs/groups/sg-e2e-runtime-connectivity/spec.md).
+- Source schema for manifests: `.claude/specs/schema/spec-group.schema.json`.
+- Parent spec: [`sg-e2e-runtime-connectivity/spec.md`](../specs/groups/sg-e2e-runtime-connectivity/spec.md).
 - Spec authoring conventions: [`memory-bank/best-practices/spec-authoring.md`](../memory-bank/best-practices/spec-authoring.md).

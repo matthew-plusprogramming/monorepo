@@ -4,8 +4,7 @@
  * validate-minimum-pruning-floor.mjs
  *
  * CLI entry point wiring `validateMinimumPruningFloor` (lib helper) to the
- * filesystem. Invoked by the `/enforce` skill before atomicity-enforcement
- * completes (AC14.4).
+ * filesystem. It can be run as a completion-time threshold validation.
  *
  * The CLI is I/O-only: it reads the canonical PerGateThresholdTable from
  * the lib module, optionally reads the decisions file, calls the pure
@@ -19,8 +18,7 @@
  * Options:
  *   --json              Emit the structured result as JSON on stdout and
  *                       suppress the human-readable stderr report. Useful
- *                       when the caller (e.g., /enforce orchestration)
- *                       needs machine-readable output.
+ *                       when the caller needs machine-readable output.
  *   --decisions <path>  Override the default decisions-file path
  *                       (.claude/prds/pipeline-efficiency/threshold-
  *                       decisions.md). Path is resolved relative to cwd.
@@ -108,7 +106,7 @@ function printUsage() {
 
 /**
  * Human-readable report for stderr. Kept compact so it fits alongside
- * other /enforce output without scrolling.
+ * other validation output without scrolling.
  *
  * @param {ReturnType<typeof validateMinimumPruningFloor>} result
  * @returns {string}

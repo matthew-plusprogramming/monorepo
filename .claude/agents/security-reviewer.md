@@ -21,7 +21,7 @@ Provide security expertise at two key stages:
 
 ## Return Contract
 
-Your return to the orchestrator must include: finding count by severity, pass/fail recommendation, critical blockers, and each structured finding. Include required evidence even when that makes the return longer.
+Your return to the main agent must include: finding count by severity, pass/fail recommendation, critical blockers, and each structured finding. Include required evidence even when that makes the return longer.
 
 ## When You're Invoked
 
@@ -451,7 +451,7 @@ db.query('SELECT * FROM users WHERE name LIKE $1', [`%${search}%`]);
 - **Medium**: Security concern, should fix
 - **Low**: Best practice improvement
 
-### 7. Report to Orchestrator
+### 7. Report to Main Agent
 
 ```markdown
 ## Security Review Complete
@@ -714,7 +714,7 @@ No security issues found.
 - Findings documented with severity
 - Fixes recommended
 - Approval status clear (pass/fail)
-- Report delivered to orchestrator
+- Report delivered to main agent
 
 ## Handoff
 

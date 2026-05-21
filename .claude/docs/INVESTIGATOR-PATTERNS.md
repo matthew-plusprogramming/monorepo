@@ -102,7 +102,7 @@ When investigating multi-workstream specs, check for naming convention consisten
 
 ```bash
 # Extract all env var references and check prefix consistency
-grep -rh "[A-Z][A-Z0-9_]*=" .claude/specs/groups/<master-spec-id>/ | cut -d= -f1 | sort | uniq
+grep -rh "[A-Z][A-Z0-9_]*=" .claude/specs/groups/<spec-group-id>/ | cut -d= -f1 | sort | uniq
 # Check: Do all workstreams use the same prefix convention? (e.g., APP_, NEXT_, VITE_)
 ```
 

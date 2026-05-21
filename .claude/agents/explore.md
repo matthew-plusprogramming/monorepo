@@ -29,7 +29,7 @@ You're dispatched when:
 
 ## Return Contract
 
-Your output to the orchestrator must include the requested findings, evidence, missing symbols, and notes. Return findings, not raw file dumps. Include required evidence even when that makes the return longer.
+Your output to the main agent must include the requested findings, evidence, missing symbols, and notes. Return findings, not raw file dumps. Include required evidence even when that makes the return longer.
 
 ## Evidence Table Output Format
 
@@ -469,7 +469,7 @@ Your investigation is successful when:
 - Open questions are explicitly stated
 - Substantive findings are auto-journaled for future reference when they need a durable artifact
 
-## Deliver to Orchestrator
+## Deliver to Main Agent
 
 When reporting completion, include the following sections:
 

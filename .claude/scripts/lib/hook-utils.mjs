@@ -344,9 +344,6 @@ export function getCanonicalProjectDir() {
  */
 const AS_013_VALID_STAGES = Object.freeze([
   'pre-implementation',
-  'pre-test',
-  'pre-review',
-  'pre-orchestration',
 ]);
 
 /**
@@ -401,8 +398,8 @@ export function parseStageFromPrompt(prompt) {
   // contexts so we don't over-match embedded text.
   //
   // `Stage:` MUST start at beginning of line OR after whitespace to avoid
-  // matching `pre-orchestration-Stage:-foo` anti-patterns. We enforce that via
-  // a preceding (start|whitespace|punctuation) lookbehind.
+  // matching embedded anti-patterns. We enforce that via a preceding
+  // (start|whitespace|punctuation) lookbehind.
   const STAGE_TOKEN = '[a-z][a-z0-9-]{2,40}';
   const patterns = [
     new RegExp(`(?:^|[\\s(\\[{;,])Stage:\\s+(${STAGE_TOKEN})\\b`, 'g'),

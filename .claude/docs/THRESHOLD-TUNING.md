@@ -18,13 +18,12 @@ Per-gate rationale: `.claude/prds/pipeline-efficiency/threshold-decisions.md` (a
 
 | Gate                  | `required_clean_passes` | `attestation_mode` | `hash_input_manifest`                                        | Relaxed |
 | --------------------- | ----------------------- | ------------------ | ------------------------------------------------------------ | ------- |
-| `unifier`             | 1                       | `content-hash`     | `.claude/specs/groups/<id>/{spec.md,requirements.md,manifest.json,atomic/*.md}` | YES     |
+| `unifier`             | 1                       | `content-hash`     | `.claude/specs/groups/<id>/{spec.md,requirements.md,manifest.json}` | YES     |
 | `completion-verifier` | 1                       | `content-hash`     | `manifest.json`, registry content, trace files               | YES     |
 | `code-review`         | 2                       | `content-hash`     | `git-diff:<branch-base>..HEAD` descriptor                    | No      |
 | `security`            | 2                       | `content-hash`     | `git-diff:<branch-base>..HEAD` descriptor                    | No      |
 | `investigation`       | 2                       | `none`             | N/A                                                          | N/A     |
 | `challenger-pre-impl` | 2                       | `none`             | N/A                                                          | N/A     |
-| `challenger-pre-orch` | 2                       | `none`             | N/A                                                          | N/A     |
 
 ## Attestation Modes
 
@@ -85,7 +84,7 @@ Required for every change. Append to `.claude/prds/pipeline-efficiency/threshold
 ### 5. Run the validator
 
 ```bash
-node .claude/scripts/minimum-pruning-floor.mjs
+node .claude/scripts/validate-minimum-pruning-floor.mjs
 ```
 
 Confirms at least one of `{unifier, code-review, security, completion-verifier}` is relaxed, OR `threshold-decisions.md` documents ≥10% Medium+ 2nd-pass rate for ALL four gates (BIZ-002 zero-relax justification).
@@ -115,14 +114,14 @@ Zero-relax justification allowed ONLY when `threshold-decisions.md` contains per
 **Measurement window**: <ISO start>..<ISO end>
 ```
 
-Validator enforces presence of all four entries when no gate is relaxed. Missing entry → floor violation → `/enforce` blocks merge.
+Validator enforces presence of all four entries when no gate is relaxed. Missing entry produces a floor violation that blocks completion.
 
 ## Hash-Input Manifest Format
 
 Entries in `hash_input_manifest` are logical descriptors expanded at attestation time:
 
 - Literal paths: `.claude/specs/groups/<id>/spec.md`, `.claude/specs/groups/<id>/requirements.md`, `.claude/specs/groups/<id>/manifest.json`
-- Glob descriptors: `.claude/specs/groups/<id>/atomic/*.md`
+- Glob descriptors: `.claude/specs/groups/<id>/slices/*.md`
 - Synthetic descriptors: `git-diff:<branch-base>..HEAD`, `registry content`, `trace files`
 
 Manifest expansion lives in `.claude/scripts/lib/hash-input-manifest.mjs`. `HashInputError` (missing file, git failure, unresolved placeholder) is trapped at `recordPass()` time to a no-op: missing content_hash falls back to consecutive counting.
@@ -138,5 +137,5 @@ Emergency tighten: set `required_clean_passes: 3` to force extra passes while in
 - `PIPELINE-EFFICIENCY-OPERATOR-RUNBOOK.md` — enforcement-flag + kill-switch procedures
 - `.claude/prds/pipeline-efficiency/threshold-decisions.md` — per-gate rationale record
 - `.claude/scripts/lib/per-gate-threshold-table.mjs` — canonical table source
-- `.claude/scripts/minimum-pruning-floor.mjs` — BIZ-002 validator
+- `.claude/scripts/validate-minimum-pruning-floor.mjs` — BIZ-002 validator CLI
 - `CLAUDE.md` §Convergence Gates — per-gate threshold semantics

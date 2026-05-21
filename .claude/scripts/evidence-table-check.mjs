@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 
 /**
- * Verifies evidence table is populated when an atomic spec transitions to 'implementing'.
+ * Verifies evidence table is populated when a spec transitions to 'implementing'.
  *
- * When an atomic spec has status: implementing, it should have a populated
- * Evidence Table (or Pre-Implementation Evidence Table) section with at least
- * one data row.
+ * When a spec has status: implementing, it should have a populated Evidence
+ * Table (or Pre-Implementation Evidence Table) section with at least one data
+ * row.
  *
  * Usage:
  *   node evidence-table-check.mjs <spec-file.md>
@@ -74,7 +74,7 @@ function validateFile(filePath) {
 
   if (!hasPopulatedEvidenceTable(content)) {
     console.error(`Warning: ${filePath}`);
-    console.error('  Atomic spec is in "implementing" status but has no populated Evidence Table.');
+    console.error('  Spec is in "implementing" status but has no populated Evidence Table.');
     console.error('  The Evidence-Before-Edit protocol requires evidence gathering before implementation.');
     console.error('  Add a "## Pre-Implementation Evidence Table" section with verified symbols.');
   }

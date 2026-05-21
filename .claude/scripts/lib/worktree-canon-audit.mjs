@@ -3,7 +3,7 @@
  * `WORKTREE_PATH_VIOLATION` rejection.
  *
  * Spec: sg-pipeline-efficiency-ws3-orchestrator-hygiene / as-009 / REQ-007 /
- *       NFR-5 item e (MasterSpec audit-log event-class catalog).
+ *       NFR-5 item e (parent-spec audit-log event-class catalog).
  *
  * Purpose
  * -------

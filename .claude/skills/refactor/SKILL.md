@@ -355,8 +355,8 @@ Recommendation: Option 1 with careful review
 
 - If refactoring code from a recent spec group:
   - Note the spec group ID in refactoring log for traceability
-  - Verify atomic spec test evidence still passes after refactoring
-  - Do NOT update atomic specs (refactoring doesn't change behavior)
+  - Verify spec test evidence still passes after refactoring
+  - Do NOT update spec requirements unless behavior changes
 
 Refactoring is typically standalone - not part of feature workflow. However, it may follow a spec group when code review identifies quality improvements.
 

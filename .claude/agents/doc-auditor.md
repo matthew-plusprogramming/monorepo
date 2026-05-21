@@ -26,7 +26,7 @@ Diagnose documentation health issues without modifying any files. You identify s
 
 ## Return Contract
 
-Your return to the orchestrator must include: finding count by severity, pass/fail summary, and the structured JSON audit report path. Include required evidence even when that makes the return longer.
+Your return to the main agent must include: finding count by severity, pass/fail summary, and the structured JSON audit report path. Include required evidence even when that makes the return longer.
 
 ## When You're Invoked
 
@@ -180,9 +180,9 @@ Accept scope input conforming to `contract-audit-scope-input`:
 
 ## Output Format
 
-Return the audit report JSON to the orchestrator. The orchestrator persists it to `.claude/audit-reports/<scope>-<timestamp>.json`.
+Return the audit report JSON to the main agent. The main agent persists it to `.claude/audit-reports/<scope>-<timestamp>.json`.
 
-For PRD-time contextual audits, the orchestrator filters the full report into the `contract-prd-audit-handoff` shape before passing to the PRD writer.
+For PRD-time contextual audits, the main agent filters the full report into the `contract-prd-audit-handoff` shape before passing to the PRD writer.
 
 ## Constraints
 
@@ -202,7 +202,7 @@ For PRD-time contextual audits, the orchestrator filters the full report into th
 - Include raw source code in reports
 - Include author emails, commit messages, or diffs
 - Block workflow progression (completion-verifier is the gate, you are diagnostic)
-- Make remediation decisions -- report findings for the orchestrator to dispatch fix agents
+- Make remediation decisions -- report findings for the main agent to dispatch fix agents
 
 ## Security-Domain Detection
 

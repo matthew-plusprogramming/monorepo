@@ -1,6 +1,6 @@
 ---
 name: investigate
-description: Investigate connection points between specs, atomic specs, and master specs. Surface inconsistencies in env vars, APIs, data shapes, and deployment assumptions before implementation.
+description: Investigate connection points within and between specs. Surface inconsistencies in env vars, APIs, data shapes, and deployment assumptions before implementation.
 allowed-tools: Read, Glob, Grep, Task
 user-invocable: true
 ---
@@ -36,7 +36,6 @@ Without investigation, these surface as integration failures during implementati
 ```
 /investigate <spec-group-id>              # Investigate connections within a spec group
 /investigate <spec-group-id> --cross      # Include connections to other spec groups
-/investigate ms-<id>                      # Investigate all workstreams in a master spec
 /investigate --all                        # Investigate all active specs
 /investigate <sg1> <sg2> <sg3>            # Investigate specific spec groups together
 ```
@@ -45,10 +44,9 @@ Without investigation, these surface as integration failures during implementati
 
 ### Mandatory Checkpoints
 
-1. **Before MasterSpec implementation** - After workstream specs written, before any implementation (mode: `standard`)
-2. **Before oneoff-spec implementation** - After spec approval, before implementation begins (mode: `single-spec`)
-3. **Before spec group depends on another** - When sg-B references sg-A outputs
-4. **After consistency issues found** - When manual review reveals conflicts
+1. **Before oneoff-spec implementation** - After spec approval, before implementation begins (mode: `single-spec`)
+2. **Before spec group depends on another** - When sg-B references sg-A outputs
+3. **After consistency issues found** - When manual review reveals conflicts
 
 ### Recommended Checkpoints
 
@@ -73,7 +71,6 @@ Determine what's being investigated:
 | -------------------------------- | --------------------------------------------- |
 | `/investigate sg-logout`         | Single spec group + its declared dependencies |
 | `/investigate sg-logout --cross` | sg-logout + all spec groups it touches        |
-| `/investigate ms-auth-system`    | All workstreams in the master spec            |
 | `/investigate --all`             | All active specs in `.claude/specs/groups/`   |
 | `/investigate sg-a sg-b sg-c`    | Exactly those three spec groups               |
 
@@ -194,25 +191,25 @@ Spec group interfaces are consistent and ready for implementation.
 ### Issues Found
 
 ```
-Interface Investigation: ms-deployment-pipeline ✗
+Interface Investigation: sg-deployment-pipeline x
 
-Scope: 3 workstreams (ws-build, ws-deploy, ws-monitor)
+Scope: 3 spec slices (build, deploy, monitor)
 
 Inconsistencies Found:
 
 CRITICAL (1):
-  INC-001: Missing .env fields in ws-monitor
-    - ws-build defines: HMAC_SECRET, LOG_LEVEL, LOG_MAX_BYTES
-    - ws-monitor template missing all three
-    - Impact: ws-monitor will fail at runtime
-    - Evidence: .claude/specs/groups/ws-build/.env.template:12-15
+  INC-001: Missing .env fields in monitor slice
+    - build slice defines: HMAC_SECRET, LOG_LEVEL, LOG_MAX_BYTES
+    - monitor template missing all three
+    - Impact: monitor will fail at runtime
+    - Evidence: .env.template:12-15
                 .claude/specs/groups/ws-monitor/.env.template (missing)
 
 HIGH (2):
   INC-002: SSH Key naming conflict
     - ws-build: GIT_SSH_KEY_PATH (file path approach)
     - ws-deploy: GIT_SSH_KEY_BASE64 (encoded approach)
-    - Evidence: ws-build/spec.md:47, ws-deploy/atomic/as-003.md:23
+    - Evidence: ws-build/spec.md:47, ws-deploy/spec.md:23
 
   INC-003: Container image format conflict
     - ws-build: Split (CONTAINER_IMAGE + CONTAINER_IMAGE_TAG)
@@ -254,32 +251,18 @@ Next steps:
 /route → PM → Spec → /investigate (MANDATORY, convergence loop) → /challenge (convergence loop) → Auto-Approval → Implement
 ```
 
-### In orchestrator Workflow
-
-```
-/route → PM → MasterSpec → [Parallel: WorkstreamSpecs]
-                                    ↓
-                              /investigate ms-<id>  ← MANDATORY (convergence loop)
-                                    ↓
-                              /challenge (convergence loop, pre-orchestration)
-                                    ↓
-                              Auto-Approval
-                                    ↓
-                        [Parallel: Implement per workstream]
-```
-
 ### Triggered by /route
 
-For complex tasks with multiple workstreams or dependencies, `/route` will recommend `/investigate` before implementation:
+For complex tasks with multiple slices or dependencies, `/route` will recommend `/investigate` before implementation:
 
 ```
-/route analysis: orchestrator workflow recommended
+/route analysis: oneoff-spec workflow recommended
 
 Before implementation:
-  1. Run /investigate ms-<id> (convergence loop, auto-decision)
+  1. Run /investigate <spec-group-id> (convergence loop, auto-decision)
   2. Run /challenge (convergence loop, auto-decision)
   3. Auto-approval after both converge
-  4. Proceed to parallel implementation
+  4. Proceed to implementation
 ```
 
 ## State Transitions
@@ -345,15 +328,6 @@ Available spec groups:
   - sg-logout-button
   - sg-auth-system
   - sg-user-management
-```
-
-### MasterSpec Without Workstreams
-
-```
-Error: MasterSpec ms-pipeline has no workstream references
-Cannot investigate cross-workstream connections
-
-Ensure MasterSpec has workstreams defined in frontmatter.
 ```
 
 ## Comparison with /unify

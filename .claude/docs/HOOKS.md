@@ -268,7 +268,7 @@ Pipeline-efficiency governance is owned by
 
 Audit event classes retained in the hook-facing contract: `flag_flip`,
 `test_writer_unlock`, `test_writer_unlock_refence`,
-`test_writer_unlock_misuse`, `atomizer_cleanup`, `session_override_flip`,
+`test_writer_unlock_misuse`, `atomizer_cleanup` (legacy), `session_override_flip`,
 `worktree_path_violation`, `sentinel_lifecycle`, `compute_hashes`.
 
 ## compute-hashes post-impl -> pre-unify gate

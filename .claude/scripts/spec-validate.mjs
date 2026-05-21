@@ -171,15 +171,15 @@ function validateSpecFile(filePath) {
     return { errors, warnings };
   }
 
-  // Validate status is a known value
-  // Top-level specs use: draft, review, approved, implementing, complete, archived
-  // Atomic specs use: pending, implementing, implemented, tested, verified
+  // Validate status is a known value. The active spec lifecycle uses
+  // draft/review/approved/implementing/complete/archived/superseded; legacy
+  // decomposed statuses remain tolerated for old markdown encountered by hooks.
   const validStatuses = [
     'draft', 'review', 'approved', 'implementing', 'complete', 'archived', 'superseded',
     'pending', 'implemented', 'tested', 'verified'
   ];
   if (frontmatter.status && !validStatuses.includes(frontmatter.status)) {
-    warnings.push(`unknown status '${frontmatter.status}' (expected one of: draft, review, approved, implementing, complete, archived [top-level] or pending, implementing, implemented, tested, verified [atomic])`);
+    warnings.push(`unknown status '${frontmatter.status}' (expected active spec status draft, review, approved, implementing, complete, archived, superseded; legacy statuses pending, implemented, tested, verified are tolerated)`);
   }
 
   // Validate e2e_skip fields (AC-7.3, AC-7.4, AC-7.5)
@@ -263,10 +263,15 @@ function validateSpecFile(filePath) {
       }
     }
 
-    // Check optional sections and warn if missing (only for atomic specs, not master/workstream specs)
-    // Master specs and workstream specs don't need Acceptance Criteria - they have workstreams instead
-    const isAtomicSpec = filePath.includes('/atomic/') || frontmatter.id?.startsWith('as-');
-    if (isAtomicSpec) {
+    // Check optional sections and warn if missing for active specs. Legacy
+    // decomposed markdown under atomic/ is tolerated but not treated as the
+    // current authoring model.
+    const isActiveSpec =
+      !filePath.includes('/atomic/') &&
+      !frontmatter.id?.startsWith('as-') &&
+      !frontmatter.id?.startsWith('ws-') &&
+      !frontmatter.id?.startsWith('ms-');
+    if (isActiveSpec) {
       for (const section of OPTIONAL_SECTIONS) {
         if (!section.pattern.test(content)) {
           warnings.push(`missing optional section '${section.name}'`);

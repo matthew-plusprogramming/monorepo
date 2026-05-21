@@ -215,7 +215,7 @@ npx vitest run tests/e2e/<spec-group-id>/
 
 ### Step 7: Report Results
 
-Return to orchestrator using the output contract:
+Return using the output contract:
 
 ```markdown
 status: success | partial | failed

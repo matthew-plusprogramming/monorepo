@@ -1,11 +1,11 @@
 ---
 type: evidence-table
 spec_group: <spec-group-id>
-atomic_spec: <as-NNN-slug>
+spec_slice: <slice-or-task-id>
 created_at: <ISO timestamp>
 ---
 
-# Evidence Table: <atomic-spec-title>
+# Evidence Table: <spec-or-slice-title>
 
 ## Symbols Verified
 

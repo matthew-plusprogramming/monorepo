@@ -6,13 +6,13 @@ Cross-boundary wiring verification for independently-created systems. Catches mi
 
 ## Overview
 
-When 21 subagents produce code in parallel across worktrees, the seams between their outputs are the highest-risk failure surface. Today, spec-time checks (interface-investigator) catch contract inconsistencies and E2E tests catch runtime failures, but nothing systematically verifies that the **implementation graph** -- the actual imports, registrations, event subscriptions, and data flows -- is properly wired together.
+When subagents produce code in parallel, the interfaces between their outputs are the highest-risk failure surface. Today, spec-time checks (interface-investigator) catch contract inconsistencies and E2E tests catch runtime failures, but nothing systematically verifies that the **implementation graph** -- the actual imports, registrations, event subscriptions, and data flows -- is properly wired together.
 
 The flow verifier fills this gap with continuous, stage-aware verification across the entire lifecycle: from PRD through implementation.
 
 **Architecture**: Two-layer split (following the doc-audit pattern):
 
-1. **`flow-verify-checks.mjs`** -- standalone script run by the orchestrator (requires Bash). Performs trace parsing, git-based file discovery, regex source scanning, and outputs structured JSON.
+1. **`flow-verify-checks.mjs`** -- standalone script run by the main agent (requires Bash). Performs trace parsing, git-based file discovery, regex source scanning, and outputs structured JSON.
 2. **`flow-verifier` agent** -- read-only agent (tools: Read, Glob, Grep). Consumes pre-computed results, evaluates carry-forward, produces structured findings.
 
 ---
@@ -118,14 +118,9 @@ PRD -> prd-review (5th critic) ->
       post-impl (coverage report) -> Code Review -> ...
 ```
 
-### orchestrator Workflow
+For large oneoff-spec work with internal slices, run the same stages against the full `spec.md`. If trace data is incomplete, the verifier uses Grep/Glob fallback (`coverage: "partial"`).
 
-Same as oneoff-spec, plus per-workstream and post-merge phases:
-
-1. **Per-workstream**: After each workstream completes, `impl-verify` runs scoped to that workstream. Cross-workstream references use Grep/Glob fallback (`coverage: "partial"`).
-2. **Post-merge**: After all workstreams merge, `impl-verify` runs against the combined codebase with full trace data. Post-merge findings supersede per-workstream findings for the same integration point.
-
-### NOT dispatched for oneoff-vibe workflows.
+Flow verifier is not dispatched for oneoff-vibe workflows.
 
 ---
 

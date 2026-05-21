@@ -40,10 +40,9 @@ Uses a two-layer architecture (following the doc-audit pattern):
 | `stage`         | string | Yes      | --      | Stage mode: `prd-review`, `spec-review`, `impl-verify`, `post-impl`                          |
 | `sg`            | string | Yes\*    | --      | Spec group ID (required for all stages except prd-review)                                    |
 | `prd`           | string | No       | --      | PRD file path (used for prd-review stage)                                                    |
-| `scope`         | string | No       | `full`  | Verification scope: `full`, `diff`, `workstream`, `post-merge` (stage-dependent — see below) |
+| `scope`         | string | No       | `full`  | Verification scope: `full` or `diff` (stage-dependent — see below) |
 | `diff_base`     | string | No       | `main`  | Git ref used as diff base when `scope=diff` (e.g., branch base ref for PR diffs)             |
 | `fallback_enum` | string | No       | `none`  | Diff-fallback strategy when `diff_base` unresolvable: `none`, `head-1`, `full-repo`          |
-| `workstream`    | string | No       | --      | Workstream ID (for per-workstream scoping in orchestrator)                                   |
 
 ### Stage → Scope Mapping (as-003 / REQ-006)
 
@@ -65,7 +64,6 @@ At `impl-verify` and `post-impl`, the dispatcher additionally passes `diff_base`
 ## Workflow Applicability
 
 - **oneoff-spec**: All four stages applicable
-- **orchestrator**: All four stages applicable, plus per-workstream and post-merge phases
 - **oneoff-vibe**: NOT dispatched (skip entirely)
 
 ## Pre-Flight Challenge
@@ -85,7 +83,7 @@ If any question cannot be answered from available context, surface it as a findi
 
 This is the highest-value stage and the most critical for catching wiring bugs.
 
-#### Step 1: Pre-Computation (Orchestrator runs this)
+#### Step 1: Pre-Computation (Main agent runs this)
 
 ```bash
 node .claude/scripts/flow-verify-checks.mjs --sg <spec-group-id> --stage impl-verify
@@ -133,21 +131,6 @@ Dispatched after unifier passes, before code review. Produces:
 - Summary of fully verified flows, flows with gaps, and undocumented flows
 
 Pre-computation required (same as impl-verify).
-
-## Orchestrator Workflow
-
-In orchestrator workflows with multiple workstreams, impl-verify runs in two phases:
-
-1. **Per-workstream**: After each workstream completes, scoped to that workstream's file set
-   ```bash
-   node .claude/scripts/flow-verify-checks.mjs --sg <sg-id> --stage impl-verify --scope workstream --workstream <ws-id>
-   ```
-2. **Post-merge**: After all workstreams merge, against combined codebase
-   ```bash
-   node .claude/scripts/flow-verify-checks.mjs --sg <sg-id> --stage impl-verify --scope post-merge
-   ```
-
-Post-merge findings supersede per-workstream findings for the same integration point.
 
 ## Carry-Forward Mechanism
 

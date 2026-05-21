@@ -2,7 +2,7 @@
  * Worktree canonicalization + pin validation helper.
  *
  * Spec: sg-pipeline-efficiency-ws3-orchestrator-hygiene / as-005 / REQ-007 /
- *       NFR-WORKTREE-CANON (MasterSpec §Contract Registry).
+ *       NFR-WORKTREE-CANON (parent-spec §Contract Registry).
  *
  * Purpose
  * -------

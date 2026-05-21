@@ -271,6 +271,15 @@ export const PROTECTED_FILENAMES = [
   'runtime-connectivity-enforcement.json',
   'rtc-enforcement-changes.log',
   'verify-rtc-enforcement-chain.mjs',
+  // sg-pre-merge-verify-20260508 / AS-8 / AC-8.8 / NFR-21+SEC-106:
+  // Operator-controlled enforcement flag for the pre-merge-verify Stop-hook
+  // gate. Lives at `.claude/coordination/pre-merge-verify-enforcement-disabled`.
+  // Agent writes (Write/Edit) AND deletes (rm/unlink/mv/truncate via Bash) MUST
+  // be blocked so the gate cannot self-disable. Only operator signed commits
+  // create/delete the sentinel under EDGE-019 carve-out. Path canonicalization
+  // discipline (path.resolve() equality, symlink/'..'/case-fold rejected) is
+  // enforced via PROTECTED_FILE_DIRS routing below.
+  'pre-merge-verify-enforcement-disabled',
 ];
 
 /**
@@ -458,6 +467,11 @@ const PROTECTED_FILE_DIRS = {
   'runtime-connectivity-enforcement.json': 'config',
   'rtc-enforcement-changes.log': 'audit',
   'verify-rtc-enforcement-chain.mjs': 'scripts',
+  // sg-pre-merge-verify-20260508 / AS-8: routes basename to `coordination/`
+  // dir so Write-branch PROTECTED_FILE_DIRS lookup AND Bash-branch
+  // buildRealpathProtectedMap canonical realpath sentinel both fire on the
+  // path `<worktree_root>/.claude/coordination/pre-merge-verify-enforcement-disabled`.
+  'pre-merge-verify-enforcement-disabled': 'coordination',
 };
 
 /**
@@ -696,6 +710,18 @@ const PROTECTED_FILE_REMEDIATION = {
     remediation:
       'Use: gate-enforcement-disabled is the global kill switch. Toggle via `node .claude/scripts/audit-append.mjs create|remove --rationale "<r>"` so the change is recorded in the tamper-evident audit log.',
     docSection: '.claude/docs/WORKFLOW-ENFORCEMENT.md § Kill Switch',
+  },
+  // sg-pre-merge-verify-20260508 / AS-8 / AC-8.8 / NFR-21+SEC-106:
+  // Operator-controlled enforcement flag for the pre-merge-verify Stop-hook
+  // gate. Lives at `.claude/coordination/pre-merge-verify-enforcement-disabled`.
+  // Agent writes (Write/Edit) AND deletes (rm/unlink/mv/truncate via Bash) MUST
+  // be blocked so the gate cannot self-disable. Only operator signed commits
+  // create/delete the sentinel under EDGE-019 carve-out.
+  'pre-merge-verify-enforcement-disabled': {
+    kind: 'override',
+    remediation:
+      'pre-merge-verify-enforcement-disabled is the operator-controlled enforcement sentinel for the pre-merge-verify Stop-hook gate. Presence disables enforcement. Only the human operator may create/delete via signed commit (EDGE-019 carve-out); direct agent writes or deletes are REJECTED. Enforcement re-enables on file removal.',
+    docSection: '.claude/docs/WORKFLOW-ENFORCEMENT.md § Pre-Merge-Verify Gate',
   },
   'shape-lint-disabled': {
     kind: 'override',

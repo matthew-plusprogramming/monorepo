@@ -178,7 +178,7 @@ Canonical 9 event classes:
 | `test_writer_unlock`         | ws-2 test-writer unlock record (`record-test-writer-unlock` CLI)          |
 | `test_writer_unlock_refence` | ws-2 test-writer unlock re-fence (5 triggers; spelling fixed by contract) |
 | `test_writer_unlock_misuse`  | ws-2 test-writer unlock misuse heartbeat (Stop hook, advisory)            |
-| `atomizer_cleanup`           | Atomizer cleanup event (ws-3: orchestrator-mediated gravestone-free)      |
+| `atomizer_cleanup`           | Legacy cleanup event retained for historical ws-3 audit logs              |
 | `session_override_flip`      | `override-enforcement` + `baseline_override_force_release`                |
 | `worktree_path_violation`    | ws-3 worktree path violation (4 closed reasons; NFR-WORKTREE-CANON)       |
 | `sentinel_lifecycle`         | Kill-switch create / remove                                               |
@@ -286,7 +286,7 @@ jq 'select(.event_class == "compute_hashes" and .payload.lock_wait_ms > 0) | {ts
   .claude/audit/pipeline-efficiency-changes.log
 ```
 
-`fallback_applied` closed enum: `"none"` (normal path) or `"retry-on-pre-lock-conflict"` (pre-lock snapshot differed from post-lock; single re-run with fresh lock). `LockTimeoutError` (`COMPUTE_HASHES_LOCK_TIMEOUT`) and `COMPUTE_HASHES_DRIFT` both surface to the facilitator as exit code 2; the session aborts before the PostToolUse convergence-recorder fires, so no ritual clean-pass append contaminates the log on drift.
+`fallback_applied` closed enum: `"none"` (normal path) or `"retry-on-pre-lock-conflict"` (pre-lock snapshot differed from post-lock; single re-run with fresh lock). `LockTimeoutError` (`COMPUTE_HASHES_LOCK_TIMEOUT`) and `COMPUTE_HASHES_DRIFT` both surface to the caller as exit code 2; the session aborts before the PostToolUse convergence-recorder fires, so no ritual clean-pass append contaminates the log on drift.
 
 See `HOOKS.md § compute-hashes post-impl → pre-unify gate` for the full hook wiring, ordering-contract rationale, and advisory-lock mechanics.
 

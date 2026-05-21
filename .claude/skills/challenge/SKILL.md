@@ -1,6 +1,6 @@
 ---
 name: challenge
-description: Dispatch the challenger agent for operational feasibility scrutiny before implementation or orchestration. Required pre-implementation for oneoff-spec and pre-orchestration for orchestrator workflows.
+description: Dispatch the challenger agent for operational feasibility scrutiny before implementation. Required pre-implementation for oneoff-spec workflows.
 allowed-tools: Read, Glob, Grep, Task
 user-invocable: true
 ---
@@ -16,12 +16,7 @@ Before beginning work, read these files for project-specific guidelines:
 
 ## Purpose
 
-Dispatch the challenger agent as a dedicated subagent for operational feasibility scrutiny. This is a required gate only for:
-
-- **oneoff-spec**: `pre-implementation`, after investigation convergence and before implementation
-- **orchestrator**: `pre-orchestration`, after investigation convergence and before orchestration
-
-Both stages run as a convergence loop (2 consecutive clean passes, auto-decision engine integration).
+Dispatch the challenger agent as a dedicated subagent for operational feasibility scrutiny. This is required for oneoff-spec at `pre-implementation`, after investigation convergence and before implementation.
 
 The embedded pre-flight questions in each skill still run as part of normal skill execution -- this dedicated dispatch provides additional scrutiny as a separate workflow step.
 
@@ -31,14 +26,13 @@ The embedded pre-flight questions in each skill still run as part of normal skil
 /challenge <spec-group-id> --stage <stage>
 ```
 
-**Stage values**: `pre-implementation`, `pre-orchestration`
+**Stage value**: `pre-implementation`
 
 ## When to Use
 
-Use the dedicated `/challenge` dispatch at the required challenger stages:
+Use the dedicated `/challenge` dispatch at the required challenger stage:
 
 - **`pre-implementation`**: Oneoff-spec only. After investigation convergence, before implementation begins. Fix agent: `implementer`.
-- **`pre-orchestration`**: Orchestrator only. After investigation convergence, before `/orchestrate` begins. Fix agent: `spec-author`.
 
 The dedicated `/challenge` dispatch is **NOT required** for:
 
@@ -54,14 +48,12 @@ The dedicated `/challenge` dispatch is **NOT required** for:
 | Workflow Phase        | Stage Parameter      | Fix Agent     |
 | --------------------- | -------------------- | ------------- |
 | Before implementation | `pre-implementation` | `implementer` |
-| Before orchestration  | `pre-orchestration`  | `spec-author` |
 
 ### Step 2: Gather Stage-Specific Input Context
 
 | Stage                | Required Input Context                                                               |
 | -------------------- | ------------------------------------------------------------------------------------ |
 | `pre-implementation` | Approved spec, environment configuration, dependency manifest, execution environment |
-| `pre-orchestration`  | MasterSpec/WorkstreamSpecs, workstream dependency graph, shared resource inventory   |
 
 ### Step 3: Execute Convergence Loop
 
@@ -134,7 +126,7 @@ Do not edit `manifest.json` or `session.json` directly. On verified convergence,
 If both `/challenge` and `/investigate` produce findings about the same issue:
 
 - Investigation findings take precedence (formal convergence gate vs. challenger)
-- Deduplication occurs at the orchestrator level
+- Deduplication occurs in the main spec convergence loop
 
 ## Integration with Workflow
 
@@ -144,7 +136,6 @@ Embedded pre-flight (always active in each skill):
 
 Dedicated dispatch (this skill):
   oneoff-spec:   After investigation convergence -> /challenge --stage pre-implementation -> Auto-Approval -> Implementation begins
-  orchestrator:  After investigation convergence -> /challenge --stage pre-orchestration  -> Auto-Approval -> /orchestrate begins
 ```
 
 ## Examples
@@ -164,21 +155,4 @@ Iteration 3: Clean pass (clean_pass_count = 2)
 
 Convergence achieved in 3 iterations.
 challenger_converged = true recorded in manifest.
-```
-
-### Example 2: Pre-Orchestration Challenge (Convergence Loop)
-
-```
-/challenge ms-deployment-pipeline --stage pre-orchestration
-
-Iteration 1:
-  Findings: 0 Critical, 0 High, 2 Medium
-  Auto-accepted: chk-resource-b2c3d4e5 (document shared CONTAINER_REGISTRY)
-  Escalated: chk-health-c3d4e5f6 (no health check endpoint -- security-tagged)
-  Human resolved: accepted health check recommendation
-
-Iteration 2: Clean pass (clean_pass_count = 1)
-Iteration 3: Clean pass (clean_pass_count = 2)
-
-Convergence achieved in 3 iterations.
 ```

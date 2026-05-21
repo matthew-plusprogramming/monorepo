@@ -4,7 +4,7 @@
  *
  * Spec: sg-pipeline-efficiency-ws3-orchestrator-hygiene / as-015-compute-hashes-advisory-lock
  *       §REQ-009 / AC15.1..AC15.4
- *       MasterSpec NFR-5 (hash-chain audit log, event_class = "compute_hashes")
+ *       parent-spec NFR-5 (hash-chain audit log, event_class = "compute_hashes")
  *
  * Responsibilities:
  *   - Acquire / release an exclusive file-based lock at

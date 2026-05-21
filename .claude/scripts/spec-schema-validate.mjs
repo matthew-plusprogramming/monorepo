@@ -6,10 +6,8 @@
  * Logic:
  * 1. Accept spec file path as argument
  * 2. Determine spec type from path or frontmatter:
- *    - atomic/*.md -> atomic-spec.schema.json
  *    - manifest.json -> spec-group.schema.json
- *    - Files with 'workstream' in frontmatter -> workstream-spec.schema.json
- *    - Files with 'master' type -> master-spec.schema.json
+ *    - legacy decomposed spec files are ignored; new work uses spec.md
  * 3. Parse YAML frontmatter from markdown (via `yaml` package)
  * 4. Validate against appropriate schema using Ajv
  * 5. Report validation errors with field-qualified diagnostics
@@ -89,9 +87,9 @@ function determineSpecType(filePath, frontmatter) {
     return 'spec-group';
   }
 
-  // Files in atomic/ directory
+  // Legacy decomposed specs are no longer schema-validated for new work.
   if (dirName === 'atomic' || filePath.includes('/atomic/')) {
-    return 'atomic-spec';
+    return null;
   }
 
   // Check frontmatter for type hints
@@ -102,25 +100,19 @@ function determineSpecType(filePath, frontmatter) {
       frontmatter.scope !== undefined ||
       frontmatter.implementation_status !== undefined
     ) {
-      // Could be workstream or task spec
-      if (frontmatter.workstreams || frontmatter.gates) {
-        return 'master-spec';
-      }
-      if (frontmatter.contracts !== undefined || frontmatter.dependencies !== undefined) {
-        return 'workstream-spec';
-      }
+      return null;
     }
 
-    // Check for master spec indicators
+    // Legacy master/decomposed spec indicators are ignored for new work.
     if (frontmatter.workstreams || frontmatter.gates) {
-      return 'master-spec';
+      return null;
     }
 
     // Check ID patterns
     if (frontmatter.id) {
-      if (frontmatter.id.startsWith('as-')) return 'atomic-spec';
-      if (frontmatter.id.startsWith('ws-')) return 'workstream-spec';
-      if (frontmatter.id.startsWith('ms-')) return 'master-spec';
+      if (frontmatter.id.startsWith('as-')) return null;
+      if (frontmatter.id.startsWith('ws-')) return null;
+      if (frontmatter.id.startsWith('ms-')) return null;
     }
   }
 
@@ -150,9 +142,6 @@ function loadSchema(schemaName) {
  * Required markdown sections for different spec types.
  */
 const REQUIRED_MARKDOWN_SECTIONS = {
-  'atomic-spec': ['## Description', '## Acceptance Criteria', '## Test Strategy', '## Atomicity Justification'],
-  'workstream-spec': ['## Context', '## Requirements', '## Task List'],
-  'master-spec': ['## Context', '## Workstreams'],
 };
 
 // Cache a single Ajv instance; Ajv compilation is O(schema size), so one
@@ -176,7 +165,6 @@ const _ajv = (() => {
 const MARKDOWN_BODY_ONLY_REQUIRED = new Set([
   'description',
   'acceptance_criteria',
-  'atomicity_justification',
 ]);
 
 function buildFrontmatterSchema(schema, specType) {

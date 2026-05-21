@@ -3,22 +3,21 @@
  *
  * Implements: REQ-004, AC24.2, AC24.3, AC24.4, SC-4, EC-10
  * Spec: sg-pipeline-efficiency-ws1-convergence-pruning / as-024
- * Parent spec section: §Task List Phase G — Tasks G6, G7; §Flow 2 (Pre-review); §EC-10
+ * Parent spec section: §Task List Phase G — Tasks G6, G7; §EC-10
  *
  * Purpose
  * -------
- * Replacement signal for the deleted `challenger pre-review` dispatch. The
- * pre-review challenger previously produced reviewer-focus metadata
- * (riskiest change areas, integration surfaces crossed, review focus
- * recommendations) which downstream `code-reviewer` and `security-reviewer`
- * consumed. This helper assembles the same signal from three passive inputs:
+ * Reviewer-focus metadata captures riskiest change areas, integration surfaces
+ * crossed, and review-focus recommendations for downstream `code-reviewer` and
+ * `security-reviewer` dispatches. This helper assembles the signal from three
+ * passive inputs:
  *
- *   1. Spec evidence table  — each atomic spec's Implementation Evidence
- *      rows (files + line ranges) drive the "changed_files" list.
+ *   1. Spec evidence table  — spec or optional spec-slice Implementation
+ *      Evidence rows (files + line ranges) drive the "changed_files" list.
  *   2. Diff summary         — caller-provided or derived from git; records
  *      which files changed between the spec's baseline and HEAD.
  *   3. Prior findings       — findings from preceding gates (unifier,
- *      investigation, challenger pre-impl/pre-orch) that reviewers should
+ *      investigation, challenger pre-implementation) that reviewers should
  *      consult before re-deriving coverage.
  *
  * The output is a dispatch-prompt JSON payload that `code-review` and
@@ -42,10 +41,10 @@
  *     review_recommendations: string[], // reviewer-facing hints
  *   }
  *
- *   FocusArea     = { file, atomic_spec_ids: string[], signal: string,
+ *   FocusArea     = { file, spec_slice_ids: string[], signal: string,
  *                     severity: 'info'|'advisory'|'attention' }
- *   ChangedFile   = { file, line_ranges: string[], atomic_spec_ids: string[] }
- *   PriorFinding  = { source, severity, message, atomic_spec_id? }
+ *   ChangedFile   = { file, line_ranges: string[], spec_slice_ids: string[] }
+ *   PriorFinding  = { source, severity, message, spec_slice_id? }
  *
  * Input contract
  * --------------
@@ -102,7 +101,6 @@ export const FOCUS_SEVERITY = Object.freeze({
 export const PRIOR_FINDING_SOURCES = Object.freeze({
   INVESTIGATION: 'investigation',
   CHALLENGER_PRE_IMPL: 'challenger-pre-impl',
-  CHALLENGER_PRE_ORCH: 'challenger-pre-orch',
   UNIFIER: 'unifier',
   UNIFY_PREFLIGHT: 'unify-preflight',
 });
@@ -175,7 +173,7 @@ export class DispatchPromptPersistError extends Error {
  * Assemble reviewer-focus metadata from spec evidence + diff summary +
  * prior findings.
  *
- * Pure (aside from filesystem reads of atomic specs) unless `persist` is
+ * Pure (aside from filesystem reads of spec markdown) unless `persist` is
  * set, in which case the payload is also written to the coordination
  * artifact (EC-10 retry path).
  *
@@ -227,7 +225,7 @@ export function assembleReviewerFocusMetadata(opts = {}) {
 
   // ---- Resolve input: form A (specGroupDir) vs form B (specEvidence) ----
   let resolvedSpecGroupId;
-  let atomicSpecs;
+  let specSlices;
   let resolvedSpecEvidence;
 
   if (specGroupDir && typeof specGroupDir === 'string') {
@@ -249,12 +247,11 @@ export function assembleReviewerFocusMetadata(opts = {}) {
       });
     }
     resolvedSpecGroupId = specGroupId || pathLib.basename(specGroupDir);
-    const atomicDir = pathLib.join(specGroupDir, 'atomic');
-    atomicSpecs = loadAtomicSpecs({ atomicDir, fs, pathLib });
+    specSlices = loadSpecSlices({ specGroupDir, fs, pathLib });
     resolvedSpecEvidence = buildSpecEvidencePointer({
       specGroupDir,
       specGroupId: resolvedSpecGroupId,
-      atomicSpecs,
+      specSlices,
     });
   } else if (specEvidence && typeof specEvidence === 'object') {
     resolvedSpecGroupId =
@@ -264,7 +261,7 @@ export function assembleReviewerFocusMetadata(opts = {}) {
         : typeof specEvidence.specId === 'string'
           ? specEvidence.specId
           : '<unknown>');
-    atomicSpecs = atomicSpecsFromSpecEvidence(specEvidence);
+    specSlices = specSlicesFromSpecEvidence(specEvidence);
     resolvedSpecEvidence = specEvidence;
   } else {
     return finalizePayload({
@@ -286,9 +283,9 @@ export function assembleReviewerFocusMetadata(opts = {}) {
   }
 
   // ---- Derive reviewer_focus aggregate ----
-  const changedFiles = deriveChangedFiles({ atomicSpecs, diffSummary });
+  const changedFiles = deriveChangedFiles({ specSlices, diffSummary });
   const focusAreas = deriveFocusAreas({
-    atomicSpecs,
+    specSlices,
     changedFiles,
     priorFindings,
   });
@@ -445,16 +442,16 @@ export function readDispatchPrompt({
 // =============================================================================
 
 /**
- * Extract changed files from atomic-spec evidence + optional diff summary.
- * Atomic specs are the authoritative source of "what was implemented"; the
- * diff summary (when provided) augments with paths that may not yet be
- * recorded in evidence (e.g., in-flight commits).
+ * Extract changed files from spec evidence + optional diff summary. Spec
+ * evidence is the authoritative source of "what was implemented"; the diff
+ * summary (when provided) augments with paths that may not yet be recorded in
+ * evidence (e.g., in-flight commits).
  */
-function deriveChangedFiles({ atomicSpecs, diffSummary }) {
+function deriveChangedFiles({ specSlices, diffSummary }) {
   /** @type {Map<string, ChangedFile>} */
   const byFile = new Map();
 
-  for (const spec of atomicSpecs) {
+  for (const spec of specSlices) {
     for (const row of spec.evidenceRows) {
       if (!row.file) continue;
       const existing = byFile.get(row.file);
@@ -462,14 +459,14 @@ function deriveChangedFiles({ atomicSpecs, diffSummary }) {
         if (row.lineRange && !existing.line_ranges.includes(row.lineRange)) {
           existing.line_ranges.push(row.lineRange);
         }
-        if (!existing.atomic_spec_ids.includes(spec.id)) {
-          existing.atomic_spec_ids.push(spec.id);
+        if (!existing.spec_slice_ids.includes(spec.id)) {
+          existing.spec_slice_ids.push(spec.id);
         }
       } else {
         byFile.set(row.file, {
           file: row.file,
           line_ranges: row.lineRange ? [row.lineRange] : [],
-          atomic_spec_ids: [spec.id],
+          spec_slice_ids: [spec.id],
         });
       }
     }
@@ -485,7 +482,7 @@ function deriveChangedFiles({ atomicSpecs, diffSummary }) {
       byFile.set(file, {
         file,
         line_ranges: [],
-        atomic_spec_ids: [],
+        spec_slice_ids: [],
       });
     }
   }
@@ -495,12 +492,12 @@ function deriveChangedFiles({ atomicSpecs, diffSummary }) {
 
 /**
  * Derive ranked focus areas. Rules (heuristic, advisory):
- *   - A file referenced by more than one atomic spec → severity 'attention'.
+ *   - A file referenced by more than one spec slice → severity 'attention'.
  *   - A file matching an integration-surface pattern → severity 'advisory'.
  *   - A file with 3+ line-range entries → severity 'advisory'.
  *   - Otherwise → severity 'info'.
  */
-function deriveFocusAreas({ atomicSpecs: _atomicSpecs, changedFiles, priorFindings }) {
+function deriveFocusAreas({ specSlices: _specSlices, changedFiles, priorFindings }) {
   const priorFindingFiles = new Set(
     (priorFindings || [])
       .map((f) => f && typeof f.file === 'string' ? f.file : null)
@@ -512,10 +509,10 @@ function deriveFocusAreas({ atomicSpecs: _atomicSpecs, changedFiles, priorFindin
     let severity = FOCUS_SEVERITY.INFO;
     const signals = [];
 
-    if (entry.atomic_spec_ids.length >= 2) {
+    if (entry.spec_slice_ids.length >= 2) {
       severity = FOCUS_SEVERITY.ATTENTION;
       signals.push(
-        `Touches ${entry.atomic_spec_ids.length} atomic specs (${entry.atomic_spec_ids.join(', ')}).`,
+        `Touches ${entry.spec_slice_ids.length} spec slices (${entry.spec_slice_ids.join(', ')}).`,
       );
     }
 
@@ -538,7 +535,7 @@ function deriveFocusAreas({ atomicSpecs: _atomicSpecs, changedFiles, priorFindin
 
     focusAreas.push({
       file: entry.file,
-      atomic_spec_ids: [...entry.atomic_spec_ids],
+      spec_slice_ids: [...entry.spec_slice_ids],
       signal: signals.length > 0 ? signals.join(' ') : 'Standard review.',
       severity,
     });
@@ -638,8 +635,10 @@ function normalizePriorFindings(priorFindings) {
       source: typeof f.source === 'string' ? f.source : '<unknown>',
       severity: typeof f.severity === 'string' ? f.severity : 'info',
       message: typeof f.message === 'string' ? f.message : '',
-      ...(typeof f.atomic_spec_id === 'string'
-        ? { atomic_spec_id: f.atomic_spec_id }
+      ...(typeof f.spec_slice_id === 'string'
+        ? { spec_slice_id: f.spec_slice_id }
+        : typeof f.atomic_spec_id === 'string'
+          ? { spec_slice_id: f.atomic_spec_id }
         : {}),
       ...(typeof f.file === 'string' ? { file: f.file } : {}),
     }));
@@ -651,32 +650,52 @@ function matchesIntegrationSurface(file) {
 }
 
 // =============================================================================
-// Atomic spec loading (lightweight, markdown-aware)
+// Spec evidence loading (lightweight, markdown-aware)
 // =============================================================================
 
-function loadAtomicSpecs({ atomicDir, fs, pathLib }) {
-  if (!fs.existsSync(atomicDir)) return [];
-  let entries;
-  try {
-    entries = fs.readdirSync(atomicDir).filter((n) => n.endsWith('.md'));
-  } catch {
-    return [];
+function loadSpecSlices({ specGroupDir, fs, pathLib }) {
+  const files = [];
+  const specPath = pathLib.join(specGroupDir, 'spec.md');
+  if (fs.existsSync(specPath)) files.push(specPath);
+
+  const slicesDir = pathLib.join(specGroupDir, 'slices');
+  if (fs.existsSync(slicesDir)) {
+    try {
+      for (const name of fs.readdirSync(slicesDir).filter((n) => n.endsWith('.md'))) {
+        files.push(pathLib.join(slicesDir, name));
+      }
+    } catch {
+      // Ignore unreadable optional slices; reviewer-focus is advisory context.
+    }
   }
+
+  if (files.length === 0) {
+    const legacyAtomicDir = pathLib.join(specGroupDir, 'atomic');
+    if (fs.existsSync(legacyAtomicDir)) {
+      try {
+        for (const name of fs.readdirSync(legacyAtomicDir).filter((n) => n.endsWith('.md'))) {
+          files.push(pathLib.join(legacyAtomicDir, name));
+        }
+      } catch {
+        // Ignore unreadable legacy directories; reviewer-focus is advisory.
+      }
+    }
+  }
+
   const specs = [];
-  for (const name of entries) {
-    const absPath = pathLib.join(atomicDir, name);
+  for (const absPath of files) {
     let content;
     try {
       content = fs.readFileSync(absPath, 'utf8');
     } catch {
       continue;
     }
-    specs.push(parseAtomicSpec({ content, filename: name }));
+    specs.push(parseSpecSlice({ content, filename: pathLib.basename(absPath) }));
   }
   return specs;
 }
 
-function parseAtomicSpec({ content, filename }) {
+function parseSpecSlice({ content, filename }) {
   const id = extractId({ content, filename });
   const evidenceRows = extractEvidenceRows(content);
   return { id, evidenceRows };
@@ -847,24 +866,24 @@ function finalizePayload({
 }
 
 /**
- * Build a compact spec_evidence pointer from atomic-spec data. Used when the
- * caller provides a spec-group directory rather than a pre-extracted
- * specEvidence structure. Downstream consumers can use the pointer to
- * re-load evidence on demand.
+ * Build a compact spec_evidence pointer from spec/spec-slice data. Used when
+ * the caller provides a spec-group directory rather than a pre-extracted
+ * specEvidence structure. Downstream consumers can use the pointer to re-load
+ * evidence on demand.
  */
 function buildSpecEvidencePointer({
   specGroupDir,
   specGroupId,
-  atomicSpecs,
+  specSlices,
 }) {
   return {
     spec_id: specGroupId,
     spec_group_dir: specGroupDir,
-    atomic_spec_count: atomicSpecs.length,
-    atomic_spec_ids: atomicSpecs.map((s) => s.id),
-    evidence: atomicSpecs.flatMap((spec) =>
+    spec_slice_count: specSlices.length,
+    spec_slice_ids: specSlices.map((s) => s.id),
+    evidence: specSlices.flatMap((spec) =>
       spec.evidenceRows.map((row) => ({
-        atomic_spec_id: spec.id,
+        spec_slice_id: spec.id,
         file: row.file,
         line_range: row.lineRange,
       })),
@@ -873,21 +892,27 @@ function buildSpecEvidencePointer({
 }
 
 /**
- * Adapt caller-provided specEvidence into the internal atomic-spec shape
+ * Adapt caller-provided specEvidence into the internal spec-slice shape
  * that the deriveChangedFiles / deriveFocusAreas helpers expect.
  *
  * The caller's shape is intentionally flexible (form B):
  *   {
  *     spec_id?, acceptance_criteria?, evidence?: [{ac, impl, test}],
- *     atomic_specs?: [{ id, evidenceRows: [{file, lineRange}] }],
+ *     spec_slices?: [{ id, evidenceRows: [{file, lineRange}] }],
  *   }
  *
- * When `atomic_specs` is provided it is used verbatim; otherwise a single
- * synthetic "bundle" atomic spec is produced from `evidence[*].impl`.
+ * Legacy `atomic_specs` input is accepted as a compatibility alias. Otherwise
+ * a single synthetic spec slice is produced from `evidence[*].impl`.
  */
-function atomicSpecsFromSpecEvidence(specEvidence) {
-  if (Array.isArray(specEvidence.atomic_specs)) {
-    return specEvidence.atomic_specs
+function specSlicesFromSpecEvidence(specEvidence) {
+  const providedSlices = Array.isArray(specEvidence.spec_slices)
+    ? specEvidence.spec_slices
+    : Array.isArray(specEvidence.atomic_specs)
+      ? specEvidence.atomic_specs
+      : null;
+
+  if (providedSlices) {
+    return providedSlices
       .filter((s) => s && typeof s === 'object')
       .map((s) => ({
         id: typeof s.id === 'string' ? s.id : '<unknown>',
@@ -925,7 +950,7 @@ function atomicSpecsFromSpecEvidence(specEvidence) {
   const syntheticId =
     typeof specEvidence.spec_id === 'string'
       ? specEvidence.spec_id
-      : 'synthetic-bundle';
+      : 'synthetic-spec-slice';
   return [{ id: syntheticId, evidenceRows }];
 }
 
@@ -943,13 +968,13 @@ function atomicSpecsFromSpecEvidence(specEvidence) {
  * @typedef {object} ChangedFile
  * @property {string} file
  * @property {string[]} line_ranges
- * @property {string[]} atomic_spec_ids
+ * @property {string[]} spec_slice_ids
  */
 
 /**
  * @typedef {object} FocusArea
  * @property {string} file
- * @property {string[]} atomic_spec_ids
+ * @property {string[]} spec_slice_ids
  * @property {string} signal
  * @property {"info"|"advisory"|"attention"} severity
  */
@@ -959,7 +984,7 @@ function atomicSpecsFromSpecEvidence(specEvidence) {
  * @property {string} source
  * @property {string} severity
  * @property {string} message
- * @property {string} [atomic_spec_id]
+ * @property {string} [spec_slice_id]
  * @property {string} [file]
  */
 

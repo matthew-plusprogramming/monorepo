@@ -21,15 +21,17 @@ Order:
 7. Emit JSONL findings and exit non-zero, or write by temp-file + atomic rename.
 
 `metaclaude-cli sync` runs the same drift checks in warn-only mode before the
-sync walk, then performs a second containment check immediately before each
-artifact read.
+sync walk, performs a second containment check immediately before each artifact
+read, then provisions consumer-local runtime dependencies for synced
+`.claude/scripts/*.mjs` or hook settings under `.claude/node_modules/`.
 
 ## Module Map
 
 - `.claude/scripts/compute-hashes.mjs`: CLI entry, gate orchestration,
   skip-gates audit, registry write.
 - `.claude/scripts/metaclaude-cli.mjs`: consumer status, sync, verify, and
-  sync-time warnings.
+  sync-time warnings; also provisions `.claude/node_modules` for synced hook
+  runtime imports.
 - `.claude/scripts/lib/orphan-detector.mjs`: scoped-root walk and `orphan`
   findings.
 - `.claude/scripts/lib/import-graph-validator.mjs`: Acorn parse, relative import

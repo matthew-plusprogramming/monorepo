@@ -50,7 +50,7 @@ describe('AC-12.1: VALID_SUBAGENT_TYPES includes e2e-test-writer', () => {
     expect(VALID_SUBAGENT_TYPES).toContain('e2e-test-writer');
   });
 
-  it('should have 22 entries in VALID_SUBAGENT_TYPES (20 existing + e2e-test-writer + flow-verifier) (AC-12.1)', async () => {
+  it('should have the current 21 active subagent types (AC-12.1)', async () => {
     // Arrange
     const mod = await loadModule();
     expect(mod).not.toBeNull();
@@ -59,7 +59,7 @@ describe('AC-12.1: VALID_SUBAGENT_TYPES includes e2e-test-writer', () => {
     const { VALID_SUBAGENT_TYPES } = mod;
 
     // Assert
-    expect(VALID_SUBAGENT_TYPES.length).toBe(23);
+    expect(VALID_SUBAGENT_TYPES.length).toBe(21);
   });
 });
 
@@ -95,20 +95,6 @@ describe('AC-12.3: getPrerequisites returns empty prerequisites for e2e-test-wri
 
     // Act
     const prereqs = getPrerequisites('oneoff-spec', 'e2e-test-writer');
-
-    // Assert
-    expect(Array.isArray(prereqs)).toBe(true);
-    expect(prereqs.length).toBe(0);
-  });
-
-  it('should return empty prerequisites for e2e-test-writer in orchestrator workflow (AC-12.3)', async () => {
-    // Arrange
-    const mod = await loadModule();
-    expect(mod).not.toBeNull();
-    const { getPrerequisites } = mod;
-
-    // Act
-    const prereqs = getPrerequisites('orchestrator', 'e2e-test-writer');
 
     // Assert
     expect(Array.isArray(prereqs)).toBe(true);

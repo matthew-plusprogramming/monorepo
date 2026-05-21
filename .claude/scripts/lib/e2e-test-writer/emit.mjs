@@ -109,7 +109,7 @@ export function emitRuntimeConnectivityTest(input) {
         `FAILED: Archetype selection ambiguous for spec ${specId}.`,
         `  Matched archetypes: ${(selection.matched || []).join(', ')}`,
         `  Resolution options:`,
-        `    (a) decompose the spec to enforce atomicity (one canonical test per spec, per DEC-003)`,
+        `    (a) narrow the spec or add an optional spec slice so the canonical test target is clear`,
         `    (b) annotate primary archetype in frontmatter (deferred)`,
       ],
       reason: 'ambiguous',

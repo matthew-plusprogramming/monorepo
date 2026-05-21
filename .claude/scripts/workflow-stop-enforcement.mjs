@@ -4,7 +4,7 @@
  * Stop Hook: Workflow Completion Enforcement
  *
  * Blocks session completion when mandatory dispatches have not occurred
- * for spec-based workflows (oneoff-spec, orchestrator).
+ * for spec-based workflows.
  *
  * Stop hooks use stdout JSON for blocking: {"decision": "block", "reason": "..."}
  * NOT stderr + exit 2 (that's for PreToolUse hooks).
@@ -33,7 +33,7 @@
  * Implements: REQ-008, REQ-009, REQ-010, REQ-025, REQ-030
  */
 
-import { existsSync, readFileSync, writeFileSync, unlinkSync, readdirSync, mkdirSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync, unlinkSync, mkdirSync } from 'node:fs';
 import { join, isAbsolute, basename, resolve, relative, sep } from 'node:path';
 import YAML from 'yaml';
 import {
@@ -106,6 +106,8 @@ const STOP_HOOK_ACTIVE_FILENAME = 'stop-hook-active';
 /** Override file for human-provided gate overrides. */
 const OVERRIDE_FILENAME = 'gate-override.json';
 
+const INFRA_BLOCKED_HUMAN_CONFIRMATION_THRESHOLD = 2;
+
 /**
  * Safely delete a file if it exists.
  * @param {string} filePath - Path to file
@@ -125,8 +127,8 @@ function safeDelete(filePath) {
  * Task 27 / REQ-M2-006 / AC-11.1). When a vibe-mode session edits any of
  * these files, the Stop hook fails closed instead of exempt-bypassing.
  *
- * Editing these files requires the full enforcement chain (oneoff-spec or
- * orchestrator workflow): an agent cannot modify the enforcement layer under
+ * Editing these files requires the full spec enforcement chain: an agent
+ * cannot modify the enforcement layer under
  * vibe-mode exemption.
  *
  * Entries are `.claude/`-relative paths. Basename matching is used to avoid
@@ -154,6 +156,148 @@ const TRUST_BEARING_ALLOWLIST = [
 
 const RUNTIME_MANUAL_TEST_PHASES = new Set(['documenting', 'complete']);
 
+// sg-manual-tester-infra-blocked-20260508 / AS-3 / DEC-010 / DEC-013.
+// Block-reason text fragments for the new `infra_blocked` Stop-hook branch.
+// Kept as named constants so test fixtures can import them and so changes to
+// operator-facing text are auditable in source control. The full block-reason
+// strings include the trigger narrative + dispatch_id so the operator sees
+// the structured trigger evidence directly in the Stop-hook output.
+//
+// Canonical form: snake_case machine-readable identifier per spec AS-3
+// (AC-4.1, AC-6.1, AC-8.1). Operator readability is preserved by the
+// colon-separated narrative that follows the marker.
+const INFRA_BLOCKED_TERMINAL_REASON_PREFIX = 'infra_blocked_terminal';
+const INFRA_BLOCKED_HUMAN_CONFIRMATION_REASON_PREFIX =
+  'infra_blocked_human_confirmation_required';
+const INFRA_BLOCKED_NARRATIVE_FALLBACK = '<missing narrative>';
+const INFRA_BLOCKED_DISPATCH_ID_FALLBACK = '<missing dispatch_id>';
+
+/**
+ * SEC-003 (defense-in-depth): strip ASCII control characters (U+0000..U+001F
+ * and U+007F) from a string before it lands in a Stop-hook block-reason.
+ * Block-reasons surface to terminals, log files, and audit trails; embedded
+ * control bytes (e.g., ANSI escape sequences, line-feeds, NULs) enable
+ * terminal-injection / log-spoofing attacks. We replace every control byte
+ * with a single space rather than dropping it so the visible-character
+ * boundary survives substring assertions in test fixtures.
+ *
+ * @param {string} value already-trimmed string
+ * @returns {string} value with control chars replaced by spaces
+ */
+function stripControlChars(value) {
+  // eslint-disable-next-line no-control-regex
+  return value.replace(/[\x00-\x1f\x7f]/g, ' ');
+}
+
+/**
+ * Extract the trigger narrative from a manual_test_result record. Falls back
+ * to a sentinel when the field is absent or non-string so the resulting
+ * block-reason string remains well-formed (NFR-2 fail-open discipline).
+ *
+ * SEC-003: control characters in the narrative are stripped before the
+ * value is returned so the formatted block-reason cannot inject terminal
+ * escape sequences or log-spoof newlines.
+ *
+ * @param {object} result `session.active_work.manual_test_result`
+ * @returns {string} narrative text or `<missing narrative>` sentinel
+ */
+function formatInfraBlockedNarrative(result) {
+  const narrative = result?.evidence?.narrative;
+  if (typeof narrative === 'string' && narrative.trim().length > 0) {
+    return stripControlChars(narrative.trim());
+  }
+  return INFRA_BLOCKED_NARRATIVE_FALLBACK;
+}
+
+/**
+ * Extract the canonical dispatch_id from a manual_test_result record.
+ * Prefers the top-level `dispatch_id` (canonicalized at write time) over
+ * `evidence.dispatch_id` so a corrupted evidence sub-object cannot mask the
+ * canonical value. Falls back to a sentinel when both are absent.
+ *
+ * SEC-003: control characters in the dispatch_id are stripped before the
+ * value is returned (same reasoning as formatInfraBlockedNarrative).
+ *
+ * @param {object} result `session.active_work.manual_test_result`
+ * @returns {string} dispatch_id text or `<missing dispatch_id>` sentinel
+ */
+function formatInfraBlockedDispatchId(result) {
+  const direct = result?.dispatch_id;
+  if (typeof direct === 'string' && direct.trim().length > 0) {
+    return stripControlChars(direct.trim());
+  }
+  const fromEvidence = result?.evidence?.dispatch_id;
+  if (typeof fromEvidence === 'string' && fromEvidence.trim().length > 0) {
+    return stripControlChars(fromEvidence.trim());
+  }
+  return INFRA_BLOCKED_DISPATCH_ID_FALLBACK;
+}
+
+/**
+ * Top-level Stop-hook check for `infra_blocked` manual-test results.
+ *
+ * Hoisted ABOVE the runtime-validation-required gate (DEC-013) so non-rvr
+ * specs that emit `infra_blocked` still block (REQ-003 — `infra_blocked` is
+ * terminal regardless of `runtime_validation_required`).
+ *
+ * Fail-open guards (DEC-017 / NFR-2 / AC-8.3a): returns an empty array when
+ *   - session is null/undefined
+ *   - session.active_work is absent/null/non-object/array
+ *   - session.active_work.manual_test_result is absent/null/non-object/array
+ *   - manual_test_result.result !== 'infra_blocked'
+ *
+ * Mirrors the guard pattern at the top of validateRuntimeManualTestGate
+ * (`session?.active_work?.manual_test_result` then shape check).
+ *
+ * Returns 0..2 reason strings to be APPENDED to runtimeManualTestBlockReasons
+ * (DEC-002 — joins existing aggregation bucket; no new parallel array). When
+ * the human-confirmation gate trips (counter >= 2), both reasons are emitted
+ * in dispatch_id-stable order: terminal first, human-confirmation second.
+ *
+ * @param {object|null|undefined} session loaded session.json content
+ * @returns {string[]} block-reason strings; empty array means no block emit
+ */
+function evaluateInfraBlockedTopLevel(session) {
+  if (!session || typeof session !== 'object' || Array.isArray(session)) {
+    return [];
+  }
+  const activeWork = session.active_work;
+  if (!activeWork || typeof activeWork !== 'object' || Array.isArray(activeWork)) {
+    return [];
+  }
+  const result = activeWork.manual_test_result;
+  if (!result || typeof result !== 'object' || Array.isArray(result)) {
+    return [];
+  }
+  if (result.result !== 'infra_blocked') {
+    return [];
+  }
+
+  const narrative = formatInfraBlockedNarrative(result);
+  const dispatchId = formatInfraBlockedDispatchId(result);
+  const reasons = [
+    `${INFRA_BLOCKED_TERMINAL_REASON_PREFIX}: ${narrative} [dispatch_id=${dispatchId}]. ` +
+      `Operator must run 'node .claude/scripts/session-checkpoint.mjs clear-manual-test-result <sg-id>' to resume.`,
+  ];
+
+  // DEC-010 / AC-6.1: emit the human-confirmation block-reason when the
+  // counter for this dispatch_id has reached 2 or more within the current
+  // phase. The counter is read from the same session snapshot the writer
+  // produced (counter-increment ordering per DEC-012 in opRecordManualTestResult).
+  const counterMap = activeWork.dispatch_infra_blocked_count;
+  if (counterMap && typeof counterMap === 'object' && !Array.isArray(counterMap)) {
+    const count = counterMap[dispatchId];
+    if (Number.isInteger(count) && count >= INFRA_BLOCKED_HUMAN_CONFIRMATION_THRESHOLD) {
+      reasons.push(
+        `${INFRA_BLOCKED_HUMAN_CONFIRMATION_REASON_PREFIX}: dispatch_id=${dispatchId} count=${count}. ` +
+          `Operator must explicitly acknowledge before honoring the halt.`
+      );
+    }
+  }
+
+  return reasons;
+}
+
 function toProjectRelativePath(claudeDir, absolutePath) {
   const projectRoot = resolve(join(claudeDir, '..'));
   return relative(projectRoot, absolutePath).split(sep).join('/');
@@ -177,19 +321,6 @@ function listRuntimeValidationSpecFiles(claudeDir, specGroupId) {
   const specPath = join(sgDir, 'spec.md');
   if (existsSync(specPath)) {
     specFiles.push(specPath);
-  }
-
-  const atomicDir = join(sgDir, 'atomic');
-  if (existsSync(atomicDir)) {
-    try {
-      const atomicFiles = readdirSync(atomicDir)
-        .filter((entry) => entry.endsWith('.md'))
-        .sort()
-        .map((entry) => join(atomicDir, entry));
-      specFiles.push(...atomicFiles);
-    } catch {
-      // Structural read errors fail-open for runtime marker discovery.
-    }
   }
 
   return specFiles;
@@ -324,8 +455,31 @@ function validateRuntimeManualTestGate(session, allTasks, claudeDir, specGroupId
     );
   }
 
-  if (!['pass', 'fail', 'blocked'].includes(result.result)) {
+  // sg-manual-tester-infra-blocked-20260508 / AS-3 / AC-1.x / AC-7.3:
+  // four-value enum admits `infra_blocked`. Out-of-enum values continue to
+  // fail-through the existing 'invalid result' path.
+  if (!['pass', 'fail', 'blocked', 'infra_blocked'].includes(result.result)) {
     reasons.push(`Structured manual-test result has invalid result '${result.result}'.`);
+    return { required: true, reasons };
+  }
+
+  // sg-manual-tester-infra-blocked-20260508 / AS-3 / AC-8.5 / DEC-004.
+  // Intercept ordering: the `infra_blocked` branch fires BEFORE the generic
+  // non-pass branch so the operator sees the structured narrative + dispatch_id
+  // rather than the generic 'expected pass' string. The hoisted top-level
+  // branch (above validateRuntimeManualTestGate) carries the actual block
+  // emission for non-rvr specs; this in-function branch handles the rvr-spec
+  // case where `validateRuntimeManualTestGate` is reached with an
+  // `infra_blocked` result. The reason content matches the hoisted branch's
+  // structured narrative (AC-8.2: contains both narrative substring and
+  // dispatch_id substring).
+  if (result.result === 'infra_blocked') {
+    const narrativeText = formatInfraBlockedNarrative(result);
+    const dispatchText = formatInfraBlockedDispatchId(result);
+    reasons.push(
+      `Manual-test infra_blocked: ${narrativeText} [dispatch_id=${dispatchText}]. ` +
+        `Operator must run 'node .claude/scripts/session-checkpoint.mjs clear-manual-test-result <sg-id>' to resume.`
+    );
     return { required: true, reasons };
   }
 
@@ -762,26 +916,7 @@ async function main() {
         try {
           const sgDir = join(claudeDir, 'specs', 'groups', sgId);
 
-          // Check for orchestrator workflows with atomic specs
-          const atomicDir = join(sgDir, 'atomic');
-          let specFiles = [];
-
-          if (existsSync(atomicDir)) {
-            // Orchestrator: glob atomic/*.md for per-spec checking (AC-5.1)
-            try {
-              const atomicEntries = readdirSync(atomicDir).filter(f => f.endsWith('.md'));
-              specFiles = atomicEntries.map(f => join(atomicDir, f));
-            } catch {
-              // AC-9.3: glob returns empty/fails -> fail-open (structural error)
-              e2eOptedOut = false;
-            }
-          }
-
-          if (specFiles.length === 0) {
-            // Oneoff-spec: single spec path (convention-based)
-            const specPath = join(sgDir, 'spec.md');
-            specFiles = [specPath];
-          }
+          const specFiles = [join(sgDir, 'spec.md')];
 
           // Per-spec checking: each spec evaluated individually (AC-5.4)
           let allSpecsSatisfied = true;
@@ -933,20 +1068,51 @@ async function main() {
     // advisory /manual-test behavior.
     let runtimeManualTestBlockReasons = [];
     let runtimeManualTestOverridden = false;
+
+    // sg-manual-tester-infra-blocked-20260508 / AS-3 / DEC-013 / DEC-017.
+    // Hoisted top-level `infra_blocked` branch. Evaluated BEFORE
+    // validateRuntimeManualTestGate so non-rvr specs that emit `infra_blocked`
+    // still block (REQ-003 — `infra_blocked` is terminal regardless of
+    // runtime_validation_required). Reasons append to
+    // runtimeManualTestBlockReasons (DEC-002 — joins the existing aggregation
+    // bucket; no new parallel array).
+    //
+    // Fail-open guards (DEC-017 / NFR-2 / AC-8.3a) are inside
+    // evaluateInfraBlockedTopLevel: missing/null/non-object/array session-state
+    // returns an empty array and yields no block emit.
+    //
+    // When `infra_blocked` is present, we short-circuit the
+    // validateRuntimeManualTestGate call: the hoisted branch is the canonical
+    // emitter for `infra_blocked`. The legacy gate handles `pass | fail | blocked`
+    // only.
+    let infraBlockedReasons = [];
     try {
-      const runtimeManualTestResult = validateRuntimeManualTestGate(
-        session,
-        allTasks,
-        claudeDir,
-        specGroupId,
-        currentPhase,
-      );
-      runtimeManualTestBlockReasons = runtimeManualTestResult.reasons;
+      infraBlockedReasons = evaluateInfraBlockedTopLevel(session);
     } catch (err) {
       process.stderr.write(
-        `[workflow-enforcement] WARNING: runtime-manual-test check error: ${err.message} -- fail-open\n`
+        `[workflow-enforcement] WARNING: infra_blocked top-level check error: ${err.message} -- fail-open\n`
       );
-      runtimeManualTestBlockReasons = [];
+      infraBlockedReasons = [];
+    }
+
+    if (infraBlockedReasons.length > 0) {
+      runtimeManualTestBlockReasons = infraBlockedReasons;
+    } else {
+      try {
+        const runtimeManualTestResult = validateRuntimeManualTestGate(
+          session,
+          allTasks,
+          claudeDir,
+          specGroupId,
+          currentPhase,
+        );
+        runtimeManualTestBlockReasons = runtimeManualTestResult.reasons;
+      } catch (err) {
+        process.stderr.write(
+          `[workflow-enforcement] WARNING: runtime-manual-test check error: ${err.message} -- fail-open\n`
+        );
+        runtimeManualTestBlockReasons = [];
+      }
     }
 
     if (runtimeManualTestBlockReasons.length > 0) {
@@ -1367,17 +1533,121 @@ async function main() {
       );
     }
 
+    // Step 7.9: Pre-merge-verify gate
+    // sg-pre-merge-verify-20260508 / AS-7 / AC-6.1..AC-6.6 / NFR-8.
+    // Per DEC-008: NEW try/catch boundary parallel to the existing
+    // deployment-verify block above. Each block has its own self-contained
+    // try/catch boundary; structural errors in one block do NOT affect the
+    // other. Composition: completionAllowed iff !deploymentBlocked && !preMergeBlocked.
+    let preMergeBlocked = false;
+    let preMergeBlockReason = '';
+
+    try {
+      const pmv = session.pre_merge_verify;
+
+      if (pmv !== undefined && pmv !== null) {
+        // AC-6.3: validate pre_merge_verify is an object (fail-open on non-object).
+        if (typeof pmv !== 'object' || Array.isArray(pmv)) {
+          process.stderr.write(
+            `[workflow-enforcement] WARNING: Malformed pre_merge_verify object (type: ${typeof pmv}) -- fail-open\n`
+          );
+        } else {
+          const status = pmv.status;
+          const reason = pmv.reason;
+          // AC-6.1..AC-6.3 decision rule:
+          //   status === 'failed'   -> preMergeBlocked = true
+          //   status ∈ {passed,skipped} -> preMergeBlocked = false
+          //   missing or non-string status -> fail-open (preMergeBlocked = false)
+          if (typeof status !== 'string') {
+            process.stderr.write(
+              `[workflow-enforcement] WARNING: pre_merge_verify.status is not string (${typeof status}) -- fail-open\n`
+            );
+          } else if (status === 'failed') {
+            // sec-pmv-001 (Stop-hook ignores enforcement-disabled sentinel):
+            // The pre-merge verifier runner honors the operator
+            // pre-merge-verify-enforcement-disabled sentinel (NFR-21 escape
+            // hatch), but the Stop-hook computed preMergeBlocked from
+            // session.pre_merge_verify.status === 'failed' regardless of the
+            // sentinel. That made the operator-flag advisory only inside the
+            // gate run itself — once a 'failed' result was persisted, the
+            // Stop-hook would still block completion. Re-read the sentinel
+            // here so the operator override genuinely makes the gate
+            // advisory-only (block decision composed AFTER the override
+            // check). Sentinel filename matches PRE_MERGE_FLAG_RELPATH at
+            // .claude/scripts/lib/pre-merge-verify.mjs:90.
+            const preMergeFlagPath = join(coordinationDir, 'pre-merge-verify-enforcement-disabled');
+            if (existsSync(preMergeFlagPath)) {
+              process.stderr.write(
+                '[workflow-enforcement] WARNING: pre-merge-verify-enforcement-disabled sentinel present -- gate is advisory-only (operator override per NFR-21)\n'
+              );
+              // Operator override: do NOT block completion despite a failed
+              // pre-merge-verify result. The audit chain still retains the
+              // failed entry; this only relaxes Stop-hook composition.
+              preMergeBlocked = false;
+            } else {
+              preMergeBlocked = true;
+              const safeReason = typeof reason === 'string' && reason.length > 0
+                ? stripControlChars(reason)
+                : '<missing reason>';
+              // Surface narrative + dispatch_id when present; SEC: only sanitized
+              // safe-message-only output here per Security Considerations §
+              // Error sanitization (full evidence remains in the audit chain).
+              const dispatchId = typeof pmv.dispatch_id === 'string' && pmv.dispatch_id.length > 0
+                ? stripControlChars(pmv.dispatch_id)
+                : null;
+              preMergeBlockReason =
+                `Pre-merge-verify gate failed: reason=${safeReason}` +
+                (dispatchId ? ` dispatch=${dispatchId}` : '') +
+                '. See audit chain for evidence narrative.';
+
+              // ≥2-emission Stop-hook block-reason (AC-13.3 / NFR-14):
+              // if dispatch_infra_blocked_count[<dispatch_id>] >= 2, surface
+              // the human-confirmation block-reason in addition (parallel to
+              // Item A's `infra_blocked_human_confirmation_required`).
+              const counterMap =
+                session.active_work && typeof session.active_work === 'object'
+                  ? session.active_work.dispatch_infra_blocked_count
+                  : null;
+              if (
+                dispatchId
+                && counterMap
+                && typeof counterMap === 'object'
+                && !Array.isArray(counterMap)
+                && Number.isInteger(counterMap[dispatchId])
+                && counterMap[dispatchId] >= INFRA_BLOCKED_HUMAN_CONFIRMATION_THRESHOLD
+              ) {
+                preMergeBlockReason +=
+                  `\nBlock-reason: pre_merge_verify_human_confirmation_required ` +
+                  `(dispatch_id=${dispatchId} infra_blocked_count=${counterMap[dispatchId]}).`;
+              }
+            }
+          }
+          // status === 'passed' or 'skipped': preMergeBlocked stays false.
+          // Unknown status string values: fail-open (preMergeBlocked stays false).
+        }
+      }
+      // pre_merge_verify field absent -- gate has not run, do not block.
+    } catch (err) {
+      // AC-6.3: Fail-open on any structural error. Independent of the
+      // deployment-verify block's try/catch (DEC-008).
+      process.stderr.write(
+        `[workflow-enforcement] WARNING: Pre-merge-verify gate structural error: ${err.message} -- fail-open\n`
+      );
+    }
+
     const hasRuntimeManualTestIssues =
       runtimeManualTestBlockReasons.length > 0 && !runtimeManualTestOverridden;
 
     // If no dispatch violations, no obligation violations, no completion-invariant blocks,
-    // and no deployment block, allow completion.
+    // no deployment block, and no pre-merge-verify block, allow completion.
+    // sg-pre-merge-verify-20260508 / AS-7 / NFR-8 truth-table conjunction.
     if (
       missingDispatches.length === 0 &&
       obligationViolations.length === 0 &&
       checkBlockReasons.length === 0 &&
       !hasRuntimeManualTestIssues &&
-      !deploymentBlocked
+      !deploymentBlocked &&
+      !preMergeBlocked
     ) {
       safeDelete(sentinelPath);
       // AC-2.1: Emit PRD warning via additionalContext if present
@@ -1421,13 +1691,14 @@ async function main() {
     }
 
     // If both dispatch and obligation issues are overridden/resolved, no completion-invariant
-    // blocks, and no deployment block, allow completion.
+    // blocks, no deployment block, and no pre-merge-verify block, allow completion.
     if (
       dispatchOverridden &&
       obligationViolations.length === 0 &&
       checkBlockReasons.length === 0 &&
       !hasRuntimeManualTestIssues &&
-      !deploymentBlocked
+      !deploymentBlocked &&
+      !preMergeBlocked
     ) {
       safeDelete(sentinelPath);
       if (prdWarning) {
@@ -1476,13 +1747,14 @@ async function main() {
         // Fail-open on session write errors
       }
 
-      // If no dispatch issues remain, no completion-invariant blocks, and no deployment block,
-      // allow completion.
+      // If no dispatch issues remain, no completion-invariant blocks, no deployment block,
+      // and no pre-merge-verify block, allow completion.
       if (
         !hasDispatchIssues &&
         checkBlockReasons.length === 0 &&
         !hasRuntimeManualTestIssues &&
-        !deploymentBlocked
+        !deploymentBlocked &&
+        !preMergeBlocked
       ) {
         safeDelete(sentinelPath);
         if (prdWarning) {
@@ -1554,6 +1826,13 @@ async function main() {
       reasonParts.push(deploymentBlockReason);
     }
 
+    // Step 9.2: Pre-merge-verify gate block (sg-pre-merge-verify-20260508 / AS-7).
+    // AC-6.6: when both deployment-verify and pre-merge-verify fail, both
+    // reasons appear in the output independently — no precedence.
+    if (preMergeBlocked) {
+      reasonParts.push(preMergeBlockReason);
+    }
+
     // If nothing to block (e.g., obligations were warn-only and dispatch had issues)
     if (reasonParts.length === 0) {
       safeDelete(sentinelPath);
@@ -1610,6 +1889,15 @@ async function main() {
         '  - Execute: npm run verify:deploy <endpoint-url>\n' +
         '  - Or use HTTP GET fallback with endpoint URL\n' +
         '  - Or call: node .claude/scripts/session-checkpoint.mjs record-deployment-failure (if deployment failed)'
+      );
+    }
+    if (preMergeBlocked) {
+      remediationParts.push(
+        'Resolve pre-merge-verify gate failure:\n' +
+        '  - Inspect audit chain: session.history filter event_type=pre_merge_verify_recorded\n' +
+        '  - Re-run gate via /pre-merge-verify after fixing the underlying issue\n' +
+        '  - For audit_chain_tamper_detected: node .claude/scripts/session-checkpoint.mjs repair-audit-chain ' + specGroupId + '\n' +
+        '  - For quarantine state: node .claude/scripts/session-checkpoint.mjs clear-pre-merge-quarantine ' + specGroupId
       );
     }
     if (checkBlockReasons.length > 0) {

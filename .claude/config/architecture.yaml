@@ -31,10 +31,10 @@ deliberation:
   # Circuit breaker: halt deliberation after this many consecutive no-progress cycles
   circuit_breaker_limit: 3
 
-# Atomization limits
-# Controls the spec decomposition and investigation process.
+# Spec-refinement limits (legacy key name retained for config compatibility).
+# Controls optional spec slicing and investigation clean-pass requirements.
 atomization:
-  # Maximum refinement iterations for atomic spec decomposition
+  # Maximum refinement iterations for spec slicing
   max_refinement_iterations: 3
   # Number of consecutive clean investigation passes required before approval
   investigation_clean_passes_required: 2

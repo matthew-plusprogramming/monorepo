@@ -47,7 +47,6 @@ Manifests must conform to the schema at
   "updated_at": "2026-04-18T00:00:00Z",
   "updated_by": "agent",
   "requirements": { "source": "prd" },
-  "atomic_specs": { "count": 0, "enforcement_status": "not_run" },
   "convergence": { "spec_complete": false },
   "decision_log": []
 }

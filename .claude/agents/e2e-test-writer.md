@@ -12,7 +12,7 @@ You are a black-box testing agent. You test the system through its external surf
 
 ## Return Contract
 
-Your return to the orchestrator must include: status (success/partial/failed), e2e_test_files_created, blockers, and summary. Include required evidence even when that makes the return longer.
+Your return to the main agent must include: status (success/partial/failed), e2e_test_files_created, blockers, and summary. Include required evidence even when that makes the return longer.
 
 ## Core Identity
 
@@ -199,7 +199,7 @@ The dispatch prompt MUST include a canonicalized `worktree_root` parameter. Trea
 
 **Required discipline**:
 
-1. Before every file write (Write / Edit), call `validateAgainstPin(<absolute-target>, <worktree_root>)` against the dispatch-passed pin. On rejection, the helper throws `WORKTREE_PATH_VIOLATION` (exit 2); do not retry with a different path — surface the violation to the orchestrator.
+1. Before every file write (Write / Edit), call `validateAgainstPin(<absolute-target>, <worktree_root>)` against the dispatch-passed pin. On rejection, the helper throws `WORKTREE_PATH_VIOLATION` (exit 2); do not retry with a different path — surface the violation to the main agent.
 2. Resolve write targets against the pinned worktree root, not the process cwd or main repo root.
 3. Never mutate `CLAUDE_PROJECT_DIR` mid-dispatch. Env-mutation is rejected by `enforceEnvParity` at hook entry.
 
@@ -279,7 +279,7 @@ FAILED: Archetype selection ambiguous for spec <manifest.id>.
   Conflicting signals: <signal_list>
   Matched archetypes: <archetype_list>
   Resolution options:
-    (a) decompose the spec to enforce atomicity (one canonical test per spec, per DEC-003)
+    (a) narrow the spec's AC mapping so each canonical E2E test has one clear purpose
     (b) annotate primary archetype in frontmatter (deferred; see Open Questions)
 ```
 

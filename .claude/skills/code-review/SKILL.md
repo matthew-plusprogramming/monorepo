@@ -7,639 +7,78 @@ user-invocable: true
 
 # Code Review Skill
 
-## Required Context
-
-## Pre-Flight Challenge
-
-Before beginning work, address these operational feasibility questions:
-
-1. What are the riskiest change areas in this implementation?
-2. Which integration boundaries does this change cross?
-3. What review focus areas does the spec's security or edge-case section highlight?
-
-If any question cannot be answered from available context, surface it as a finding -- do not skip.
-
 ## Purpose
 
-Review implementation for quality issues before security review. Catch maintainability problems, style inconsistencies, weak tests, false-positive paths, and best practice violations. Produce pass/fail report with findings.
+Review the completed implementation for quality issues before security review.
+The review is read-only and tied to one approved `spec.md`.
 
-**Key Input**: Spec group at `.claude/specs/groups/<spec-group-id>/`
+**Key input**: `.claude/specs/groups/<spec-group-id>/spec.md`
 
-## Review Specialty Contract
+## Usage
 
-`/code-review` still owns one convergence gate: `code_review`. Inside that gate, the reviewer must run four named specialty passes:
+```bash
+/code-review <spec-group-id>
+```
+
+## Prerequisites
+
+Before dispatch:
+
+1. Spec group exists.
+2. `/unify` has passed or produced a reviewable partial result.
+3. Changed files and validation evidence are available.
+4. Tests relevant to the spec have run or failures are documented.
+
+If prerequisites are missing, stop and run `/unify` or complete the missing
+validation first.
+
+## Required Review Specialties
+
+Every code-review report must include these four sections:
 
 | `review_specialty` | Focus |
 | ------------------ | ----- |
 | `style_naming` | Redundancy, conventions, DRY, naming, API shape, local maintainability |
 | `test_quality` | Assertion strength, vacuous truth, tautology, weak snapshots, isolation, determinism |
-| `adversarial` | "How could this pass incorrectly?", false positives, happy-path bias, unproven invariants |
+| `adversarial` | How this could pass incorrectly, false positives, happy-path bias, unproven invariants |
 | `holistic` | Whole-change coherence, duplicate consolidation, severity normalization, final judgment |
 
-Every report MUST contain sections named `style_naming`, `test_quality`, `adversarial`, and `holistic`, even when a section is clean. Every finding MUST include `review_specialty` in the markdown finding and in the optional `convergence-result.findings[]` object.
+Every finding must include `review_specialty`.
 
-## Usage
+## Process
 
-```
-/code-review <spec-group-id>                   # Review all changes for spec group
-/code-review <spec-group-id> <atomic-spec-id>  # Review changes for specific atomic spec
-```
+1. Load `manifest.json`, `spec.md`, unifier output, changed-file list, and reviewer-focus metadata when present.
+2. If a dispatch retry needs prior context, read `.claude/coordination/review-dispatch-prompt-<dispatch-id>.json`.
+3. Build review focus from reviewer-focus metadata, the spec's risk areas, contracts, edge cases, and validation evidence.
+4. Review changed files against the four specialties.
+5. Check tests for meaningful AC coverage and failure modes.
+6. Normalize duplicate findings and severity.
+7. Return pass/fail recommendation with concrete file references.
 
-## When to Use
+## Finding Format
 
-**Mandatory for**:
+Each finding should include:
 
-- Any implementation completing the spec workflow
-- Multi-file changes
-- Public API additions or modifications
-- Changes to core services
+- `severity`: `critical`, `high`, `medium`, or `low`
+- `review_specialty`
+- `file`
+- `line`
+- `issue`
+- `impact`
+- `recommendation`
 
-**Optional for**:
+## Output
 
-- Single-file bug fixes
-- Documentation-only changes
-- Test-only changes
-- Configuration changes
+Return:
 
-## Review Pipeline Position
+- `status`: `pass`, `fail`, or `partial`
+- `finding_count_by_severity`
+- `top_blockers`
+- `findings`
+- `residual_risk`
 
-```
-Implementation → Unify → Code Review → Security Review → Merge
-                            ↑
-                        You are here
-```
-
-Code Review runs BEFORE Security Review because:
-
-- Quality issues may mask security issues
-- Consistent code is easier to security-review
-- Catches different class of problems
-
-## Prerequisites
-
-Before code review, verify:
-
-1. **Spec group exists** at `.claude/specs/groups/<spec-group-id>/`
-2. **Convergence validated** - `/unify` has passed
-3. **All atomic specs implemented** - status is `implemented`
-4. **Tests passing** - all tests pass
-
-If prerequisites not met → STOP and run `/unify` first.
-
-**Note (REQ-004 / as-024)**: Dispatching this skill no longer requires a preceding `challenger pre-review` pass. The formerly pre-review-scoped reviewer-focus signal is now assembled by `.claude/scripts/lib/reviewer-focus-metadata.mjs` and surfaced as dispatch-prompt context in Step 1a below. On dispatch failure the metadata is persisted at `.claude/coordination/review-dispatch-prompt-<dispatch-id>.json` for retry (EC-10).
-
-## Code Review Process
-
-### Step 1: Load Review Context
+After a clean pass, update convergence:
 
 ```bash
-# Load manifest
-cat .claude/specs/groups/<spec-group-id>/manifest.json
-
-# Verify convergence passed
-# convergence.all_acs_implemented: true
-# convergence.all_tests_passing: true
-
-# Load spec and atomic specs
-cat .claude/specs/groups/<spec-group-id>/spec.md
-ls .claude/specs/groups/<spec-group-id>/atomic/
-
-# What files changed (from atomic spec evidence)
-# Read Implementation Evidence sections from each atomic spec
-```
-
-### Step 1a: Assemble Reviewer-Focus Metadata (REQ-004 / as-024)
-
-Before listing files to review, assemble reviewer-focus metadata — the replacement signal for the deleted `challenger pre-review` dispatch. The helper reads the spec evidence table + (optional) diff summary + prior findings and emits a dispatch-prompt JSON payload.
-
-```js
-import {
-  assembleReviewerFocusMetadata,
-  persistDispatchPrompt,
-  readDispatchPrompt,
-  DispatchPromptPersistError,
-} from '.claude/scripts/lib/reviewer-focus-metadata.mjs';
-
-// EC-10 retry path: if a persisted artifact exists for this dispatch, use it.
-let metadata = readDispatchPrompt({
-  coordinationDir: '.claude/coordination',
-  dispatchId: '<dispatch-id>',
-});
-
-if (!metadata) {
-  metadata = assembleReviewerFocusMetadata({
-    specGroupDir: '.claude/specs/groups/<spec-group-id>',
-    diffSummary: {
-      changed_files: /* from `git diff --name-only main..HEAD` */ [],
-    },
-    priorFindings: /* carry-forward from unifier / investigation */ [],
-  });
-
-  // Persist for EC-10 retry. Keep payload in memory until write succeeds.
-  try {
-    persistDispatchPrompt(metadata, {
-      coordinationDir: '.claude/coordination',
-      dispatchId: '<dispatch-id>',
-    });
-  } catch (err) {
-    if (!(err instanceof DispatchPromptPersistError)) throw err;
-    // Artifact write failed — reviewer proceeds with in-memory metadata;
-    // a subsequent retry will re-assemble (EC-10 fail-open).
-  }
-}
-```
-
-**Dispatch prompt inclusion**: Include the `metadata` payload verbatim in the reviewer's dispatch prompt under a "Reviewer-Focus Metadata" heading. The reviewer uses:
-
-- `focus_areas`: ranked riskiest change areas — prioritize attention-severity entries first
-- `changed_files`: file + line-range list built from atomic-spec evidence tables
-- `prior_findings`: carry-forward findings from previous gates — do not re-flag these without adding new signal
-- `integration_surfaces`: cross-boundary paths needing contract stability review
-- `review_recommendations`: reviewer-facing hints derived from the signal above
-
-This metadata is **advisory**, not a convergence signal — findings generated during review remain authoritative for the pass/fail verdict.
-
-### Step 2: Identify Files to Review
-
-Build file list from atomic spec Implementation Evidence:
-
-```bash
-# For each atomic spec, extract Implementation Evidence
-# These are the files that need review
-
-# Alternatively, use git diff if on a feature branch
-git diff --name-only main..HEAD
-```
-
-### Step 3: Review Categories
-
-Check each category systematically under the four specialty sections. Categories A-E primarily feed `style_naming`, Category G feeds `test_quality`, spec conformance and false-positive paths feed `adversarial`, and duplicate/severity synthesis feeds `holistic`.
-
-#### A. Code Style & Consistency
-
-- Naming conventions (camelCase, PascalCase per project standard)
-- File organization (imports, exports, structure)
-- Formatting consistency
-- Comment quality (useful vs obvious vs missing)
-- AC references in comments (should reference atomic spec IDs)
-
-#### B. Code Quality & Maintainability
-
-- Function length (>50 lines is suspect)
-- Cyclomatic complexity (>10 is suspect)
-- Deep nesting (>3 levels is suspect)
-- Code duplication
-- Dead code
-- Magic numbers/strings
-
-#### C. TypeScript Best Practices
-
-- `any` usage (should be rare and justified)
-- Missing return types on public methods
-- Proper null/undefined handling
-- Generic usage appropriateness
-- Type assertions (`as`) overuse
-
-#### D. Error Handling
-
-- Empty catch blocks
-- Swallowed errors (catch and return null)
-- Missing error types
-- Inconsistent error handling patterns
-- Error messages quality
-
-#### E. API Design
-
-- Inconsistent parameter ordering
-- Missing or inconsistent return types
-- Breaking changes to public API
-- Undocumented public methods
-
-#### F. Spec Conformance
-
-- Implementation matches atomic spec ACs
-- No undocumented features added
-- Error handling per spec
-- Edge cases per spec addressed
-
-#### G. Testing Gaps
-
-- Public methods without tests
-- Edge cases not covered
-- Test quality (meaningful assertions)
-- Test isolation (no shared state)
-- Tests reference correct atomic spec IDs
-- Vacuous truth, tautologies, assertion mirrors of implementation details
-
-#### H. Assumption Review
-
-- `// TODO(assumption):` comments identified and reviewed
-- Each assumption's confidence level assessed for appropriateness
-- No assumptions contradict explicit spec requirements
-- No assumptions make behavioral decisions (should have been escalated)
-- Atomic spec "Assumptions Made" section matches code TODOs
-- Each assumption has clear resolution: Accept / Reject / Escalate
-
-### Step 4: Severity Classification
-
-| Level        | Meaning                                        | Blocks Merge |
-| ------------ | ---------------------------------------------- | ------------ |
-| **Critical** | Will cause runtime failure                     | Yes          |
-| **High**     | Significant maintainability issue              | Yes          |
-| **High**     | Unresolved assumptions (TODO(assumption) open) | Yes          |
-| **Medium**   | Should fix but not blocking                    | No           |
-| **Low**      | Suggestion for improvement                     | No           |
-
-**Assumption Severity Rules**:
-
-- Unresolved `// TODO(assumption):` comments → High (blocking)
-- Assumption contradicts spec → High (blocking)
-- Assumption makes behavioral decision → High (blocking)
-- Low-confidence assumption without justification → Medium
-- Accepted assumption with documentation → No finding
-
-### Step 5: Generate Review Report
-
-```markdown
-## Code Review Report
-
-**Spec Group**: <spec-group-id>
-**Files Reviewed**: 6
-**Review Date**: 2026-01-14
-
-### Summary
-
-| Severity | Count |
-| -------- | ----- |
-| Critical | 0     |
-| High     | 0     |
-| Medium   | 2     |
-| Low      | 3     |
-
-**Verdict**: ✅ PASS
-
-### Specialty Coverage
-
-| `review_specialty` | Result | Notes |
-| ------------------ | ------ | ----- |
-| `style_naming` | Dirty | M1, M2 |
-| `test_quality` | Clean | No weak assertion or coverage-quality findings |
-| `adversarial` | Clean | No false-positive pass paths found |
-| `holistic` | Clean | Findings deduplicated and severity normalized |
-
-### style_naming
-
-Findings from redundancy, naming, conventions, DRY, and local maintainability review.
-
-### test_quality
-
-Findings from assertion-strength, vacuous-truth, tautology, isolation, and coverage-quality review.
-
-### adversarial
-
-Findings from false-positive and "could this pass incorrectly?" review.
-
-### holistic
-
-Findings from whole-change synthesis, duplicate consolidation, and severity normalization.
-
-### Per Atomic Spec Review
-
-#### as-001: Logout Button UI
-
-- Files: src/components/UserMenu.tsx
-- Quality: ✅ Clean
-- Spec Conformance: ✅ Matches ACs
-- Assumption Review: ✅ No assumptions
-
-#### as-002: Token Clearing
-
-- Files: src/services/auth-service.ts
-- Quality: ⚠️ 1 Medium finding (M1)
-- Spec Conformance: ✅ Matches ACs
-- Assumption Review: ✅ 1 assumption (Accepted)
-
-#### as-003: Post-Logout Redirect
-
-- Files: src/router/auth-router.ts
-- Quality: ✅ Clean
-- Spec Conformance: ✅ Matches ACs
-- Assumption Review: ✅ No assumptions
-
-#### as-004: Error Handling
-
-- Files: src/services/auth-service.ts
-- Quality: ⚠️ 1 Medium finding (M2)
-- Spec Conformance: ✅ Matches ACs
-- Assumption Review: ✅ No assumptions
-
-### Findings
-
-#### Medium Severity
-
-**M1: Function approaching length limit**
-
-- **File**: src/services/auth-service.ts:45-90
-- **Atomic Spec**: as-002
-- **Review specialty**: style_naming
-- **Issue**: `logout` function is 45 lines (approaching 50 line threshold)
-- **Impact**: May become harder to maintain as feature grows
-- **Suggestion**: Consider extracting token clearing logic
-
-**M2: Missing return type**
-
-- **File**: src/services/auth-service.ts:95
-- **Atomic Spec**: as-004
-- **Review specialty**: style_naming
-- **Issue**: `handleLogoutError` has no return type annotation
-- **Impact**: Type safety lost for consumers
-- **Suggestion**: Add `Promise<void>` return type
-
-#### Low Severity
-
-[... suggestions ...]
-
-### Positive Observations
-
-- Good traceability - code comments reference atomic spec IDs
-- Consistent use of Result type pattern
-- Clear separation of concerns in handlers
-- Test coverage matches Implementation Evidence
-
-### Recommendations
-
-1. Consider extracting token clearing logic (M1) in follow-up
-2. Add return types to all public methods (M2)
-3. Add JSDoc to public APIs (L1, L2) for better DX
-```
-
-### Step 6: Handle Blocking Issues
-
-If Critical or High severity issues found:
-
-```markdown
-## Code Review Report
-
-**Spec Group**: <spec-group-id>
-**Verdict**: ❌ BLOCKED (2 High severity issues)
-
-### Blocking Issues
-
-**H1: Swallowed exception in error handling**
-
-- **File**: src/services/auth-service.ts:78
-- **Atomic Spec**: as-004
-- **Issue**: Catch block returns null, hiding failure cause
-- **AC Violation**: as-004 AC1 requires error message display
-- **Impact**: Logout failures will be silent, hard to debug
-- **Required Fix**: Throw AuthError with cause chain
-
-**H2: Implementation deviates from spec**
-
-- **File**: src/services/auth-service.ts:67
-- **Atomic Spec**: as-002
-- **Issue**: Clears ALL localStorage, spec says only auth_token
-- **AC Violation**: as-002 AC1 specifies "clear authentication token"
-- **Impact**: User data loss
-- **Required Fix**: Change `localStorage.clear()` to `localStorage.removeItem('auth_token')`
-
-**Action**: Fix blocking issues, then re-run code review.
-```
-
-#### Blocking on Unresolved Assumptions
-
-When unresolved assumptions are found, the review produces verdict `BLOCKED`:
-
-```markdown
-## Code Review Report
-
-**Spec Group**: <spec-group-id>
-**Verdict**: ❌ BLOCKED (1 unresolved assumption)
-
-### Blocking Issues
-
-**H3: Unresolved assumption - timeout duration**
-
-- **File**: src/services/auth-service.ts:52
-- **Atomic Spec**: as-002
-- **TODO**: `// TODO(assumption): [HIGH] Assuming 5s timeout is sufficient - spec doesn't specify`
-- **Issue**: Behavioral assumption made without escalation
-- **Impact**: May cause timeout failures in slow network conditions
-- **Resolution Required**: One of:
-  - **Accept**: Add to atomic spec "Assumptions Made" section with justification
-  - **Reject**: Remove assumption, use spec-defined value or escalate
-  - **Escalate**: Propose spec amendment with timeout AC
-
-### Assumption Summary
-
-| File                         | Line | Assumption                  | Confidence | Status     |
-| ---------------------------- | ---- | --------------------------- | ---------- | ---------- |
-| src/services/auth-service.ts | 52   | 5s timeout sufficient       | HIGH       | Unresolved |
-| src/services/auth-service.ts | 78   | Retry not needed on failure | MEDIUM     | Accepted   |
-
-**Action**: Resolve all unresolved assumptions, then re-run code review.
-```
-
-### Step 7: Update Manifest
-
-Update manifest.json with code review status:
-
-```json
-{
-  "convergence": {
-    "code_review_passed": true
-  },
-  "decision_log": [
-    {
-      "timestamp": "<ISO timestamp>",
-      "actor": "agent",
-      "action": "code_review_complete",
-      "details": "0 critical, 0 high, 2 medium, 3 low - PASS"
-    }
-  ]
-}
-```
-
-## Convergence Loop
-
-This gate runs under the Convergence Loop Protocol: **check → fix → recheck** until 2 consecutive clean passes or 5 iterations (escalate after 5).
-
-- **Check agent**: `code-reviewer`
-- **Fix agent**: `implementer`
-- **Gate name**: `code_review`
-
-After each clean pass, record via:
-
-```
 node .claude/scripts/session-checkpoint.mjs update-convergence code_review
 ```
-
-Coercive enforcement: `workflow-gate-enforcement.mjs` blocks downstream dispatches when `clean_pass_count < 2`. See `/challenge` SKILL.md for full loop mechanics (state schema, fix agent input contract, escalation format).
-
-## Review Guidelines
-
-### Be Specific and Actionable
-
-**Bad**:
-
-```markdown
-Code quality could be better in auth.ts
-```
-
-**Good**:
-
-```markdown
-**Quality: Function too long** (Medium)
-
-- File: src/services/auth-service.ts:45-120
-- Atomic Spec: as-002
-- Issue: `validateSession` is 75 lines with 8 branches
-- Impact: Hard to test, hard to modify safely
-- Suggestion: Extract token parsing (L45-65) and permission check (L80-100)
-```
-
-### Check Spec Conformance
-
-Always verify implementation matches atomic spec:
-
-```markdown
-**Spec Conformance: Extra feature added** (High)
-
-- File: src/services/auth-service.ts:85
-- Atomic Spec: as-002
-- Issue: Auto-retry on failure added (not in spec)
-- AC Violation: No AC mentions retry logic
-- Impact: Undocumented behavior, may cause unexpected side effects
-- Required Fix: Remove or add to spec via amendment
-```
-
-### Reference Atomic Specs in Findings
-
-Every finding should reference the atomic spec it relates to:
-
-```markdown
-**H1: Missing error handling**
-
-- **File**: src/router/auth-router.ts:45
-- **Atomic Spec**: as-003 ← Always include this
-- **Review specialty**: adversarial
-- **Issue**: ...
-```
-
-### Acknowledge Good Patterns
-
-Include positive observations:
-
-- Well-structured code
-- Good test coverage
-- Clear AC references in code
-- Good traceability
-
-### Scope to Changes
-
-Review what changed, not the entire codebase.
-
-**In scope**: Files listed in atomic spec Implementation Evidence
-**Out of scope**: Pre-existing issues in unchanged files
-
-Note pre-existing issues as "Pre-existing" - they don't block merge.
-
-## Review Checklist
-
-For each atomic spec:
-
-```markdown
-□ Implementation Evidence files reviewed
-□ Code matches ACs in atomic spec
-□ No undocumented features added
-□ Naming follows project conventions
-□ No obvious code duplication
-□ Functions are reasonably sized (<50 lines)
-□ Nesting depth acceptable (<4 levels)
-□ Error handling matches spec
-□ No `any` without justification
-□ Public APIs have return types
-□ Tests reference correct atomic spec IDs
-
-## Assumption Review (Category H)
-
-□ TODO(assumption) comments identified and reviewed
-□ Each assumption's confidence level validated for appropriateness
-□ Spec intent checked - no assumptions contradict requirements
-□ Behavioral assumption contradictions flagged (should have been escalated)
-□ Atomic spec "Assumptions Made" section matches code TODOs
-□ Each assumption resolved: Accept / Reject / Escalate
-```
-
-## Integration with Other Skills
-
-**Before code review**:
-
-- `/unify` to ensure spec-impl-test convergence
-
-**After code review**:
-
-- If PASS → Proceed to `/security`
-- If BLOCKED → Use `/implement` to fix issues, then re-run `/code-review`
-
-**Full review chain after code-review**:
-
-1. `/security` - Security review (always)
-2. `/docs` - Documentation generation (if public API)
-3. `/manual-test` - Bounded exploratory verification (advisory by default; mandatory for `runtime_validation_required: true`; runs after `/docs` as the final step before commit)
-4. Commit
-
-## Constraints
-
-### READ-ONLY
-
-You report findings but do not modify code. Let Implementer fix issues.
-
-### Not Security Review
-
-Focus on code quality. Security Reviewer handles:
-
-- Injection vulnerabilities
-- Authentication/authorization flaws
-- Secrets exposure
-- OWASP Top 10
-
-Flag obvious security issues, but security review is the comprehensive check.
-
-## Examples
-
-### Example 1: Clean Pass
-
-**Input**: Well-structured logout implementation (spec group sg-logout-button)
-
-**Review**:
-
-- as-001: ✅ Clean implementation
-- as-002: ✅ Clean implementation
-- as-003: ✅ Clean implementation
-- as-004: ✅ Clean implementation
-
-**Output**: ✅ PASS - No findings, proceed to security review
-
-### Example 2: Pass with Recommendations
-
-**Input**: Feature implementation with minor issues
-
-**Review**:
-
-- as-001: ✅ Clean
-- as-002: ⚠️ 1 Medium (long function)
-- as-003: ✅ Clean
-- as-004: ⚠️ 1 Medium (missing JSDoc)
-
-**Output**: ✅ PASS with recommendations - Proceed, address in follow-up
-
-### Example 3: Blocked
-
-**Input**: Implementation with spec deviation
-
-**Review**:
-
-- as-002: ❌ High (clears all localStorage instead of just auth_token)
-
-**Output**: ❌ BLOCKED - Fix H1 before proceeding

@@ -42,47 +42,10 @@ import {
 // =============================================================================
 
 /**
- * Predecessor graph for orchestrator workflow.
- * Keys use parameterized encoding: "challenging:<stage>" maps to challenger
- * dispatch with that stage value, not a literal phase name in VALID_PHASES.
- *
- * REQ-003 (sg-pipeline-efficiency-ws1-convergence-pruning / as-023):
- *   `challenging:pre-test` deleted; `testing` now depends directly on
- *   `implementing`. Formerly-pre-test-scoped advisories are folded into the
- *   `/unify` preflight block (see `.claude/scripts/lib/unify-preflight.mjs`).
- *
- * REQ-004 (sg-pipeline-efficiency-ws1-convergence-pruning / as-024):
- *   `challenging:pre-review` deleted; `reviewing` now depends directly on
- *   `verifying`. Formerly-pre-review-scoped reviewer-focus signal is folded
- *   into the `code-reviewer` / `security-reviewer` dispatch-prompt context
- *   via `.claude/scripts/lib/reviewer-focus-metadata.mjs` (EC-10 persistence).
- */
-export const ORCHESTRATOR_PREDECESSORS = {
-  'spec_authoring': ['prd_gathering'],
-  'atomizing': ['spec_authoring'],
-  'enforcing': ['atomizing'],
-  'investigating': ['enforcing'],
-  'challenging:pre-orchestration': ['investigating'],
-  'auto_approval': ['challenging:pre-orchestration'],
-  'implementing': ['auto_approval'],
-  'testing': ['implementing'],
-  'verifying': ['testing'],
-  'reviewing': ['verifying'],
-  'completion_verifying': ['reviewing'],
-  'documenting': ['completion_verifying'],
-  'complete': ['documenting'],
-};
-
-/**
  * Predecessor graph for oneoff-spec workflow.
  *
- * REQ-003 (sg-pipeline-efficiency-ws1-convergence-pruning / as-023):
- *   `challenging:pre-test` deleted; `testing` now depends directly on
- *   `implementing`. See ORCHESTRATOR_PREDECESSORS for rationale.
- *
- * REQ-004 (sg-pipeline-efficiency-ws1-convergence-pruning / as-024):
- *   `challenging:pre-review` deleted; `reviewing` now depends directly on
- *   `verifying`. See ORCHESTRATOR_PREDECESSORS for rationale.
+ * Current shape keeps one pre-implementation challenger gate and direct
+ * implementation -> test -> review progression after that gate.
  */
 export const ONEOFF_SPEC_PREDECESSORS = {
   'spec_authoring': ['prd_gathering'],
@@ -106,7 +69,7 @@ export const ONEOFF_SPEC_PREDECESSORS = {
 export const EXEMPT_WORKFLOWS = ['oneoff-vibe', 'refactor', 'journal-only'];
 
 /**
- * Valid workflow types (5 entries).
+ * Valid workflow types for new and active work.
  * Single source of truth — consumed by session-validate.mjs and verified
  * against session.schema.json by enum-sync.test.mjs.
  * @type {string[]}
@@ -114,13 +77,12 @@ export const EXEMPT_WORKFLOWS = ['oneoff-vibe', 'refactor', 'journal-only'];
 export const VALID_WORKFLOWS = [
   'oneoff-vibe',
   'oneoff-spec',
-  'orchestrator',
   'refactor',
   'journal-only'
 ];
 
 /**
- * Valid phase values (16 entries).
+ * Valid phase values for new and active work.
  * Single source of truth — consumed by session-validate.mjs and verified
  * against session.schema.json by enum-sync.test.mjs.
  *
@@ -132,8 +94,6 @@ export const VALID_WORKFLOWS = [
 export const VALID_PHASES = [
   'prd_gathering',
   'spec_authoring',
-  'atomizing',
-  'enforcing',
   'investigating',
   'awaiting_approval',
   'auto_approval',
@@ -149,7 +109,7 @@ export const VALID_PHASES = [
 ];
 
 /**
- * Valid subagent types (23 entries).
+ * Valid subagent types (21 entries).
  * Single source of truth — consumed by session-validate.mjs and verified
  * against session.schema.json by enum-sync.test.mjs.
  * @type {string[]}
@@ -157,8 +117,6 @@ export const VALID_PHASES = [
 export const VALID_SUBAGENT_TYPES = [
   'explore',
   'spec-author',
-  'atomizer',
-  'atomicity-enforcer',
   'interface-investigator',
   'implementer',
   'test-writer',
@@ -169,7 +127,6 @@ export const VALID_SUBAGENT_TYPES = [
   'doc-auditor',
   'documenter',
   'refactorer',
-  'facilitator',
   'manual-tester',
   'prd-writer',
   'prd-critic',
@@ -185,21 +142,10 @@ export const VALID_SUBAGENT_TYPES = [
  * Mandatory dispatches per phase per workflow.
  * Used by SubagentStop advisory hooks and completion checklist.
  *
- * REQ-003 (as-023): pre-test challenger dispatch removed from the testing
- * phase. Formerly-pre-test-scoped advisories now run via `/unify` preflight
- * (see `.claude/scripts/lib/unify-preflight.mjs`). The `testing` phase
- * therefore has no mandatory dispatches beyond the implicit test-writer path.
- *
- * REQ-004 (as-024): pre-review challenger dispatch removed from the reviewing
- * phase. Formerly-pre-review-scoped reviewer-focus signal now surfaces as
- * dispatch-prompt context via `.claude/scripts/lib/reviewer-focus-metadata.mjs`.
+ * Keep this table lean: one challenger before implementation, reviewers at
+ * review, completion-verifier/documenter at completion.
  */
 export const MANDATORY_DISPATCHES = {
-  orchestrator: {
-    'implementing': [{ type: 'challenger', stage: 'pre-orchestration' }],
-    'reviewing': [{ type: 'code-reviewer' }],
-    'complete': [{ type: 'completion-verifier' }, { type: 'documenter' }],
-  },
   'oneoff-spec': {
     'implementing': [{ type: 'challenger', stage: 'pre-implementation' }],
     'reviewing': [{ type: 'code-reviewer' }],
@@ -210,32 +156,21 @@ export const MANDATORY_DISPATCHES = {
 /**
  * Required challenger stages per workflow.
  *
- * REQ-003 (as-023) — AC23.2: MANDATORY_STAGES (this table) SHALL NOT include
- * `pre-test`.
- * REQ-004 (as-024) — AC24.1: MANDATORY_STAGES SHALL NOT include `pre-review`.
- * Only pre-orchestration (orchestrator) / pre-implementation (oneoff-spec)
- * remain as required challenger stages.
+ * Only pre-implementation remains required for spec work.
  */
 export const REQUIRED_CHALLENGER_STAGES = {
-  orchestrator: ['pre-orchestration'],
   'oneoff-spec': ['pre-implementation'],
 };
 
 /**
  * Flat union of all required challenger stages across workflows. Mirrors the
- * parent spec's "MANDATORY_STAGES" phrasing (§REQ-003/REQ-004) — this is the
- * authoritative container tests inspect to assert stage removal. Derived
- * from REQUIRED_CHALLENGER_STAGES so the two stay in lock-step.
- *
- * REQ-004 (as-024) — AC24.1 enforcement: this export SHALL NOT contain
- * `pre-review` (nor the namespaced `challenging:pre-review`). As-023
- * established that `pre-test` was removed here; as-024 completes the pair.
+ * parent spec's "MANDATORY_STAGES" phrasing. Derived from
+ * REQUIRED_CHALLENGER_STAGES so the two stay in lock-step.
  *
  * @type {readonly string[]}
  */
 export const MANDATORY_STAGES = Object.freeze([
   ...new Set([
-    ...REQUIRED_CHALLENGER_STAGES.orchestrator,
     ...REQUIRED_CHALLENGER_STAGES['oneoff-spec'],
   ]),
 ]);
@@ -464,7 +399,7 @@ export const VALID_CONVERGENCE_GATES = ['code_review', 'security_review', 'inves
 export { PerGateThresholdTable } from './per-gate-threshold-table.mjs';
 
 /**
- * Valid challenger substage enum values (closed set).
+ * Valid challenger substage enum values for new and active work.
  *
  * Source of truth for the `substages_visited.<phase>` array element enum and
  * for `REQUIRED_SUBSTAGES_BY_WORKFLOW`. Verified against
@@ -474,29 +409,15 @@ export { PerGateThresholdTable } from './per-gate-threshold-table.mjs';
  * Requirements: REQ-011, REQ-014, REQ-017.
  * Contract: `contract-substages-visited-schema` (owned by ws-dag-substages).
  *
- * NOTE: Pre-REQ-003/004 the canonical short forms were `pre-impl` /
- * `pre-test` / `pre-review` / `pre-orch`. After REQ-004 (as-024) deletion of
- * the pre-review dispatch, only `pre-impl` / `pre-test` / `pre-orch` remain
- * valid. `pre-test` retained for in-flight session compatibility (as-030
- * migration); `pre-review` removed outright because AC24.5 requires no
- * exported surface surfaces it. The predecessor graph uses
- * `pre-implementation` / `pre-orchestration` verbose forms as dispatch-record
- * stage values. Mapping between the two is handled at the `transition-phase`
- * populate call site (see as-002c) so the attribute set uses the short enum
- * canonical form.
- *
- * REQ-004 (as-024): `pre-review` removed from VALID_SUBSTAGES. The
- * `PHASE_REQUIRED_SUBSTAGE.reviewing` entry is already removed above, and
- * `REQUIRED_SUBSTAGES_BY_WORKFLOW` no longer references it. Historical
- * sessions carrying a visited `pre-review` substage are tolerated (the
- * validator treats unknown substages as no-ops); they simply do not gate.
+ * Deleted workflow substages are not accepted for new transitions.
+ * Historical sessions carrying those values are
+ * tolerated only as already-persisted data; they simply do not satisfy any
+ * active gate.
  *
  * @type {readonly string[]}
  */
 export const VALID_SUBSTAGES = Object.freeze([
   'pre-impl',
-  'pre-test',
-  'pre-orch',
 ]);
 
 /**
@@ -505,32 +426,14 @@ export const VALID_SUBSTAGES = Object.freeze([
  * Spec: sg-workflow-convergence-bugs (ws-dag-substages) — as-004c.
  * Requirements: REQ-011 (sub-stage isolation, workflow-scoped extension),
  *               REQ-017 (semantic preservation).
- * Authoritative: tech.context.md L253-264, L273.
- *
- * REQ-003 (sg-pipeline-efficiency-ws1-convergence-pruning / as-023):
- *   `pre-test` removed from required substage sets — pre-test challenger
- *   dispatch is deleted; testing phase transitions no longer require a
- *   pre-test substage visit. The `pre-test` enum value itself is preserved
- *   in `VALID_SUBSTAGES` for in-flight session compatibility (see as-030
- *   migration); it is simply no longer REQUIRED.
- *
- * REQ-004 (sg-pipeline-efficiency-ws1-convergence-pruning / as-024):
- *   `pre-review` removed from required substage sets — pre-review challenger
- *   dispatch is deleted; reviewing phase transitions no longer require a
- *   pre-review substage visit. The `pre-review` enum value is not in
- *   `VALID_SUBSTAGES`; historical sessions carrying it are tolerated by the
- *   validator as non-gating unknown entries.
  *
  * - oneoff-spec: {pre-impl} (1)
- * - orchestrator: {pre-orch} (1; pre-impl does NOT apply to orchestrator
- *   per TECH-201)
  * - oneoff-vibe, refactor, journal-only: exempt (empty set)
  *
  * @type {Readonly<Record<string, readonly string[]>>}
  */
 export const REQUIRED_SUBSTAGES_BY_WORKFLOW = Object.freeze({
   'oneoff-spec': Object.freeze(['pre-impl']),
-  'orchestrator': Object.freeze(['pre-orch']),
   'oneoff-vibe': Object.freeze([]),
   'refactor': Object.freeze([]),
   'journal-only': Object.freeze([]),
@@ -553,49 +456,26 @@ export const REQUIRED_SUBSTAGES_BY_WORKFLOW = Object.freeze({
  * @type {Readonly<Record<string, Readonly<Record<string, string>>>>}
  */
 export const PHASE_REQUIRED_SUBSTAGE = Object.freeze({
-  orchestrator: Object.freeze({
-    // pre-orchestration (pre-orch short form) required before implementing
-    implementing: 'pre-orch',
-    // REQ-003 (as-023): testing phase no longer requires pre-test substage —
-    // challenger pre-test dispatch deleted; advisories folded into /unify.
-    // REQ-004 (as-024): reviewing phase no longer requires pre-review
-    // substage — challenger pre-review dispatch deleted; reviewer-focus
-    // signal folded into code-reviewer / security-reviewer dispatch prompts
-    // (see reviewer-focus-metadata.mjs).
-  }),
   'oneoff-spec': Object.freeze({
     // pre-implementation (pre-impl short form) required before implementing
     implementing: 'pre-impl',
-    // REQ-003 (as-023): testing phase no longer requires pre-test substage.
-    // REQ-004 (as-024): reviewing phase no longer requires pre-review substage.
   }),
 });
 
 /**
  * Substage node identifiers used by the obligation/enforcement layer.
  *
- * These four named constants are additive first-class node identifiers
+ * These named constants are additive first-class node identifiers
  * distinct from the bare `challenging` PHASE_OBLIGATIONS key. They provide
  * addressable handles for downstream consumer code / error messages / logs
  * referring to individual challenger sub-stages.
  *
  * Spec: sg-workflow-convergence-bugs (ws-dag-substages) — as-001c.
  *
- * NOTE (REQ-018 semantic preservation): the pre-existing
- * `ORCHESTRATOR_PREDECESSORS` / `ONEOFF_SPEC_PREDECESSORS` constants continue
- * to use their parameterized `challenging:<stage>` keys unchanged; these
- * node identifiers live alongside, not replacing them.
- *
  * @type {readonly string[]}
  */
 export const CHALLENGING_SUBSTAGE_NODES = Object.freeze([
   'challenging-pre-impl',
-  // REQ-003 (as-023): `challenging-pre-test` node removed — pre-test
-  // challenger dispatch deleted. The `pre-test` enum value is retained in
-  // VALID_SUBSTAGES for in-flight session compatibility (as-030 migration).
-  // REQ-004 (as-024): `challenging-pre-review` node removed — pre-review
-  // challenger dispatch deleted. `pre-review` is not in VALID_SUBSTAGES.
-  'challenging-pre-orch',
 ]);
 
 // =============================================================================
@@ -761,7 +641,7 @@ export const WORKTREE_PATH_VIOLATION = WORKTREE_PATH_VIOLATION_CONST;
 //      the event loop before the recorder runs.
 //
 // Pre-impl removal (AC16.4): there is no pre-impl compute-hashes dispatch
-// in the facilitator workflow or agent prompts. The PostToolUse registry
+// in workflow or agent prompts. The PostToolUse registry
 // hash-verify hook at `.claude/settings.json` is a continuous safety net
 // (fires on every `.claude/**` write, not phase-scoped) — it is orthogonal
 // to the phase-transition hook and retained.
@@ -828,7 +708,7 @@ export const COMPUTE_HASHES_DRIFT = 'COMPUTE_HASHES_DRIFT';
  *
  * @param {string} fromPhase - Outgoing phase (VALID_PHASES member).
  * @param {string} toPhase - Incoming phase (VALID_PHASES member).
- * @param {string|null|undefined} workflow - Workflow string (orchestrator | oneoff-spec | ...).
+ * @param {string|null|undefined} workflow - Workflow string (oneoff-spec | exempt workflows).
  * @returns {boolean} True iff the hook should invoke compute-hashes --verify.
  *
  * @spec sg-pipeline-efficiency-ws3-orchestrator-hygiene / as-016 / AC16.1
@@ -1034,7 +914,7 @@ function hashSessionIdForLog(sessionId) {
  * Silent on serialization failure — structured logging must never throw
  * from an enforcement path.
  *
- * Contract: `contract-structured-log-keys` (MasterSpec
+ * Contract: `contract-structured-log-keys` (parent spec
  * sg-workflow-convergence-bugs). Keys emitted from this module:
  *   - dag.substage.skipped {phase, substage, session_id}
  *   - dag.substage.malformed {gate, observed_type, observed_value, session_id}
@@ -1406,12 +1286,8 @@ export function validateSubstages(targetPhase, session, workflow) {
     substage: requiredSubstage,
     session_id: sessionIdHash,
   });
-  // AC-C7 / AC-C2: `missing` reports the CUMULATIVE required substages up
-  // to and including targetPhase that are not yet visited. For `testing`
-  // target this spans {implementing, testing} required substages; for
-  // `reviewing` target, all three phases. Non-required visited substages
-  // (e.g., pre-impl in an orchestrator session) do NOT substitute for
-  // the workflow-required set.
+  // AC-C7 / AC-C2: `missing` reports the cumulative required substages up
+  // to and including targetPhase that are not yet visited.
   const missingReport = computeCumulativeMissing(
     targetPhase, workflow, visitedSet
   );
@@ -1506,7 +1382,7 @@ export function getMissingRequiredSubstages(session, workflow) {
 
 /**
  * Get the workflow type from session state.
- * Returns the workflow from active_work, defaulting to 'orchestrator' if missing.
+ * Returns the workflow from active_work, defaulting to 'oneoff-spec' if missing.
  * Backward-compatible -- used by session-checkpoint.mjs (cooperative layer).
  *
  * @param {object} session - Session object from session.json
@@ -1515,7 +1391,7 @@ export function getMissingRequiredSubstages(session, workflow) {
 export function getWorkflowType(session) {
   const workflow = session?.active_work?.workflow;
   if (!workflow) {
-    return 'orchestrator';
+    return 'oneoff-spec';
   }
   return workflow;
 }
@@ -1543,7 +1419,7 @@ export function isExemptWorkflow(workflow) {
 
 /**
  * Get the predecessor graph for a given workflow type.
- * Returns null for exempt workflows. Defaults to orchestrator when unknown.
+ * Returns null for exempt workflows. Defaults to oneoff-spec when unknown.
  *
  * @param {string} workflow - Workflow type string
  * @returns {object|null} Predecessor graph or null for exempt workflows
@@ -1551,7 +1427,7 @@ export function isExemptWorkflow(workflow) {
 export function getPredecessorGraph(workflow) {
   if (EXEMPT_WORKFLOWS.includes(workflow)) return null;
   if (workflow === 'oneoff-spec') return ONEOFF_SPEC_PREDECESSORS;
-  return ORCHESTRATOR_PREDECESSORS; // default to most restrictive
+  return ONEOFF_SPEC_PREDECESSORS;
 }
 
 /**
@@ -1560,7 +1436,7 @@ export function getPredecessorGraph(workflow) {
  * subagent with the matching stage field. For plain phase names, checks
  * session history for a phase_transition event to that phase.
  *
- * @param {string} predecessorKey - Predecessor key (e.g., "challenging:pre-orchestration" or "spec_authoring")
+ * @param {string} predecessorKey - Predecessor key (e.g., "challenging:pre-implementation" or "spec_authoring")
  * @param {object} session - Session object from session.json
  * @returns {boolean} True if the predecessor was visited
  */
@@ -1607,7 +1483,7 @@ export function getAllTasks(session) {
  * - { type: 'dispatch', subagent_type: string, stage: string } - a staged dispatch must exist
  * - { type: 'convergence', gate: string, required_count: number } - convergence count must be met
  *
- * @param {string} workflow - Workflow type ('oneoff-spec' or 'orchestrator')
+ * @param {string} workflow - Workflow type ('oneoff-spec' or an exempt workflow)
  * @param {string} subagentType - The subagent type to check prerequisites for
  * @returns {Array<object>} Prerequisites array
  */
@@ -1649,10 +1525,7 @@ export function getPrerequisites(workflow, subagentType) {
     }
 
     case 'code-reviewer': {
-      // REQ-004 (as-024) — AC24.5: challenger pre-review dispatch deleted.
-      // Only unifier dispatch remains as coercive prereq; reviewer-focus
-      // signal is surfaced via dispatch-prompt metadata (see
-      // reviewer-focus-metadata.mjs) rather than a blocking challenger pass.
+      // Only unifier dispatch remains as coercive prereq for reviewers.
       prerequisites.push({
         type: 'dispatch',
         subagent_type: 'unifier',
@@ -1663,8 +1536,7 @@ export function getPrerequisites(workflow, subagentType) {
 
     case 'security-reviewer': {
       // Same prerequisites as code-reviewer — both run in parallel after
-      // review prerequisites. REQ-004 (as-024) removed the challenger
-      // pre-review prereq; reviewer-focus metadata replaces that signal.
+      // review prerequisites.
       prerequisites.push({
         type: 'dispatch',
         subagent_type: 'unifier',

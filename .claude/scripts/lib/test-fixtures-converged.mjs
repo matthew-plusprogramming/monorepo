@@ -9,10 +9,9 @@
  *   - checkChallengerStages (challenger dispatches for every required stage
  *     per REQUIRED_CHALLENGER_STAGES[workflow])
  *   - checkPhaseDagPredecessors (phase_transition history for every mandatory
- *     predecessor of 'complete' per ONEOFF_SPEC_PREDECESSORS /
- *     ORCHESTRATOR_PREDECESSORS)
+ *     predecessor of 'complete' per ONEOFF_SPEC_PREDECESSORS)
  *   - checkArtifactInventory (investigation-report.md, unify-report.md,
- *     docs/COVERAGE.md, atomic/*.md for orchestrator)
+ *     docs/COVERAGE.md)
  *   - checkConvergenceFieldSanity (manifest.convergence.<gate>_passed booleans
  *     agree with session.convergence[gate].clean_pass_count >= 2)
  *
@@ -40,7 +39,6 @@ import { join } from 'node:path';
 import {
   REQUIRED_CHALLENGER_STAGES,
   ONEOFF_SPEC_PREDECESSORS,
-  ORCHESTRATOR_PREDECESSORS,
   VALID_CONVERGENCE_GATES,
 } from './workflow-dag.mjs';
 
@@ -58,7 +56,7 @@ const DEFAULT_TIMESTAMP = '2026-04-17T12:00:00.000Z';
  * Build challenger dispatch entries for all required stages of a workflow.
  * Shape matches spec.md § Session data shapes consumed (a).
  *
- * @param {'oneoff-spec'|'orchestrator'} workflow
+ * @param {string} workflow
  * @param {object} [opts]
  * @param {string} [opts.specGroupId]
  * @returns {Array<object>} Task record entries
@@ -75,7 +73,6 @@ export function makeChallengerDispatches(workflow, opts = {}) {
     status: 'completed',
     result_summary: 'clean',
     spec_group_id: specGroupId,
-    atomic_spec_id: null,
     stage,
   }));
 }
@@ -84,16 +81,13 @@ export function makeChallengerDispatches(workflow, opts = {}) {
  * Build phase_transition history entries for every mandatory predecessor of
  * 'complete' in the given workflow.
  *
- * @param {'oneoff-spec'|'orchestrator'} workflow
+ * @param {string} workflow
  * @param {object} [opts]
  * @param {string} [opts.specGroupId]
  * @returns {Array<object>} session.history[] entries
  */
 export function makePhaseTransitionHistory(workflow, opts = {}) {
-  const graph =
-    workflow === 'orchestrator'
-      ? ORCHESTRATOR_PREDECESSORS
-      : ONEOFF_SPEC_PREDECESSORS;
+  const graph = ONEOFF_SPEC_PREDECESSORS;
   const specGroupId = opts.specGroupId ?? 'sg-test-fixture';
   // Walk every predecessor key (to-phases) AND every value in the graph
   // (predecessors including root 'prd_gathering'). Every phase referenced
@@ -142,7 +136,7 @@ function makeSessionConvergence(count = 2) {
  * by default. Each check can be independently unsatisfied via overrides.
  *
  * @param {object} [overrides]
- * @param {'oneoff-spec'|'orchestrator'} [overrides.workflow]
+ * @param {string} [overrides.workflow]
  * @param {string} [overrides.currentPhase]
  * @param {string|undefined} [overrides.specGroupId]
  * @param {string} [overrides.enforcementLevel]
@@ -276,7 +270,6 @@ export function makeFailedManualTesterSession(overrides = {}) {
       manualTesterSummary ??
       'FAILURE: exploratory findings recorded; see evidence/*.png',
     spec_group_id: specGroupId,
-    atomic_spec_id: null,
   });
   return session;
 }
@@ -324,8 +317,7 @@ export function makeConvergedManifest(overrides = {}) {
 
 /**
  * Create a spec group directory under a temp root with the optional artifact
- * files specified. Used for AC9 (oneoff-spec artifact inventory) and AC10
- * (orchestrator atomic/*.md inventory).
+ * files specified. Used for artifact-inventory checks.
  *
  * @param {string} tmpRoot - absolute path to .claude/specs/groups/ parent
  *                           (i.e., the tests pass the real CLAUDE_DIR/specs/groups)
@@ -386,21 +378,6 @@ export function makeSpecGroupDir(tmpRoot, specGroupId, artifacts = {}) {
       '# Coverage\n\nFixture.\n',
     );
   }
-  if (artifacts.atomicDirEmpty) {
-    // Create atomic/ with no *.md files (for AC10 orchestrator zero-atomic case)
-    mkdirSync(join(dir, 'atomic'), { recursive: true });
-  } else if (artifacts.atomic) {
-    const count = artifacts.atomic === true ? 1 : artifacts.atomic;
-    mkdirSync(join(dir, 'atomic'), { recursive: true });
-    for (let i = 1; i <= count; i++) {
-      const idStr = String(i).padStart(3, '0');
-      writeFileSync(
-        join(dir, 'atomic', `as-${idStr}-fixture.md`),
-        '---\nid: as-' + idStr + '-fixture\n---\n\n# Atomic\n',
-      );
-    }
-  }
-
   return dir;
 }
 
@@ -410,7 +387,6 @@ export function makeSpecGroupDir(tmpRoot, specGroupId, artifacts = {}) {
 export const FIXTURE_CONSTANTS = {
   REQUIRED_CHALLENGER_STAGES,
   ONEOFF_SPEC_PREDECESSORS,
-  ORCHESTRATOR_PREDECESSORS,
   VALID_CONVERGENCE_GATES,
   ALL_MANDATORY_DISPATCHES,
   DEFAULT_TIMESTAMP,

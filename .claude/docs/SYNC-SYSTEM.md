@@ -33,6 +33,7 @@ Useful flags:
 | `--force`             | Overwrite local modifications and force-delete locally modified obsolete artifacts.        |
 | `--resolve-conflicts` | Accept upstream only for artifacts currently in conflict.                                  |
 | `--ack-drift`         | For `never-overwrite` artifacts, advance the lock hash without touching the consumer file. |
+| `--no-runtime-deps`   | Skip `.claude/node_modules` provisioning for synced hooks and scripts.                     |
 | `--base-dir=<path>`   | Override the default sibling-repo base directory.                                          |
 
 Run hash commands directly:
@@ -57,6 +58,7 @@ writing `.claude/metaclaude-registry.json`.
 | `.claude/scripts/metaclaude-cli.mjs`     | Sync/status/verify/project-management CLI.                             |
 | `.claude/scripts/compute-hashes.mjs`     | Registry hash updater and validation-gate entry point.                 |
 | `.claude/scripts/lib/sync-constants.mjs` | Code-owned bundle ancestry, roots, whitelist, and skip-gate constants. |
+| `<consumer>/.claude/node_modules/`       | Local runtime packages used by synced hooks/scripts. Gitignored.       |
 
 Not everything in the registry is synced. `compute-hashes.mjs` is hash-tracked
 with `_sync: false`; artifacts marked `_sync_policy: "never-sync"` are skipped;
@@ -108,7 +110,7 @@ minimal -> core-workflow -> full-workflow
 | Bundle          | Purpose                                                                                               |
 | --------------- | ----------------------------------------------------------------------------------------------------- |
 | `minimal`       | Core config, scripts, schemas, hooks, infrastructure, and base prompt.                                |
-| `core-workflow` | Adds implement/test/unify/atomize/enforce agents, skills, templates, and docs.                        |
+| `core-workflow` | Adds active implement/test/unify agents, skills, templates, and docs.                                 |
 | `full-workflow` | Adds review, routing, docs, PRD, security, trace, structured-docs, and specialist workflow artifacts. |
 
 Child bundles inherit parent artifacts. Put each artifact in the lowest bundle
@@ -182,6 +184,26 @@ consumer and commit the merged target file.
 after the lock has seen the current upstream hash. For `agent-assisted`
 artifacts, any remaining `.claude/sync-pending/` file is still a verification
 failure.
+
+## Runtime Dependencies
+
+After syncing script artifacts or hook settings, `metaclaude-cli sync`
+provisions the packages needed by synced hooks and scripts under the consumer's
+`.claude/node_modules/`.
+Node resolves imports for `.claude/scripts/*.mjs` through that directory, so
+consumer application `package.json` files do not need metaclaude-only
+dependencies such as `ajv-formats`.
+
+Provisioning uses the canonical repo's installed `node_modules` as the fast path
+and symlinks required packages into the consumer runtime. If those packages are
+not available in the canonical repo, sync writes a private `.claude/package.json`
+and runs `npm install --ignore-scripts --no-audit --no-fund` inside
+`<consumer>/.claude/`. The generated runtime manifest, lockfile, and
+`node_modules` directory are ignored by the synced `.gitignore` patch.
+
+Set `METACLAUDE_SKIP_RUNTIME_DEP_PROVISION=1` or pass `--no-runtime-deps` to
+skip this step. Skipping it can leave hooks failing with `ERR_MODULE_NOT_FOUND`
+until the runtime packages are installed another way.
 
 ---
 
@@ -368,13 +390,14 @@ have operator-visible behavior worth calling out separately.
 Propagates the project-scoped MCP server configuration to consumer projects so
 Claude Code sessions there can use the Playwright MCP for browser automation.
 
-| Field              | Value                                                                    |
-| ------------------ | ------------------------------------------------------------------------ |
-| Source             | `.claude/templates/mcp.json`                                             |
-| Target             | `.mcp.json` (consumer repo root)                                         |
-| Sync policy        | `never-overwrite`                                                        |
-| Bundle             | `minimal` (inherits to `core-workflow` and `full-workflow`)              |
-| Underlying package | `@playwright/mcp@0.0.70` (pinned, fetched via `npx -y` at session start) |
+| Field              | Value                                                       |
+| ------------------ | ----------------------------------------------------------- |
+| Source             | `.claude/templates/mcp.json`                                |
+| Target             | `.mcp.json` (consumer repo root)                            |
+| Sync policy        | `never-overwrite`                                           |
+| Bundle             | `minimal` (inherits to `core-workflow` and `full-workflow`) |
+| Server key         | `playwright`                                                |
+| Underlying package | `@playwright/mcp@0.0.70` (pinned, launched via `npx -y`)    |
 
 The hub keeps two byte-identical copies: `.mcp.json` at repo root (used by the
 hub's own Claude Code sessions) and `.claude/templates/mcp.json` (the sync
@@ -395,7 +418,22 @@ expected per consumer, depending on whether the consumer already has an
 | No pre-existing `.mcp.json` | Receives a byte-identical copy from the hub source. Lock records the install.                                                                                                                        |
 | Pre-existing `.mcp.json`    | File is preserved unchanged. Stderr contains one `Skip config/mcp: never-overwrite` line and, if the local content's hash differs from the registry hash, one `shadow-file divergence` WARNING line. |
 
-Both outcomes are designed `never-overwrite` behavior, not defects. See `metaclaude-cli.mjs` lines 756-787 for the enforcement source.
+Both outcomes are designed `never-overwrite` behavior, not defects. See the
+`never-overwrite` branch in `metaclaude-cli.mjs` for the enforcement source.
+
+Sync also performs an idempotent Claude Code MCP ensure step for consumer
+projects:
+
+```bash
+claude mcp add playwright -- npx @playwright/mcp@latest
+claude mcp add mcp-notify -- node /Users/matthewlin/workspace/mcp-notify/dist/index.js
+```
+
+The ensure step runs only when the server is not already available through the
+consumer `.mcp.json` or Claude Code's local project config. It does not install
+browser binaries; those remain an environment prerequisite
+(`npx playwright install chromium`). To skip the ensure step for a sync run, use
+`--no-mcp-ensure` or set `METACLAUDE_SKIP_MCP_ENSURE=1`.
 
 #### Opting out
 

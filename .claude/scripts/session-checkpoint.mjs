@@ -12,10 +12,9 @@
  *     [--force-reset-convergence]                 - Explicit convergence reset (REQ-001.3 / as-009)
  *     [--switch-from-current]                     - Preserve current work item and switch focus
  *   start-work --exempt-workflow <W>              - Start tracking vibe-mode work (flag-only; auto-gen id+objective)
- *   rotate-worktree <new-root>                    - Facilitator-only re-pin of project_dir_pin (REQ-007 / as-006 / AC6.3)
+ *   rotate-worktree <new-root>                    - Re-pin project_dir_pin after an intentional worktree rotation
  *   reconcile-convergence <spec_group_id>         - Run manifest-seed reconciliation on demand (REQ-007.3 / as-008)
  *   transition-phase <new_phase>                  - Update current phase (with DAG enforcement)
- *   complete-atomic-spec <atomic_spec_id>         - Mark an atomic spec as done
  *   dispatch-subagent <id> <type> <desc> [--stage] [--work-id <id>]
  *                                                 - Track subagent dispatch (--stage for challengers)
  *   complete-subagent <task_id> <result_summary>  - Mark subagent as complete
@@ -100,7 +99,7 @@ import {
   fsyncSync,
   constants as fsConstants,
   // sg-pipeline-efficiency-ws3-orchestrator-hygiene / as-006 (AC6.3 CVG-001):
-  // rotate-worktree pre-resolves facilitator-supplied symlinks so well-known
+  // rotate-worktree pre-resolves trusted rotation symlinks so well-known
   // canonical directories (e.g., /tmp → /private/tmp on Darwin) succeed.
   realpathSync,
 } from 'node:fs';
@@ -109,7 +108,6 @@ import { spawnSync } from 'node:child_process';
 import { basename, dirname, join, resolve, relative, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import {
-  ORCHESTRATOR_PREDECESSORS,
   ONEOFF_SPEC_PREDECESSORS,
   EXEMPT_WORKFLOWS,
   VALID_PHASES,
@@ -201,9 +199,6 @@ import {
   formatConvergenceSanityFailure,
 } from './lib/stop-hook-checks.mjs';
 import { validatePath, PATH_REJECT_REASONS } from './lib/path-validate.mjs';
-// REQ-008 / as-011: single source of truth for atomic-spec ID regex.
-// Replaces prior inline literal in validateAtomicSpecId (semantics identical).
-import { ATOMIC_ID_REGEX } from './lib/atomic-id-schema.mjs';
 import {
   registerActiveSession,
   unregisterActiveSession,
@@ -376,14 +371,13 @@ function looksLikeStandalonePath(s) {
 const SESSION_VERSION = '1.0.0';
 
 // VALID_PHASES imported from ./lib/workflow-dag.mjs
-// (single source of truth -- includes 16 entries with awaiting_approval kept
+// (single source of truth -- includes 14 entries with awaiting_approval kept
 // for backwards compatibility per AC-1.12 and auto_approval per AC-1.9)
 
 // Valid workflow types
 const VALID_WORKFLOWS = [
   'oneoff-vibe',
   'oneoff-spec',
-  'orchestrator',
   'refactor',
   'journal-only'
 ];
@@ -397,16 +391,14 @@ const VALID_WORKFLOWS = [
 // string and validate against VALID_STAGES will now reject the deleted
 // value — that is the intended failure mode.
 const VALID_STAGES = [
-  'pre-implementation',
-  'pre-test',
-  'pre-orchestration'
+  'pre-implementation'
 ];
 
 // VALID_SUBAGENT_TYPES imported from ./lib/workflow-dag.mjs
 
 // =============================================================================
 // Workflow Enforcement: DAG constants and query functions imported from shared module
-// (ORCHESTRATOR_PREDECESSORS, ONEOFF_SPEC_PREDECESSORS, EXEMPT_WORKFLOWS,
+// (ONEOFF_SPEC_PREDECESSORS, EXEMPT_WORKFLOWS,
 //  MANDATORY_DISPATCHES, REQUIRED_CHALLENGER_STAGES imported from ./lib/workflow-dag.mjs)
 // =============================================================================
 
@@ -872,13 +864,9 @@ const WORKFLOW_IMMUTABLE_ERROR_CODE = 'WORKFLOW_IMMUTABLE';
  *
  * Accepted long and short forms:
  *   'pre-implementation'  -> 'pre-impl'
- *   'pre-orchestration'   -> 'pre-orch'
- *   'pre-test'            -> 'pre-test'
  *
- * REQ-004 (as-024): the previously-supported review-phase challenger
- * substage mapping is removed — that dispatch is deleted and the short
- * form no longer appears in VALID_SUBSTAGES. Any other value is returned
- * unchanged (caller validates against VALID_SUBSTAGES before storing).
+ * Deleted workflow substages are returned unchanged so the caller rejects
+ * them against VALID_SUBSTAGES before storing.
  *
  * @param {string|null|undefined} stage
  * @returns {string|null}
@@ -886,7 +874,6 @@ const WORKFLOW_IMMUTABLE_ERROR_CODE = 'WORKFLOW_IMMUTABLE';
 function normalizeSubstage(stage) {
   if (!stage || typeof stage !== 'string') return null;
   if (stage === 'pre-implementation') return 'pre-impl';
-  if (stage === 'pre-orchestration') return 'pre-orch';
   return stage;
 }
 
@@ -1000,18 +987,6 @@ function checkWorkflowImmutable(session, requestedWorkflow) {
 function validateSpecGroupId(id) {
   if (!id || !/^sg-[a-z0-9.-]+$/.test(id)) {
     throw new Error(`Invalid spec_group_id '${id}'. Must match pattern 'sg-[a-z0-9.-]+'`);
-  }
-}
-
-/**
- * Validate atomic spec ID format.
- *
- * REQ-008 / as-011: regex sourced from `./lib/atomic-id-schema.mjs` single
- * source of truth — semantics identical to the prior inline literal.
- */
-function validateAtomicSpecId(id) {
-  if (!id || !ATOMIC_ID_REGEX.test(id)) {
-    throw new Error(`Invalid atomic_spec_id '${id}'. Must match pattern 'as-NNN' or 'as-NNN-slug'`);
   }
 }
 
@@ -1298,10 +1273,7 @@ export class TestWriterUnlockError extends Error {
  *   ROUTE_DECISION_USAGE_ERROR             — missing / invalid required arg
  *   ROUTE_DECISION_WORKFLOW_INVALID        — workflow not in VALID_WORKFLOWS
  *   ROUTE_DECISION_RATIONALE_INVALID       — rationale missing or empty
- *   ROUTE_DECISION_JUSTIFICATION_INVALID   — justification JSON malformed or
- *                                            does not match contract shape
- *   ROUTE_DECISION_JUSTIFICATION_REQUIRED  — orchestrator without justification
- *   ROUTE_DECISION_JUSTIFICATION_FORBIDDEN — non-orchestrator with justification
+ *   ROUTE_DECISION_JUSTIFICATION_FORBIDDEN — obsolete justification supplied
  *   ROUTE_DECISION_RISK_TIER_INVALID       — risk tier not in VALID_RISK_TIERS
  *   ROUTE_DECISION_SESSION_MISSING         — session.json absent; run `init`
  *   ROUTE_DECISION_LOCK_FAILED             — session.json lock acquisition failed
@@ -1704,8 +1676,8 @@ function opInit() {
  * route-skill-authored entry path). Positional form retains legacy behavior
  * (workflow_set_by not recorded unless a future writer sets it).
  *
- * Downgrade protection (AC-10.1): workflow downgrades (e.g., orchestrator →
- * oneoff-vibe) require --override-workflow and retain the throw. The
+ * Downgrade protection (AC-10.1): workflow downgrades to oneoff-vibe require
+ * --override-workflow and retain the throw. The
  * --override-workflow flag is mutually exclusive with --exempt-workflow for
  * the flag-only form — downgrade from the exempt-workflow surface requires
  * complete-work first (EC-21).
@@ -2053,7 +2025,6 @@ function opStartWork(args) {
       initialPhase = 'implementing';
       break;
     case 'oneoff-spec':
-    case 'orchestrator':
       initialPhase = 'prd_gathering';
       break;
     case 'refactor':
@@ -2143,8 +2114,6 @@ function opStartWork(args) {
 
   session.phase_checkpoint = {
     phase: initialPhase,
-    atomic_specs_completed: [],
-    atomic_specs_pending: [],
     next_actions: [],
     // Enforcement fields (REQ-005) -- backward-compatible defaults
     phase_skip_warnings: {},
@@ -2412,17 +2381,13 @@ function opStartWork(args) {
 }
 
 /**
- * sg-pipeline-efficiency-ws3-orchestrator-hygiene / as-006 (REQ-007 / AC6.3)
- *
  * rotate-worktree <new-root>
  *
- * Facilitator-only re-pin path for legitimate worktree rotations (e.g., when
- * the facilitator swaps one worktree for another mid-session). Atomically
- * updates `session.active_work.project_dir_pin` after canonicalizing
- * `<new-root>`. Appends an audit-log entry with `event_class` equal to the
- * canonical `worktree_path_violation` class (ws-3 shares that class for all
- * pin-lifecycle events per spec §Implementation Notes) so the re-pin is
- * observable in the hash-chained audit log.
+ * Re-pin path for legitimate worktree rotations. Atomically updates
+ * `session.active_work.project_dir_pin` after canonicalizing `<new-root>`.
+ * Appends an audit-log entry with `event_class` equal to the canonical
+ * `worktree_path_violation` class so the re-pin is observable in the
+ * hash-chained audit log.
  *
  * CLI form:
  *   rotate-worktree <new-root>
@@ -2431,17 +2396,13 @@ function opStartWork(args) {
  *   - An active_work record MUST exist. Without a prior pin there is nothing
  *     to rotate; operators should invoke `start-work` instead.
  *
- * Canonicalization model (AC6.3 / CVG-001 fix):
- *   - `<new-root>` is realpath-resolved BEFORE `capturePin()`. The facilitator
- *     is a trusted actor invoking a legitimate rotation and is permitted to
- *     reference canonical well-known directories via their conventional
- *     symlinks (e.g., `/tmp → /private/tmp` on Darwin, per AC6.3 integration
- *     test). `start-work` retains the stricter symlink-reject contract for
- *     `CLAUDE_PROJECT_DIR` — operator-controlled input where a symlink may
- *     signal an escape attempt — but rotate-worktree operates on a
- *     facilitator-provided path that is resolved before downstream pin-shape
- *     validation. `capturePin()` still runs on the realpath-resolved target
- *     to enforce pin-shape invariants (absolute, non-empty, realpath-stable).
+ * Canonicalization model:
+ *   - `<new-root>` is realpath-resolved BEFORE `capturePin()`. `start-work`
+ *     retains the stricter symlink-reject contract for `CLAUDE_PROJECT_DIR`,
+ *     while rotate-worktree resolves the intended new root before downstream
+ *     pin-shape validation. `capturePin()` still runs on the realpath-resolved
+ *     target to enforce pin-shape invariants (absolute, non-empty,
+ *     realpath-stable).
  *
  * Error behavior:
  *   - `<new-root>` absent -> usage error (exit 1).
@@ -2466,13 +2427,13 @@ function opRotateWorktree(newRoot) {
     );
   }
 
-  // AC6.3 (CVG-001): rotate-worktree is a facilitator-trusted re-pin entry.
+  // AC6.3 (CVG-001): rotate-worktree is a trusted re-pin entry.
   // Resolve symlinks FIRST so well-known canonical directories (e.g.,
   // `/tmp → /private/tmp` on Darwin) succeed. `capturePin()` then runs on
   // the realpath-resolved target to enforce the pin-shape contract. This
   // diverges from start-work (which rejects any symlinked CLAUDE_PROJECT_DIR)
   // because start-work consumes operator-controlled env while rotate-worktree
-  // consumes a facilitator-supplied argument — the threat models differ.
+  // consumes an explicit rotation argument — the threat models differ.
   const priorPin = session.active_work.project_dir_pin || null;
   let realRoot;
   try {
@@ -2670,8 +2631,7 @@ function opReconcileConvergence(args) {
  * transition-phase - Update current phase.
  *
  * Extended signature (ws-dag-substages as-002c / as-004c):
- *   - substage: optional short-form substage (pre-impl | pre-test |
- *     pre-orch; REQ-004 / as-024 removed the review-phase short form).
+ *   - substage: optional short-form substage (pre-impl).
  *     Only consulted when newPhase === 'challenging'; on a challenger
  *     transition the substage is appended to
  *     session.substages_visited.challenging (deduped) and a
@@ -3027,53 +2987,6 @@ function opTransitionPhase(newPhase, substage = null, requestedWorkflow = null) 
 }
 
 /**
- * complete-atomic-spec - Mark an atomic spec as done.
- */
-function opCompleteAtomicSpec(atomicSpecId) {
-  if (!atomicSpecId) {
-    throw new Error('Usage: complete-atomic-spec <atomic_spec_id>');
-  }
-
-  validateAtomicSpecId(atomicSpecId);
-
-  const session = loadSession();
-  if (!session) {
-    throw new Error('No session.json exists. Run "init" first.');
-  }
-
-  if (!session.active_work) {
-    throw new Error('No active work. Run "start-work" first.');
-  }
-
-  if (!session.phase_checkpoint) {
-    throw new Error('No phase checkpoint. This should not happen.');
-  }
-
-  // Check if already completed
-  if (session.phase_checkpoint.atomic_specs_completed.includes(atomicSpecId)) {
-    console.error(`Atomic spec '${atomicSpecId}' is already marked as completed.`);
-    return;
-  }
-
-  // Remove from pending if present
-  const pendingIndex = session.phase_checkpoint.atomic_specs_pending.indexOf(atomicSpecId);
-  if (pendingIndex !== -1) {
-    session.phase_checkpoint.atomic_specs_pending.splice(pendingIndex, 1);
-  }
-
-  // Add to completed
-  session.phase_checkpoint.atomic_specs_completed.push(atomicSpecId);
-
-  addHistoryEntry(session, 'checkpoint_saved', {
-    spec_group_id: session.active_work.spec_group_id,
-    message: `Completed atomic spec: ${atomicSpecId}`
-  });
-
-  saveSession(session);
-  console.error(`Marked atomic spec '${atomicSpecId}' as completed.`);
-}
-
-/**
  * dispatch-subagent - Track subagent dispatch.
  *
  * Supports optional --stage flag for challenger subagent dispatches (DEC-004).
@@ -3231,8 +3144,7 @@ function opDispatchSubagent(taskId, subagentType, description, stage, stageSourc
     status: 'in_flight',
     result_summary: null,
     work_id: dispatchWorkId || resolveActiveWorkId(session),
-    spec_group_id: dispatchWorkId || session.active_work?.spec_group_id || null,
-    atomic_spec_id: null
+    spec_group_id: dispatchWorkId || session.active_work?.spec_group_id || null
   };
 
   // Store stage on dispatch record for challenger subagents (REQ-003, DEC-004)
@@ -6160,7 +6072,7 @@ export function evaluateRefenceTriggerForAllUnlocks(session, trigger) {
  * opArchiveIncomplete) so the predicate runs inside the same session-save
  * transaction as the trigger's primary effect (Q2 resolution, design-doc §4.2).
  *
- * Callers (version-bump detector, facilitator rotation hook) invoke this CLI
+ * Callers (version-bump detector, external rotation hook) invoke this CLI
  * with the sg-id and trigger label; the predicate runs against the loaded
  * session and persists via `saveSession`. Idempotent — returns exit 0 even
  * when no unlock exists for the sg-id (AC5.3).
@@ -6330,98 +6242,26 @@ function truncateRationale(s) {
 }
 
 /**
- * Validate the `multi_domain_justification` shape.
+ * Validate the obsolete `multi_domain_justification` option.
  *
- * Contract (ROUTING.md routing-decision persistence):
- *   - Array of `{criterion: string, evidence: string}` objects.
- *   - Required when workflow === 'orchestrator'; forbidden otherwise.
- *   - Each element must have non-empty `criterion` AND non-empty `evidence`.
- *   - Requires two or more entries.
+ * Spec-first routing keeps complex-domain evidence in the rationale and the
+ * optional spec-slice notes instead of a workflow-specific route field.
  *
- * Returns the validated array on success; throws RouteDecisionError on
- * failure with a code describing which validation layer fired.
- *
- * @param {string} workflow — validated workflow enum value
- * @param {string|null} rawJson — raw `--multi-domain-justification` value
- * @returns {Array<{criterion: string, evidence: string}>|null}
+ * @param {string} workflow - validated workflow enum value
+ * @param {string|null} rawJson - raw `--multi-domain-justification` value
+ * @returns {null}
  */
 function validateMultiDomainJustification(workflow, rawJson) {
-  const isOrchestrator = workflow === 'orchestrator';
-
   if (rawJson === null || rawJson === undefined) {
-    if (isOrchestrator) {
-      throw new RouteDecisionError(
-        'ROUTE_DECISION_JUSTIFICATION_REQUIRED',
-        'ROUTE_DECISION_JUSTIFICATION_REQUIRED: --multi-domain-justification ' +
-          'is required when workflow=orchestrator (REQ-003). Supply a JSON ' +
-        'array of {criterion, evidence} objects with at least two entries.'
-      );
-    }
     return null;
   }
 
-  // Non-orchestrator with justification — reject to keep the log tidy.
-  if (!isOrchestrator) {
-    throw new RouteDecisionError(
-      'ROUTE_DECISION_JUSTIFICATION_FORBIDDEN',
-      `ROUTE_DECISION_JUSTIFICATION_FORBIDDEN: --multi-domain-justification ` +
-        `is only permitted when workflow=orchestrator (got workflow=${workflow}).`
-    );
-  }
-
-  let parsed;
-  try {
-    parsed = JSON.parse(rawJson);
-  } catch (err) {
-    throw new RouteDecisionError(
-      'ROUTE_DECISION_JUSTIFICATION_INVALID',
-      `ROUTE_DECISION_JUSTIFICATION_INVALID: --multi-domain-justification ` +
-        `is not valid JSON: ${err.message}`
-    );
-  }
-
-  if (!Array.isArray(parsed)) {
-    throw new RouteDecisionError(
-      'ROUTE_DECISION_JUSTIFICATION_INVALID',
-      'ROUTE_DECISION_JUSTIFICATION_INVALID: --multi-domain-justification ' +
-        'must be a JSON array of {criterion, evidence} objects.'
-    );
-  }
-
-  if (parsed.length < 2) {
-    throw new RouteDecisionError(
-      'ROUTE_DECISION_JUSTIFICATION_INVALID',
-      `ROUTE_DECISION_JUSTIFICATION_INVALID: --multi-domain-justification ` +
-        `must enumerate at least two criteria (REQ-003); got ${parsed.length}.`
-    );
-  }
-
-  const validated = [];
-  for (let i = 0; i < parsed.length; i++) {
-    const entry = parsed[i];
-    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) {
-      throw new RouteDecisionError(
-        'ROUTE_DECISION_JUSTIFICATION_INVALID',
-        `ROUTE_DECISION_JUSTIFICATION_INVALID: entry [${i}] is not an object.`
-      );
-    }
-    const { criterion, evidence } = entry;
-    if (typeof criterion !== 'string' || criterion.trim().length === 0) {
-      throw new RouteDecisionError(
-        'ROUTE_DECISION_JUSTIFICATION_INVALID',
-        `ROUTE_DECISION_JUSTIFICATION_INVALID: entry [${i}].criterion must be a non-empty string.`
-      );
-    }
-    if (typeof evidence !== 'string' || evidence.trim().length === 0) {
-      throw new RouteDecisionError(
-        'ROUTE_DECISION_JUSTIFICATION_INVALID',
-        `ROUTE_DECISION_JUSTIFICATION_INVALID: entry [${i}].evidence must be a non-empty string.`
-      );
-    }
-    validated.push({ criterion: criterion.trim(), evidence: evidence.trim() });
-  }
-
-  return validated;
+  throw new RouteDecisionError(
+    'ROUTE_DECISION_JUSTIFICATION_FORBIDDEN',
+    `ROUTE_DECISION_JUSTIFICATION_FORBIDDEN: --multi-domain-justification ` +
+      `is obsolete under spec-first routing (got workflow=${workflow}). Put ` +
+      `complex-domain evidence in the route rationale or spec slices.`
+  );
 }
 
 /**
@@ -6458,10 +6298,7 @@ function validateRouteRiskTier(rawRiskTier) {
  * Behavior:
  *   1. Validate workflow against VALID_WORKFLOWS (reuse of session-level enum).
  *   2. Validate rationale (non-empty string; truncated to 120 chars per OQ-105).
- *   3. Validate multi-domain-justification JSON:
- *        - Required for orchestrator (ROUTE_DECISION_JUSTIFICATION_REQUIRED).
- *        - Forbidden for non-orchestrator (ROUTE_DECISION_JUSTIFICATION_FORBIDDEN).
- *        - ≥2 entries with {criterion, evidence} non-empty strings.
+ *   3. Reject obsolete multi-domain-justification JSON.
  *   4. Validate optional risk_tier route metadata.
  *   5. Append entry to session.active_work.route_decisions[]
  *      (create the array on first write).
@@ -6640,8 +6477,7 @@ export function opRecordRouteDecision(
     timestamp,
     workflow,
     rationale_excerpt: truncateRationale(rationale.trim()),
-    // Omit the field for non-orchestrator workflows (contract says null OR
-    // omitted is acceptable; omitting keeps the log lean).
+    // Omit obsolete multi-domain justification unless legacy data exists.
     ...(justification !== null ? { multi_domain_justification: justification } : {}),
     ...(riskTier !== null ? { risk_tier: riskTier } : {}),
   };
@@ -6757,7 +6593,6 @@ export function opRecordRouteDecision(
     risk_tier: riskTier,
     timestamp,
     rationale_excerpt: entry.rationale_excerpt,
-    multi_domain_justification: justification,
     audit_seq: auditSeq,
   };
   console.log(JSON.stringify(out));
@@ -6815,7 +6650,7 @@ function opCompleteWork() {
     const overriddenPhases = new Set(overrideHistory.map(h => h.details?.phase));
 
     // Check per-stage challenger dispatches (REQ-011)
-    const requiredStages = REQUIRED_CHALLENGER_STAGES[workflow] || REQUIRED_CHALLENGER_STAGES['orchestrator'];
+    const requiredStages = REQUIRED_CHALLENGER_STAGES[workflow] || REQUIRED_CHALLENGER_STAGES['oneoff-spec'];
     for (const stage of requiredStages) {
       const dispatched = allTasks.some(
         t => t.subagent_type === 'challenger' && t.stage === stage
@@ -6920,7 +6755,6 @@ function opCompleteWork() {
   addHistoryEntry(session, 'work_completed', {
     spec_group_id: specGroupId,
     workflow: session.active_work.workflow,
-    atomic_specs_completed: session.phase_checkpoint?.atomic_specs_completed || [],
     tasks_completed: session.subagent_tasks.completed_this_session.length,
     message: `Completed work: ${objective}`
   });
@@ -7003,8 +6837,6 @@ function opArchiveIncomplete() {
     spec_group_id: specGroupId,
     workflow: session.active_work.workflow,
     abandoned_at_phase: currentPhase,
-    atomic_specs_completed: session.phase_checkpoint?.atomic_specs_completed || [],
-    atomic_specs_pending: session.phase_checkpoint?.atomic_specs_pending || [],
     in_flight_tasks: session.subagent_tasks.in_flight.map(t => t.task_id),
     message: `Abandoned work at phase '${currentPhase}': ${objective}`
   });
@@ -7336,8 +7168,6 @@ function opGetStatus() {
     } : null,
     phase_checkpoint: session.phase_checkpoint ? {
       phase: session.phase_checkpoint.phase,
-      atomic_specs_completed_count: session.phase_checkpoint.atomic_specs_completed?.length || 0,
-      atomic_specs_pending_count: session.phase_checkpoint.atomic_specs_pending?.length || 0,
       next_actions: session.phase_checkpoint.next_actions || []
     } : null,
     subagent_tasks: {
@@ -7638,7 +7468,7 @@ function hashSessionId(sessionId) {
 
 /**
  * Emit a structured log line to stderr in JSON format.
- * Contract: `contract-structured-log-keys` (MasterSpec sg-workflow-convergence-bugs).
+ * Contract: `contract-structured-log-keys` (parent spec sg-workflow-convergence-bugs).
  * Keys emitted by derivation path (owned by ws-counter-derivation):
  *   - convergence.streak.derived {gate, clean_pass_count, iteration_count}
  *   - convergence.legacy_source_rejected {gate, source, recordIndex, sessionId}
@@ -8450,7 +8280,7 @@ function opUpdateCircuitBreaker(args) {
 // ws-hook-firing: recordPass atomic write primitives (as-003..as-006)
 // =============================================================================
 //
-// Contract (sg-workflow-convergence-bugs / MasterSpec contract-atomic-write-protocol):
+// Contract (sg-workflow-convergence-bugs / parent-spec contract-atomic-write-protocol):
 //   - primitive: write-to-tmp + POSIX rename() on same filesystem
 //   - tmp_filename_convention: "session.json.tmp.<pid>.<timestamp_ms>"
 //   - symlink_defense: lstat() pre-check; O_NOFOLLOW on open; abort with
@@ -8461,7 +8291,7 @@ function opUpdateCircuitBreaker(args) {
 //   - mode: explicit 0o600; does NOT rely on process umask
 //   - forbidden: proper-lockfile, flock, advisory locks, multi-process locking
 //
-// Structured log contract (MasterSpec contract-structured-log-keys):
+// Structured log contract (parent-spec contract-structured-log-keys):
 //   - convergence.record_pass_failed {gate, agent_type, error}
 //   - error field: ExceptionClass + truncated message (<= 200 chars); no stack
 //
@@ -9884,14 +9714,14 @@ Required arguments:
   <sg-id>                       Positional. Target spec-group id.
   --trigger <label>             One of:
                                   version-bump       (spec content_hash change)
-                                  workstream-rotate  (facilitator rotation)
+                                  workstream-rotate  (external work rotation)
                                   spec-complete      (also fires internally)
                                   test-pass          (also fires internally)
                                   session-end        (also fires internally)
 
 Typical external callers:
   version-bump       spec post-edit hooks after spec.md content_hash mutation.
-  workstream-rotate  orchestrator facilitator-rotation hook.
+  workstream-rotate  external work-rotation hook.
 
 The remaining 3 triggers (spec-complete, test-pass, session-end) fire
 internally from opTransitionPhase, opUpdateConvergence (unifier gate), and
@@ -9939,13 +9769,8 @@ Optional arguments:
                                 Stored on active_work for risk-tiered Stop
                                 dispatch enforcement.
   --multi-domain-justification <json>
-                                JSON array of {criterion, evidence} objects.
-                                REQUIRED when workflow=orchestrator (REQ-003);
-                                forbidden otherwise. Two or more entries
-                                required.
-                                Example:
-                                  '[{"criterion":"3+ services","evidence":"websocket, auth, db"},
-                                    {"criterion":"cross-runtime","evidence":"browser + node"}]'
+                                Obsolete. Spec-first routing records complex
+                                domain evidence in the rationale/spec slices.
 
 Effects on success (exit 0):
   1. Appends entry to session.active_work.route_decisions[] (creates array
@@ -9960,15 +9785,13 @@ Structured errors (exit 1):
   ROUTE_DECISION_USAGE_ERROR             Missing required arg.
   ROUTE_DECISION_WORKFLOW_INVALID        Unknown workflow value.
   ROUTE_DECISION_RATIONALE_INVALID       Empty rationale.
-  ROUTE_DECISION_JUSTIFICATION_REQUIRED  Orchestrator without justification.
-  ROUTE_DECISION_JUSTIFICATION_FORBIDDEN Non-orchestrator with justification.
-  ROUTE_DECISION_JUSTIFICATION_INVALID   Malformed JSON or contract violation.
+  ROUTE_DECISION_JUSTIFICATION_FORBIDDEN Obsolete multi-domain justification supplied.
   ROUTE_DECISION_RISK_TIER_INVALID       Unknown risk tier.
   ROUTE_DECISION_WRITE_FAILED            Lock or atomic-rename failed.
 
 References:
   Owner doc:    .claude/docs/ROUTING.md
-  Contract:     Evidence Requirement — multi_domain_justification
+  Contract:     Spec-first route decision persistence
 `);
 }
 
@@ -9988,13 +9811,12 @@ Operations:
     Optional: --force-reset-convergence            Explicit convergence reset (REQ-001.3)
               --switch-from-current                Preserve current work item and switch focus
   start-work --exempt-workflow <workflow>         Start vibe-mode work (flag-only; auto-gen id+objective)
-  rotate-worktree <new-root>                       Facilitator-only re-pin of session.active_work.project_dir_pin
-                                                   (ws-3 REQ-007 / AC6.3). Canonicalizes <new-root> via
+  rotate-worktree <new-root>                       Re-pin session.active_work.project_dir_pin after an intentional worktree rotation.
+                                                   Canonicalizes <new-root> via
                                                    worktree-canon.capturePin(); appends audit entry
                                                    event_class='worktree_path_violation' subtype='rotate-worktree'.
   reconcile-convergence <spec_group_id>           Run manifest-seed reconciliation on demand (REQ-007.3)
   transition-phase <new_phase>                    Update current phase
-  complete-atomic-spec <atomic_spec_id>           Mark atomic spec as done
   dispatch-subagent <id> <type> <desc> [--stage] [--work-id <id>]
                                                    Track subagent dispatch
   complete-subagent <task_id> <result_summary>    Mark subagent complete
@@ -10062,11 +9884,9 @@ Operations:
                                                    workstream-rotate, session-end}. Idempotent.
                                                    Appends test_writer_unlock_refence audit entry.
   record-route-decision <workflow> <rationale>    Append /route decision to session log
-    [--multi-domain-justification <json>]          (ROUTING.md)
+    [--multi-domain-justification <json>]          Obsolete; rejected under spec-first routing.
                                                    Sole-writer for session.active_work.route_decisions[];
-                                                   --multi-domain-justification required when
-                                                   workflow=orchestrator (REQ-003). Rationale
-                                                   truncated to 120 chars (OQ-105).
+                                                   Rationale truncated to 120 chars (OQ-105).
   record-pass <gate> --findings-count <N> ...      Record convergence pass evidence
   update-convergence <gate_name> [--work-id <id>]  Derive convergence count from evidence
   record-deployment --target <t> --method <m>     Record deployment activity
@@ -10129,8 +9949,7 @@ async function main() {
         break;
 
       case 'rotate-worktree':
-        // sg-pipeline-efficiency-ws3-orchestrator-hygiene / as-006 / REQ-007 / AC6.3
-        // Facilitator-only re-pin action. args[1] is the new canonical root.
+        // Re-pin action. args[1] is the new canonical root.
         opRotateWorktree(args[1]);
         break;
 
@@ -10167,10 +9986,6 @@ async function main() {
         opTransitionPhase(tpNewPhase, tpSubstage, tpRequestedWorkflow);
         break;
       }
-
-      case 'complete-atomic-spec':
-        opCompleteAtomicSpec(args[1]);
-        break;
 
       case 'dispatch-subagent': {
         // Parse --stage and --stage-source flags (as-013 AC-002.4).
@@ -10528,8 +10343,8 @@ async function main() {
         //
         // Sole-writer CLI for session.active_work.route_decisions[]. The
         // main-agent invokes this after /route produces its decision block,
-        // before phase transitions. Justification is required for
-        // workflow=orchestrator (REQ-003) and forbidden otherwise.
+        // before phase transitions. Multi-domain justification is obsolete
+        // under spec-first routing and rejected by validation.
         if (args[1] === '--help' || args[1] === '-h') {
           printRecordRouteDecisionHelp(true);
           break;

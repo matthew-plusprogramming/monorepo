@@ -59,10 +59,10 @@
  *   - Rotate secrets (session-checkpoint.mjs owns lifecycle).
  *   - Include first-failure-ref in the signed message (per as-004 Task 4.2
  *     signature; spec.md Q1 "64-hex-char" format note is superseded by the
- *     atomic-spec implementer contract).
+ *     shipped implementer contract).
  *
  * @req REQ-005 (AC-005.4, AC-005.5)
- * @spec sg-pipeline-efficiency-ws2-practice-2.4 / atomic/as-004.md
+ * @spec sg-pipeline-efficiency-ws2-practice-2.4 / spec.md
  */
 
 import { createHmac, timingSafeEqual } from 'node:crypto';

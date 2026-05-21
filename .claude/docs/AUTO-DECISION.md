@@ -4,18 +4,17 @@
 
 ## Scope
 
-The Auto-Decision Engine evaluates findings produced by convergence-loop gates (`/investigate` and `/challenge` — pre-implementation and pre-orchestration stages) and auto-accepts qualifying findings so the workflow proceeds autonomously in the common case (zero escalations).
+The Auto-Decision Engine evaluates findings produced by convergence-loop gates (`/investigate` and `/challenge` at pre-implementation) and auto-accepts qualifying findings so the workflow proceeds autonomously in the common case (zero escalations).
 
 **Applies to**:
 
 - Investigation convergence loop (interface-investigator)
 - Challenger convergence loop (pre-implementation stage — implementer is fix agent)
-- Challenger convergence loop (pre-orchestration stage — spec-author is fix agent)
 
 **Does NOT apply to**:
 
 - PRD gather-criticize loop (fully human-in-the-loop — see "PRD Loop Unchanged" below)
-- Deleted post-implementation challenger signals now handled by `/unify` preflight and reviewer-focus metadata
+- Deleted challenger stages now handled by `/unify` preflight, reviewer-focus metadata, or ordinary spec amendment
 - Non-convergence gates (code_review, security_review, unifier, completion_verifier findings are evaluated by their own review machinery, not by this engine)
 
 ## Autonomous Convergence Workflow
@@ -23,7 +22,7 @@ The Auto-Decision Engine evaluates findings produced by convergence-loop gates (
 The workflow from spec authoring to implementation is fully autonomous for the common case (zero escalations). The legacy `awaiting_approval` phase has been replaced by convergence-based quality gates:
 
 1. **Investigation convergence loop**: Interface investigator runs iteratively until 2 consecutive clean passes (no Medium+ findings). Auto-decision engine evaluates findings between passes.
-2. **Challenger convergence loop**: Challenger runs iteratively for `pre-implementation` and `pre-orchestration` stages until 2 consecutive clean passes. Fix agents: implementer (pre-impl), spec-author (pre-orch).
+2. **Challenger convergence loop**: Challenger runs iteratively for `pre-implementation` until 2 consecutive clean passes. Fix agent: implementer.
 3. **Auto-approval**: After both convergence loops complete, a passthrough `auto_approval` phase is recorded for audit purposes. No human gate required.
 
 ## Auto-Decision Engine

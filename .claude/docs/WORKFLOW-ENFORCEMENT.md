@@ -64,7 +64,7 @@ Rules:
   `phase_checkpoint`, `convergence`, and `convergence_evidence`.
 - `transition-phase` validates the DAG and writes the active phase.
 - `dispatch-subagent --work-id` pins a dispatch to a stable work item even when
-  the facilitator later changes focus.
+  the main agent later changes focus.
 - `update-convergence` derives counters from evidence. It does not accept a
   caller-provided count, and `--work-id` derives from that work item's evidence.
 - `record-pass` is not a public write path. CLI attempts exit 2 with
@@ -119,7 +119,6 @@ Workflows:
 | Workflow | Enforcement |
 | --- | --- |
 | `oneoff-spec` | DAG, dispatch, convergence, Stop, and obligation enforcement. |
-| `orchestrator` | DAG, dispatch, convergence, Stop, and obligation enforcement. |
 | `oneoff-vibe`, `refactor`, `journal-only` | Exempt unless the Stop hook detects trust-bearing enforcement edits. |
 
 Main phase chain for enforced workflows:
@@ -133,10 +132,8 @@ Current required challenger substages:
 | Workflow | Dispatch stage | Session substage |
 | --- | --- | --- |
 | `oneoff-spec` | `pre-implementation` | `pre-impl` |
-| `orchestrator` | `pre-orchestration` | `pre-orch` |
 
-`pre-test` remains accepted for older sessions but is not required. Other former
-stage names are not current. `substages_visited` is object-shaped:
+Other former stage names are not current. `substages_visited` is object-shaped:
 
 ```json
 {
@@ -185,8 +182,9 @@ completion. `e2e-test-writer` is dropped only when the active spec opts out with
 
 Runtime manual-test requirement:
 
-- Specs that declare `runtime_validation_required: true` in `spec.md` or
-  `atomic/*.md` require `/manual-test` before terminal Stop.
+- Specs that declare `runtime_validation_required: true` in `spec.md` require
+  `/manual-test` before terminal Stop. Optional spec slices are supporting
+  material; the active spec's frontmatter remains the enforcement source.
 - The Stop hook requires a `manual-tester` dispatch record for the active spec
   group and a structured `session.active_work.manual_test_result` with
   `result: "pass"`.

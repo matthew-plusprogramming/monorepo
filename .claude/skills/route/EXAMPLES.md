@@ -1,52 +1,52 @@
 # Route Skill — Edge-Case Examples
 
-These edge-case routing examples were moved out of `./SKILL.md` to reduce the skill's baseline per-session token load. The three canonical examples (trivial `oneoff-vibe`, default `oneoff-spec`, large-task `orchestrator`) remain inline in `SKILL.md`. This file covers the less-common routing paths.
+These edge-case routing examples were moved out of `./SKILL.md` to reduce the skill's baseline per-session token load. The canonical examples (trivial `oneoff-vibe`, default `oneoff-spec`, and large oneoff-spec) remain inline in `SKILL.md`. This file covers the less-common routing paths.
 
 ## Numbering Map
 
-| This file | Original `SKILL.md`                                  |
-| --------- | ---------------------------------------------------- |
-| Example 1 | Example 4 (Orchestrator with Investigation Findings) |
-| Example 2 | Example 5 (Exploration-First)                        |
-| Example 3 | Example 6 (User Vibe Override)                       |
-| Example 4 | Example 7 (Refactor)                                 |
-| Example 5 | Example 8 (Refactor with Feature)                    |
-| Example 6 | Example 9 (Journal-Only)                             |
-| Example 7 | Example 10 (Not Journal-Only)                        |
+| This file | Scenario                       |
+| --------- | ------------------------------ |
+| Example 1 | Large oneoff-spec with findings |
+| Example 2 | Exploration-First              |
+| Example 3 | User Vibe Override             |
+| Example 4 | Refactor                       |
+| Example 5 | Refactor with Feature          |
+| Example 6 | Journal-Only                   |
+| Example 7 | Not Journal-Only               |
 
 ## Examples
 
-### Example 1: Orchestrator with Investigation Findings
+### Example 1: Large Oneoff-Spec with Investigation Findings
 
-**Request**: "Build deployment pipeline with build, deploy, and monitoring workstreams"
+**Request**: "Build deployment pipeline with build, deploy, and monitoring slices"
 
 **Routing**:
 
-- workflow: orchestrator
-- rationale: Multi-workstream infrastructure project with 3 distinct concerns that will share env vars, secrets, and container conventions
+- workflow: oneoff-spec
+- rationale: Large infrastructure project with 3 distinct concerns that will share env vars, secrets, and container conventions
 - estimated_scope: large
-- workstreams:
-  - ws-build: CI build pipeline
-  - ws-deploy: Deployment automation
-  - ws-monitor: Monitoring and alerting
+- spec_slices:
+  - build: CI build pipeline
+  - deploy: Deployment automation
+  - monitor: Monitoring and alerting
 - delegation:
   - parallel_subtasks:
-    - workstream specs: spec-author (parallel)
+    - spec slice analysis: spec-author / explore as needed
   - sequential_dependencies:
-    - After specs complete: `/investigate ms-deployment-pipeline` (MANDATORY)
+    - After spec is drafted: `/investigate sg-deployment-pipeline` (MANDATORY)
     - Investigation must complete before approval
     - Any blocker decisions must be resolved before implementation
   - investigation_required: true
-- next_action: Use `/prd` to gather requirements, create MasterSpec
+- next_action: Use `/prd` to gather requirements, then create one spec with clear slices, contracts, and dependency order
 
 **Post-Investigation (example)**:
 
-After `/investigate ms-deployment-pipeline`:
+After `/investigate sg-deployment-pipeline`:
 
 ```
 Issues Found:
-  - CRITICAL: ws-monitor missing HMAC_SECRET, LOG_LEVEL from ws-build template
-  - HIGH: GIT_SSH_KEY_PATH (ws-build) vs GIT_SSH_KEY_BASE64 (ws-deploy) conflict
+  - CRITICAL: monitor slice missing HMAC_SECRET, LOG_LEVEL from build template
+  - HIGH: GIT_SSH_KEY_PATH (build) vs GIT_SSH_KEY_BASE64 (deploy) conflict
   - HIGH: Container image format inconsistency
 
 Decisions Required:
@@ -63,7 +63,7 @@ User must resolve decisions before implementation proceeds.
 
 **Routing**:
 
-- workflow: oneoff-spec (may escalate to orchestrator)
+- workflow: oneoff-spec
 - rationale: Requires investigation to understand bottlenecks before planning
 - estimated_scope: unknown (pending exploration)
 - delegation:

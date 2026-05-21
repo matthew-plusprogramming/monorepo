@@ -49,6 +49,16 @@ const RouteSchema = z.object({
   body_skeleton: z.record(z.unknown()).optional(),
   timeout_ms: z.number().int().positive().optional().default(DEFAULT_PER_ROUTE_TIMEOUT_MS),
   headers: z.record(z.string()).optional(),
+  // sg-pre-merge-verify-20260508 / AS-3 / AC-14.1 / Q-Default(c):
+  // REQUIRED-when-present `phases` field declares which pipeline stages probe
+  // this route. Values: "pre-merge" (probed by pre-merge-verifier before merge)
+  // and/or "post-deploy" (probed by deployment-verifier after deploy). A route
+  // MAY appear in both phases (intentional dual-purpose per NFR-29).
+  // No `.optional()`, no `.default()`: routes omitting `phases` are rejected
+  // by Zod at manifest-load time. Backward compat is satisfied by NFR-31
+  // pre-ship invariant (`.claude/deployment-manifests/` is empty cluster-wide
+  // at compute-hashes time; zero deployed routes; zero migration impact).
+  phases: z.array(z.enum(['pre-merge', 'post-deploy'])).min(1),
 }).strict();
 
 // =============================================================================

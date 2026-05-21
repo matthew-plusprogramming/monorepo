@@ -29,11 +29,7 @@
  *   The enforcement prerequisite set for `implementer` checks
  *   `session.convergence.challenger.clean_pass_count` — a single aggregated
  *   counter that reflects the pre-implementation stage (the only challenger
- *   stage gating implementer dispatch). The snapshot separates
- *   `challenger-pre-impl` from `challenger-pre-orch`; the former is the
- *   threshold consumed by implementer enforcement. `challenger-pre-orch` is
- *   orchestration-phase and is read separately by the spec-author /
- *   orchestrate path (out of scope for as-008).
+ *   stage gating implementer dispatch).
  *
  * Implements:
  *   REQ-012 — snapshot reader pattern (consumers 3-4 of 8: hook enforcement pair)
@@ -58,7 +54,6 @@ const CONSUMER_TO_SNAPSHOT_GATE = Object.freeze({
   investigation: 'investigation',
   challenger: 'challenger-pre-impl',
   'challenger-pre-impl': 'challenger-pre-impl',
-  'challenger-pre-orch': 'challenger-pre-orch',
   code_review: 'code-review',
   'code-review': 'code-review',
   security_review: 'security',

@@ -11,10 +11,9 @@
  *
  * The validator is a pure function over the PerGateThresholdTable and the
  * decisions-file content; it performs no filesystem I/O itself so it is
- * trivially unit-testable (see spec atomicity criterion "Independently
- * Testable"). A thin CLI wrapper (`validate-minimum-pruning-floor.mjs`) and
- * the `/enforce` skill invocation path do the filesystem read and translate
- * structured failures into process exit codes / user-facing errors.
+ * trivially unit-testable. A thin CLI wrapper
+ * (`validate-minimum-pruning-floor.mjs`) does the filesystem read and
+ * translates structured failures into process exit codes / user-facing errors.
  *
  * Spec: sg-pipeline-efficiency-ws1-convergence-pruning / as-014
  *   - AC14.1: fail when zero of the four content-stable gates is at
@@ -23,7 +22,7 @@
  *             2nd-pass rate for all four gates.
  *   - AC14.3: structured error MINIMUM_PRUNING_FLOOR_VIOLATION with
  *             gate-by-gate summary.
- *   - AC14.4: invoked by /enforce before atomicity-enforcement completes.
+ *   - AC14.4: available as a completion-time threshold validation.
  *
  * Requirements: REQ-001 (minimum-pruning floor).
  * Contract ref: contract-per-gate-threshold-table §minimum_pruning_floor.

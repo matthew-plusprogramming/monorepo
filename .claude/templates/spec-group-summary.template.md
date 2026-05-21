@@ -44,12 +44,12 @@ work_status: plan_ready
 
 ## Scope Summary
 
-**Total Atomic Specs**: <N>
+**Total Spec Slices**: <N>
 **Requirements Covered**: <N>
 
 ### High-Level Changes
 
-<1-2 paragraph summary of what this spec group accomplishes. This is what the user reviews instead of each atomic spec individually.>
+<1-2 paragraph summary of what this spec group accomplishes. This is what the user reviews instead of each spec slice individually.>
 
 ### Key Behaviors
 
@@ -145,7 +145,7 @@ _Status of gates required for merge._
 
 ## User Review Section
 
-_This section is for user review. The user reviews this summary, not individual atomic specs._
+_This section is for user review. The user reviews this summary, not individual spec slices._
 
 ### Summary for Review
 

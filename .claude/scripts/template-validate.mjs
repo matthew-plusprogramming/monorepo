@@ -7,10 +7,8 @@
  * 1. Accept template file path as argument
  * 2. Based on template type (from filename), check for required placeholders:
  *    - agent.template.md: <agent-name>, <primary responsibility>, sections
- *    - atomic-spec.template.md: id:, title:, status:, sections
  *    - requirements.template.md: Required sections
  *    - task-spec.template.md: Required sections
- *    - workstream-spec.template.md: Required sections
  *    - prd.template.md: Required PRD sections
  *    - SKILL.template.md or skill templates: name:, description:, allowed-tools:, user-invocable:
  * 3. Report missing placeholders/sections
@@ -38,22 +36,6 @@ const TEMPLATE_REQUIREMENTS = {
     frontmatterFields: ['name:', 'description:', 'tools:', 'model:'],
   },
 
-  'atomic-spec.template.md': {
-    placeholders: [],
-    sections: [
-      '## Description',
-      '## Acceptance Criteria',
-      '## Test Strategy',
-      '## Atomicity Justification',
-      '## Pre-Implementation Evidence Table',
-      '## Contracts & Schemas',
-      '## Dependencies',
-      '## Implementation Evidence',
-      '## Test Evidence',
-    ],
-    frontmatterFields: ['id:', 'title:', 'status:'],
-  },
-
   'requirements.template.md': {
     placeholders: [],
     sections: ['## Source', '## Requirements', '## Traceability', '## Open Questions'],
@@ -64,20 +46,6 @@ const TEMPLATE_REQUIREMENTS = {
     placeholders: [],
     sections: ['## Context', '## Goal', '## Requirements', '## Acceptance Criteria', '## Task List', '## Test Plan'],
     frontmatterFields: ['id:', 'title:', 'date:', 'status:'],
-  },
-
-  'workstream-spec.template.md': {
-    placeholders: [],
-    sections: [
-      '## Context',
-      '## Goals / Non-goals',
-      '## Requirements',
-      '## Core Flows',
-      '## Task List',
-      '## Testing',
-      '## Open Questions',
-    ],
-    frontmatterFields: ['id:', 'title:', 'owner:', 'status:'],
   },
 
   'prd-report.template.md': {

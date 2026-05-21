@@ -87,7 +87,7 @@ Creates a new PRD through the full gather-criticize loop.
 
 #### Phase 1.5: Integration Surface Exploration
 
-> **Applicability**: MANDATORY for oneoff-spec and orchestrator workflows. SKIP for oneoff-vibe.
+> **Applicability**: MANDATORY for oneoff-spec workflows. SKIP for oneoff-vibe.
 
 After the PRD Writer saves the draft (end of Phase 1), explore the codebase to pre-populate the PRD's Integration Surface section before critics see the document.
 
@@ -582,7 +582,7 @@ PRD Writer: conversational discovery interview
     ↓
 PRD draft saved to .claude/prds/<prd-id>/prd.md
     ↓
-[Phase 1.5] Explore codebase for integration surfaces (oneoff-spec/orchestrator only)
+[Phase 1.5] Explore codebase for integration surfaces (oneoff-spec only)
     ↓
 PRD Writer amends Integration Surface section with exploration findings
     ↓

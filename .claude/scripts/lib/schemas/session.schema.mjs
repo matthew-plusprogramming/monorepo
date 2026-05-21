@@ -46,7 +46,7 @@ import {
 
 /**
  * Re-export the snapshot schema so downstream modules have a single import
- * target (`session.schema.mjs`) per the atomic-spec registration contract.
+ * target (`session.schema.mjs`) per the shipped registration contract.
  */
 export {
   sessionThresholdSnapshotSchema,

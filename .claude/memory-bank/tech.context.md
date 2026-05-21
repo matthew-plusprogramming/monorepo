@@ -282,7 +282,7 @@ For the full convergence architecture (4-tier extraction pipeline, streak-reset 
 Request → Route → Delegate to subagent → Synthesize → Commit
 ```
 
-- Simple changes with clear scope
+- Simple changes with clear bounded low-risk scope
 - No formal spec required
 - Single subagent dispatch
 

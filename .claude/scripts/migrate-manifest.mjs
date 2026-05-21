@@ -14,7 +14,7 @@
  *     review_state, work_state,
  *     created_at, updated_at,
  *     updated_by: "agent" | "human",
- *     requirements?, atomic_specs?, convergence?, decision_log?,
+ *     requirements?, convergence?, decision_log?,
  *     last_progress_update?, heartbeat_warnings?,
  *     session_ref?, last_session_id?, priority?, related_prds?
  *   }
@@ -24,10 +24,11 @@
  *   2. Move top-level `prd_id`, `prd_path`, `prd_version` into nested
  *      `prd.{id, file_path, version}` (pre-existing drift).
  *   3. Strip top-level `spec_group_id` (it duplicates `id`).
- *   4. Strip non-canonical `convergence.*_clean_pass_count` subfields
+ *   4. Strip legacy `atomic_specs` (archived decomposition metadata).
+ *   5. Strip non-canonical `convergence.*_clean_pass_count` subfields
  *      (they belong in session.json; inv-contract-a26e31 / AC-1a.*).
- *   5. Backfill `updated_by: "agent"` if missing (AC-4.4).
- *   6. Rewrite `updated_by: "user"` -> `updated_by: "human"` (AC-4.5).
+ *   6. Backfill `updated_by: "agent"` if missing (AC-4.4).
+ *   7. Rewrite `updated_by: "user"` -> `updated_by: "human"` (AC-4.5).
  *   7. Preserve all other fields unchanged.
  *
  * Conflict detection (AC-4.8):
@@ -445,7 +446,16 @@ export function migrateManifest(input, options = {}) {
     }
   }
 
-  // Rule 4: strip non-canonical convergence.*_clean_pass_count subfields
+  // Rule 4: strip legacy decomposed-spec metadata. Archived manifests keep
+  // their historical shape; current spec-group manifests must validate under
+  // `.claude/specs/schema/spec-group.schema.json`, which no longer accepts
+  // `atomic_specs`.
+  if (Object.prototype.hasOwnProperty.call(output, 'atomic_specs')) {
+    delete output.atomic_specs;
+    changed = true;
+  }
+
+  // Rule 5: strip non-canonical convergence.*_clean_pass_count subfields
   //
   // as-010 / AC10.2: the stripped subfield's canonical threshold is read
   // directly from PerGateThresholdTable (not from the session snapshot — this
@@ -469,17 +479,17 @@ export function migrateManifest(input, options = {}) {
     }
   }
 
-  // Rule 5: backfill updated_by: "agent" when missing
+  // Rule 6: backfill updated_by: "agent" when missing
   if (!Object.prototype.hasOwnProperty.call(output, 'updated_by')) {
     output.updated_by = UPDATED_BY_AGENT;
     changed = true;
   } else if (output.updated_by === UPDATED_BY_LEGACY_USER) {
-    // Rule 6: rewrite "user" -> "human"
+    // Rule 7: rewrite "user" -> "human"
     output.updated_by = UPDATED_BY_HUMAN;
     changed = true;
   }
 
-  // Rule 7: normalize missing `prd` to explicit `prd: null`.
+  // Rule 8: normalize missing `prd` to explicit `prd: null`.
   // AC-1.2 declares missing `prd` fails validation identically to malformed; AC-1.3
   // permits explicit `prd: null` for bootstrap/infra specs with no linked PRD.
   // Migration converts missing -> null so the canonical-shape rule holds uniformly.
@@ -488,7 +498,7 @@ export function migrateManifest(input, options = {}) {
     changed = true;
   }
 
-  // Rule 7b (as-001 / AC1.4): tolerate absent `spec_mode`.
+  // Rule 8b (as-001 / AC1.4): tolerate absent `spec_mode`.
   //
   // Decision: NO-OP on missing `spec_mode`. The field is optional in the
   // spec-group JSON schema with a default of `"feature"` (per
@@ -513,7 +523,7 @@ export function migrateManifest(input, options = {}) {
   // explicitly", the rewrite is safe (idempotent) and lives here — see
   // atomic spec as-001 Decision Log.
 
-  // Rule 8 (as-027 / AC27.2 / Task I2): pipeline-efficiency `threshold_snapshot`
+  // Rule 9 (as-027 / AC27.2 / Task I2): pipeline-efficiency `threshold_snapshot`
   // seeding. Opt-in via `--pipeline-efficiency` flag. Idempotent: if the
   // manifest already has a well-formed snapshot we skip. Uses direct
   // PerGateThresholdTable read (pre-session context, mirrors AC10.2 pattern

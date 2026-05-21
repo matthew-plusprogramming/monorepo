@@ -261,41 +261,6 @@ describe('AC-2.1: Blocks implementer without prerequisites', () => {
     expect(result.exitCode).toBe(0);
   });
 
-  it('should block implementer in orchestrator when convergence not met', async () => {
-    // Arrange -- orchestrator workflow, convergence gates not met
-    const session = makeSessionJson({
-      active_work: { workflow: 'orchestrator' },
-      convergence: {
-        investigation: { clean_pass_count: 2 },
-        challenger: { clean_pass_count: 1 },
-      },
-    });
-    writeSessionJson(session);
-
-    // Act
-    const result = await runHook(makeAgentStdin('test-session', 'implementer'));
-
-    // Assert -- should block because challenger convergence < 2
-    expect(result.exitCode).toBe(2);
-  });
-
-  it('should allow implementer in orchestrator when both convergence gates are met', async () => {
-    // Arrange -- orchestrator workflow, both gates converged
-    const session = makeSessionJson({
-      active_work: { workflow: 'orchestrator' },
-      convergence: {
-        investigation: { clean_pass_count: 2 },
-        challenger: { clean_pass_count: 2 },
-      },
-    });
-    writeSessionJson(session);
-
-    // Act
-    const result = await runHook(makeAgentStdin('test-session', 'implementer'));
-
-    // Assert
-    expect(result.exitCode).toBe(0);
-  });
 });
 
 describe('Work-scoped gate enforcement', () => {
@@ -667,14 +632,11 @@ describe('AC-2.7: Non-enforced subagent types pass through', () => {
   const nonEnforcedTypes = [
     'explore',
     'spec-author',
-    'atomizer',
-    'atomicity-enforcer',
     'prd-writer',
     'prd-critic',
     'prd-reader',
     'prd-amender',
     'refactorer',
-    'facilitator',
     'manual-tester',
     'challenger',
     'unifier',

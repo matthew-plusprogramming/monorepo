@@ -82,7 +82,7 @@ Before beginning audit work, address these operational feasibility questions:
 
 ## Execution Flow
 
-### Step 1: Pre-Computation (Orchestrator)
+### Step 1: Pre-Computation (Main Agent)
 
 The orchestrating agent runs `doc-audit-checks.mjs` before dispatching the auditor:
 

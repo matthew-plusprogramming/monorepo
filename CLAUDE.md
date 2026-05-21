@@ -63,21 +63,21 @@ Use `.claude/traces/high-level.md` when routing or dispatching work that touches
 
 ---
 
-## Advanced Orchestration Patterns
+## Advanced Delegation Patterns
 
 These are runtime invariants. Detailed examples and mechanics live in `.claude/memory-bank/delegation.guidelines.md`, `.claude/docs/WORKFLOW-ENFORCEMENT.md`, `.claude/docs/AUTO-DECISION.md`, and `.claude/docs/HOOKS.md`.
 
-### Recursive Conductor (Practice 1.4)
+### Recursive Delegation (Practice 1.4)
 
-Workstream agents are conductors, not just executors: **main agent -> workstream conductor -> leaf executor**. Maximum depth: 3 levels. Each level returns structured summaries and artifact pointers, never raw data. Treat main-agent context as RAM; subagent context is the cheap read path.
+Subagents may coordinate bounded slices of work instead of only executing leaf tasks: **main agent -> slice coordinator -> leaf executor**. Maximum depth: 3 levels. Each level returns structured summaries and artifact pointers, never raw data. Treat main-agent context as RAM; subagent context is the cheap read path.
 
 ### Pre-Computed Structure (Practice 1.5)
 
-When the human provides explicit decomposition, **use it directly**. The atomizer is a fallback for ambiguous scope, not the default.
+When the human provides explicit decomposition, **use it directly**. For ambiguous larger scope, capture a compact slice/dependency table in `spec.md` instead of creating a separate decomposition workflow.
 
 ### File-Based Coordination (Practice 1.6)
 
-For trivial inter-agent coordination, sentinel files (`.claude/coordination/<workstream-id>.done`, `.status`) are allowed. A single `ls` or tiny status read may be direct; anything investigative is delegated.
+For trivial inter-agent coordination, sentinel files (`.claude/coordination/<slice-id>.done`, `.status`) are allowed. A single `ls` or tiny status read may be direct; anything investigative is delegated.
 
 ### Error Escalation Protocol
 
@@ -158,18 +158,18 @@ The memory-bank provides persistent project knowledge that survives across sessi
 
 Load memory-bank files based on task context; this is the canonical agent-to-file mapping:
 
-| Context file                             | Load trigger / consumers                                                          |
-| ---------------------------------------- | --------------------------------------------------------------------------------- |
-| `project.brief.md`                       | Session start / main agent                                                        |
-| `org-context.md`                         | PRD work / PRD-writer                                                             |
-| `tech.context.md`                        | Implementation or spec routing / Implementer, Spec-author                         |
-| `testing.guidelines.md`                  | Test work / Test-writer, Implementer                                              |
-| `best-practices/{code-quality,contract-first,logging,software-principles}.md` | Implementation and review / Implementer, Code-reviewer |
-| `best-practices/{spec-authoring,ears-format}.md` | Spec or security requirements work / Spec-author, Atomizer, Security-reviewer |
-| `best-practices/{subagent-design,typescript}.md` | Subagent or TypeScript work / route, implement, orchestrate, spec, Implementer |
-| `self-answer-protocol.md`                | All agent dispatches / all agents                                                 |
-| `traces/high-level.md` and `.json`       | Routing and dispatch planning / main agent, Route                                 |
-| `traces/low-level/*.json` or `.summary.json` | Implementation, test, review, exploration / relevant subagents                |
+| Context file                                                                  | Load trigger / consumers                                      |
+| ----------------------------------------------------------------------------- | ------------------------------------------------------------- |
+| `project.brief.md`                                                            | Session start / main agent                                    |
+| `org-context.md`                                                              | PRD work / PRD-writer                                         |
+| `tech.context.md`                                                             | Implementation or spec routing / Implementer, Spec-author     |
+| `testing.guidelines.md`                                                       | Test work / Test-writer, Implementer                          |
+| `best-practices/{code-quality,contract-first,logging,software-principles}.md` | Implementation and review / Implementer, Code-reviewer        |
+| `best-practices/{spec-authoring,ears-format}.md`                              | Spec or security requirements work / Spec-author, Security-reviewer |
+| `best-practices/{subagent-design,typescript}.md`                              | Subagent or TypeScript work / route, implement, spec, Implementer |
+| `self-answer-protocol.md`                                                     | All agent dispatches / all agents                             |
+| `traces/high-level.md` and `.json`                                            | Routing and dispatch planning / main agent, Route             |
+| `traces/low-level/*.json` or `.summary.json`                                  | Implementation, test, review, exploration / relevant subagents |
 
 ### Usage & Maintenance
 
@@ -219,21 +219,21 @@ Every response must include:
 
 ### Workflow Routing (MANDATORY FIRST STEP)
 
-**Every new user request MUST begin with `/route`** (except follow-ups and clarifications). Route determines: (1) workflow (oneoff-vibe | oneoff-spec | orchestrator), (2) delegation plan, (3) exploration needs.
+**Every new user request MUST begin with `/route`** (except follow-ups and clarifications). Route determines: (1) workflow (`oneoff-vibe` | `oneoff-spec` | `refactor` | `journal-only`), (2) delegation plan, (3) exploration needs.
 
 - **Small tasks (oneoff-vibe)**: Truly trivial work, clear bounded low-risk edits, or explicit vibe/skip-spec override
-- **Medium tasks (oneoff-spec)**: TaskSpec + parallel delegation (implement + test)
-- **Large tasks (orchestrator)**: MasterSpec + full parallel workstream delegation
+- **Spec tasks (oneoff-spec)**: TaskSpec/full spec in one `spec.md`, with parallel delegation for implementation, tests, E2E, and optional slices
+- **Large tasks (oneoff-spec)**: Same workflow; capture contracts, dependencies, test surfaces, and optional spec slices in `spec.md`
 
-**Raised orchestrator bar** (see `.claude/docs/ROUTING.md`): `/route` recommends `orchestrator` only when the request clears a three-condition gate (10+ anticipated atomic specs AND ≥2 multi-domain criteria with evidence AND tight parallelization benefit) and emits a `multi_domain_justification` field. Medium-complexity work that previously routed to orchestrator under the legacy "5+ files, 4+ hours" heuristic now defaults to `oneoff-spec`. In-flight orchestrator spec groups are not reclassified; the raised bar is forward-only.
+**Spec-first routing** (see `.claude/docs/ROUTING.md`): `/route` never creates a separate large-work coordination workflow for new work. Complexity changes the richness of `spec.md` and the delegation plan, not the workflow.
 
 ### Core Skills
 
-- **Routing/spec gates**: `/route` starts new tasks; `/prd` gathers requirements; `/spec` authors TaskSpec/WorkstreamSpec/MasterSpec; `/atomize` and `/enforce` apply to orchestrator workflows.
-- **Pre-implementation scrutiny**: `/investigate` is MANDATORY for oneoff-spec and orchestrator before implementation; `/challenge` runs before oneoff-spec implementation or orchestrator orchestration.
-- **Build/test/review**: `/implement`, `/test`, and `/e2e-test` run from specs; E2E Test runs parallel with implementation with opt-out via `e2e_skip`; `/unify` validates spec/impl/test alignment.
+- **Routing/spec gates**: `/route` starts new tasks; `/prd` gathers requirements; `/spec` authors one `spec.md` with TaskSpec/full-spec detail as needed.
+- **Pre-implementation scrutiny**: `/investigate` is MANDATORY for oneoff-spec before implementation; `/challenge` runs before oneoff-spec implementation.
+- **Build/test/review**: `/implement`, `/test`, and `/e2e-test` run from specs; E2E Test runs parallel with implementation (opt-out via e2e_skip); `/unify` validates spec/impl/test alignment.
 - **Release gates**: `/code-review` and `/security` run after unifier and reviewer-focus metadata; `/docs` runs after security; `/manual-test` runs after `/docs`, advisory by default and mandatory for `runtime_validation_required: true` specs.
-- **Operations**: `/doc-audit` diagnoses docs health; `/refactor` dispatches refactorer for behavior-preserving cleanup; `/orchestrate` coordinates large multi-workstream projects; `/flow-verify` checks prd-review, spec-review, impl-verify, and post-impl flows.
+- **Operations**: `/doc-audit` diagnoses docs health; `/refactor` dispatches refactorer for behavior-preserving cleanup; `/flow-verify` checks prd-review, spec-review, impl-verify, and post-impl flows.
 
 See `.claude/memory-bank/tech.context.md` for the full subagent list, directory structure, branch naming convention, and spec-is-contract principle.
 
@@ -243,11 +243,11 @@ For the `/doc-audit` skill internals, see `.claude/docs/DOC-AUDIT.md`. For the `
 
 ### Iteration Cycles
 
-Full workflow sequences live in `/route` SKILL.md § Integration with Other Skills. Investigation is MANDATORY before implementation for oneoff-spec and orchestrator workflows. Dedicated `/challenge` dispatches are required only at `pre-implementation` and `pre-orchestration`; former `pre-test` and `pre-review` challenger dispatches were replaced by `/unify` preflight and reviewer-focus metadata. Security-category overrides must be tagged as "security-risk acknowledgment" in the Decisions Log.
+Full workflow sequences live in `/route` SKILL.md § Integration with Other Skills. Investigation is MANDATORY before implementation for oneoff-spec workflows. Dedicated `/challenge` dispatches are required at `pre-implementation`; `/unify` preflight and reviewer-focus metadata cover post-implementation review routing. Security-category overrides must be tagged as "security-risk acknowledgment" in the Decisions Log.
 
 ### Parallel Execution
 
-- Multiple `spec-author` subagents for workstreams
+- Optional `spec-author` subagents for clearly separated slices, all folded back into the same `spec.md`
 - `implementer`, `test-writer`, and `e2e-test-writer` run in parallel (no ordering constraint — test-writer and e2e-test-writer work from spec only; e2e-test-writer dispatched by default with opt-out via `e2e_skip: true` in spec frontmatter)
 - `code-reviewer` and `security-reviewer` may run in parallel after unifier and reviewer-focus metadata prerequisites
 - Both reviewers converge independently; `documenter` waits for both convergences
@@ -265,17 +265,28 @@ After parallel implementation and before review, scan modified files for `TODO(a
 
 Before merge, all workflow/risk-tier-required gates must pass. Per-gate thresholds and `attestation_mode` come from `PerGateThresholdTable` through the `SessionThresholdSnapshot`.
 
-| Gate / requirement | Required state |
-| ------------------ | -------------- |
-| Spec, ACs, tests | Spec complete; all ACs implemented; all tests passing with 100% AC coverage |
-| Investigation (Interface investigator) and challenger **(loop)** | 2 consecutive clean passes, `attestation_mode: none`, auto-decision for investigation and pre-impl/pre-orch challenger only |
-| Unifier and completion-verifier **(loop)** | `required_clean_passes: 1`, `attestation_mode: content-hash`; content-hash attestation-skip may converge at 1 clean pass + attestation when inputs are stable |
-| Code-review and security **(loop)** | No High/Critical issues; `required_clean_passes: 2`, `attestation_mode: content-hash` pending baseline-backed relaxation |
-| E2E, docs, manual test | E2E tests passed (unless e2e_skip); documentation generated; `/manual-test` is advisory by default but blocks terminal Stop for `runtime_validation_required: true` until passing |
+| Gate / requirement                                               | Required state                                                                                                                                                                    |
+| ---------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Spec, ACs, tests                                                 | Spec complete; all ACs implemented; all tests passing with 100% AC coverage                                                                                                       |
+| Investigation (Interface investigator) and challenger **(loop)** | 2 consecutive clean passes, `attestation_mode: none`, auto-decision for investigation and pre-implementation challenger only                                                       |
+| Unifier and completion-verifier **(loop)**                       | `required_clean_passes: 1`, `attestation_mode: content-hash`; content-hash attestation-skip may converge at 1 clean pass + attestation when inputs are stable                     |
+| Code-review and security **(loop)**                              | No High/Critical issues; `required_clean_passes: 2`, `attestation_mode: content-hash` pending baseline-backed relaxation                                                          |
+| E2E, docs, manual test                                           | E2E tests passed (unless e2e_skip); documentation generated; `/manual-test` is advisory by default but blocks terminal Stop for `runtime_validation_required: true` until passing |
 
 **Minimum-pruning floor (BIZ-002)**: At least one of `{unifier, code-review, security, completion-verifier}` must remain configured at `(required_clean_passes: 1, attestation_mode: "content-hash")` unless `.claude/prds/pipeline-efficiency/threshold-decisions.md` documents the zero-relax evidence required by `minimum-pruning-floor.mjs`.
 
 **compute-hashes gate ordering (REQ-009 / SC-9)**: Registry hash verification runs only at `post-impl -> pre-unify` / `testing -> verifying` via `node .claude/scripts/compute-hashes.mjs --verify`. Drift aborts before convergence recording; success lets unifier dispatch against fresh hashes. The advisory lock, error shapes, audit payloads, and secondary completion-verifier drift check are documented in `.claude/docs/HOOKS.md`.
+
+### Stop-hook Gates
+
+Stop-hook gates run inside `workflow-stop-enforcement.mjs` (PostToolUse / Stop hook) and block session-completion via `{decision: "block"}` when their preconditions fail. They are NOT entries in `PerGateThresholdTable`; they have no clean-pass / convergence loop. Each block is independently fail-open on structural error (DEC-008).
+
+| Gate                | Source                                                    | Condition                                                               | Block-reason format                                              |
+| ------------------- | --------------------------------------------------------- | ----------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| `deployment-verify` | `workflow-stop-enforcement.mjs:1489-1564`                 | `session.deployment.detected === true && verify_deploy_passed !== true` | "Deployment detected without post-deploy verification..."        |
+| `pre-merge-verify`  | `workflow-stop-enforcement.mjs` (after deployment-verify) | `session.pre_merge_verify.status === 'failed'`                          | "Pre-merge-verify gate failed: reason=<closed-22-value-enum>..." |
+
+Both gates are composed at the truth-table conjunction: `completionAllowed iff !deploymentBlocked && !preMergeBlocked` (NFR-8). When both fail, both reasons appear in the operator-facing output (AC-6.6, no precedence). The pre-merge-verify gate consumes the closed 22-value reason vocabulary at `.claude/scripts/lib/pre-merge-verify.mjs:97` (REQ-007 / NFR-12). For pre-merge-verify internals, see `.claude/docs/internals/pre-merge-verify-architecture.md`.
 
 ### Integration Verification Gate (Practice 4.5)
 

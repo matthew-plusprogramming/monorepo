@@ -130,7 +130,7 @@ function getTimeSinceLastUpdate(manifest) {
  * Check if this file edit represents a progress update.
  * Progress updates are detected by:
  * - Edits to manifest.json (updating last_progress_update directly)
- * - Edits to atomic spec files (updating Implementation Evidence or Decision Log)
+ * - Edits to spec markdown (updating Implementation Evidence or Decision Log)
  */
 function isProgressUpdate(filePath, content) {
   // If editing manifest and it contains last_progress_update, it's a progress update
@@ -138,8 +138,8 @@ function isProgressUpdate(filePath, content) {
     return true;
   }
 
-  // If editing an atomic spec and adding implementation evidence or decision log
-  if (filePath.includes('/atomic/') && filePath.endsWith('.md')) {
+  // If editing spec markdown and adding implementation evidence or decision log
+  if (filePath.endsWith('.md') && filePath.includes('/specs/groups/')) {
     // Check if the content has implementation evidence or decision log updates
     // This is a heuristic - we check for common patterns
     if (

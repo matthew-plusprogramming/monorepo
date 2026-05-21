@@ -1,10 +1,10 @@
 ---
-_source_modules: ['pipeline-efficiency-ws3-orchestrator-hygiene']
+_source_modules: ['worktree-canon']
 ---
 
 # Worktree-Canon Operator Guide
 
-Operator reference for the NFR-WORKTREE-CANON contract shipped in `sg-pipeline-efficiency-ws3-orchestrator-hygiene` (REQ-007). Closes SEC H2 (symlink escape / mid-session `CLAUDE_PROJECT_DIR` mutation attack on the ws-1 hook surface). The contract establishes a canonical worktree pin at session start, validates every file-touching access against the pin, and rejects unauthorized env mutation with a structured error.
+Operator reference for the NFR-WORKTREE-CANON contract. Closes SEC H2 (symlink escape / mid-session `CLAUDE_PROJECT_DIR` mutation attack on the hook surface). The contract establishes a canonical worktree pin at session start, validates every file-touching access against the pin, and rejects unauthorized env mutation with a structured error.
 
 ## The Worktree Pin
 
@@ -75,14 +75,14 @@ Retrofitted in `as-021-ws1-hook-consumer-canon-upgrade.md`. Each live hook invok
 
 ### ws-3 Native Consumers (4 Consumers)
 
-Shipped in as-005 through as-010. Cover the file-write surface, phase-transition DAG, facilitator rotation, and pre-merge completion-verifier.
+Shipped in as-005 through as-010. Cover the file-write surface, phase-transition DAG, explicit worktree rotation, and pre-merge completion-verifier.
 
 | #   | Consumer                                                                                                                  | Call site                                                                                   | Purpose                                                               |
 | --- | ------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
 | 4   | `.claude/scripts/workflow-file-protection.mjs`                                                                            | `canonicalize(target)` + `validateAgainstPin(target, pin)` before FULL_BLOCK basename check | Reject path-escape + symlink-component on every protected-file write. |
 | 5   | `.claude/scripts/lib/workflow-dag.mjs` phase-transition validators                                                        | `enforceEnvParity(pin)` at each phase transition                                            | Reject env-mutation at every DAG edge.                                |
 | 6   | `.claude/agents/completion-verifier.md` (pre-merge)                                                                       | `enforceEnvParity(pin)` before merge evaluation                                             | Prevent merging under a spoofed worktree.                             |
-| 7   | File-touching agent dispatches (prd-writer, spec-author, atomizer, implementer, test-writer, e2e-test-writer, documenter) | `validateAgainstPin(target, pin)` before every file write                                   | Per-agent write-path escape-guard.                                    |
+| 7   | File-touching agent dispatches (prd-writer, spec-author, implementer, test-writer, e2e-test-writer, documenter)           | `validateAgainstPin(target, pin)` before every file write                                   | Per-agent write-path escape-guard.                                    |
 
 `session-checkpoint.mjs start-work` is NOT an "enforcement consumer" in the 7-count — it is the producer that captures the pin. `session-checkpoint.mjs rotate-worktree` is the legitimate-rotation writer (see next section).
 

@@ -25,7 +25,7 @@ The PRD Writer conducts conversational discovery interviews with humans and prod
 
 ## Return Contract
 
-Your return to the orchestrator must include: PRD file path, sections completed, key requirements captured, and open questions remaining. The PRD itself is the artifact.
+Your return to the main agent must include: PRD file path, sections completed, key requirements captured, and open questions remaining. The PRD itself is the artifact.
 
 ## PRD Storage
 
@@ -176,7 +176,7 @@ When dispatched to amend the PRD after critic findings are resolved:
 After completing discovery or amendment:
 
 1. PRD saved to `.claude/prds/<prd-id>/prd.md`
-2. Return PRD path, section count, and key requirements to orchestrator
+2. Return PRD path, section count, and key requirements to the main agent
 3. Suggest next step based on mode:
    - Discovery: "PRD draft ready for critique phase"
    - Amendment: "PRD amended with N resolutions. Ready for next critique pass."
@@ -220,7 +220,7 @@ The dispatch prompt MUST include a canonicalized `worktree_root` parameter. Trea
 
 **Required discipline**:
 
-1. Before every file write (Write / Edit), call `validateAgainstPin(<absolute-target>, <worktree_root>)` against the dispatch-passed pin. On rejection, the helper throws `WORKTREE_PATH_VIOLATION` (exit 2); do not retry with a different path — surface the violation to the orchestrator.
+1. Before every file write (Write / Edit), call `validateAgainstPin(<absolute-target>, <worktree_root>)` against the dispatch-passed pin. On rejection, the helper throws `WORKTREE_PATH_VIOLATION` (exit 2); do not retry with a different path — surface the violation to the main agent.
 2. Resolve write targets against the pinned worktree root, not the process cwd or main repo root.
 3. Never mutate `CLAUDE_PROJECT_DIR` mid-dispatch. Env-mutation is rejected by `enforceEnvParity` at hook entry.
 

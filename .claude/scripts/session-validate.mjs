@@ -27,8 +27,6 @@ import {
   VALID_WORKFLOWS,
   VALID_SUBSTAGES,
 } from './lib/workflow-dag.mjs';
-// REQ-008 / as-011: single source of truth for atomic-spec ID regex.
-import { ATOMIC_ID_REGEX } from './lib/atomic-id-schema.mjs';
 
 // Find the .claude directory by walking up from script location
 function findClaudeDir() {
@@ -107,17 +105,6 @@ function isValidSpecGroupId(str) {
 }
 
 /**
- * Check if a string matches the atomic_spec_id pattern (as-NNN or as-NNN-slug).
- *
- * REQ-008 / as-011: regex sourced from `./lib/atomic-id-schema.mjs` single
- * source of truth — semantics identical to the prior inline literal.
- */
-function isValidAtomicSpecId(str) {
-  if (typeof str !== 'string') return false;
-  return ATOMIC_ID_REGEX.test(str);
-}
-
-/**
  * Validate a subagent_task object
  */
 function validateSubagentTask(task, path) {
@@ -165,12 +152,6 @@ function validateSubagentTask(task, path) {
   if (task.spec_group_id !== undefined && task.spec_group_id !== null) {
     if (!isValidSpecGroupId(task.spec_group_id)) {
       errors.push(`${path}.spec_group_id: '${task.spec_group_id}' does not match pattern sg-<slug>`);
-    }
-  }
-
-  if (task.atomic_spec_id !== undefined && task.atomic_spec_id !== null) {
-    if (!isValidAtomicSpecId(task.atomic_spec_id)) {
-      errors.push(`${path}.atomic_spec_id: '${task.atomic_spec_id}' does not match pattern as-NNN or as-NNN-slug`);
     }
   }
 
@@ -275,31 +256,6 @@ function validateSession(data) {
       // phase is required
       if (!VALID_PHASES.includes(pc.phase)) {
         errors.push(`phase_checkpoint.phase: '${pc.phase}' is not a valid phase`);
-      }
-
-      // Optional arrays with pattern validation
-      if (pc.atomic_specs_completed !== undefined) {
-        if (!Array.isArray(pc.atomic_specs_completed)) {
-          errors.push('phase_checkpoint.atomic_specs_completed: expected array');
-        } else {
-          pc.atomic_specs_completed.forEach((id, i) => {
-            if (!isValidAtomicSpecId(id)) {
-              errors.push(`phase_checkpoint.atomic_specs_completed[${i}]: '${id}' does not match pattern as-NNN or as-NNN-slug`);
-            }
-          });
-        }
-      }
-
-      if (pc.atomic_specs_pending !== undefined) {
-        if (!Array.isArray(pc.atomic_specs_pending)) {
-          errors.push('phase_checkpoint.atomic_specs_pending: expected array');
-        } else {
-          pc.atomic_specs_pending.forEach((id, i) => {
-            if (!isValidAtomicSpecId(id)) {
-              errors.push(`phase_checkpoint.atomic_specs_pending[${i}]: '${id}' does not match pattern as-NNN or as-NNN-slug`);
-            }
-          });
-        }
       }
 
       if (pc.next_actions !== undefined) {

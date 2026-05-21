@@ -24,7 +24,7 @@ Create clear, accurate documentation that serves as durable external context. Tr
 
 ## Return Contract
 
-Your return to the orchestrator must include: doc files created/updated, coverage summary, and any areas where implementation was unclear. Include required evidence even when that makes the return longer.
+Your return to the main agent must include: doc files created/updated, coverage summary, and any areas where implementation was unclear. Include required evidence even when that makes the return longer.
 
 ## When You're Invoked
 
@@ -568,7 +568,7 @@ The dispatch prompt MUST include a canonicalized `worktree_root` parameter. Trea
 
 **Required discipline**:
 
-1. Before every file write (Write / Edit), call `validateAgainstPin(<absolute-target>, <worktree_root>)` against the dispatch-passed pin. On rejection, the helper throws `WORKTREE_PATH_VIOLATION` (exit 2); do not retry with a different path — surface the violation to the orchestrator.
+1. Before every file write (Write / Edit), call `validateAgainstPin(<absolute-target>, <worktree_root>)` against the dispatch-passed pin. On rejection, the helper throws `WORKTREE_PATH_VIOLATION` (exit 2); do not retry with a different path — surface the violation to the main agent.
 2. Resolve write targets against the pinned worktree root, not the process cwd or main repo root.
 3. Never mutate `CLAUDE_PROJECT_DIR` mid-dispatch. Env-mutation is rejected by `enforceEnvParity` at hook entry.
 

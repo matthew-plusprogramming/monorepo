@@ -2,7 +2,7 @@
 name: manual-test
 description: Bounded exploratory end-to-end verification — 5 happy paths + 3 failure injections + 2 adjacent surfaces, then stop. Runs after /docs as the final pipeline step. Advisory by default; mandatory for runtime-validation-required specs. Findings are logged to session.subagent_tasks, surfaced in a narrative report, and recorded as structured result data when runtime validation is required.
 user-invocable: true
-allowed-tools: Read, Grep, Bash, Write, mcp__playwright-mcp__*
+allowed-tools: Read, Grep, Bash, Write, mcp__playwright__*
 ---
 
 # Manual Test Skill
@@ -24,11 +24,11 @@ For specs whose frontmatter declares `runtime_validation_required: true`, this s
 
 ## When to Use
 
-Dispatched as the **final step after `/docs`** in spec-based workflows (oneoff-spec and orchestrator). Both `/docs/SKILL.md` § "After docs" and `/route/SKILL.md` workflow-integration rows list `/manual-test` after `/docs` and before commit.
+Dispatched as the **final step after `/docs`** in oneoff-spec workflows. Both `/docs/SKILL.md` § "After docs" and `/route/SKILL.md` workflow-integration rows list `/manual-test` after `/docs` and before commit.
 
 **Default invocation**: Advisory. Findings are logged in `session.subagent_tasks.completed_this_session[]` and surfaced to the user.
 
-**Runtime-validation invocation**: Mandatory when any `spec.md` or `atomic/*.md` frontmatter in the active spec group declares:
+**Runtime-validation invocation**: Mandatory when `spec.md` frontmatter in the active spec group declares:
 
 ```yaml
 runtime_validation_required: true
@@ -45,7 +45,7 @@ For these specs, the Stop hook requires a `manual-tester` dispatch record plus a
 npx playwright install chromium
 ```
 
-**`.mcp.json`** at project root declares the MCP servers. If `.mcp.json` is absent or the MCP servers are not installed, the agent reports gracefully. For runtime-validation-required specs, that is a structured `blocked` result and it blocks completion unless an explicit `runtime_manual_test` override is recorded with a rationale.
+**`.mcp.json`** at project root declares the `playwright` MCP server. If `.mcp.json` is absent or the MCP server is not installed, the agent reports gracefully. For runtime-validation-required specs, that is a structured `blocked` result and it blocks completion unless an explicit `runtime_manual_test` override is recorded with a rationale.
 
 ## Bounded Scope
 
@@ -66,7 +66,6 @@ Stop after the selected scenario set. If another branch looks worth exploring, r
 ```bash
 cat .claude/specs/groups/<spec-group-id>/spec.md
 cat .claude/specs/groups/<spec-group-id>/manifest.json
-ls .claude/specs/groups/<spec-group-id>/atomic/ 2>/dev/null || true
 ```
 
 Read acceptance criteria, core flows, and the implementation evidence table. Identify the feature's risk surface.
@@ -197,7 +196,7 @@ Format:
 
 - happy-1: PASS. Observed dashboard renders in 1.2s; CTA triggers expected modal.
 - happy-2: PASS. Checkout completes end-to-end; confirmation email logged.
-- failure-1: PASS. Retry UI appears; clicking retry issues new request (confirmed via Chrome DevTools network panel).
+- failure-1: PASS. Retry UI appears; clicking retry issues new request (confirmed via browser network inspection).
 - failure-2: FAIL. Token expiry does not redirect; user sees 401 error toast but remains on protected page.
 - adjacent-1: PASS. Neighbor page toast renders correctly; no regression.
 - ...
@@ -358,29 +357,27 @@ The narrative report has four required sections. This is the contract this skill
 
 ```javascript
 // Navigate, observe, capture
-(await mcp__playwright) -
-  mcp__browser_navigate({ url: 'http://localhost:3000/dashboard' });
-(await mcp__playwright) -
-  mcp__browser_click({ element: 'logout button', ref: 'e1' });
-(await mcp__playwright) - mcp__browser_wait_for({ text: 'Logged out' });
-(await mcp__playwright) -
-  mcp__browser_take_screenshot({ filename: 'evidence/happy-1-<ts>.png' });
+mcp__playwright__browser_navigate({ url: 'http://localhost:3000/dashboard' });
+mcp__playwright__browser_click({ element: 'logout button', ref: 'e1' });
+mcp__playwright__browser_wait_for({ text: 'Logged out' });
+mcp__playwright__browser_take_screenshot({
+  filename: 'evidence/happy-1-<ts>.png',
+});
 ```
 
 ### Pattern 2: Failure Injection
 
 ```javascript
 // Inject failure via JS evaluate, then exercise the flow
-(await mcp__playwright) -
-  mcp__browser_evaluate({
-    function:
-      "() => { window.fetch = () => Promise.reject(new Error('Network')); }",
-  });
-(await mcp__playwright) -
-  mcp__browser_click({ element: 'submit button', ref: 'e2' });
-(await mcp__playwright) - mcp__browser_wait_for({ text: 'error' });
-(await mcp__playwright) -
-  mcp__browser_take_screenshot({ filename: 'evidence/failure-1-<ts>.png' });
+mcp__playwright__browser_evaluate({
+  function:
+    "() => { window.fetch = () => Promise.reject(new Error('Network')); }",
+});
+mcp__playwright__browser_click({ element: 'submit button', ref: 'e2' });
+mcp__playwright__browser_wait_for({ text: 'error' });
+mcp__playwright__browser_take_screenshot({
+  filename: 'evidence/failure-1-<ts>.png',
+});
 ```
 
 ### Pattern 3: Adjacent-Surface Probe via Bash

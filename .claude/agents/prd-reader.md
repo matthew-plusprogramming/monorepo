@@ -22,7 +22,7 @@ The PRD reader agent extracts structured requirements from Product Requirements 
 
 ## Return Contract
 
-Your return to the orchestrator must include: requirement count extracted, EARS format requirements, key constraints, and assumptions identified. Include required evidence even when that makes the return longer.
+Your return to the main agent must include: requirement count extracted, EARS format requirements, key constraints, and assumptions identified. Include required evidence even when that makes the return longer.
 
 ## PRD Storage
 

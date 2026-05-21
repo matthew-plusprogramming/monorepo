@@ -28,8 +28,8 @@
  *   shape: any valid JSON object. Rationale is required in the operator's
  *          written record (REQ-011 operator accountability) but this consumer
  *          does not enforce the rationale field — presence + valid JSON is
- *          sufficient per atomic-spec "Implementation Notes" (ws-3 atomic
- *          Implementation Notes §2: "any presence + valid JSON accepted").
+ *          sufficient per shipped Implementation Notes §2 ("any presence +
+ *          valid JSON accepted").
  *
  * ### Entry point
  *
@@ -74,7 +74,7 @@ import { join } from 'node:path';
 // =============================================================================
 
 /**
- * Canonical baseline path (short-form ws-id per MasterSpec Contract Registry
+ * Canonical baseline path (short-form ws-id per parent-spec Contract Registry
  * §Baselines + Investigation Pass 1 amendment inv-contract-a8f3c2).
  *
  * AC18.4: this is the ONLY baseline path this module reads. The legacy
@@ -119,7 +119,7 @@ export const MIN_SUFFICIENT_SAMPLE_SIZE = 10;
 
 /**
  * Frozen registry of the error codes the preflight emits on rejection. The
- * codes are the atomic-spec AC text verbatim (AC18.1 `BASELINE_MISSING`,
+ * codes are the shipped AC text verbatim (AC18.1 `BASELINE_MISSING`,
  * AC18.2 `BASELINE_UNDERSIZED`) plus a parallel `BASELINE_SCHEMA_INVALID`
  * code for the third distinct failure mode.
  *
@@ -246,8 +246,8 @@ export function isSufficient(baseline) {
 /**
  * Check whether the workstream-scoped override file is present AND contains
  * valid JSON. Any parseable JSON object satisfies AC18.3 — rationale field
- * enforcement is deliberately deferred to the operator runbook per
- * atomic-spec Implementation Notes.
+ * enforcement is deliberately deferred to the operator runbook per shipped
+ * Implementation Notes.
  *
  * Returns `{ present: false }` when the file does not exist OR exists but
  * cannot be read or parsed; the "invalid JSON" case treats the override as

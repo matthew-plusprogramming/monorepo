@@ -28,7 +28,7 @@ hooks:
 
 ## Return Contract
 
-Your return to the orchestrator must include: status (success/partial/failed), files modified, pattern changes applied, and test suite status (all passing / regressions). Include required evidence even when that makes the return longer.
+Your return to the main agent must include: status (success/partial/failed), files modified, pattern changes applied, and test suite status (all passing / regressions). Include required evidence even when that makes the return longer.
 
 ## Your Role
 

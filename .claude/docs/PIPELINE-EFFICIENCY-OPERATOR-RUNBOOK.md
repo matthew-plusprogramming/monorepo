@@ -2,8 +2,8 @@
 
 Current operator entry point for pipeline-efficiency enforcement primitives:
 mode flag, kill-switch sentinel, audit chain, coercive-flip preflight,
-test-writer unlocks, worktree pinning, flow-verify diff scope, atomic-spec ID
-validation, and hash verification.
+test-writer unlocks, worktree pinning, flow-verify diff scope, legacy ID
+audit compatibility, and hash verification.
 
 Detailed contracts live in the narrower owner docs linked below. Keep this file
 as the operator map, not a second implementation history.
@@ -20,7 +20,7 @@ as the operator map, not a second implementation history.
 | Test-writer unlock | `node .claude/scripts/session-checkpoint.mjs record-test-writer-unlock <sg-id> ...` | `TEST-WRITER-UNLOCK-OPERATOR.md` |
 | Worktree pin | `session.active_work.project_dir_pin` | `WORKTREE-CANON.md` |
 | Flow-verify diff scope | `node .claude/scripts/flow-verify-checks.mjs --stage impl-verify --scope diff ...` | `FLOW-VERIFIER.md` |
-| Atomic-spec ID validation | `node .claude/scripts/validate-atomic-filenames.mjs <sg-dir>` | `HOOKS.md`, validator source |
+| Legacy ID validation | `node .claude/scripts/validate-atomic-filenames.mjs <sg-dir>` | Archive-only compatibility utility |
 | Hash verification gate | `node .claude/scripts/compute-hashes.mjs --verify` | `HOOKS.md`, `AUDIT-LOG-INSPECTION.md` |
 
 ## Enforcement Mode
@@ -100,7 +100,7 @@ Canonical event classes:
 - `test_writer_unlock`
 - `test_writer_unlock_refence`
 - `test_writer_unlock_misuse`
-- `atomizer_cleanup`
+- `atomizer_cleanup` (legacy event class retained for old logs)
 - `session_override_flip`
 - `worktree_path_violation`
 - `sentinel_lifecycle`
@@ -171,18 +171,20 @@ node .claude/scripts/session-checkpoint.mjs rotate-worktree <new-root> \
 Unauthorized mid-session root changes emit `WORKTREE_PATH_VIOLATION` and abort.
 See `WORKTREE-CANON.md`.
 
-### Atomic-Spec IDs
+### Legacy ID Validation
 
-Validate atomic-spec filenames:
+Historical spec groups may still carry old decomposed-spec filenames. Validate
+those archived filenames only when repairing or auditing old groups:
 
 ```bash
 node .claude/scripts/validate-atomic-filenames.mjs \
   .claude/specs/groups/<sg-id>
 ```
 
-Canonical filename shape is `<ws-id>-as-NNN-<slug>.md` with per-workstream
-uniqueness. Migration support remains in `migrate-manifest.mjs
---atomic-id-schema`, but normal operation should validate rather than migrate.
+Canonical historical filename shape was `<ws-id>-as-NNN-<slug>.md` with
+per-workstream uniqueness. Active oneoff-spec work does not create these files.
+Migration support remains in `migrate-manifest.mjs --atomic-id-schema`, but
+normal operation should not invoke this path.
 
 ### Hash Verification Gate
 

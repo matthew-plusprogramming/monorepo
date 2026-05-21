@@ -257,13 +257,31 @@ export function runVerifyBuild(options = {}) {
  * - No-follow-redirects, skip TLS for localhost, standard User-Agent
  * - 30-second timeout (AC-4.6)
  *
+ * sg-pre-merge-verify-20260508 / AS-4 / AC-14.2 / DEC-004 / NFR-7:
+ * Optional `phase_filter` parameter restricts manifest-driven probes to routes
+ * whose `phases` array includes the filter value. When omitted, default is
+ * `"post-deploy"` (preserves NFR-7 backward compat for existing post-deploy
+ * callers). Pre-merge-verifier passes `phase_filter: "pre-merge"`. Returning
+ * 0 routes after filtering triggers the `no_routes_for_phase` advisory.
+ *
+ * Note: `phase_filter` only affects the manifest-driven `runMethodCoverageProbes`
+ * iteration set (when consumers call into that path). The script-and-HTTP-GET-
+ * fallback paths in this function are unaffected — they probe a single endpoint
+ * URL, not a manifest.
+ *
  * @param {object} [options] - Options
  * @param {string} [options.endpointUrl] - Deployed endpoint URL
  * @param {string} [options.cwd] - Working directory for script execution
- * @returns {Promise<{ result: string, exitCode: number, command: string, endpointUrl?: string }>}
+ * @param {"pre-merge" | "post-deploy"} [options.phase_filter] - Phase filter for
+ *   manifest route iteration. Defaults to "post-deploy" when omitted (DEC-004).
+ * @returns {Promise<{ result: string, exitCode: number, command: string, endpointUrl?: string, phase_filter?: string }>}
  */
 export async function runVerifyDeploy(options = {}) {
   const { endpointUrl, cwd: cwdOpt } = options;
+  // DEC-004: when `phase_filter` is omitted, default to "post-deploy" so
+  // existing post-deploy callers see no behavior change. Pre-merge-verifier
+  // explicitly passes `phase_filter: "pre-merge"`.
+  const phaseFilter = options.phase_filter ?? 'post-deploy';
   const packageJson = readConsumerPackageJson();
   const scripts = packageJson?.scripts || {};
   const hasVerifyDeploy = 'verify:deploy' in scripts;
@@ -271,14 +289,16 @@ export async function runVerifyDeploy(options = {}) {
   // Case 1: verify:deploy script exists (AC-4.1)
   if (hasVerifyDeploy) {
     // Pass packageJson to avoid redundant re-read (Fix 6)
-    return runVerifyDeployScript(endpointUrl, cwdOpt, packageJson);
+    const scriptResult = runVerifyDeployScript(endpointUrl, cwdOpt, packageJson);
+    return { ...scriptResult, phase_filter: phaseFilter };
   }
 
   // Case 2: No script but endpoint URL available -- HTTP GET fallback (AC-4.2)
   if (endpointUrl) {
     // Validate URL before making any network request (SSRF prevention)
     validateEndpointUrl(endpointUrl);
-    return runHttpGetFallback(endpointUrl);
+    const fallbackResult = await runHttpGetFallback(endpointUrl);
+    return { ...fallbackResult, phase_filter: phaseFilter };
   }
 
   // Case 3: Neither script nor endpoint URL (AC-6.2)
@@ -291,8 +311,9 @@ export async function runVerifyDeploy(options = {}) {
     command: null,
     exit_code: null,
     reason: warning,
+    phase_filter: phaseFilter,
   });
-  return { result: 'SKIP', exitCode: null, command: null };
+  return { result: 'SKIP', exitCode: null, command: null, phase_filter: phaseFilter };
 }
 
 /**
@@ -557,13 +578,49 @@ export function loadDeploymentManifest(serviceName) {
  * Applies method-default or route-level expected_status allowlists.
  * Enforces NF5 30s batch timeout across all probes.
  *
+ * sg-pre-merge-verify-20260508 / AS-4 / AC-4.5 / AC-14.2 / AC-14.3 / DEC-004:
+ * Optional `phaseFilter` argument restricts the route iteration set to those
+ * whose `phases` array includes the filter value. When omitted, default is
+ * `"post-deploy"` (preserves NFR-7 backward compat). Returning 0 routes
+ * after filtering triggers the `no_routes_for_phase` advisory (per EC-13).
+ *
  * @param {string} endpointBaseUrl - Base URL for the deployed service
  * @param {object} manifest - Parsed deployment manifest
- * @returns {Promise<{ result: string, probeResults: object[], error?: string }>}
+ * @param {"pre-merge" | "post-deploy"} [phaseFilter] - Phase filter for route
+ *   iteration. Defaults to "post-deploy".
+ * @returns {Promise<{ result: string, probeResults: object[], error?: string, reason?: string }>}
  */
-export async function runMethodCoverageProbes(endpointBaseUrl, manifest) {
+export async function runMethodCoverageProbes(endpointBaseUrl, manifest, phaseFilter = 'post-deploy') {
   const probeResults = [];
-  const routes = manifest.routes || [];
+  const allRoutes = manifest.routes || [];
+
+  // AS-4 / DEC-004: filter routes by `phases` array BEFORE further iteration.
+  // Routes are guaranteed to declare `phases` via Zod (RouteSchema requires
+  // `phases.min(1)`); a missing field is a manifest-load failure, not a
+  // runtime branch we need to handle here.
+  const phaseFilteredRoutes = allRoutes.filter(
+    (r) => Array.isArray(r.phases) && r.phases.includes(phaseFilter)
+  );
+
+  // EC-13 / AC-14.3: zero routes for the requested phase is an advisory PASS,
+  // NOT a SKIP. Surface `reason: "no_routes_for_phase"` so callers (notably
+  // the pre-merge-verifier orchestrator) can record the advisory in the
+  // session state without triggering a block.
+  if (phaseFilteredRoutes.length === 0) {
+    logAudit({
+      event: 'method_coverage_no_routes_for_phase',
+      message: `method-coverage-smoke-test: zero routes match phase_filter=${phaseFilter}`,
+      timestamp: new Date().toISOString(),
+      phase_filter: phaseFilter,
+    });
+    return {
+      result: 'PASS',
+      probeResults,
+      reason: 'no_routes_for_phase',
+    };
+  }
+
+  const routes = phaseFilteredRoutes;
 
   // AC-13.9: GET-only manifest with zero POST/PUT routes
   const postPutRoutes = routes.filter((r) => r.method === 'POST' || r.method === 'PUT');
@@ -572,6 +629,7 @@ export async function runMethodCoverageProbes(endpointBaseUrl, manifest) {
       event: 'method_coverage_skipped',
       message: 'method-coverage-smoke-test: skipped (no POST/PUT routes declared)',
       timestamp: new Date().toISOString(),
+      phase_filter: phaseFilter,
     });
     return { result: 'PASS', probeResults };
   }

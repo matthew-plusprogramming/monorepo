@@ -55,7 +55,7 @@ E_DUAL_CORRUPT: both manifest.json and session.json unreadable; manual recovery 
 4. **Re-run `start-work`** to verify recovery:
 
    ```bash
-   node .claude/scripts/session-checkpoint.mjs start-work <sg-id> orchestrator "<objective>"
+   node .claude/scripts/session-checkpoint.mjs start-work <sg-id> oneoff-spec "<objective>"
    ```
 
    A successful run proceeds to phase selection; no `E_DUAL_CORRUPT` re-fires.
@@ -312,7 +312,7 @@ WORKFLOW_IMMUTABLE: cannot change workflow mid-session ...
 
 ### Why it happens
 
-The workflow value on `active_work.workflow` is immutable for the duration of an active-work window. Workflow determines the DAG predecessor graph, the required sub-stage set, and obligation-check semantics; a mid-session downgrade (e.g., orchestrator → oneoff-spec) would invalidate accumulated session history and sub-stage visits.
+The workflow value on `active_work.workflow` is immutable for the duration of an active-work window. Workflow determines the DAG predecessor graph, the required sub-stage set, and obligation-check semantics; a mid-session switch (for example, oneoff-spec -> oneoff-vibe) would invalidate accumulated session history and sub-stage visits.
 
 Common triggers:
 

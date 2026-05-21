@@ -1,6 +1,6 @@
 ---
 name: spec
-description: Author specifications (TaskSpec for small-medium tasks, WorkstreamSpec for complex single-workstream tasks, or coordinate MasterSpec creation for multi-workstream efforts). Use after /prd requirements gathering or when refining existing specs.
+description: Author oneoff specifications. Use TaskSpec detail for small-medium tasks and fuller design/contract sections for complex or large tasks. Use after /prd requirements gathering or when refining existing specs.
 allowed-tools: Read, Write, Edit, Glob, Grep, Task
 user-invocable: true
 ---
@@ -59,13 +59,13 @@ All specs are written to the spec group directory:
 
 The complexity of the spec is determined by the requirements, but **all specs output to `spec.md`** in the spec group.
 
-### TaskSpec (Light) - For Small to Medium Tasks
+### Light Spec - For Small to Medium Tasks
 
 Use for:
 
 - Single feature or enhancement
 - 2-5 files impacted
-- Clear scope, single workstream
+- Clear scope, single concern
 - Estimated 30 min - 4 hours
 
 **Sections**:
@@ -78,15 +78,15 @@ Use for:
 - Test Plan
 - Decision & Work Log
 
-### WorkstreamSpec (Full) - For Complex Single-Workstream Tasks
+### Full Spec - For Complex or Large Tasks
 
 Use for:
 
 - Complex feature requiring detailed design
 - Multiple components or layers involved
 - Needs sequence diagrams and interface definitions
-- Estimated 4-8 hours
-- Part of a larger effort but can be worked independently
+- Estimated 4+ hours
+- Large effort with clear spec slices, dependencies, or parallel subagent opportunities
 
 **Sections**:
 
@@ -102,19 +102,8 @@ Use for:
 - Task List
 - Testing
 - Open Questions
-- Workstream Reflection
+- Implementation Reflection
 - Decision & Work Log
-
-### MasterSpec (Multi-workstream) - For Large Projects
-
-Use for:
-
-- 5+ workstreams needed
-- Multiple parallel efforts
-- Complex dependencies and contracts
-- Requires orchestration and integration
-
-**Approach**: Use `/orchestrate` skill which creates separate spec groups per workstream.
 
 ## Process: Spec Creation in Spec Group
 
@@ -362,21 +351,14 @@ Update the spec group manifest:
 
 1. Review spec: `.claude/specs/groups/<spec-group-id>/spec.md`
 
-**For oneoff-spec workflow:**
+**Next workflow steps:**
 
-2. (Optional) Run `/investigate <spec-group-id>` if cross-spec dependencies exist
+2. Run `/investigate <spec-group-id>` for oneoff-spec work
 3. User approves → `review_state: APPROVED`
 4. Run `/implement <spec-group-id>` + `/test <spec-group-id>` (parallel)
-
-**For orchestrator workflow:**
-
-2. Run `/atomize <spec-group-id>` to decompose into atomic specs
-3. Run `/enforce <spec-group-id>` to validate atomicity
-4. User approves → `review_state: APPROVED`
-5. Run `/implement <spec-group-id>` + `/test <spec-group-id>` (parallel)
 ```
 
-## Process: Complex Specs (WorkstreamSpec-level detail)
+## Process: Complex Specs
 
 For complex features requiring sequence diagrams and interface definitions:
 
@@ -396,12 +378,12 @@ Follow the template structure:
 10. **Task List**: Discrete tasks with dependencies
 11. **Testing**: Testing strategy and coverage
 12. **Open Questions**: Unresolved questions with status
-13. **Workstream Reflection**: (Fill during/after implementation)
+13. **Implementation Reflection**: (Fill during/after implementation)
 14. **Decision & Work Log**: Decisions and approvals
 
 ### Step 3: Define Contracts
 
-If this workstream creates interfaces used by others:
+If this spec creates interfaces used by other slices, modules, or systems:
 
 ```yaml
 contracts:
@@ -411,195 +393,35 @@ contracts:
     version: 1.0
 ```
 
-Add to contract registry in MasterSpec (if applicable).
+List owned and consumed contracts in `spec.md` so implementation, tests, and review share the same boundary definitions.
 
 ### Step 4: Identify Dependencies
 
-List other workstreams this depends on:
+List other spec slices, modules, or external systems this work depends on:
 
 ```yaml
 dependencies:
-  - ws-database-schema
-  - ws-api-gateway
+  - database-schema
+  - api-gateway
 ```
 
-## Process: MasterSpec Coordination
+## Large Spec Slices
 
-For large multi-workstream efforts, coordinate parallel spec authoring.
-
-### Step 1: Create ProblemBrief
-
-Start with high-level brief:
-
-```bash
-cp .claude/templates/master-spec.template.md .claude/specs/groups/<spec-group-id>/spec.md
-```
-
-Fill Problem Brief section from /prd discovery.
-
-### Step 2: Identify Workstreams
-
-Decompose into parallel workstreams:
-
-- Each workstream should be independently executable
-- Minimize cross-workstream coupling
-- Identify clear contracts/interfaces between workstreams
-
-Example workstream breakdown:
+For large efforts, keep one `spec.md` and add a compact slice table instead of
+creating separate spec groups. Use slices only when they clarify parallel work
+or dependency order.
 
 ```markdown
-## Workstream Overview
+## Spec Slices
 
-| ID   | Title                | Owner         | Estimated Effort |
-| ---- | -------------------- | ------------- | ---------------- |
-| ws-1 | WebSocket Server     | spec-author-1 | 6-8h             |
-| ws-2 | Frontend Client      | spec-author-2 | 4-6h             |
-| ws-3 | Notification Service | spec-author-3 | 6-8h             |
+| Slice | Scope | Depends On | Parallelizable | Notes |
+| ----- | ----- | ---------- | -------------- | ----- |
+| api   | REST contract and handler changes | schema | no | schema first |
+| ui    | User-facing screen changes | api contract | yes after contract approval | can start with mock contract |
 ```
 
-### Step 3: Dispatch Spec-Author Subagents
-
-Use Task tool to create workstream specs in parallel:
-
-```javascript
-// Dispatch subagent for ws-1
-Task({
-  description: 'Author WebSocket Server workstream spec',
-  prompt: `Create a WorkstreamSpec for the WebSocket Server workstream.
-
-Context from ProblemBrief:
-<paste relevant context>
-
-Your scope:
-- WebSocket server infrastructure
-- Authentication middleware
-- Message routing
-
-Contracts you provide:
-- contract-websocket-api: Client connection API
-
-Dependencies:
-- ws-3 (Notification Service provides messages)
-
-Follow the WorkstreamSpec template at .claude/templates/workstream-spec.template.md`,
-  subagent_type: 'spec-author',
-});
-```
-
-Dispatch one subagent per workstream.
-
-### Step 4: Collect and Review
-
-Review completed workstream specs:
-
-- Check for missing sections
-- Verify contracts are registered
-- Confirm dependencies are valid (no cycles)
-
-### Step 5: Merge into MasterSpec
-
-Update MasterSpec with:
-
-- Links to workstream specs
-- Contract registry (consolidated)
-- Dependency graph
-- Gates & acceptance criteria
-
-```markdown
-## Contract Registry
-
-| Contract ID               | Type | Owner Workstream | Path                          | Version |
-| ------------------------- | ---- | ---------------- | ----------------------------- | ------- |
-| contract-websocket-api    | API  | ws-1             | src/websocket/server.ts       | 1.0     |
-| contract-notification-api | API  | ws-3             | src/services/notifications.ts | 1.0     |
-
-## Cross-Workstream Dependencies
-
-\`\`\`mermaid
-graph TD
-ws-1[WebSocket Server] --> ws-3[Notification Service]
-ws-2[Frontend Client] --> ws-1
-\`\`\`
-```
-
-### Step 5.5: Determine Worktree Allocation
-
-Analyze dependency graph and workstream coupling to allocate worktrees:
-
-**Allocation Analysis**:
-
-1. **Identify independent workstreams**:
-   - No shared files
-   - No tight coupling
-   - Can execute fully in parallel
-   - → Assign separate worktrees
-
-2. **Identify tightly coupled workstreams**:
-   - Implementation + tests for same feature
-   - Sequential modifications to same files
-   - One workstream's output is immediate input to another
-   - → Share worktree
-
-3. **Consider dependency ordering**:
-   - Workstreams with no dependencies can start immediately
-   - Dependent workstreams blocked until prerequisites merge
-   - Document merge order in allocation strategy
-
-**Example Allocation**:
-
-```markdown
-# Analyzing 4 workstreams
-
-ws-1: Backend API (no dependencies, independent) → worktree-1
-ws-2: Frontend UI (depends on ws-1, independent from ws-3) → worktree-2
-ws-3: Database schema (no dependencies, independent) → worktree-3
-ws-4: Integration tests (tests ws-1, tight coupling) → worktree-1 (shared with ws-1)
-
-**Rationale**:
-
-- ws-1 and ws-4 share worktree: ws-4 tests ws-1 implementation (tight coupling)
-- ws-2 separate: Independent frontend work, no file conflicts with backend
-- ws-3 separate: Independent database work, can run in parallel
-
-**Merge Order**:
-
-1. ws-1 (no dependencies) + ws-4 (tests ws-1) → Merge together from worktree-1
-2. ws-2 (depends on ws-1) → Blocked until ws-1 merges
-3. ws-3 (no dependencies) → Can merge anytime (parallel with ws-1)
-```
-
-**Document in MasterSpec**:
-Add worktree allocation strategy to MasterSpec:
-
-```markdown
-## Worktree Allocation Strategy
-
-**Strategy**: ws-1 and ws-4 share worktree (tight coupling), ws-2 and ws-3 isolated (independent)
-
-| Worktree ID | Branch                       | Workstreams | Rationale                      |
-| ----------- | ---------------------------- | ----------- | ------------------------------ |
-| worktree-1  | feature/ws-1-backend-api     | ws-1, ws-4  | ws-4 tests ws-1 implementation |
-| worktree-2  | feature/ws-2-frontend-ui     | ws-2        | Independent frontend work      |
-| worktree-3  | feature/ws-3-database-schema | ws-3        | Independent database work      |
-
-**Merge Order**:
-
-1. ws-1+ws-4 (no dependencies)
-2. ws-3 (no dependencies) - can merge in parallel with ws-1
-3. ws-2 (depends on ws-1) - blocked until ws-1 merges
-```
-
-Update Workstream Overview table with Worktree column.
-
-### Step 6: Validate Gates
-
-Check spec-complete gates:
-
-- [ ] All workstream specs approved
-- [ ] Contract registry complete and validated
-- [ ] No unresolved cross-workstream conflicts
-- [ ] Dependency graph is acyclic
-- [ ] All critical open questions resolved or deferred
+Each slice should still map back to acceptance criteria and tests in the same
+spec. Do not create decomposed spec files for new work.
 
 ## Spec is Contract Principle
 
@@ -658,23 +480,11 @@ After spec creation:
   ↓
 /spec → spec.md (YOU ARE HERE)
   ↓
-  ├── [oneoff-spec workflow]
-  │     ↓
-  │   (optional) /investigate
-  │     ↓
-  │   User approves → review_state: APPROVED
-  │     ↓
-  │   /implement + /test (parallel)
-  │
-  └── [orchestrator workflow]
-        ↓
-      /atomize → atomic/*.md
-        ↓
-      /enforce → validation
-        ↓
-      User approves → review_state: APPROVED
-        ↓
-      /implement + /test (parallel, per atomic spec)
+ /investigate
+  ↓
+ User approves → review_state: APPROVED
+  ↓
+ /implement + /test + /e2e-test as needed (parallel)
   ↓
 /unify → convergence validation
   ↓
@@ -688,7 +498,7 @@ Merge
 ```json
 {
   "review_state": "DRAFT", // Still needs user review
-  "work_state": "PLAN_READY", // Ready for approval (oneoff-spec) or atomization (orchestrator)
+  "work_state": "PLAN_READY", // Ready for investigation and approval
   "convergence": {
     "spec_complete": true // Spec authored
   }
@@ -699,20 +509,10 @@ Merge
 
 After `/spec` creates `spec.md`:
 
-**For oneoff-spec workflow:**
-
 1. User reviews spec
-2. (Optional) Run `/investigate <spec-group-id>` if cross-spec dependencies exist
+2. Run `/investigate <spec-group-id>`
 3. User approves → `review_state: APPROVED`
 4. Implementation begins with `/implement` + `/test`
-
-**For orchestrator workflow:**
-
-1. User reviews spec
-2. Run `/atomize <spec-group-id>` to decompose into atomic specs
-3. Run `/enforce <spec-group-id>` to validate atomicity
-4. User approves → `review_state: APPROVED`
-5. Implementation begins
 
 ## Examples
 
@@ -784,9 +584,9 @@ Use AuthService.logout() method. Toast for confirmation (consistent with existin
 - 2026-01-02: Decision - Toast for confirmation
 ```
 
-### Example 2: WorkstreamSpec for WebSocket Server
+### Example 2: Full Spec for WebSocket Server
 
-See `.claude/templates/workstream-spec.template.md` for full structure.
+Use the full spec sections above for structure.
 
 Key sections filled:
 
@@ -794,5 +594,5 @@ Key sections filled:
 - Requirements: Authentication, message routing, connection management (EARS format)
 - Sequence Diagram: Client connection, authentication, message delivery flows
 - Contracts: `contract-websocket-api` with connection interface
-- Dependencies: ws-3 (Notification Service)
+- Dependencies: Notification Service slice
 - Task List: 8 tasks broken down by component

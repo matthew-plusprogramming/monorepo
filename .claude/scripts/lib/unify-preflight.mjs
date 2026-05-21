@@ -3,12 +3,12 @@
  *
  * Implements: REQ-003, AC23.3, SC-3
  * Spec: sg-pipeline-efficiency-ws1-convergence-pruning / as-023
- * Parent spec section: §Task List Phase G — Task G3; §Flow 2 (Pre-test)
+ * Parent spec section: §Task List Phase G — Task G3
  *
  * Purpose
  * -------
- * Lightweight, ADVISORY preflight checks that surface formerly-pre-test-scoped
- * signal from within `/unify`. These checks run once per `/unify` dispatch
+ * Lightweight, ADVISORY preflight checks that surface implementation-readiness
+ * signals from within `/unify`. These checks run once per `/unify` dispatch
  * (they are NOT convergence-loop checks; they do NOT block convergence).
  *
  * The three check categories (per Flow 2, step 5):
@@ -32,7 +32,7 @@
  *   }
  *
  * Where:
- *   Finding      = { category, severity, message, atomic_spec_id?, evidence?, ... }
+ *   Finding      = { category, severity, message, spec_id?, evidence?, ... }
  *   CheckOutcome = { status: "ok"|"advisory"|"skipped", message, ... }
  *
  * Non-blocking: callers (the `/unify` skill) MUST surface advisories but MUST
@@ -102,12 +102,11 @@ export function runUnifyPreflight({
     return buildSkippedResult(`specGroupDir does not exist: ${specGroupDir}`);
   }
 
-  const atomicDir = pathLib.join(specGroupDir, 'atomic');
-  const atomicSpecs = loadAtomicSpecs({ atomicDir, fs, pathLib });
+  const specs = loadSpecSummaries({ specGroupDir, fs, pathLib });
 
-  const coverageVsAcs = checkCoverageVsAcs({ atomicSpecs });
-  const testFilePlacement = checkTestFilePlacement({ atomicSpecs });
-  const mockVsRealMismatches = checkMockVsRealMismatches({ atomicSpecs });
+  const coverageVsAcs = checkCoverageVsAcs({ specs });
+  const testFilePlacement = checkTestFilePlacement({ specs });
+  const mockVsRealMismatches = checkMockVsRealMismatches({ specs });
 
   const findings = [
     ...coverageVsAcs.findings,
@@ -132,14 +131,14 @@ export function runUnifyPreflight({
 // =============================================================================
 
 /**
- * Compare AC count against test-evidence-row count per atomic spec.
+ * Compare AC count against test-evidence-row count per spec summary.
  * Advisory-only: missing test evidence is surfaced as a finding, never as a
  * convergence failure (the unifier's own traceability check remains
  * authoritative for coverage gating).
  */
-function checkCoverageVsAcs({ atomicSpecs }) {
+function checkCoverageVsAcs({ specs }) {
   const findings = [];
-  for (const spec of atomicSpecs) {
+  for (const spec of specs) {
     const acCount = spec.acIds.length;
     const testCount = spec.testEvidenceRowCount;
     if (acCount === 0) continue; // no ACs — nothing to check
@@ -147,10 +146,10 @@ function checkCoverageVsAcs({ atomicSpecs }) {
       findings.push({
         category: PREFLIGHT_CATEGORIES.COVERAGE_VS_ACS,
         severity: PREFLIGHT_SEVERITY.ADVISORY,
-        atomic_spec_id: spec.id,
+        spec_id: spec.id,
         message:
           `AC count (${acCount}) exceeds test-evidence rows (${testCount}); ` +
-          `formerly-pre-test-scoped advisory.`,
+          `unify preflight advisory.`,
         evidence: { ac_count: acCount, test_evidence_rows: testCount },
       });
     }
@@ -160,8 +159,8 @@ function checkCoverageVsAcs({ atomicSpecs }) {
     findings,
     message:
       findings.length === 0
-        ? 'All atomic specs have at least as many test-evidence rows as ACs.'
-        : `${findings.length} atomic spec(s) have fewer test-evidence rows than ACs.`,
+        ? 'All specs have at least as many test-evidence rows as ACs.'
+        : `${findings.length} spec(s) have fewer test-evidence rows than ACs.`,
   };
 }
 
@@ -175,16 +174,16 @@ function checkCoverageVsAcs({ atomicSpecs }) {
  * test file outside the defaults (rare); the preflight surfaces the signal
  * and lets the human judge.
  */
-function checkTestFilePlacement({ atomicSpecs }) {
+function checkTestFilePlacement({ specs }) {
   const findings = [];
-  for (const spec of atomicSpecs) {
+  for (const spec of specs) {
     for (const file of spec.testEvidenceFiles) {
       if (!file || typeof file !== 'string') continue;
       if (!isUnderExpectedTestRoot(file)) {
         findings.push({
           category: PREFLIGHT_CATEGORIES.TEST_FILE_PLACEMENT,
           severity: PREFLIGHT_SEVERITY.ADVISORY,
-          atomic_spec_id: spec.id,
+          spec_id: spec.id,
           message:
             `Test file "${file}" is not under a recognized test root ` +
             `(expected one of: ${EXPECTED_TEST_ROOTS.join(', ')}).`,
@@ -208,14 +207,14 @@ function checkTestFilePlacement({ atomicSpecs }) {
 // =============================================================================
 
 /**
- * Heuristic signal: if an atomic spec's Test Strategy or Implementation Evidence
+ * Heuristic signal: if a spec's Test Strategy or Implementation Evidence
  * references a module by name AND a test file's own evidence path appears to
  * mock that module, surface an advisory. This is intentionally coarse —
  * semantic mock-vs-real reasoning is out-of-scope.
  */
-function checkMockVsRealMismatches({ atomicSpecs }) {
+function checkMockVsRealMismatches({ specs }) {
   const findings = [];
-  for (const spec of atomicSpecs) {
+  for (const spec of specs) {
     const strategyLower = (spec.testStrategy || '').toLowerCase();
     if (!strategyLower) continue;
     const prohibitsMocks =
@@ -230,7 +229,7 @@ function checkMockVsRealMismatches({ atomicSpecs }) {
       findings.push({
         category: PREFLIGHT_CATEGORIES.MOCK_VS_REAL_MISMATCH,
         severity: PREFLIGHT_SEVERITY.ADVISORY,
-        atomic_spec_id: spec.id,
+        spec_id: spec.id,
         message:
           `Test Strategy signals integration/real-service preference, but ` +
           `test-evidence references mock file(s): ${mockingFiles.join(', ')}.`,
@@ -244,48 +243,70 @@ function checkMockVsRealMismatches({ atomicSpecs }) {
     message:
       findings.length === 0
         ? 'No mock-vs-real mismatch signals detected.'
-        : `${findings.length} atomic spec(s) show a mock-vs-real signal mismatch.`,
+        : `${findings.length} spec(s) show a mock-vs-real signal mismatch.`,
   };
 }
 
 // =============================================================================
-// Atomic spec loading (lightweight, markdown-aware)
+// Spec summary loading (lightweight, markdown-aware)
 // =============================================================================
 
 /**
- * Load atomic specs from the spec group's `atomic/` directory. Each spec is
- * parsed just enough to extract AC identifiers, Test-Evidence rows, and the
- * Test Strategy description. This helper does NOT validate spec structure;
- * missing directories or malformed files produce a zero-spec result.
+ * Load active `spec.md` plus optional `slices/*.md` summaries. Legacy
+ * `atomic/*.md` files are read only as a fallback for old spec groups that do
+ * not yet have current-form markdown.
  *
- * @returns {AtomicSpecSummary[]}
+ * @returns {SpecSummary[]}
  */
-function loadAtomicSpecs({ atomicDir, fs, pathLib }) {
-  if (!fs.existsSync(atomicDir)) return [];
-  const entries = fs
-    .readdirSync(atomicDir)
-    .filter((name) => name.endsWith('.md'));
+function loadSpecSummaries({ specGroupDir, fs, pathLib }) {
+  const files = [];
+  const specPath = pathLib.join(specGroupDir, 'spec.md');
+  if (fs.existsSync(specPath)) files.push(specPath);
+
+  const slicesDir = pathLib.join(specGroupDir, 'slices');
+  if (fs.existsSync(slicesDir)) {
+    try {
+      for (const name of fs.readdirSync(slicesDir).filter((n) => n.endsWith('.md'))) {
+        files.push(pathLib.join(slicesDir, name));
+      }
+    } catch {
+      // Ignore unreadable optional slices; preflight is advisory.
+    }
+  }
+
+  if (files.length === 0) {
+    const legacyAtomicDir = pathLib.join(specGroupDir, 'atomic');
+    if (fs.existsSync(legacyAtomicDir)) {
+      try {
+        for (const name of fs.readdirSync(legacyAtomicDir).filter((n) => n.endsWith('.md'))) {
+          files.push(pathLib.join(legacyAtomicDir, name));
+        }
+      } catch {
+        // Ignore unreadable legacy directories; preflight is advisory.
+      }
+    }
+  }
+
   const specs = [];
-  for (const name of entries) {
-    const absPath = pathLib.join(atomicDir, name);
+  for (const absPath of files) {
     let content;
     try {
       content = fs.readFileSync(absPath, 'utf8');
     } catch {
       continue;
     }
-    specs.push(parseAtomicSpec({ content, filename: name }));
+    specs.push(parseSpecSummary({ content, filename: pathLib.basename(absPath) }));
   }
   return specs;
 }
 
 /**
- * Parse a single atomic spec markdown body and extract the fields the
- * preflight needs.
+ * Parse a single markdown spec summary and extract the fields the preflight
+ * needs.
  *
- * @returns {AtomicSpecSummary}
+ * @returns {SpecSummary}
  */
-function parseAtomicSpec({ content, filename }) {
+function parseSpecSummary({ content, filename }) {
   const id = extractId({ content, filename });
   const acIds = extractAcIds(content);
   const { testEvidenceRowCount, testEvidenceFiles } =
@@ -403,7 +424,7 @@ function buildSkippedResult(reason) {
 }
 
 /**
- * @typedef {object} AtomicSpecSummary
+ * @typedef {object} SpecSummary
  * @property {string} id
  * @property {string[]} acIds
  * @property {number} testEvidenceRowCount
@@ -416,7 +437,7 @@ function buildSkippedResult(reason) {
  * @property {string} category
  * @property {string} severity
  * @property {string} message
- * @property {string} [atomic_spec_id]
+ * @property {string} [spec_id]
  * @property {object} [evidence]
  */
 

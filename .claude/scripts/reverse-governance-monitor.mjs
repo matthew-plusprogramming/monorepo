@@ -51,7 +51,7 @@
  * Warning audit-logging (ASM-025-04):
  *   Uses `appendAuditEntry('flag_flip', 'reverse-governance-drift-<reason>',
  *   payload)` via as-017. The 9-class canonical enum (as-003) has no dedicated
- *   reverse-governance class; adding one requires MasterSpec amendment
+ *   reverse-governance class; adding one requires parent-spec amendment
  *   (spec.md:643) -- explicitly out-of-scope. `flag_flip` covers enforcement-
  *   flag lifecycle events; drift is an enforcement-related event.
  *
@@ -549,7 +549,7 @@ export function detectDriftWarnings(windows, latestSignalIso, regressions, outco
  *
  * Audit-log append uses `event_class: "flag_flip"` with a distinctive
  * subtype prefix `reverse-governance-drift-<reason>`. A new event_class
- * would require MasterSpec amendment (spec.md:643), out-of-scope per as-025.
+ * would require parent-spec amendment (spec.md:643), out-of-scope per as-025.
  *
  * @param {Record<string, unknown>} payload
  * @param {object} options

@@ -13,14 +13,14 @@
  * Purity:
  *   - All functions are side-effect-free (no fs writes, no process.exit,
  *     no console output).
- *   - `checkArtifactInventory` calls `existsSync`/`readdirSync` (read-only,
- *     idempotent against a stable directory snapshot); still considered pure
+ *   - `checkArtifactInventory` calls `existsSync` (read-only, idempotent
+ *     against a stable directory snapshot); still considered pure
  *     at the granularity of a single hook/CLI run.
  *   - Functions may throw `TypeError` on structurally invalid input (e.g.,
  *     `session` is null). Callers catch and map to fail-open.
  */
 
-import { existsSync, readdirSync } from 'node:fs';
+import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   REQUIRED_CHALLENGER_STAGES,
@@ -264,7 +264,7 @@ export function checkConvergenceDepth(session, _manifest) {
  * satisfies the requirement for that stage.
  *
  * @param {object} session
- * @param {'oneoff-spec'|'orchestrator'} workflow
+ * @param {string} workflow
  * @returns {{passed: boolean, failures: Array<{stage: string, workflow: string}>}}
  */
 export function checkChallengerStages(session, workflow) {
@@ -309,7 +309,7 @@ export function checkChallengerStages(session, workflow) {
  *     in failures[]).
  *
  * @param {object} session
- * @param {'oneoff-spec'|'orchestrator'} workflow
+ * @param {string} workflow
  * @returns {{passed: boolean, failures: Array<{finding_type: string, details: object}>}}
  */
 export function checkPhaseDagPredecessors(session, workflow) {
@@ -369,8 +369,7 @@ export function checkPhaseDagPredecessors(session, workflow) {
  * Verify the spec group directory contains the workflow-specific required
  * artifact set.
  *
- * For `oneoff-spec`: investigation-report.md, unify-report.md, docs/COVERAGE.md.
- * For `orchestrator`: the oneoff-spec set PLUS at least one atomic/*.md file.
+ * For spec work: investigation-report.md, unify-report.md, docs/COVERAGE.md.
  *
  * Precondition: caller MUST validate `specGroupDir` path format against
  * `/^sg-[a-z0-9.-]+$/` before invoking (SEC-001 parity).
@@ -380,7 +379,7 @@ export function checkPhaseDagPredecessors(session, workflow) {
  * (Fail-Open case 1) and typically skips the block decision.
  *
  * @param {string} specGroupDir - Absolute path to spec group directory
- * @param {'oneoff-spec'|'orchestrator'} workflow
+ * @param {string} workflow
  * @returns {{passed: boolean, failures: Array<{file: string, reason: string}>}}
  */
 export function checkArtifactInventory(specGroupDir, workflow) {
@@ -404,24 +403,6 @@ export function checkArtifactInventory(specGroupDir, workflow) {
     const abs = join(specGroupDir, relPath);
     if (!existsSync(abs)) {
       failures.push({ file: relPath, reason: 'missing' });
-    }
-  }
-
-  // Orchestrator-only: atomic/*.md existence check.
-  if (workflow === 'orchestrator') {
-    const atomicDir = join(specGroupDir, 'atomic');
-    if (!existsSync(atomicDir)) {
-      failures.push({ file: 'atomic/', reason: 'empty_dir' });
-    } else {
-      try {
-        const entries = readdirSync(atomicDir).filter(f => f.endsWith('.md'));
-        if (entries.length === 0) {
-          failures.push({ file: 'atomic/', reason: 'empty_dir' });
-        }
-      } catch {
-        // Fail open for readdirSync errors (permission/etc.) —
-        // caller classifies; do not block.
-      }
     }
   }
 
@@ -541,9 +522,6 @@ export function formatPhaseDagFailure(f, prefix = '') {
 export function formatArtifactInventoryFailure(f, specGroupDir, prefix = '') {
   if (f.reason === 'spec_group_missing') {
     return `${prefix}spec group directory missing: ${specGroupDir}`;
-  }
-  if (f.reason === 'empty_dir') {
-    return `${prefix}${f.file}: No atomic specs found under ${specGroupDir}/atomic/`;
   }
   return `${prefix}${f.file}: missing under ${specGroupDir}/`;
 }

@@ -4,7 +4,7 @@
  * publish-ws2-metrics.mjs
  *
  * Before-after metrics publication runner for ws-2 Practice 2.4 (REQ-014).
- * Reads spec-group manifests + atomic-spec and test files across a
+ * Reads spec-group manifests, spec/spec-slice, and test files across a
  * pre-ship / post-ship sampling window and emits a single metrics artifact
  * at `.claude/metrics/pipeline-efficiency-ws2-practice-2.4-<run-id>.json`
  * covering the test/AC ratio on bug-fix workstreams.
@@ -38,16 +38,17 @@
  *      applied to each sampled group.
  *
  * AC denominator rule (AC11.2 — sum-of-ACs):
- *   For each bug-fix spec group selected into either sample, the script walks
- *   its atomic specs (under `atomic/*.md`) and reads the frontmatter
- *   `ac_coverage` array, summing the length of every array. Missing arrays
- *   contribute zero. This is the structural definition; no spec-body parsing
- *   is performed. The rule is emitted verbatim in the output JSON.
+ *   For each bug-fix spec group selected into either sample, the script reads
+ *   `spec.md` plus optional `slices/*.md` and sums each frontmatter
+ *   `ac_coverage` array. Missing arrays contribute zero. Legacy `atomic/*.md`
+ *   files are read only as a fallback for old samples. This is the structural
+ *   definition; no spec-body parsing is performed. The rule is emitted
+ *   verbatim in the output JSON.
  *
  * Test denominator rule (AC11.2 — sum-of-tests):
  *   For each bug-fix spec group, we search under the conventional test
  *   directory `__tests__/` at the repo root for test files whose basename
- *   references either (a) the spec-group id, (b) any atomic-spec id within
+ *   references either (a) the spec-group id, (b) any spec-slice id within
  *   that group, or (c) any `requirements_refs` REQ id. Matching tests are
  *   counted by discrete `test(` / `it(` / `test.each(` occurrences — a single
  *   table-driven test(...each(...)) call counts once, matching the
@@ -117,9 +118,9 @@ const ERR_MISSING_SPLIT_ANCHOR = 'MISSING_SPLIT_ANCHOR';
 // Documented rule strings — emitted verbatim in the output JSON so reviewers
 // can audit how each denominator was produced.
 const AC_DENOMINATOR_RULE =
-  'For each bug-fix spec group, sum len(frontmatter.ac_coverage) across atomic/*.md. Missing arrays contribute 0.';
+  'For each bug-fix spec group, sum len(frontmatter.ac_coverage) across spec.md and slices/*.md; legacy atomic/*.md contributes only when current-form files are absent. Missing arrays contribute 0.';
 const TEST_DENOMINATOR_RULE =
-  "Match test files under repo __tests__/ recursively whose basename contains spec-group id OR any atomic-spec id OR any requirements_refs REQ id; count discrete test(, it(, test.each( occurrences.";
+  "Match test files under repo __tests__/ recursively whose basename contains spec-group id OR any spec-slice id OR any requirements_refs REQ id; count discrete test(, it(, test.each( occurrences.";
 const BUG_FIX_CLASSIFIER_RULE =
   "manifest.spec_mode == 'bug-fix' (positive); fallback legacy-id rule: /bug|bugs|bug-fix|^fix-/ applied to pre-ship samples lacking spec_mode.";
 
@@ -260,12 +261,28 @@ function listSpecGroupDirs(specsRoot) {
     });
 }
 
-function listAtomicSpecs(groupDir) {
-  const atomicDir = join(groupDir, 'atomic');
-  if (!existsSync(atomicDir)) return [];
-  return readdirSync(atomicDir)
-    .filter((n) => n.endsWith('.md'))
-    .map((n) => join(atomicDir, n));
+function listSpecCoverageFiles(groupDir) {
+  const files = [];
+  const specPath = join(groupDir, 'spec.md');
+  if (existsSync(specPath)) files.push(specPath);
+
+  const slicesDir = join(groupDir, 'slices');
+  if (existsSync(slicesDir)) {
+    for (const name of readdirSync(slicesDir).filter((n) => n.endsWith('.md'))) {
+      files.push(join(slicesDir, name));
+    }
+  }
+
+  if (files.length === 0) {
+    const legacyAtomicDir = join(groupDir, 'atomic');
+    if (existsSync(legacyAtomicDir)) {
+      for (const name of readdirSync(legacyAtomicDir).filter((n) => n.endsWith('.md'))) {
+        files.push(join(legacyAtomicDir, name));
+      }
+    }
+  }
+
+  return files;
 }
 
 function listTestFilesRecursive(root) {
@@ -356,12 +373,12 @@ function loadManifest(groupDir) {
  * Pure — no I/O beyond what's passed in.
  */
 function summariseGroup(groupDir, manifest, classifier, testsRoot) {
-  const atomicFiles = listAtomicSpecs(groupDir);
-  const atomicIds = [];
+  const coverageFiles = listSpecCoverageFiles(groupDir);
+  const specSliceIds = [];
   let acSum = 0;
-  for (const f of atomicFiles) {
+  for (const f of coverageFiles) {
     const fm = parseFrontmatter(readFileSync(f, 'utf-8'));
-    if (typeof fm.id === 'string') atomicIds.push(fm.id);
+    if (typeof fm.id === 'string') specSliceIds.push(fm.id);
     if (Array.isArray(fm.ac_coverage)) {
       acSum += fm.ac_coverage.length;
     }
@@ -372,7 +389,7 @@ function summariseGroup(groupDir, manifest, classifier, testsRoot) {
   const testCount = countTestsForGroup(
     testsRoot,
     manifest.id,
-    atomicIds,
+    specSliceIds,
     reqRefs,
   );
   return {
@@ -381,18 +398,18 @@ function summariseGroup(groupDir, manifest, classifier, testsRoot) {
     classifier,
     ac_count: acSum,
     test_count: testCount,
-    atomic_spec_count: atomicFiles.length,
+    spec_slice_count: coverageFiles.length,
   };
 }
 
 /**
  * Count test-function occurrences in files whose basename references the
- * spec-group id, any atomic-spec id, or any requirements_refs REQ id.
+ * spec-group id, any spec-slice id, or any requirements_refs REQ id.
  * Counts discrete `test(`, `it(`, `test.each(` call sites.
  */
-function countTestsForGroup(testsRoot, groupId, atomicIds, reqIds) {
+function countTestsForGroup(testsRoot, groupId, specSliceIds, reqIds) {
   const testFiles = listTestFilesRecursive(testsRoot);
-  const needles = [groupId, ...atomicIds, ...reqIds]
+  const needles = [groupId, ...specSliceIds, ...reqIds]
     .filter((x) => typeof x === 'string' && x.length > 0)
     .map((x) => x.toLowerCase());
   if (needles.length === 0) return 0;

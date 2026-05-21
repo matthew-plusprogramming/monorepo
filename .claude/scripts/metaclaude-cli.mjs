@@ -16,6 +16,8 @@
  *   --base-dir=<path>       - Override default base directory
  *   --force                 - Force overwrite on conflicts
  *   --resolve-conflicts     - Accept upstream version for conflicting artifacts only
+ *   --no-runtime-deps       - Skip .claude/node_modules provisioning for synced hooks/scripts
+ *   --no-mcp-ensure         - Skip Claude Code MCP add/get ensure checks
  *
  * Sync Overrides (per-project in projects.json):
  *   "agent-assisted"        - Stage upstream to .claude/sync-pending/ for manual merge
@@ -24,7 +26,18 @@
  *   node metaclaude-cli.mjs <command> [project] [options]
  */
 
-import { readFileSync, writeFileSync, existsSync, mkdirSync, copyFileSync, readdirSync, rmSync } from 'node:fs';
+import {
+  readFileSync,
+  writeFileSync,
+  existsSync,
+  mkdirSync,
+  copyFileSync,
+  readdirSync,
+  rmSync,
+  lstatSync,
+  realpathSync,
+  symlinkSync,
+} from 'node:fs';
 import { resolve, dirname, basename, join, isAbsolute } from 'node:path';
 import { execSync, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
@@ -48,6 +61,34 @@ function resolveMetaclaudeRoot() {
   return resolve(__dirname, '../..');
 }
 const METACLAUDE_ROOT = resolveMetaclaudeRoot();
+const EXECUTABLE_ROOT = resolve(__dirname, '../..');
+
+const SYNC_RUNTIME_PACKAGE_NAMES = Object.freeze([
+  'acorn',
+  'ajv',
+  'ajv-formats',
+  'typescript',
+  'yaml',
+  'zod',
+]);
+const SYNC_RUNTIME_TRIGGER_PATHS = new Set(['.claude/settings.json']);
+const SKIP_RUNTIME_DEP_PROVISION_ENV = 'METACLAUDE_SKIP_RUNTIME_DEP_PROVISION';
+const RUNTIME_DEP_INSTALL_TIMEOUT_MS = 120_000;
+const PLAYWRIGHT_MCP_ARTIFACT = 'config/mcp';
+const PLAYWRIGHT_MCP_SERVER_NAME = 'playwright';
+const PLAYWRIGHT_MCP_ADD_ARGS = Object.freeze([
+  'mcp',
+  'add',
+  PLAYWRIGHT_MCP_SERVER_NAME,
+  '--',
+  'npx',
+  '@playwright/mcp@latest',
+]);
+const MCP_NOTIFY_SERVER_NAME = 'mcp-notify';
+const MCP_NOTIFY_ENTRY_ENV = 'METACLAUDE_MCP_NOTIFY_ENTRY';
+const CLAUDE_BIN_ENV = 'METACLAUDE_CLAUDE_BIN';
+const SKIP_MCP_ENSURE_ENV = 'METACLAUDE_SKIP_MCP_ENSURE';
+const MCP_ENSURE_TIMEOUT_MS = 60_000;
 
 // ANSI colors
 const colors = {
@@ -91,7 +132,11 @@ function loadProjectsConfig() {
 }
 
 function loadRegistry() {
-  const registryPath = join(METACLAUDE_ROOT, '.claude', 'metaclaude-registry.json');
+  const registryPath = join(
+    METACLAUDE_ROOT,
+    '.claude',
+    'metaclaude-registry.json',
+  );
   const registry = loadJson(registryPath);
   if (!registry) {
     log('Registry not found at .claude/metaclaude-registry.json', 'red');
@@ -100,7 +145,12 @@ function loadRegistry() {
   return registry;
 }
 
-function resolveProjectPath(projectName, projectConfig, defaults, options = {}) {
+function resolveProjectPath(
+  projectName,
+  projectConfig,
+  defaults,
+  options = {},
+) {
   // Explicit per-project absolute path aliases (in priority order):
   //   - projectConfig.path
   //   - projectConfig.target_path (test fixture convention)
@@ -123,7 +173,9 @@ function resolveProjectPath(projectName, projectConfig, defaults, options = {}) 
 
   // Use base_dir from options, defaults, or fallback to '..'
   const baseDir = options.baseDir || defaults?.base_dir || '..';
-  const resolvedBase = isAbsolute(baseDir) ? baseDir : resolve(METACLAUDE_ROOT, baseDir);
+  const resolvedBase = isAbsolute(baseDir)
+    ? baseDir
+    : resolve(METACLAUDE_ROOT, baseDir);
   return join(resolvedBase, projectName);
 }
 
@@ -132,7 +184,12 @@ function getLockPath(projectName, projectPath) {
   // consumer-local lock file first. Fall back to the authoritative author-side
   // lock if the consumer-local variant doesn't exist.
   if (projectPath) {
-    const consumerLock = join(projectPath, '.claude', 'locks', `${projectName}.lock.json`);
+    const consumerLock = join(
+      projectPath,
+      '.claude',
+      'locks',
+      `${projectName}.lock.json`,
+    );
     if (existsSync(consumerLock)) return consumerLock;
   }
   return join(METACLAUDE_ROOT, '.claude', 'locks', `${projectName}.lock.json`);
@@ -181,31 +238,43 @@ function resolveTargetArtifactsForProject(registry, projectConfig, defaults) {
 
   const targetArtifacts = resolveBundleArtifacts(registry, bundleName);
   if (projectConfig.additional) {
-    projectConfig.additional.forEach(a => targetArtifacts.add(a));
+    projectConfig.additional.forEach((a) => targetArtifacts.add(a));
   }
   if (projectConfig.excluded) {
-    projectConfig.excluded.forEach(a => targetArtifacts.delete(a));
+    projectConfig.excluded.forEach((a) => targetArtifacts.delete(a));
   }
 
   return targetArtifacts;
 }
 
 function resolveInstalledTargetPath(installed) {
-  return installed?.target_path || installed?.targetPath || installed?.path || null;
+  return (
+    installed?.target_path || installed?.targetPath || installed?.path || null
+  );
 }
 
-function isProtectedArtifact(projectConfig, artifactPath, targetPath, sourcePath) {
+function isProtectedArtifact(
+  projectConfig,
+  artifactPath,
+  targetPath,
+  sourcePath,
+) {
   const protectedPaths = projectConfig.protected || [];
-  return protectedPaths.includes(artifactPath)
-    || (targetPath && protectedPaths.includes(targetPath))
-    || (sourcePath && protectedPaths.includes(sourcePath));
+  return (
+    protectedPaths.includes(artifactPath) ||
+    (targetPath && protectedPaths.includes(targetPath)) ||
+    (sourcePath && protectedPaths.includes(sourcePath))
+  );
 }
 
 function getProjectsToProcess(config, projectArg) {
   if (projectArg) {
     if (!config.projects[projectArg]) {
       log(`Project not found: ${projectArg}`, 'red');
-      log(`Available projects: ${Object.keys(config.projects).join(', ') || '(none)'}`, 'dim');
+      log(
+        `Available projects: ${Object.keys(config.projects).join(', ') || '(none)'}`,
+        'dim',
+      );
       process.exit(1);
     }
     return [projectArg];
@@ -264,11 +333,15 @@ function mergeSettings(sourceContent, targetPath) {
       const matcher = sourceGroup.matcher || '*';
 
       // Find matching group in target (same matcher)
-      let targetGroup = targetHookGroups.find(g => (g.matcher || '*') === matcher);
+      let targetGroup = targetHookGroups.find(
+        (g) => (g.matcher || '*') === matcher,
+      );
 
       if (!targetGroup) {
         // No matching group in target, use source group directly (excluding _sync: false hooks)
-        const syncableHooks = (sourceGroup.hooks || []).filter(h => h._sync !== false);
+        const syncableHooks = (sourceGroup.hooks || []).filter(
+          (h) => h._sync !== false,
+        );
         mergedHookGroups.push({ ...sourceGroup, hooks: syncableHooks });
         report.push(`  Added hook group [${hookType}] matcher="${matcher}"`);
       } else {
@@ -277,23 +350,33 @@ function mergeSettings(sourceContent, targetPath) {
         const sourceHooks = sourceGroup.hooks || [];
 
         // Remove metaclaude hooks from target
-        const projectHooks = targetHooks.filter(h => h._source !== 'metaclaude');
+        const projectHooks = targetHooks.filter(
+          (h) => h._source !== 'metaclaude',
+        );
         const removedCount = targetHooks.length - projectHooks.length;
         if (removedCount > 0) {
-          report.push(`  Removed ${removedCount} existing metaclaude hooks from [${hookType}] matcher="${matcher}"`);
+          report.push(
+            `  Removed ${removedCount} existing metaclaude hooks from [${hookType}] matcher="${matcher}"`,
+          );
         }
 
         // Add all source hooks (all have _source: "metaclaude"), excluding _sync: false hooks
-        const metaclaudeHooks = sourceHooks.filter(h => h._source === 'metaclaude' && h._sync !== false);
+        const metaclaudeHooks = sourceHooks.filter(
+          (h) => h._source === 'metaclaude' && h._sync !== false,
+        );
 
         if (projectHooks.length > 0) {
-          report.push(`  Preserved ${projectHooks.length} project-specific hooks in [${hookType}] matcher="${matcher}"`);
+          report.push(
+            `  Preserved ${projectHooks.length} project-specific hooks in [${hookType}] matcher="${matcher}"`,
+          );
         }
-        report.push(`  Added ${metaclaudeHooks.length} metaclaude hooks to [${hookType}] matcher="${matcher}"`);
+        report.push(
+          `  Added ${metaclaudeHooks.length} metaclaude hooks to [${hookType}] matcher="${matcher}"`,
+        );
 
         mergedHookGroups.push({
           ...sourceGroup,
-          hooks: [...metaclaudeHooks, ...projectHooks]
+          hooks: [...metaclaudeHooks, ...projectHooks],
         });
       }
     }
@@ -301,18 +384,24 @@ function mergeSettings(sourceContent, targetPath) {
     // Also preserve any target hook groups that don't exist in source
     for (const targetGroup of targetHookGroups) {
       const matcher = targetGroup.matcher || '*';
-      const existsInSource = sourceHookGroups.some(g => (g.matcher || '*') === matcher);
+      const existsInSource = sourceHookGroups.some(
+        (g) => (g.matcher || '*') === matcher,
+      );
 
       if (!existsInSource) {
         // This is a project-specific hook group, preserve it
         // But still filter out any metaclaude hooks that may have been added previously
-        const projectHooks = (targetGroup.hooks || []).filter(h => h._source !== 'metaclaude');
+        const projectHooks = (targetGroup.hooks || []).filter(
+          (h) => h._source !== 'metaclaude',
+        );
         if (projectHooks.length > 0) {
           mergedHookGroups.push({
             ...targetGroup,
-            hooks: projectHooks
+            hooks: projectHooks,
           });
-          report.push(`  Preserved project hook group [${hookType}] matcher="${matcher}" (${projectHooks.length} hooks)`);
+          report.push(
+            `  Preserved project hook group [${hookType}] matcher="${matcher}" (${projectHooks.length} hooks)`,
+          );
         }
       }
     }
@@ -367,7 +456,12 @@ async function cmdStatus(projectArg, options) {
 
   for (const projectName of projects) {
     const projectConfig = config.projects[projectName];
-    const projectPath = resolveProjectPath(projectName, projectConfig, config.defaults, options);
+    const projectPath = resolveProjectPath(
+      projectName,
+      projectConfig,
+      config.defaults,
+      options,
+    );
     const lockPath = getLockPath(projectName, projectPath);
     const lock = loadJson(lockPath) || { installed: {} };
 
@@ -387,7 +481,11 @@ async function cmdStatus(projectArg, options) {
       continue;
     }
 
-    const targetArtifacts = resolveTargetArtifactsForProject(registry, projectConfig, config.defaults);
+    const targetArtifacts = resolveTargetArtifactsForProject(
+      registry,
+      projectConfig,
+      config.defaults,
+    );
 
     let updatesAvailable = 0;
     let missing = 0;
@@ -408,17 +506,25 @@ async function cmdStatus(projectArg, options) {
       // Show agent-assisted artifacts with distinct indicator
       const [statusCategory] = artifactPath.split('/');
       const statusCategoryMeta = registry.artifacts[statusCategory];
-      const statusEffectivePolicy = artifact._sync_policy || statusCategoryMeta?._sync_policy;
-      const statusIsAgentAssisted = projectConfig.sync_overrides?.[artifactPath] === 'agent-assisted'
-        || statusEffectivePolicy === 'agent-assisted';
+      const statusEffectivePolicy =
+        artifact._sync_policy || statusCategoryMeta?._sync_policy;
+      const statusIsAgentAssisted =
+        projectConfig.sync_overrides?.[artifactPath] === 'agent-assisted' ||
+        statusEffectivePolicy === 'agent-assisted';
       if (statusIsAgentAssisted) {
         const installed = lock.installed[artifactPath];
         const hasUpdate = installed ? installed.hash !== artifact.hash : true;
         if (hasUpdate) {
-          log(`⊕ ${artifactPath}: ${artifact.version}@${artifact.hash} (agent-assisted merge needed)`, 'cyan');
+          log(
+            `⊕ ${artifactPath}: ${artifact.version}@${artifact.hash} (agent-assisted merge needed)`,
+            'cyan',
+          );
           agentAssisted++;
         } else {
-          log(`⊕ ${artifactPath}: ${artifact.version}@${artifact.hash} (agent-assisted, up to date)`, 'dim');
+          log(
+            `⊕ ${artifactPath}: ${artifact.version}@${artifact.hash} (agent-assisted, up to date)`,
+            'dim',
+          );
           current++;
         }
         continue;
@@ -428,43 +534,68 @@ async function cmdStatus(projectArg, options) {
       const targetPath = artifact.target_path || artifact.path;
       const localPath = join(projectPath, targetPath);
       const localExists = existsSync(localPath);
-      const statusIsNeverOverwrite = statusEffectivePolicy === 'never-overwrite';
+      const statusIsNeverOverwrite =
+        statusEffectivePolicy === 'never-overwrite';
 
       if (statusIsNeverOverwrite && localExists) {
-        log(`↷ ${artifactPath}: ${artifact.version}@${artifact.hash} (never-overwrite, local file exists)`, 'dim');
+        log(
+          `↷ ${artifactPath}: ${artifact.version}@${artifact.hash} (never-overwrite, local file exists)`,
+          'dim',
+        );
         current++;
         continue;
       }
 
       if (!installed && !localExists) {
-        log(`+ ${artifactPath}: ${artifact.version}@${artifact.hash} (not installed)`, 'yellow');
+        log(
+          `+ ${artifactPath}: ${artifact.version}@${artifact.hash} (not installed)`,
+          'yellow',
+        );
         missing++;
       } else if (!installed && localExists) {
         const localHash = computeHash(readFileSync(localPath, 'utf-8'));
         if (localHash === artifact.hash) {
-          log(`= ${artifactPath}: ${artifact.version}@${artifact.hash} (unlocked but matches)`, 'dim');
+          log(
+            `= ${artifactPath}: ${artifact.version}@${artifact.hash} (unlocked but matches)`,
+            'dim',
+          );
           current++;
         } else {
           log(`~ ${artifactPath}: local differs from upstream`, 'yellow');
           modified++;
         }
       } else if (installed.hash !== artifact.hash) {
-        log(`↑ ${artifactPath}: ${installed.version}@${installed.hash} → ${artifact.version}@${artifact.hash}`, 'green');
+        log(
+          `↑ ${artifactPath}: ${installed.version}@${installed.hash} → ${artifact.version}@${artifact.hash}`,
+          'green',
+        );
         updatesAvailable++;
       } else {
         // Check for local modifications
         if (localExists) {
           const localHash = computeHash(readFileSync(localPath, 'utf-8'));
           if (localHash !== installed.hash) {
-            if (artifact.merge_strategy === 'settings-merge' || artifact.merge_strategy === 'gitignore-merge') {
-              log(`  ${artifactPath}: ${artifact.version}@${artifact.hash} (merged)`, 'dim');
+            if (
+              artifact.merge_strategy === 'settings-merge' ||
+              artifact.merge_strategy === 'gitignore-merge'
+            ) {
+              log(
+                `  ${artifactPath}: ${artifact.version}@${artifact.hash} (merged)`,
+                'dim',
+              );
               // Don't increment modified count - merge-strategy artifacts are expected to differ
             } else {
-              log(`* ${artifactPath}: ${artifact.version}@${artifact.hash} (locally modified)`, 'yellow');
+              log(
+                `* ${artifactPath}: ${artifact.version}@${artifact.hash} (locally modified)`,
+                'yellow',
+              );
               modified++;
             }
           } else {
-            log(`✓ ${artifactPath}: ${artifact.version}@${artifact.hash}`, 'dim');
+            log(
+              `✓ ${artifactPath}: ${artifact.version}@${artifact.hash}`,
+              'dim',
+            );
             current++;
           }
         } else {
@@ -474,39 +605,59 @@ async function cmdStatus(projectArg, options) {
       }
     }
 
-    for (const [artifactPath, installed] of Object.entries(lock.installed || {}).sort()) {
+    for (const [artifactPath, installed] of Object.entries(
+      lock.installed || {},
+    ).sort()) {
       if (targetArtifacts.has(artifactPath)) continue;
 
       const targetPath = resolveInstalledTargetPath(installed);
       if (!targetPath) {
-        log(`- ${artifactPath}: obsolete lock entry (no target path recorded)`, 'yellow');
+        log(
+          `- ${artifactPath}: obsolete lock entry (no target path recorded)`,
+          'yellow',
+        );
         obsoleteLocks++;
         continue;
       }
 
       const localPath = join(projectPath, targetPath);
       if (!existsSync(localPath)) {
-        log(`- ${artifactPath}: obsolete lock entry (file already absent)`, 'dim');
+        log(
+          `- ${artifactPath}: obsolete lock entry (file already absent)`,
+          'dim',
+        );
         obsoleteLocks++;
         continue;
       }
 
       const localHash = computeHash(readFileSync(localPath, 'utf-8'));
       if (installed.hash && localHash === installed.hash) {
-        log(`- ${artifactPath}: no longer targeted (deletion pending)`, 'yellow');
+        log(
+          `- ${artifactPath}: no longer targeted (deletion pending)`,
+          'yellow',
+        );
         deletionsPending++;
       } else {
-        log(`! ${artifactPath}: no longer targeted but locally modified`, 'yellow');
+        log(
+          `! ${artifactPath}: no longer targeted but locally modified`,
+          'yellow',
+        );
         deletionConflicts++;
       }
     }
 
     log('');
-    const agentMsg = agentAssisted > 0 ? `, ${agentAssisted} agent-assisted` : '';
-    const deletionMsg = deletionsPending > 0 ? `, ${deletionsPending} deletion pending` : '';
-    const deletionConflictMsg = deletionConflicts > 0 ? `, ${deletionConflicts} deletion conflict` : '';
-    const obsoleteMsg = obsoleteLocks > 0 ? `, ${obsoleteLocks} obsolete lock` : '';
-    log(`Summary: ${current} current, ${updatesAvailable} updates, ${missing} missing, ${modified} modified${agentMsg}${deletionMsg}${deletionConflictMsg}${obsoleteMsg}`);
+    const agentMsg =
+      agentAssisted > 0 ? `, ${agentAssisted} agent-assisted` : '';
+    const deletionMsg =
+      deletionsPending > 0 ? `, ${deletionsPending} deletion pending` : '';
+    const deletionConflictMsg =
+      deletionConflicts > 0 ? `, ${deletionConflicts} deletion conflict` : '';
+    const obsoleteMsg =
+      obsoleteLocks > 0 ? `, ${obsoleteLocks} obsolete lock` : '';
+    log(
+      `Summary: ${current} current, ${updatesAvailable} updates, ${missing} missing, ${modified} modified${agentMsg}${deletionMsg}${deletionConflictMsg}${obsoleteMsg}`,
+    );
   }
 
   log('');
@@ -536,7 +687,10 @@ function emitSyncTimeDriftWarnings(registry) {
     const imp = validateImports(registry, METACLAUDE_ROOT);
     findings = findings.concat(imp.findings);
   } catch (err) {
-    log(`WARNING: sync import-graph validator failed: ${err.message}`, 'yellow');
+    log(
+      `WARNING: sync import-graph validator failed: ${err.message}`,
+      'yellow',
+    );
   }
   for (const f of findings) {
     console.error(`WARNING: ${JSON.stringify(f)}`);
@@ -568,10 +722,12 @@ function syncTimeContainmentOk(sourceFile, artifactPath) {
       importer: null,
       missingImport: null,
       target: sourceFile,
-      message: err instanceof PathEscapeError
-        ? `Sync-time containment re-check failed: ${err.message}`
-        : `Sync-time read aborted: ${err.message}`,
-      remediation: 'Investigate filesystem state; the source file changed or became a symlink between compute and sync',
+      message:
+        err instanceof PathEscapeError
+          ? `Sync-time containment re-check failed: ${err.message}`
+          : `Sync-time read aborted: ${err.message}`,
+      remediation:
+        'Investigate filesystem state; the source file changed or became a symlink between compute and sync',
     };
     console.error(`WARNING: ${JSON.stringify(finding)}`);
     return false;
@@ -604,9 +760,17 @@ function preflightValidateConsumerManifests(projectPath) {
   if (!existsSync(specsGroupsDir)) {
     return { blocked: false, offenders: [], scanned: 0 };
   }
-  const validatorPath = join(METACLAUDE_ROOT, '.claude', 'scripts', 'validate-manifest.mjs');
+  const validatorPath = join(
+    METACLAUDE_ROOT,
+    '.claude',
+    'scripts',
+    'validate-manifest.mjs',
+  );
   if (!existsSync(validatorPath)) {
-    log(`  Pre-flight skipped: validator script not found at ${validatorPath}`, 'yellow');
+    log(
+      `  Pre-flight skipped: validator script not found at ${validatorPath}`,
+      'yellow',
+    );
     return { blocked: false, offenders: [], scanned: 0 };
   }
 
@@ -619,7 +783,10 @@ function preflightValidateConsumerManifests(projectPath) {
       if (existsSync(mp)) manifestPaths.push(mp);
     }
   } catch (err) {
-    log(`  Pre-flight error reading consumer manifests: ${err.message}`, 'yellow');
+    log(
+      `  Pre-flight error reading consumer manifests: ${err.message}`,
+      'yellow',
+    );
     return { blocked: false, offenders: [], scanned: 0 };
   }
 
@@ -637,13 +804,534 @@ function preflightValidateConsumerManifests(projectPath) {
       offenders.push(mp);
       if (r.stderr) {
         // Surface first few lines of validator output for operator context.
-        const lines = r.stderr.split('\n').filter((l) => l.length > 0).slice(0, 4);
+        const lines = r.stderr
+          .split('\n')
+          .filter((l) => l.length > 0)
+          .slice(0, 4);
         for (const line of lines) log(`    ${line}`, 'red');
       }
     }
   }
 
-  return { blocked: offenders.length > 0, offenders, scanned: manifestPaths.length };
+  return {
+    blocked: offenders.length > 0,
+    offenders,
+    scanned: manifestPaths.length,
+  };
+}
+
+function packageDir(nodeModulesRoot, packageName) {
+  return join(nodeModulesRoot, ...packageName.split('/'));
+}
+
+function packageIsPresent(nodeModulesRoot, packageName) {
+  return existsSync(
+    join(packageDir(nodeModulesRoot, packageName), 'package.json'),
+  );
+}
+
+function tryLstat(path) {
+  try {
+    return lstatSync(path);
+  } catch {
+    return null;
+  }
+}
+
+function sortedObject(obj) {
+  return Object.fromEntries(
+    Object.entries(obj).sort(([a], [b]) => a.localeCompare(b)),
+  );
+}
+
+function loadRuntimeDependencyVersions() {
+  const packageJsonCandidates = [
+    join(METACLAUDE_ROOT, 'package.json'),
+    join(EXECUTABLE_ROOT, 'package.json'),
+  ];
+  const seen = new Set();
+
+  for (const candidate of packageJsonCandidates) {
+    if (seen.has(candidate) || !existsSync(candidate)) continue;
+    seen.add(candidate);
+
+    try {
+      const pkg = JSON.parse(readFileSync(candidate, 'utf-8'));
+      const sections = [
+        pkg.dependencies || {},
+        pkg.devDependencies || {},
+        pkg.optionalDependencies || {},
+      ];
+      const deps = {};
+      const missing = [];
+      for (const packageName of SYNC_RUNTIME_PACKAGE_NAMES) {
+        const version = sections.map((s) => s[packageName]).find(Boolean);
+        if (version) {
+          deps[packageName] = version;
+        } else {
+          missing.push(packageName);
+        }
+      }
+      if (missing.length === 0) {
+        return { deps: sortedObject(deps), source: candidate, missing };
+      }
+    } catch {
+      // Try the next candidate; sync should not fail because a fallback package
+      // manifest is malformed or absent in a test fixture.
+    }
+  }
+
+  return {
+    deps: sortedObject(
+      Object.fromEntries(SYNC_RUNTIME_PACKAGE_NAMES.map((name) => [name, '*'])),
+    ),
+    source: null,
+    missing: [...SYNC_RUNTIME_PACKAGE_NAMES],
+  };
+}
+
+function findRuntimeDependencySourceRoot() {
+  const candidates = [
+    join(METACLAUDE_ROOT, 'node_modules'),
+    join(EXECUTABLE_ROOT, 'node_modules'),
+  ];
+  const seen = new Set();
+
+  for (const candidate of candidates) {
+    if (seen.has(candidate) || !existsSync(candidate)) continue;
+    seen.add(candidate);
+    if (
+      SYNC_RUNTIME_PACKAGE_NAMES.every((name) =>
+        packageIsPresent(candidate, name),
+      )
+    ) {
+      return candidate;
+    }
+  }
+  return null;
+}
+
+function writeRuntimeDependencyManifest(projectPath, deps) {
+  const runtimeDir = join(projectPath, '.claude');
+  const manifestPath = join(runtimeDir, 'package.json');
+  mkdirSync(runtimeDir, { recursive: true });
+
+  let manifest = {};
+  if (existsSync(manifestPath)) {
+    try {
+      manifest = JSON.parse(readFileSync(manifestPath, 'utf-8'));
+    } catch {
+      manifest = {};
+    }
+  }
+
+  const next = {
+    ...manifest,
+    name: manifest.name || 'metaclaude-consumer-runtime',
+    private: true,
+    type: 'module',
+    dependencies: sortedObject({
+      ...(manifest.dependencies || {}),
+      ...deps,
+    }),
+  };
+  const nextContent = JSON.stringify(next, null, 2) + '\n';
+  const currentContent = existsSync(manifestPath)
+    ? readFileSync(manifestPath, 'utf-8')
+    : null;
+  if (currentContent !== nextContent) {
+    writeFileSync(manifestPath, nextContent);
+    return { changed: true, manifestPath };
+  }
+  return { changed: false, manifestPath };
+}
+
+function linkRuntimeDependencyPackages(projectPath, sourceNodeModulesRoot) {
+  const targetNodeModulesRoot = join(projectPath, '.claude', 'node_modules');
+  mkdirSync(targetNodeModulesRoot, { recursive: true });
+
+  let linked = 0;
+  let present = 0;
+  const skipped = [];
+
+  for (const packageName of SYNC_RUNTIME_PACKAGE_NAMES) {
+    const sourcePackageDir = packageDir(sourceNodeModulesRoot, packageName);
+    const targetPackageDir = packageDir(targetNodeModulesRoot, packageName);
+    const stat = tryLstat(targetPackageDir);
+
+    if (stat && existsSync(join(targetPackageDir, 'package.json'))) {
+      if (stat.isSymbolicLink()) {
+        const sourceReal = realpathSync(sourcePackageDir);
+        const targetReal = realpathSync(targetPackageDir);
+        if (sourceReal === targetReal) {
+          present++;
+          continue;
+        }
+        rmSync(targetPackageDir, { recursive: true, force: true });
+      } else {
+        present++;
+        continue;
+      }
+    } else if (stat?.isSymbolicLink()) {
+      rmSync(targetPackageDir, { recursive: true, force: true });
+    } else if (stat) {
+      skipped.push(packageName);
+      continue;
+    }
+
+    mkdirSync(dirname(targetPackageDir), { recursive: true });
+    symlinkSync(sourcePackageDir, targetPackageDir, 'dir');
+    linked++;
+  }
+
+  return { status: 'linked', linked, present, skipped, sourceNodeModulesRoot };
+}
+
+function installRuntimeDependencyPackages(projectPath, deps) {
+  const runtimeDir = join(projectPath, '.claude');
+  const targetNodeModulesRoot = join(runtimeDir, 'node_modules');
+  const { changed } = writeRuntimeDependencyManifest(projectPath, deps);
+
+  const missing = SYNC_RUNTIME_PACKAGE_NAMES.filter(
+    (name) => !packageIsPresent(targetNodeModulesRoot, name),
+  );
+  if (!changed && missing.length === 0) {
+    return { status: 'current' };
+  }
+
+  const result = spawnSync(
+    'npm',
+    ['install', '--ignore-scripts', '--no-audit', '--no-fund'],
+    {
+      cwd: runtimeDir,
+      encoding: 'utf-8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+      timeout: RUNTIME_DEP_INSTALL_TIMEOUT_MS,
+    },
+  );
+
+  if (result.error) {
+    return { status: 'failed', error: result.error.message };
+  }
+  if (result.status !== 0) {
+    const details = (result.stderr || result.stdout || '')
+      .split('\n')
+      .filter(Boolean)
+      .slice(0, 3)
+      .join(' ');
+    return {
+      status: 'failed',
+      error: details || `npm exited ${result.status}`,
+    };
+  }
+  return { status: 'installed', missing };
+}
+
+function shouldProvisionRuntimeDeps(registry, targetArtifacts) {
+  for (const artifactPath of targetArtifacts) {
+    const artifact = getArtifact(registry, artifactPath);
+    const sourcePath = artifact?.path || '';
+    if (
+      sourcePath.startsWith('.claude/scripts/') ||
+      SYNC_RUNTIME_TRIGGER_PATHS.has(sourcePath)
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function ensureConsumerRuntimeDependencies(
+  projectPath,
+  registry,
+  targetArtifacts,
+  options = {},
+) {
+  try {
+    const skipFromEnv = /^(1|true|yes)$/i.test(
+      process.env[SKIP_RUNTIME_DEP_PROVISION_ENV] || '',
+    );
+    if (options.runtimeDeps === false || skipFromEnv) {
+      return { status: 'skipped' };
+    }
+    if (!shouldProvisionRuntimeDeps(registry, targetArtifacts)) {
+      return { status: 'not-needed' };
+    }
+
+    const { deps } = loadRuntimeDependencyVersions();
+    const sourceNodeModulesRoot = findRuntimeDependencySourceRoot();
+    if (sourceNodeModulesRoot) {
+      writeRuntimeDependencyManifest(projectPath, deps);
+      try {
+        return linkRuntimeDependencyPackages(
+          projectPath,
+          sourceNodeModulesRoot,
+        );
+      } catch (err) {
+        const installResult = installRuntimeDependencyPackages(
+          projectPath,
+          deps,
+        );
+        if (installResult.status === 'failed') {
+          return {
+            status: 'failed',
+            error: `link failed (${err.message}); install failed (${installResult.error})`,
+          };
+        }
+        return installResult;
+      }
+    }
+
+    return installRuntimeDependencyPackages(projectPath, deps);
+  } catch (err) {
+    return { status: 'failed', error: err.message };
+  }
+}
+
+function logRuntimeDependencyResult(result) {
+  if (!result || result.status === 'not-needed') return;
+  if (result.status === 'skipped') {
+    log(
+      `  Runtime deps: skipped (${SKIP_RUNTIME_DEP_PROVISION_ENV}=1 or --no-runtime-deps)`,
+      'dim',
+    );
+    return;
+  }
+  if (result.status === 'current') {
+    log('  Runtime deps: already available in .claude/node_modules', 'dim');
+    return;
+  }
+  if (result.status === 'linked') {
+    const skipMsg =
+      result.skipped.length > 0 ? `, ${result.skipped.length} skipped` : '';
+    log(
+      `  Runtime deps: ${result.linked} linked, ${result.present} present${skipMsg} in .claude/node_modules`,
+      result.skipped.length > 0 ? 'yellow' : 'green',
+    );
+    if (result.skipped.length > 0) {
+      log(
+        `    Skipped existing non-package paths: ${result.skipped.join(', ')}`,
+        'yellow',
+      );
+    }
+    return;
+  }
+  if (result.status === 'installed') {
+    log('  Runtime deps: installed into .claude/node_modules', 'green');
+    return;
+  }
+  if (result.status === 'failed') {
+    log(`  Runtime deps warning: ${result.error}`, 'yellow');
+    log(
+      '    Hooks may fail until dependencies are installed; rerun sync after installing npm dependencies.',
+      'dim',
+    );
+  }
+}
+
+function projectMcpJsonHasServer(projectPath, serverName) {
+  const mcpJsonPath = join(projectPath, '.mcp.json');
+  if (!existsSync(mcpJsonPath)) return false;
+
+  try {
+    const data = JSON.parse(readFileSync(mcpJsonPath, 'utf-8'));
+    return Boolean(data?.mcpServers?.[serverName]);
+  } catch {
+    return false;
+  }
+}
+
+function getMcpNotifyEntryPath() {
+  return (
+    process.env[MCP_NOTIFY_ENTRY_ENV] ||
+    join(METACLAUDE_ROOT, '..', MCP_NOTIFY_SERVER_NAME, 'dist', 'index.js')
+  );
+}
+
+function getMcpEnsureDefinitions() {
+  const notifyEntry = getMcpNotifyEntryPath();
+  return [
+    {
+      name: PLAYWRIGHT_MCP_SERVER_NAME,
+      addArgs: PLAYWRIGHT_MCP_ADD_ARGS,
+      commandDisplay: 'claude mcp add playwright -- npx @playwright/mcp@latest',
+      targetArtifact: PLAYWRIGHT_MCP_ARTIFACT,
+      skipWhenProtected: true,
+      protectedTargetPath: '.mcp.json',
+      protectedSourcePath: '.claude/templates/mcp.json',
+    },
+    {
+      name: MCP_NOTIFY_SERVER_NAME,
+      addArgs: [
+        'mcp',
+        'add',
+        MCP_NOTIFY_SERVER_NAME,
+        '--',
+        'node',
+        notifyEntry,
+      ],
+      commandDisplay: `claude mcp add ${MCP_NOTIFY_SERVER_NAME} -- node ${notifyEntry}`,
+      requiredPath: notifyEntry,
+    },
+  ];
+}
+
+function claudeMcpGetServer(projectPath, serverName) {
+  const claudeBin = process.env[CLAUDE_BIN_ENV] || 'claude';
+  const result = spawnSync(claudeBin, ['mcp', 'get', serverName], {
+    cwd: projectPath,
+    encoding: 'utf-8',
+    stdio: ['ignore', 'pipe', 'pipe'],
+    timeout: MCP_ENSURE_TIMEOUT_MS,
+  });
+
+  if (result.error) {
+    return { exists: false, error: result.error.message };
+  }
+  return { exists: result.status === 0 };
+}
+
+function ensureConsumerMcpServer(
+  definition,
+  projectPath,
+  projectConfig,
+  targetArtifacts,
+) {
+  if (
+    definition.targetArtifact &&
+    !targetArtifacts.has(definition.targetArtifact)
+  ) {
+    return { status: 'not-needed' };
+  }
+
+  if (definition.requiredPath && !existsSync(definition.requiredPath)) {
+    return {
+      status: 'failed',
+      name: definition.name,
+      error: `required MCP entry not found: ${definition.requiredPath}`,
+    };
+  }
+
+  if (
+    definition.skipWhenProtected &&
+    isProtectedArtifact(
+      projectConfig,
+      definition.targetArtifact,
+      definition.protectedTargetPath,
+      definition.protectedSourcePath,
+    )
+  ) {
+    return { status: 'protected', name: definition.name };
+  }
+
+  if (projectMcpJsonHasServer(projectPath, definition.name)) {
+    return { status: 'current', name: definition.name, source: '.mcp.json' };
+  }
+
+  const existing = claudeMcpGetServer(projectPath, definition.name);
+  if (existing.exists) {
+    return {
+      status: 'current',
+      name: definition.name,
+      source: 'claude-local-config',
+    };
+  }
+
+  const claudeBin = process.env[CLAUDE_BIN_ENV] || 'claude';
+  const result = spawnSync(claudeBin, definition.addArgs, {
+    cwd: projectPath,
+    encoding: 'utf-8',
+    stdio: ['ignore', 'pipe', 'pipe'],
+    timeout: MCP_ENSURE_TIMEOUT_MS,
+  });
+
+  if (result.error) {
+    return {
+      status: 'failed',
+      name: definition.name,
+      error: result.error.message,
+    };
+  }
+  if (result.status !== 0) {
+    const details = (result.stderr || result.stdout || '')
+      .split('\n')
+      .filter(Boolean)
+      .slice(0, 3)
+      .join(' ');
+    return {
+      status: 'failed',
+      name: definition.name,
+      error: details || `claude exited ${result.status}`,
+    };
+  }
+
+  return {
+    status: 'installed',
+    name: definition.name,
+    commandDisplay: definition.commandDisplay,
+  };
+}
+
+function ensureConsumerMcpServers(
+  projectPath,
+  projectConfig,
+  targetArtifacts,
+  options = {},
+) {
+  const skipFromEnv = /^(1|true|yes)$/i.test(
+    process.env[SKIP_MCP_ENSURE_ENV] || '',
+  );
+  if (options.mcpEnsure === false || skipFromEnv) {
+    return [{ status: 'skipped' }];
+  }
+
+  return getMcpEnsureDefinitions().map((definition) =>
+    ensureConsumerMcpServer(
+      definition,
+      projectPath,
+      projectConfig,
+      targetArtifacts,
+    ),
+  );
+}
+
+function logMcpEnsureResults(results) {
+  if (!Array.isArray(results)) return;
+  for (const result of results) {
+    if (!result || result.status === 'not-needed') continue;
+    if (result.status === 'skipped') {
+      log(
+        `  MCP ensure: skipped (${SKIP_MCP_ENSURE_ENV}=1 or --no-mcp-ensure)`,
+        'dim',
+      );
+      continue;
+    }
+    if (result.status === 'protected') {
+      log(`  MCP ${result.name}: skipped (.mcp.json is protected)`, 'dim');
+      continue;
+    }
+    if (result.status === 'current') {
+      log(
+        `  MCP ${result.name}: already configured via ${result.source}`,
+        'dim',
+      );
+      continue;
+    }
+    if (result.status === 'installed') {
+      log(
+        `  MCP ${result.name}: installed via \`${result.commandDisplay}\``,
+        'green',
+      );
+      continue;
+    }
+    if (result.status === 'failed') {
+      log(`  MCP ${result.name} warning: ${result.error}`, 'yellow');
+      log(
+        '    Run the logged `claude mcp add ...` command from the consumer project.',
+        'dim',
+      );
+    }
+  }
 }
 
 async function cmdSync(projectArg, options) {
@@ -655,12 +1343,20 @@ async function cmdSync(projectArg, options) {
   // Warn-only: findings printed, process continues.
   const driftCount = emitSyncTimeDriftWarnings(registry);
   if (driftCount > 0) {
-    log(`\nWARNING: ${driftCount} registry drift finding(s) detected (warn-only)`, 'yellow');
+    log(
+      `\nWARNING: ${driftCount} registry drift finding(s) detected (warn-only)`,
+      'yellow',
+    );
   }
 
   for (const projectName of projects) {
     const projectConfig = config.projects[projectName];
-    const projectPath = resolveProjectPath(projectName, projectConfig, config.defaults, options);
+    const projectPath = resolveProjectPath(
+      projectName,
+      projectConfig,
+      config.defaults,
+      options,
+    );
     const lockPath = getLockPath(projectName, projectPath);
 
     log(`\n${colors.bold}Syncing: ${projectName}${colors.reset}`, 'cyan');
@@ -685,13 +1381,16 @@ async function cmdSync(projectArg, options) {
     if (preflight.blocked) {
       log(
         `  [SYNC:manifest-preflight-warning] ${projectPath} has ${preflight.offenders.length}/${preflight.scanned} invalid manifests; continuing sync`,
-        'yellow'
+        'yellow',
       );
       log(
         '  Remediation: clean consumer manifests separately; start with `node .claude/scripts/migrate-manifest.mjs --all`,',
-        'dim'
+        'dim',
       );
-      log('  then manually fix remaining schema enum/path/extra-field errors.', 'dim');
+      log(
+        '  then manually fix remaining schema enum/path/extra-field errors.',
+        'dim',
+      );
       for (const offender of preflight.offenders) {
         log(`    offender: ${offender}`, 'dim');
       }
@@ -702,7 +1401,7 @@ async function cmdSync(projectArg, options) {
       project: projectName,
       synced_at: null,
       registry_version: registry.registry_version,
-      installed: {}
+      installed: {},
     };
 
     // Resolve target artifacts
@@ -712,7 +1411,17 @@ async function cmdSync(projectArg, options) {
       continue;
     }
 
-    const targetArtifacts = resolveTargetArtifactsForProject(registry, projectConfig, config.defaults);
+    const targetArtifacts = resolveTargetArtifactsForProject(
+      registry,
+      projectConfig,
+      config.defaults,
+    );
+    const mcpEnsureResults = ensureConsumerMcpServers(
+      projectPath,
+      projectConfig,
+      targetArtifacts,
+      options,
+    );
 
     log(`Syncing ${targetArtifacts.size} artifacts...`);
 
@@ -737,7 +1446,14 @@ async function cmdSync(projectArg, options) {
       }
 
       // Check if protected
-      if (isProtectedArtifact(projectConfig, artifactPath, targetPath, artifact.path)) {
+      if (
+        isProtectedArtifact(
+          projectConfig,
+          artifactPath,
+          targetPath,
+          artifact.path,
+        )
+      ) {
         log(`  Skip ${artifactPath}: protected`, 'dim');
         skipped++;
         continue;
@@ -746,11 +1462,15 @@ async function cmdSync(projectArg, options) {
       // Check sync policies (category-level and per-artifact)
       const [category] = artifactPath.split('/');
       const categoryMeta = registry.artifacts[category];
-      const effectivePolicy = artifact._sync_policy || categoryMeta?._sync_policy;
+      const effectivePolicy =
+        artifact._sync_policy || categoryMeta?._sync_policy;
 
       // DEC-002: never-sync means never propagate to consumer projects at all
       if (effectivePolicy === 'never-sync') {
-        log(`  Skip ${artifactPath}: never-sync policy (excluded from sync)`, 'dim');
+        log(
+          `  Skip ${artifactPath}: never-sync policy (excluded from sync)`,
+          'dim',
+        );
         skipped++;
         continue;
       }
@@ -772,29 +1492,39 @@ async function cmdSync(projectArg, options) {
               path: artifact.path,
               installed_at: new Date().toISOString(),
             };
-            log(`  ⊕ ${artifactPath}: shadow-file divergence acknowledged (lock advanced, file unchanged)`, 'cyan');
+            log(
+              `  ⊕ ${artifactPath}: shadow-file divergence acknowledged (lock advanced, file unchanged)`,
+              'cyan',
+            );
             skipped++;
             continue;
           }
-          console.error(`WARNING: ${JSON.stringify({
-            rule: 'provenance-invalid',
-            file: artifactPath,
-            bundle: null,
-            importer: null,
-            missingImport: null,
-            target: targetPath,
-            message: `shadow-file divergence: never-overwrite artifact ${artifactPath} has diverged from registry (${srcHash} vs ${localHash})`,
-            remediation: 'Review the local file; rerun sync with --ack-drift to advance the lock without overwriting',
-          })}`);
+          console.error(
+            `WARNING: ${JSON.stringify({
+              rule: 'provenance-invalid',
+              file: artifactPath,
+              bundle: null,
+              importer: null,
+              missingImport: null,
+              target: targetPath,
+              message: `shadow-file divergence: never-overwrite artifact ${artifactPath} has diverged from registry (${srcHash} vs ${localHash})`,
+              remediation:
+                'Review the local file; rerun sync with --ack-drift to advance the lock without overwriting',
+            })}`,
+          );
         }
-        log(`  Skip ${artifactPath}: never-overwrite policy (file exists)`, 'dim');
+        log(
+          `  Skip ${artifactPath}: never-overwrite policy (file exists)`,
+          'dim',
+        );
         skipped++;
         continue;
       }
 
       // Check for agent-assisted policy (per-project override OR registry-level)
-      const isAgentAssisted = projectConfig.sync_overrides?.[artifactPath] === 'agent-assisted'
-        || (effectivePolicy === 'agent-assisted' && existsSync(targetFile));
+      const isAgentAssisted =
+        projectConfig.sync_overrides?.[artifactPath] === 'agent-assisted' ||
+        (effectivePolicy === 'agent-assisted' && existsSync(targetFile));
       if (isAgentAssisted) {
         const srcContent = readFileSync(sourceFile, 'utf-8');
         const srcHash = computeHash(srcContent);
@@ -802,7 +1532,10 @@ async function cmdSync(projectArg, options) {
 
         // Skip if upstream hasn't changed since last sync
         if (installed && installed.hash === srcHash) {
-          log(`  Skip ${artifactPath}: agent-assisted (no upstream changes)`, 'dim');
+          log(
+            `  Skip ${artifactPath}: agent-assisted (no upstream changes)`,
+            'dim',
+          );
           skipped++;
           continue;
         }
@@ -818,7 +1551,7 @@ async function cmdSync(projectArg, options) {
           version: artifact.version,
           hash: srcHash,
           path: artifact.path,
-          installed_at: new Date().toISOString()
+          installed_at: new Date().toISOString(),
         };
 
         pendingMerges.push({
@@ -848,18 +1581,37 @@ async function cmdSync(projectArg, options) {
       // Check for local modifications
       if (existsSync(targetFile) && lock.installed[artifactPath]) {
         const localHash = computeHash(readFileSync(targetFile, 'utf-8'));
-        if (localHash !== lock.installed[artifactPath].hash && !options.force && !options.resolveConflicts) {
+        if (
+          localHash !== lock.installed[artifactPath].hash &&
+          !options.force &&
+          !options.resolveConflicts
+        ) {
           // Special case: merge-strategy artifacts handle their own merging, not conflict
-          if (artifact.merge_strategy !== 'settings-merge' && artifact.merge_strategy !== 'gitignore-merge') {
-            log(`  Conflict ${artifactPath}: local modifications detected`, 'yellow');
+          if (
+            artifact.merge_strategy !== 'settings-merge' &&
+            artifact.merge_strategy !== 'gitignore-merge'
+          ) {
+            log(
+              `  Conflict ${artifactPath}: local modifications detected`,
+              'yellow',
+            );
             log(`    Use --force or --resolve-conflicts to overwrite`, 'dim');
             conflicts++;
             continue;
           }
-        } else if (localHash !== lock.installed[artifactPath].hash && options.resolveConflicts) {
+        } else if (
+          localHash !== lock.installed[artifactPath].hash &&
+          options.resolveConflicts
+        ) {
           // --resolve-conflicts: accept upstream version for conflicting artifacts
-          if (artifact.merge_strategy !== 'settings-merge' && artifact.merge_strategy !== 'gitignore-merge') {
-            log(`  Resolving conflict ${artifactPath}: accepting upstream`, 'cyan');
+          if (
+            artifact.merge_strategy !== 'settings-merge' &&
+            artifact.merge_strategy !== 'gitignore-merge'
+          ) {
+            log(
+              `  Resolving conflict ${artifactPath}: accepting upstream`,
+              'cyan',
+            );
             resolved++;
           }
         }
@@ -894,7 +1646,7 @@ async function cmdSync(projectArg, options) {
         version: artifact.version,
         hash: sourceHash,
         path: artifact.path,
-        installed_at: new Date().toISOString()
+        installed_at: new Date().toISOString(),
       };
 
       log(`  ✓ ${artifactPath}: ${artifact.version}@${sourceHash}`, 'green');
@@ -906,18 +1658,30 @@ async function cmdSync(projectArg, options) {
     // are left in place unless --force is explicit.
     let pruned = 0;
     let deleted = 0;
-    for (const [artifactPath, installed] of Object.entries(lock.installed || {})) {
+    for (const [artifactPath, installed] of Object.entries(
+      lock.installed || {},
+    )) {
       if (targetArtifacts.has(artifactPath)) continue;
 
       const targetPath = resolveInstalledTargetPath(installed);
       if (!targetPath) {
         delete lock.installed[artifactPath];
-        log(`  - ${artifactPath}: pruned obsolete lock entry (no target path recorded)`, 'dim');
+        log(
+          `  - ${artifactPath}: pruned obsolete lock entry (no target path recorded)`,
+          'dim',
+        );
         pruned++;
         continue;
       }
 
-      if (isProtectedArtifact(projectConfig, artifactPath, targetPath, installed.path)) {
+      if (
+        isProtectedArtifact(
+          projectConfig,
+          artifactPath,
+          targetPath,
+          installed.path,
+        )
+      ) {
         log(`  Skip deletion ${artifactPath}: protected`, 'dim');
         skipped++;
         continue;
@@ -926,7 +1690,10 @@ async function cmdSync(projectArg, options) {
       const targetFile = join(projectPath, targetPath);
       if (!existsSync(targetFile)) {
         delete lock.installed[artifactPath];
-        log(`  - ${artifactPath}: pruned obsolete lock entry (file already absent)`, 'dim');
+        log(
+          `  - ${artifactPath}: pruned obsolete lock entry (file already absent)`,
+          'dim',
+        );
         pruned++;
         continue;
       }
@@ -934,7 +1701,8 @@ async function cmdSync(projectArg, options) {
       try {
         assertContainment(targetFile, join(projectPath, '.claude'));
       } catch (err) {
-        const rule = err instanceof PathEscapeError ? 'path-escape' : 'path-check-failed';
+        const rule =
+          err instanceof PathEscapeError ? 'path-escape' : 'path-check-failed';
         log(`  Conflict ${artifactPath}: deletion skipped (${rule})`, 'yellow');
         conflicts++;
         continue;
@@ -943,15 +1711,23 @@ async function cmdSync(projectArg, options) {
       const localHash = computeHash(readFileSync(targetFile, 'utf-8'));
       const safeToDelete = installed.hash && localHash === installed.hash;
       if (!safeToDelete && !options.force) {
-        log(`  Conflict ${artifactPath}: no longer targeted but locally modified`, 'yellow');
-        log('    Use --force to delete the local file and prune the lock', 'dim');
+        log(
+          `  Conflict ${artifactPath}: no longer targeted but locally modified`,
+          'yellow',
+        );
+        log(
+          '    Use --force to delete the local file and prune the lock',
+          'dim',
+        );
         conflicts++;
         continue;
       }
 
       rmSync(targetFile, { force: true });
       delete lock.installed[artifactPath];
-      const reason = safeToDelete ? 'removed upstream/no longer in bundle' : 'forced deletion of locally modified obsolete artifact';
+      const reason = safeToDelete
+        ? 'removed upstream/no longer in bundle'
+        : 'forced deletion of locally modified obsolete artifact';
       log(`  - ${artifactPath}: deleted (${reason})`, 'yellow');
       deleted++;
     }
@@ -962,12 +1738,24 @@ async function cmdSync(projectArg, options) {
 
     saveJson(lockPath, lock);
 
+    const runtimeDepsResult = ensureConsumerRuntimeDependencies(
+      projectPath,
+      registry,
+      targetArtifacts,
+      options,
+    );
+
     log('');
-    const pendingMsg = pendingMerges.length > 0 ? `, ${pendingMerges.length} pending merge` : '';
+    const pendingMsg =
+      pendingMerges.length > 0 ? `, ${pendingMerges.length} pending merge` : '';
     const prunedMsg = pruned > 0 ? `, ${pruned} pruned` : '';
     const deletedMsg = deleted > 0 ? `, ${deleted} deleted` : '';
     const resolvedMsg = resolved > 0 ? `, ${resolved} resolved` : '';
-    log(`Complete: ${synced} synced, ${skipped} skipped, ${conflicts} conflicts${resolvedMsg}${pendingMsg}${deletedMsg}${prunedMsg}`);
+    log(
+      `Complete: ${synced} synced, ${skipped} skipped, ${conflicts} conflicts${resolvedMsg}${pendingMsg}${deletedMsg}${prunedMsg}`,
+    );
+    logMcpEnsureResults(mcpEnsureResults);
+    logRuntimeDependencyResult(runtimeDepsResult);
 
     // Report agent-assisted merges
     if (pendingMerges.length > 0) {
@@ -979,12 +1767,20 @@ async function cmdSync(projectArg, options) {
         log(`    Local file:      ${pm.local}`, 'dim');
       }
       log('');
-      log('Merge upstream changes into local files, preserving project-specific content.', 'dim');
+      log(
+        'Merge upstream changes into local files, preserving project-specific content.',
+        'dim',
+      );
       log('Delete .claude/sync-pending/ after merging.', 'dim');
     }
 
     // Auto-repair session.json if it exists but is missing required fields
-    const sessionJsonPath = join(projectPath, '.claude', 'context', 'session.json');
+    const sessionJsonPath = join(
+      projectPath,
+      '.claude',
+      'context',
+      'session.json',
+    );
     const sessionData = loadJson(sessionJsonPath);
     if (sessionData) {
       const defaults = {
@@ -1022,7 +1818,12 @@ async function cmdVerify(projectArg, options) {
 
   for (const projectName of projects) {
     const projectConfig = config.projects[projectName];
-    const projectPath = resolveProjectPath(projectName, projectConfig, config.defaults, options);
+    const projectPath = resolveProjectPath(
+      projectName,
+      projectConfig,
+      config.defaults,
+      options,
+    );
     const lockPath = getLockPath(projectName, projectPath);
     const lock = loadJson(lockPath);
 
@@ -1043,14 +1844,21 @@ async function cmdVerify(projectArg, options) {
       log('No bundle specified', 'yellow');
       continue;
     }
-    const targetArtifacts = resolveTargetArtifactsForProject(registry, projectConfig, config.defaults);
+    const targetArtifacts = resolveTargetArtifactsForProject(
+      registry,
+      projectConfig,
+      config.defaults,
+    );
 
     let passed = 0;
     let failed = 0;
 
     for (const [artifactPath, installed] of Object.entries(lock.installed)) {
       if (!targetArtifacts.has(artifactPath)) {
-        log(`✗ ${artifactPath}: no longer targeted (run metaclaude sync to delete/prune)`, 'red');
+        log(
+          `✗ ${artifactPath}: no longer targeted (run metaclaude sync to delete/prune)`,
+          'red',
+        );
         failed++;
         continue;
       }
@@ -1058,7 +1866,10 @@ async function cmdVerify(projectArg, options) {
       // Get actual path from registry
       const artifact = getArtifact(registry, artifactPath);
       if (!artifact) {
-        log(`✗ ${artifactPath}: not found in registry (run metaclaude sync to delete/prune)`, 'red');
+        log(
+          `✗ ${artifactPath}: not found in registry (run metaclaude sync to delete/prune)`,
+          'red',
+        );
         failed++;
         continue;
       }
@@ -1072,9 +1883,14 @@ async function cmdVerify(projectArg, options) {
         continue;
       }
 
-      const effectivePolicy = getEffectiveSyncPolicy(registry, artifactPath, artifact);
-      const isAgentAssisted = projectConfig.sync_overrides?.[artifactPath] === 'agent-assisted'
-        || effectivePolicy === 'agent-assisted';
+      const effectivePolicy = getEffectiveSyncPolicy(
+        registry,
+        artifactPath,
+        artifact,
+      );
+      const isAgentAssisted =
+        projectConfig.sync_overrides?.[artifactPath] === 'agent-assisted' ||
+        effectivePolicy === 'agent-assisted';
       const isNeverOverwrite = effectivePolicy === 'never-overwrite';
 
       // Local-owned policies intentionally preserve consumer edits. Their lock
@@ -1082,13 +1898,21 @@ async function cmdVerify(projectArg, options) {
       // bytes, so strict local-vs-lock drift detection would be a false alarm.
       if (isAgentAssisted || isNeverOverwrite) {
         if (installed.hash !== artifact.hash) {
-          log(`✗ ${artifactPath}: lock stale (expected upstream ${artifact.hash}, got ${installed.hash})`, 'red');
+          log(
+            `✗ ${artifactPath}: lock stale (expected upstream ${artifact.hash}, got ${installed.hash})`,
+            'red',
+          );
           failed++;
           continue;
         }
 
         if (isAgentAssisted) {
-          const pendingPath = join(projectPath, '.claude', 'sync-pending', targetPath);
+          const pendingPath = join(
+            projectPath,
+            '.claude',
+            'sync-pending',
+            targetPath,
+          );
           if (existsSync(pendingPath)) {
             log(`✗ ${artifactPath}: agent-assisted merge pending`, 'red');
             failed++;
@@ -1097,7 +1921,10 @@ async function cmdVerify(projectArg, options) {
         }
 
         const label = isAgentAssisted ? 'agent-assisted' : 'never-overwrite';
-        log(`✓ ${artifactPath}: ${installed.version}@${installed.hash} (${label}, local-owned)`, 'green');
+        log(
+          `✓ ${artifactPath}: ${installed.version}@${installed.hash} (${label}, local-owned)`,
+          'green',
+        );
         passed++;
         continue;
       }
@@ -1106,15 +1933,27 @@ async function cmdVerify(projectArg, options) {
       if (localHash !== installed.hash) {
         // Merge-strategy artifacts (settings-merge, gitignore-merge) produce merged files
         // whose hash will never match the source hash. Skip drift detection for these.
-        if (artifact.merge_strategy === 'settings-merge' || artifact.merge_strategy === 'gitignore-merge') {
-          log(`✓ ${artifactPath}: ${installed.version}@${installed.hash} (merge-managed)`, 'green');
+        if (
+          artifact.merge_strategy === 'settings-merge' ||
+          artifact.merge_strategy === 'gitignore-merge'
+        ) {
+          log(
+            `✓ ${artifactPath}: ${installed.version}@${installed.hash} (merge-managed)`,
+            'green',
+          );
           passed++;
         } else {
-          log(`✗ ${artifactPath}: drift detected (expected ${installed.hash}, got ${localHash})`, 'red');
+          log(
+            `✗ ${artifactPath}: drift detected (expected ${installed.hash}, got ${localHash})`,
+            'red',
+          );
           failed++;
         }
       } else {
-        log(`✓ ${artifactPath}: ${installed.version}@${installed.hash}`, 'green');
+        log(
+          `✓ ${artifactPath}: ${installed.version}@${installed.hash}`,
+          'green',
+        );
         passed++;
       }
     }
@@ -1138,7 +1977,10 @@ async function cmdVerify(projectArg, options) {
 
 async function cmdAdd(projectName, options) {
   if (!projectName) {
-    log('Usage: metaclaude add <project-name> [--path=<path>] [--bundle=<bundle>]', 'yellow');
+    log(
+      'Usage: metaclaude add <project-name> [--path=<path>] [--bundle=<bundle>]',
+      'yellow',
+    );
     process.exit(1);
   }
 
@@ -1162,11 +2004,19 @@ async function cmdAdd(projectName, options) {
   }
 
   // Resolve and verify path
-  const resolvedPath = resolveProjectPath(projectName, projectConfig, config.defaults, options);
+  const resolvedPath = resolveProjectPath(
+    projectName,
+    projectConfig,
+    config.defaults,
+    options,
+  );
 
   if (!existsSync(resolvedPath)) {
     log(`Warning: Directory does not exist: ${resolvedPath}`, 'yellow');
-    log('The project will be added but sync will fail until the directory exists.', 'dim');
+    log(
+      'The project will be added but sync will fail until the directory exists.',
+      'dim',
+    );
   }
 
   config.projects[projectName] = projectConfig;
@@ -1174,7 +2024,10 @@ async function cmdAdd(projectName, options) {
 
   log(`Added project: ${projectName}`, 'green');
   log(`  Path: ${resolvedPath}`, 'dim');
-  log(`  Bundle: ${projectConfig.bundle || config.defaults?.bundle || '(default)'}`, 'dim');
+  log(
+    `  Bundle: ${projectConfig.bundle || config.defaults?.bundle || '(default)'}`,
+    'dim',
+  );
   log('');
   log(`Next: metaclaude sync ${projectName}`, 'cyan');
 }
@@ -1223,10 +2076,18 @@ async function cmdClean(projectArg, options) {
 
   for (const projectName of projects) {
     const projectConfig = config.projects[projectName];
-    const projectPath = resolveProjectPath(projectName, projectConfig, config.defaults, options);
+    const projectPath = resolveProjectPath(
+      projectName,
+      projectConfig,
+      config.defaults,
+      options,
+    );
 
     if (!existsSync(projectPath)) {
-      log(`\nSkipping ${projectName}: directory not found at ${projectPath}`, 'yellow');
+      log(
+        `\nSkipping ${projectName}: directory not found at ${projectPath}`,
+        'yellow',
+      );
       continue;
     }
 
@@ -1250,7 +2111,9 @@ async function cmdClean(projectArg, options) {
             rmdirSync(parentDir);
             log(`  ✗ Removed empty dir: ${dirname(orphanPath)}`, 'dim');
           }
-        } catch { /* dir not empty, that's fine */ }
+        } catch {
+          /* dir not empty, that's fine */
+        }
       }
     }
 
@@ -1273,13 +2136,17 @@ async function main() {
     force: args.includes('--force'),
     resolveConflicts: args.includes('--resolve-conflicts'),
     ackDrift: args.includes('--ack-drift'),
-    baseDir: args.find(a => a.startsWith('--base-dir='))?.split('=')[1],
-    path: args.find(a => a.startsWith('--path='))?.split('=')[1],
-    bundle: args.find(a => a.startsWith('--bundle='))?.split('=')[1],
+    runtimeDeps: !args.includes('--no-runtime-deps'),
+    mcpEnsure: !args.includes('--no-mcp-ensure'),
+    baseDir: args.find((a) => a.startsWith('--base-dir='))?.split('=')[1],
+    path: args.find((a) => a.startsWith('--path='))?.split('=')[1],
+    bundle: args.find((a) => a.startsWith('--bundle='))?.split('=')[1],
   };
 
   // Get positional arg (project name for most commands)
-  const positionalArgs = args.filter(a => !a.startsWith('--') && a !== command);
+  const positionalArgs = args.filter(
+    (a) => !a.startsWith('--') && a !== command,
+  );
   const projectArg = positionalArgs[0];
 
   switch (command) {
@@ -1328,6 +2195,8 @@ Options:
   --force                   Force overwrite on conflicts
   --resolve-conflicts       Accept upstream version for conflicting artifacts only
   --ack-drift               (sync) Acknowledge shadow-file divergence: advance lock hash without touching the consumer file
+  --no-runtime-deps         (sync) Skip provisioning .claude/node_modules for synced hooks/scripts
+  --no-mcp-ensure           (sync) Skip Claude Code MCP add/get ensure checks
   --path=<path>             (add) Explicit path for project
   --bundle=<bundle>         (add) Bundle to use
 
@@ -1346,7 +2215,7 @@ Examples:
   }
 }
 
-main().catch(err => {
+main().catch((err) => {
   console.error('Error:', err.message);
   process.exit(1);
 });

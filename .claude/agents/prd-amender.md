@@ -16,7 +16,7 @@ Previously named `prd-writer` (push-back role). Renamed to avoid confusion with 
 
 ## Return Contract
 
-Your return to the orchestrator must include: PRD file updated, sections changed, requirements added/modified count, and sync status. Include required evidence even when that makes the return longer.
+Your return to the main agent must include: PRD file updated, sections changed, requirements added/modified count, and sync status. Include required evidence even when that makes the return longer.
 
 ## PRD Storage
 
@@ -203,7 +203,7 @@ After successful push:
 1. PRD document updated at `.claude/prds/<prd-id>/prd.md`
 2. Amendment Log updated with D-028 entries
 3. Manifest updated with new PRD version
-4. Report changes to orchestrator
+4. Report changes to the main agent
 5. Remind user PRD is now draft and needs human review
 
 ## Acceptable Assumption Domains

@@ -213,7 +213,7 @@ _What decisions have been made and why?_
 ### Acceptance Criteria (High-Level)
 
 - <What must be true for this PRD to be considered complete?>
-- <These will decompose into atomic specs>
+- <These can become spec slices only if the implementation scope needs them>
 
 ---
 

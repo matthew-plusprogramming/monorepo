@@ -30,7 +30,6 @@ Review implementation for security vulnerabilities before approval. Produce pass
 
 ```
 /security <spec-group-id>                   # Security review all changes for spec group
-/security <spec-group-id> <atomic-spec-id>  # Review specific atomic spec implementation
 ```
 
 ## When to Use
@@ -71,11 +70,11 @@ Before security review, verify:
 
 1. **Spec group exists** at `.claude/specs/groups/<spec-group-id>/`
 2. **Code review passed** - `convergence.code_review_passed: true` in manifest
-3. **All atomic specs implemented** - status is `implemented`
+3. **Implementation complete** - implementation evidence or diff is available
 
 If prerequisites not met → STOP and run `/code-review` first.
 
-**Note (REQ-004 / as-024)**: Dispatching this skill no longer requires a preceding `challenger pre-review` pass. The formerly pre-review-scoped reviewer-focus signal is now assembled by `.claude/scripts/lib/reviewer-focus-metadata.mjs` and surfaced as dispatch-prompt context in Step 1a below. On dispatch failure the metadata is persisted at `.claude/coordination/review-dispatch-prompt-<dispatch-id>.json` for retry (EC-10).
+**Note (REQ-004 / as-024)**: Reviewer-focus metadata is assembled by `.claude/scripts/lib/reviewer-focus-metadata.mjs` and surfaced as dispatch-prompt context in Step 1a below. On dispatch failure the metadata is persisted at `.claude/coordination/review-dispatch-prompt-<dispatch-id>.json` for retry (EC-10).
 
 ## Security Review Process
 
@@ -91,10 +90,7 @@ cat .claude/specs/groups/<spec-group-id>/manifest.json
 # Load spec for context
 cat .claude/specs/groups/<spec-group-id>/spec.md
 
-# List atomic specs
-ls .claude/specs/groups/<spec-group-id>/atomic/
-
-# Build file list from Implementation Evidence in each atomic spec
+# Build file list from implementation evidence or git diff
 ```
 
 Identify:
@@ -105,7 +101,7 @@ Identify:
 
 ### Step 1a: Assemble Reviewer-Focus Metadata (REQ-004 / as-024)
 
-Before auditing inputs, assemble reviewer-focus metadata — the replacement signal for the deleted `challenger pre-review` dispatch. The helper reads the spec evidence table + (optional) diff summary + prior findings and emits a dispatch-prompt JSON payload oriented toward security-relevant surfaces.
+Before auditing inputs, assemble reviewer-focus metadata. The helper reads the spec evidence table + (optional) diff summary + prior findings and emits a dispatch-prompt JSON payload oriented toward security-relevant surfaces.
 
 ```js
 import {
@@ -149,7 +145,7 @@ if (!metadata) {
 - `integration_surfaces`: cross-boundary paths — highest priority for input-validation / auth-boundary audit
 - `focus_areas`: attention-severity entries frequently correspond to multi-spec changes that span trust boundaries
 - `prior_findings`: carry-forward security-relevant signal from unifier / code-reviewer — do not re-flag without adding new evidence
-- `changed_files`: file + line-range list from atomic-spec evidence tables
+- `changed_files`: file + line-range list from spec evidence and implementation records
 - `review_recommendations`: reviewer-facing hints derived from the signal above
 
 This metadata is **advisory**, not a convergence signal — security findings generated during review remain authoritative for the pass/fail verdict.
@@ -568,7 +564,7 @@ Coercive enforcement: `workflow-gate-enforcement.mjs` blocks downstream dispatch
 - If PASS → After `/docs` completes, dispatch `/manual-test` as the final step before commit (advisory by default; mandatory for `runtime_validation_required: true`)
 - If FAIL → Use `/implement` to fix issues, then re-run `/security`
 
-**Documentation trigger**: Documentation is mandatory for all spec-based workflows (oneoff-spec and orchestrator). Dispatch the documenter subagent after security passes.
+**Documentation trigger**: Documentation is mandatory for spec-based workflows. Dispatch the documenter subagent after security passes.
 
 ## Examples
 

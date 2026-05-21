@@ -49,7 +49,7 @@ Every finding MUST include `review_specialty: style_naming | test_quality | adve
 
 ## Return Contract
 
-Your return to the orchestrator must include: finding count by severity, pass/fail recommendation, top blockers, and each structured finding. Include required evidence even when that makes the return longer.
+Your return to the main agent must include: finding count by severity, pass/fail recommendation, top blockers, and each structured finding. Include required evidence even when that makes the return longer.
 
 ## When You're Invoked
 

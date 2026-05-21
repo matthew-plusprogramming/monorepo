@@ -16,12 +16,11 @@ archived specs stay out of the live hook path. See [HOOKS.md § spec-schema-vali
 
 ## Overview
 
-`spec-schema-validate.mjs` validates spec frontmatter and manifest.json files against JSON Schemas under `.claude/specs/schema/`:
+`spec-schema-validate.mjs` validates active spec frontmatter and manifest.json files against JSON Schemas under `.claude/specs/schema/`:
 
-- `workstream-spec.schema.json` — WorkstreamSpec frontmatter.
-- `atomic-spec.schema.json` — AtomicSpec frontmatter.
-- `master-spec.schema.json` — MasterSpec frontmatter.
+- `session.schema.json` — Session state.
 - `spec-group.schema.json` — SpecGroup `manifest.json` files.
+- `contract-registry.schema.json`, `audit-report.schema.json`, `problem-brief.schema.json` — supporting structured docs.
 
 The validator is a thin wrapper around [Ajv](https://ajv.js.org/) (JSON Schema Draft-07). Field-path-qualified diagnostics are preserved via a custom Ajv-error formatter.
 
@@ -73,7 +72,7 @@ Frontmatter parsing uses the `yaml` package (already a project dep at v2.8.2+) i
 
 ## Section-Validation Scoping
 
-The validator enforces required markdown sections (e.g., `## Context`, `## Task List` for WorkstreamSpec; `## Description`, `## Acceptance Criteria`, `## Test Strategy`, `## Atomicity Justification` for AtomicSpec). As of v2.0.1, section validation runs **only** on files whose resolved absolute path contains `.claude/specs/`.
+The validator enforces required markdown sections for active task specs. Section validation runs **only** on files whose resolved absolute path contains `.claude/specs/`.
 
 ### Scope Guard
 
@@ -100,8 +99,7 @@ Helper-driven temp-file fixture tests write spec files to `/var/folders/.../*/sp
 `determineSpecType(filePath, frontmatter)` resolves the target schema using three signals in priority order:
 
 1. **Filename** — `manifest.json` → `spec-group`.
-2. **Directory** — path contains `/atomic/` → `atomic-spec`.
-3. **Frontmatter hints** — `owner`, `scope`, `implementation_status`, `workstreams`, `gates`, or `id` prefixes (`as-`, `ws-`, `ms-`).
+2. **Frontmatter hints** — active task-spec fields and supported manifest fields.
 
 If no signal resolves, the validator emits a warning and exits 0 (no blocking; the hook surface is advisory for non-spec files).
 
@@ -109,13 +107,12 @@ If no signal resolves, the validator emits a warning and exits 0 (no blocking; t
 
 ## Markdown-Body Exclusion
 
-JSON Schemas declare several sections as `required` (e.g., `description`, `acceptance_criteria`, `atomicity_justification` for AtomicSpec) because those sections belong in the markdown body, not the frontmatter. When validating frontmatter-only, the validator strips body-only required fields before compiling.
+JSON Schemas declare some sections as `required` even though those sections belong in the markdown body, not the frontmatter. When validating frontmatter-only, the validator strips body-only required fields before compiling.
 
 ```js
 const MARKDOWN_BODY_ONLY_REQUIRED = new Set([
   'description',
   'acceptance_criteria',
-  'atomicity_justification',
 ]);
 
 function buildFrontmatterSchema(schema, specType) {
@@ -180,7 +177,7 @@ Tests live at `.claude/scripts/__tests__/`:
 - `ajv-validator.test.mjs` — Ajv integration and formatter behaviour.
 - `frontmatter-fields.test.mjs` — Per-field positive/negative cases for each new frontmatter field.
 - `e2e-skip-rationale-widened.test.mjs` — Enum widening regression + new `pure-compute` acceptance.
-- `integration-contracts.test.mjs` — Composite runtime-field fixtures and cross-schema consistency (workstream vs atomic structural equality for frontmatter-only fields; all three schemas equal for `e2e_skip_rationale`).
+- `integration-contracts.test.mjs` — Composite runtime-field fixtures and cross-schema consistency.
 
 Runner: vitest via `npm run test:scripts`. Config: `.claude/scripts/vitest.config.mjs`.
 
@@ -191,4 +188,4 @@ Runner: vitest via `npm run test:scripts`. Config: `.claude/scripts/vitest.confi
 - Field-by-field reference: [SPEC-FRONTMATTER.md](./SPEC-FRONTMATTER.md).
 - Hook registration: [HOOKS.md § spec-schema-validate.mjs](./HOOKS.md#spec-schema-validatemjs).
 - Manifest validator (sibling): [MANIFEST-MIGRATION.md](./MANIFEST-MIGRATION.md).
-- Source schemas: `.claude/specs/schema/{workstream-spec,atomic-spec,spec-group}.schema.json`.
+- Source schemas: `.claude/specs/schema/*.schema.json`.

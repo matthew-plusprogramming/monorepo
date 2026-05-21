@@ -12,16 +12,15 @@
  *   -----------------------   ---------------------  -----------------  ------------------------------------
  *   unifier                   1                      content-hash       .claude/specs/groups/<id>/spec.md,
  *                                                                       requirements.md, manifest.json,
- *                                                                       atomic/*.md
+ *                                                                       spec-linked docs
  *   completion-verifier       1                      content-hash       manifest.json, registry content,
  *                                                                       trace files
  *   code-review               2                      content-hash       git-diff descriptor
  *   security                  2                      content-hash       git-diff descriptor
  *   investigation             2                      none               (rationale required)
  *   challenger-pre-impl       2                      none               (rationale required)
- *   challenger-pre-orch       2                      none               (rationale required)
  *
- * Rationale for "none" gates (AC2.2): investigation and challenger substages
+ * Rationale for "none" gates (AC2.2): investigation and challenger gates
  * surface distinct findings per pass observed in evidence runs; attestation
  * by content hash would falsely equate two runs that uncovered different
  * issues. Pass counting alone is the intended clearance signal.
@@ -41,8 +40,8 @@
  *
  * Implements: REQ-001, REQ-002
  * Spec: sg-pipeline-efficiency-ws1-convergence-pruning / as-002
- *   - AC2.1: table covers all 7 canonical gates.
- *   - AC2.2: investigation + both challenger substages at 2/none + rationale.
+ *   - AC2.1: table covers all 6 canonical gates.
+ *   - AC2.2: investigation + challenger at 2/none + rationale.
  *   - AC2.3: unifier + completion-verifier at 1/content-hash; code-review
  *            + security at 2/content-hash (git-diff descriptor).
  *   - AC2.4: unifier + completion-verifier hash_input_manifest populated.
@@ -66,7 +65,6 @@ const UNIFIER_HASH_INPUT_MANIFEST = Object.freeze([
   '.claude/specs/groups/<id>/spec.md',
   '.claude/specs/groups/<id>/requirements.md',
   '.claude/specs/groups/<id>/manifest.json',
-  '.claude/specs/groups/<id>/atomic/*.md',
 ]);
 
 /**
@@ -142,12 +140,6 @@ const RAW_TABLE = {
     hash_input_manifest: [],
     rationale: FINDINGS_VARIANCE_RATIONALE,
   },
-  'challenger-pre-orch': {
-    required_clean_passes: 2,
-    attestation_mode: 'none',
-    hash_input_manifest: [],
-    rationale: FINDINGS_VARIANCE_RATIONALE,
-  },
 };
 
 // =============================================================================
@@ -208,5 +200,4 @@ export const PER_GATE_THRESHOLD_TABLE_GATES = Object.freeze([
   'completion-verifier',
   'investigation',
   'challenger-pre-impl',
-  'challenger-pre-orch',
 ]);

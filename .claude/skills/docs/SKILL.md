@@ -1,6 +1,6 @@
 ---
 name: docs
-description: Generate documentation from implementation. Creates user docs, API docs, and architecture docs. MANDATORY for all spec-based workflows (oneoff-spec, orchestrator). Only skipped for oneoff-vibe.
+description: Generate documentation from implementation. Creates user docs, API docs, and architecture docs. MANDATORY for oneoff-spec. Only skipped for oneoff-vibe.
 user-invocable: true
 allowed-tools: Read, Write, Glob, Grep
 ---
@@ -22,7 +22,7 @@ Generate documentation artifacts from implemented code. Create durable external 
 
 ### Mandatory (Always Run)
 
-Documentation is mandatory for all spec-based workflows (oneoff-spec and orchestrator). Run after security review, before commit.
+Documentation is mandatory for oneoff-spec. Run after security review, before commit.
 
 ### What to Document (scope varies by change)
 
@@ -131,14 +131,7 @@ What this component depends on and why.
 cat .claude/specs/groups/<spec-group-id>/manifest.json
 cat .claude/specs/groups/<spec-group-id>/spec.md
 
-# List atomic specs for implementation details
-ls .claude/specs/groups/<spec-group-id>/atomic/
-
-# Read atomic specs for Implementation Evidence (exact files/lines changed)
-cat .claude/specs/groups/<spec-group-id>/atomic/as-001-*.md
-
-# Find modified files from Implementation Evidence
-# Or use git diff
+# Find modified files from implementation evidence or git diff
 git diff --name-only main..HEAD
 
 # Identify public interfaces

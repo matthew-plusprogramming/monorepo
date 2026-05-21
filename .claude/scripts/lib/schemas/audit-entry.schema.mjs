@@ -135,9 +135,9 @@ export const sha256HexSchema = makeStringRegexSchema(
 /**
  * Canonical 9-class event_class enum per spec.md:651-659.
  *
- * Ordering follows the spec source verbatim. Additions require MasterSpec
+ * Ordering follows the spec source verbatim. Additions require parent-spec
  * amendment (spec.md:643: "enum is extensible but additions require
- * MasterSpec amendment"). Letter-code fallback (`a`..`f`) is intentionally
+ * parent-spec amendment"). Letter-code fallback (`a`..`f`) is intentionally
  * NOT accepted (AC3.6).
  *
  * Note: `test_writer_unlock_refence` is the correct spelling per the

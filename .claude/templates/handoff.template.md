@@ -3,7 +3,7 @@
 
 Use this template to capture interrupted work session state when:
 
-(a) **Significant work interruptions**: Complex investigation, orchestrator-level work, or multi-session
+(a) **Significant work interruptions**: Complex investigation, broad spec work, or multi-session
     efforts where losing context means losing hours of investigation. The handoff doc preserves the
     "why" and "what next" that session.json cannot capture.
 

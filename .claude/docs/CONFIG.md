@@ -37,14 +37,14 @@ Defines Claude CLI version pinning and upgrade strategy.
 
 ### architecture.yaml (Template with defaults)
 
-Defines thresholds for architecture analysis tools: complexity scoring, debt tracking, deliberation cycles, and atomization limits.
+Defines thresholds for architecture analysis tools: complexity scoring, debt tracking, deliberation cycles, and spec-refinement limits.
 
 | Section        | Key Fields                                                         | Description                                |
 | -------------- | ------------------------------------------------------------------ | ------------------------------------------ |
 | `complexity`   | `threshold`, `warn_at`                                             | Maximum and warning complexity scores      |
 | `debt`         | `threshold_per_component`, `severity_weights`                      | Debt scoring limits and weight multipliers |
 | `deliberation` | `max_cycles`, `circuit_breaker_limit`                              | Deliberation round limits                  |
-| `atomization`  | `max_refinement_iterations`, `investigation_clean_passes_required` | Spec decomposition limits                  |
+| `atomization`  | `max_refinement_iterations`, `investigation_clean_passes_required` | Legacy key for spec-refinement limits      |
 | `paths`        | `specs`, `config`, `debt_inventory`                                | Standard project directory paths           |
 
 **Status**: Template with sensible defaults. Usable out-of-the-box, but projects should review and customize thresholds for their specific codebase size and complexity profile.
