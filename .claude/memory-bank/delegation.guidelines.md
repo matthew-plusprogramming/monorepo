@@ -181,7 +181,7 @@ These patterns emerged from production use of the delegation-first system. They 
 
 ### Recursive Conductor (Practice 1.4)
 
-Workstream agents are themselves conductors, not just executors. When a facilitator dispatches an implementer for a complex workstream, that implementer dispatches its own subagents:
+Workstream agents are themselves conductors, not just executors. When the main agent or a spec-slice owner dispatches an implementer for a complex workstream, that implementer dispatches its own subagents:
 
 - **Explore subagent**: Evidence gathering before any edit (see Evidence-Before-Edit)
 - **Test-writer subagent**: Unit tests within the workstream scope
@@ -306,7 +306,7 @@ The rule: if the check is a single `ls` or tiny status-file read, do it directly
 
 ### Pre-Computed Structure
 
-When the human provides explicit decomposition in their prompt, use it directly. The atomizer is a fallback for ambiguous scope, not the default. Front-loading decomposition in prompts saves 5-10 exploratory turns per workstream.
+When the human provides explicit decomposition in their prompt, use it directly. Add spec slices only when they make dependencies, ownership, or test surfaces clearer; do not create a separate decomposition workflow by default. Front-loading useful structure in prompts saves 5-10 exploratory turns per workstream.
 
 ---
 

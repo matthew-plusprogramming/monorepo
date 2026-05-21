@@ -9,13 +9,13 @@ Every subagent must return using this format:
 - **blockers**: List of blocking issues (empty if success)
 - **artifacts**: Files created or modified
 
-Return structured status and evidence pointers rather than raw data. The contract protects orchestrator context efficiency without using numeric response caps.
+Return structured status and evidence pointers rather than raw data. The contract protects main-agent context efficiency without using numeric response caps.
 
 ### Error Escalation
 
 - `success` → proceed to next step
-- `partial` → list what completed vs. what didn't, orchestrator reviews and retries incomplete portion
-- `failed` → include error category; orchestrator retries once silently, then escalates to human
+- `partial` → list what completed vs. what didn't; the main agent reviews and retries the incomplete portion
+- `failed` → include error category; the main agent retries once silently, then escalates to human
 - Never silently swallow failures
 
 ## Tool Assignment (Least Privilege)
@@ -62,10 +62,10 @@ A single agent definition that accepts a parameter (e.g., `stage` for challenger
 
 **Examples**:
 
-- `challenger` — parameterized by `stage` (`pre-implementation` or `pre-orchestration`). The core challenge logic is identical; only the input context and fix agent change per stage.
+- `challenger` — parameterized by `stage` (`pre-implementation`). Keep the parameter because the dispatch interface is stage-aware, but do not add extra challenger stages without a current workflow need.
 - `prd-critic` — parameterized by `perspective` (completeness, feasibility, clarity, consistency). Same evaluation structure, different lens.
 
-**Anti-pattern**: Creating separate challenger agents for each active stage when a single `challenger` with a `stage` parameter covers both cases.
+**Anti-pattern**: Creating separate challenger agents for stage variants when a single `challenger` with a `stage` parameter covers the active case.
 
 ### Direct-Dispatch Pattern
 

@@ -29,7 +29,7 @@ If evidence is missing: search more, or propose adding the symbol to the contrac
 
 ### Recursive Conductor Integration
 
-For implementers using the recursive conductor pattern: the DISCOVER phase is a mandatory explore-subagent dispatch before any implementer dispatch. The evidence table should be included in the atomic spec.
+For implementers using the recursive conductor pattern: the DISCOVER phase is a mandatory explore-subagent dispatch before any implementer dispatch. The evidence table should be included in the task spec or relevant spec slice.
 
 ## Contract Integrity
 

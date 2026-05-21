@@ -9,7 +9,7 @@ Canonical locations for all numbered practices in the metaclaude-assistant syste
 | Practice | Name                          | Canonical File                                         | Line | Description                                                              |
 | -------- | ----------------------------- | ------------------------------------------------------ | ---- | ------------------------------------------------------------------------ |
 | 1.4      | Recursive Conductor           | `CLAUDE.md`                                            | 70   | Workstream agents are conductors, not just executors; max depth 3 levels |
-| 1.5      | Pre-Computed Structure        | `CLAUDE.md`                                            | 74   | Use human-provided decomposition directly; atomizer is fallback          |
+| 1.5      | Pre-Computed Structure        | `CLAUDE.md`                                            | 74   | Use human-provided decomposition directly; add spec slices only as needed |
 | 1.6      | File-Based Coordination       | `CLAUDE.md`                                            | 78   | Sentinel files for trivial inter-agent coordination instead of dispatch  |
 | 1.7      | Evidence-Before-Edit          | `.claude/memory-bank/best-practices/contract-first.md` | 7    | Prove symbols exist before referencing them; evidence table required     |
 | 1.8      | Wire Protocol Contracts       | `CLAUDE.md`                                            | 290  | Cross-boundary integration points need explicit protocol contracts       |

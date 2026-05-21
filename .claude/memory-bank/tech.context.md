@@ -69,11 +69,7 @@ Scaffolding
 
 ---
 
----
-
 ## Claude Code Orchestration Framework
-
-The following sections describe the shared Claude Code workflow infrastructure synced from metaclaude-assistant.
 
 ## Architecture Overview
 
@@ -81,7 +77,7 @@ The system is organized around the `.claude/` directory structure:
 
 ```
 .claude/
-├── agents/              # Subagent specifications (23 specialized agents)
+├── agents/              # Subagent specifications (21 specialized agents)
 ├── skills/              # Skill definitions (workflow stages)
 ├── specs/
 │   ├── groups/          # Active spec groups
@@ -105,17 +101,15 @@ The system is organized around the `.claude/` directory structure:
 
 ## Subagent Model
 
-23 specialized subagents, each with focused responsibilities:
+21 specialized subagents, each with focused responsibilities:
 
 | Subagent                 | Model | Purpose                                                                                                                              |
 | ------------------------ | ----- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| `atomicity-enforcer`     | opus  | Validate atomic specs meet atomicity criteria                                                                                        |
-| `atomizer`               | opus  | Decompose specs into atomic specs with single responsibility                                                                         |
-| `challenger`             | opus  | MANDATORY operational feasibility check for oneoff-spec and orchestrator workflows (pre-implementation/test/review/orchestration)    |
+| `challenger`             | opus  | MANDATORY operational feasibility check for oneoff-spec workflows (pre-implementation)                                                |
 | `completion-verifier`    | opus  | Post-completion verification gates (docs, assumptions, registry, memory bank)                                                        |
 | `explore`                | opus  | Investigate questions via web or codebase research; returns structured findings                                                      |
 | `interface-investigator` | opus  | Surface cross-spec inconsistencies (env vars, APIs, data shapes, assumptions)                                                        |
-| `spec-author`            | opus  | Author workstream specs (no code)                                                                                                    |
+| `spec-author`            | opus  | Author oneoff specs (no code)                                                                                                        |
 | `implementer`            | opus  | Implement from approved specs                                                                                                        |
 | `test-writer`            | opus  | Write tests for acceptance criteria                                                                                                  |
 | `e2e-test-writer`        | opus  | Black-box E2E testing: Playwright browser tests and HTTP API tests from spec contracts only                                          |
@@ -124,7 +118,6 @@ The system is organized around the `.claude/` directory structure:
 | `security-reviewer`      | opus  | Security review - PRDs (shift-left) and implementation (read-only)                                                                   |
 | `documenter`             | opus  | Generate docs from implementation                                                                                                    |
 | `refactorer`             | opus  | Code quality improvements with behavior preservation                                                                                 |
-| `facilitator`            | opus  | Orchestrate multi-workstream projects with git worktrees                                                                             |
 | `manual-tester`          | opus  | Bounded exploratory end-to-end verification (5 happy + 3 failure + 2 adjacent, then stop); advisory/non-blocking; runs after `/docs` |
 | `prd-writer`             | opus  | Conduct discovery interviews and draft/amend PRDs (D-034 format)                                                                     |
 | `prd-critic`             | opus  | Evaluate PRDs from one of four perspectives with severity ratings                                                                    |
@@ -146,24 +139,20 @@ The system is organized around the `.claude/` directory structure:
 
 ```
 oneoff-spec:  TaskSpec → Investigation Convergence Loop (2 clean passes, auto-decision) → Challenger Convergence Loop (pre-implementation, auto-decision) → Auto-Approval → Implement + Test → Integration Verify → Unify + reviewer-focus metadata → Code Review → Security → Completion Verify
-orchestrator: WorkstreamSpecs → Atomize → Enforce → Investigation Convergence Loop (2 clean passes, auto-decision) → Challenger Convergence Loop (pre-orchestration, auto-decision) → Auto-Approval → Implement + Test → Integration Verify → Unify + reviewer-focus metadata → Code Review → Security → Completion Verify
 ```
 
 ### Spec Types
 
-- **TaskSpec**: Single-feature specifications for medium tasks
-- **WorkstreamSpec**: Component of a larger orchestrated effort
-- **MasterSpec**: Coordinates multiple workstreams with contracts
+- **TaskSpec**: Main active spec format for work that needs a written contract
+- **Spec slices**: Optional lightweight sections inside the same `spec.md` for larger work; do not create separate workstream, master, or decomposed spec files
 
 ### Spec Lifecycle
 
 1. **Draft**: Initial authoring from requirements
-2. **Atomized**: Decomposed into atomic specs (orchestrator workflows only)
-3. **Enforced**: Validated against atomicity criteria (orchestrator workflows only)
-4. **Approved**: User-approved, ready for implementation
-5. **Implementing**: Work in progress
-6. **Implemented**: All atomic specs complete
-7. **Verified**: Unifier confirmed convergence
+2. **Approved**: User-approved, ready for implementation
+3. **Implementing**: Work in progress
+4. **Implemented**: Acceptance criteria complete
+5. **Verified**: Unifier confirmed convergence
 
 ## Validation Hooks
 
@@ -301,34 +290,16 @@ Request → Route → /prd (gather-criticize loop, optional TAD) → [Optional: 
 ```
 
 - Requires formal specification
-- No atomization step (TaskSpec is implemented directly)
+- No decomposition step (TaskSpec is implemented directly; optional slices stay inside `spec.md`)
 - Investigation is MANDATORY (single-spec mode: Category 7, env/dep, external surfaces)
 - Parallel implementation and testing
 - Full review chain
 
-### orchestrator (Large tasks)
+For large tasks, keep one `spec.md` and use optional internal spec slices rather than separate workstream/master/decomposed files.
 
-```
-Request → Route → /prd (gather-criticize loop, optional TAD) → [Optional: PRD Draft] → ProblemBrief →
-  [Parallel: WorkstreamSpecs] → MasterSpec →
-  Investigation Convergence Loop (2 clean passes, auto-decision) →
-  Challenger Convergence Loop (pre-orchestration, auto-decision) →
-  Auto-Approval (passthrough logging) →
-  /orchestrate (allocates worktrees, dispatches facilitator) →
-  [Parallel per workstream: Implement + Test + E2E Test (E2E only for cross-boundary specs)] →
-  Integration Verify →
-  Unify + reviewer-focus metadata →
-  Code Review → Security → Completion Verification →
-  Browser Test → Docs → [If PRD: PRD Push] → Commit
-```
+**Investigation Checkpoint**: `/investigate` is MANDATORY before implementation for oneoff-spec (mode: `single-spec`). It surfaces cross-boundary inconsistencies (env vars, API contracts, deployment assumptions) that would otherwise become runtime bugs.
 
-- 3+ workstreams
-- Git worktree isolation
-- Cross-workstream contract validation
-
-**Investigation Checkpoint**: `/investigate` is MANDATORY before implementation for both oneoff-spec (mode: `single-spec`) and orchestrator (mode: `standard`) workflows. It surfaces cross-boundary inconsistencies (env vars, API contracts, deployment assumptions) that would otherwise become runtime bugs.
-
-**Challenger Stages**: `/challenge` is required only at `pre-implementation` for oneoff-spec and `pre-orchestration` for orchestrator. Both stages run as convergence loops (2 consecutive clean passes, auto-decision). Deleted post-implementation challenger dispatches are replaced by `/unify` preflight and reviewer-focus metadata.
+**Challenger Stage**: `/challenge` is required at `pre-implementation` and runs as a convergence loop (2 consecutive clean passes, auto-decision).
 
 ## Branch Naming Convention
 
@@ -350,9 +321,8 @@ Cross-session recovery via `.claude/context/session.json`:
 {
   "phase_checkpoint": {
     "phase": "implementing",
-    "atomic_specs_pending": ["as-003", "as-004"],
-    "atomic_specs_complete": ["as-001", "as-002"],
-    "last_completed": "as-002"
+    "substages_visited": ["pre-impl"],
+    "last_transition_at": "2026-04-21T00:00:00Z"
   }
 }
 ```
@@ -365,9 +335,9 @@ Cross-session recovery via `.claude/context/session.json`:
 
 ### Valid Phases
 
-The session tracks workflow progress through 15 phases:
+The session tracks workflow progress through 14 active phases:
 
-`prd_gathering`, `spec_authoring`, `atomizing`, `enforcing`, `investigating`, `awaiting_approval` (backwards compat), `auto_approval`, `challenging`, `implementing`, `testing`, `verifying`, `reviewing`, `completion_verifying`, `documenting`, `journaling`, `complete`
+`prd_gathering`, `spec_authoring`, `investigating`, `awaiting_approval` (backwards compat), `auto_approval`, `challenging`, `implementing`, `testing`, `verifying`, `reviewing`, `completion_verifying`, `documenting`, `journaling`, `complete`
 
 Phases added by workflow enforcement: `challenging` (mandatory feasibility checks), `completion_verifying` (post-completion gates), `documenting` (documentation generation), `auto_approval` (passthrough logging after convergence). Phase transitions are validated via DAG-based predecessor rules in `session-checkpoint.mjs`.
 
@@ -376,7 +346,6 @@ Phases added by workflow enforcement: `challenging` (mandatory feasibility check
 | Artifact                   | Location                                                                       |
 | -------------------------- | ------------------------------------------------------------------------------ |
 | Active specs               | `.claude/specs/groups/<spec-group-id>/`                                        |
-| Atomic specs               | `.claude/specs/groups/<spec-group-id>/atomic/`                                 |
 | Manifest                   | `.claude/specs/groups/<spec-group-id>/manifest.json`                           |
 | Session state              | `.claude/context/session.json`                                                 |
 | Convergence diagnostic log | `.claude/context/session.log` (FULL_BLOCK, mode 0600)                          |
@@ -447,17 +416,17 @@ When `implementer`, `test-writer`, and `e2e-test-writer` run in parallel, neithe
 - Tests are derived from the spec's acceptance criteria, not from reading implementation details
 - This ensures tests verify the _contract_, not the _implementation_ — catching cases where code passes its own logic but violates the spec
 
-When dispatching in parallel, the orchestrator must provide the test-writer with the spec artifact only. If the test-writer needs to understand interfaces or types, those should come from the spec's evidence table or contract definitions, not from implementation files.
+When dispatching in parallel, the main agent must provide the test-writer with the spec artifact only. If the test-writer needs to understand interfaces or types, those should come from the spec's evidence table or contract definitions, not from implementation files.
 
 ## Assumption Tracking (Practice 1.10)
 
-When multiple agents implement in parallel, each agent's `TODO(assumption)` comments create a distributed assumption graph. After parallel implementation and before the review gate, the orchestrator MUST scan modified files for `TODO(assumption)` markers, group by topic, and flag conflicts (two agents assumed different values for the same integration point). A single agent's assumption is a local decision; multiple agents' assumptions about the same topic are a distributed consensus problem.
+When multiple agents implement in parallel, each agent's `TODO(assumption)` comments create a distributed assumption graph. After parallel implementation and before the review gate, the main agent MUST scan modified files for `TODO(assumption)` markers, group by topic, and flag conflicts (two agents assumed different values for the same integration point). A single agent's assumption is a local decision; multiple agents' assumptions about the same topic are a distributed consensus problem.
 
 ## Parallel Execution
 
-For large tasks, the main agent orchestrates parallel execution:
+For large tasks, the main agent coordinates parallel execution from one `spec.md`:
 
-- Multiple `spec-author` subagents for workstreams
+- Optional spec slices inside `spec.md`; avoid separate spec files for decomposition
 - `implementer`, `test-writer`, and `e2e-test-writer` run in parallel (no ordering constraint — test-writer and e2e-test-writer work from spec only; e2e-test-writer dispatched only for cross-boundary specs)
 - `code-reviewer` and `security-reviewer` run in parallel after unifier and reviewer-focus metadata prerequisites
 - Both reviewers converge independently; `documenter` waits for both convergences
@@ -469,7 +438,7 @@ Before merge, all gates must pass. Each gate marked with **(loop)** runs under t
 
 - Spec complete
 - Investigation convergence **(loop)** — auto-decision engine integration
-- Challenger convergence **(loop)** — pre-impl/pre-orch stages, auto-decision engine
+- Challenger convergence **(loop)** — pre-implementation, auto-decision engine
 - All ACs implemented
 - All tests passing (100% AC coverage)
 - Unifier validation passed **(loop)**
@@ -501,28 +470,27 @@ User: "Add a logout button to the dashboard"
 13. Synthesize results → Commit with spec evidence
 ```
 
-## Example Workflow: Multi-Workstream with Investigation
+## Example Workflow: Large Spec With Slices
 
 ```markdown
 User: "Build a deployment pipeline with build, deploy, and monitoring"
 
-1. `/route` → orchestrator (3 workstreams)
-2. Use `/prd` to gather requirements for each workstream
-3. [Parallel] Dispatch 3 Spec-author subagents → Create WorkstreamSpecs
-4. Create MasterSpec linking workstreams
-5. `/investigate ms-deployment-pipeline` → MANDATORY checkpoint
+1. `/route` → oneoff-spec (large, use internal spec slices)
+2. Use `/prd` to gather requirements across build, deploy, and monitoring
+3. Dispatch Spec-author subagent → Create one `spec.md` with optional slices
+4. `/investigate sg-deployment-pipeline` → MANDATORY checkpoint
    - Finds: GIT_SSH_KEY_PATH vs GIT_SSH_KEY_BASE64 conflict
-   - Finds: Missing LOG\_\* vars in monitoring workstream
+   - Finds: Missing LOG\_\* vars in monitoring slice
    - Finds: Container image format inconsistency
-6. Surface decisions to user → User chooses canonical patterns
-7. Update affected specs with decisions
-8. Re-run `/investigate` → Clean (no issues)
-9. User approves MasterSpec
-10. `/challenge` → MANDATORY operational feasibility check (stage: pre-orchestration)
-11. [Parallel per workstream] Dispatch Implementer + Test-writer
-12. Integration Verify → Unify → Validate convergence
-13. Assemble reviewer-focus metadata
-14. Continue with Code Review → Security → Docs → Commit
+5. Surface decisions to user → User chooses canonical patterns
+6. Update `spec.md` with decisions
+7. Re-run `/investigate` → Clean (no issues)
+8. User approves spec
+9. `/challenge` → MANDATORY operational feasibility check (stage: pre-implementation)
+10. [Parallel] Dispatch Implementer + Test-writer + E2E-test-writer where relevant
+11. Integration Verify → Unify → Validate convergence
+12. Assemble reviewer-focus metadata
+13. Continue with Code Review → Security → Docs → Commit
 ```
 
 ## Trace System

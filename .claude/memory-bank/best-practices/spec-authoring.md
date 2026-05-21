@@ -30,12 +30,12 @@ Use GIVEN-WHEN-THEN for every AC:
 | Multiple behaviors    | "Clear token and redirect and show message" | Split into AC1.1, AC1.2, AC1.3                   |
 | Untestable            | "System should be secure"                   | "Session expires after 30 minutes of inactivity" |
 
-## Atomicity
+## Scope Size
 
-Each atomic spec should have exactly one reason to fail:
+Each spec or internal spec slice should be small enough to review and test clearly:
 
-- **Single Responsibility**: One behavior per atomic spec
-- **Independent Implementation**: Can be implemented without other atomic specs
+- **Single Responsibility**: One coherent behavior or feature area
+- **Independent Implementation**: Can be implemented without hidden dependencies
 - **Independent Testing**: Can be tested in isolation
 - **Clear Boundary**: Obviously complete or incomplete
 
