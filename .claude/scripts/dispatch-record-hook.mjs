@@ -83,8 +83,8 @@ const CHECKPOINT_CLI_TIMEOUT_MS = 10_000;
 // are forwarded; everything else (AWS creds, SSH agents, shell history,
 // user secrets piped into the parent process, etc.) stays inside this
 // hook's own process.
-//   CLAUDE_PROJECT_DIR — required for claudeDir discovery (hook-utils,
-//     yaml-utils, trace-utils all consult this).
+//   CLAUDE_PROJECT_DIR — required for claudeDir discovery (hook-utils and
+//     yaml-utils consult this).
 //   PATH — required for Node's own child_process / OS lookups.
 //   HOME — needed by Node for `~`-style cache + config paths on some hosts.
 //   USER — session-checkpoint.mjs records operator in audit entries

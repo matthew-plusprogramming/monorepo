@@ -493,102 +493,15 @@ User: "Build a deployment pipeline with build, deploy, and monitoring"
 13. Continue with Code Review → Security → Docs → Commit
 ```
 
-## Trace System
-
-The trace system generates pre-computed architectural summaries of the codebase. Agents consume these summaries instead of performing expensive Explore dispatches.
-
-### Architecture
-
-```
-trace.config.json          # Module definitions with fileGlobs
-    ↓
-trace-generate.mjs         # Main generation script
-    ├── analyzeFile()       # Parse exports (symbol, type, signature, lineNumber) and imports per file
-    ├── parseExports()      # Regex-based export extraction with signature capture
-    └── parseImports()      # Regex-based import extraction (static only)
-    ↓
-lib/trace-utils.mjs        # Shared utilities
-    ├── loadTraceConfig()   # Load and validate trace.config.json
-    ├── fileToModule()      # Map file path → module ID (first match)
-    ├── fileToModules()     # Map file path → all matching module IDs (for ambiguity detection)
-    ├── isTraceStale()      # Check trace freshness against staleness threshold
-    ├── matchesGlob()       # File glob matching
-    ├── findFilesMatchingGlobs()  # Find all files matching module globs
-    └── sanitizeMarkdown()  # Escape CommonMark special chars for .md output
-    ↓
-lib/high-level-trace.mjs   # High-level trace generation
-    ├── generateHighLevelTrace()          # Entry point: produces JSON + MD
-    ├── generateHighLevelTraceJSON()      # Build high-level JSON structure
-    ├── generateHighLevelTraceMarkdown()  # Render high-level MD summary
-    └── validateHighLevelTrace()          # Schema validation
-    ↓
-traces/                    # Output directory (not committed, not synced)
-    ├── high-level.json    # Module landscape with dependencies/dependents
-    ├── high-level.md      # Human-readable module summary
-    └── low-level/
-        ├── <module-id>.json          # Per-module detailed trace (exports, imports, files)
-        ├── <module-id>.md            # Per-module human-readable summary
-        ├── <module-id>.calls.json    # Per-module call graph (fenced from main-agent reads; can balloon)
-        └── <module-id>.summary.json  # Call-graph summary (top-20 callees, counts) — safe for main-agent
-```
-
-### Trace Data Fields
-
-**Low-level trace exports** include:
-
-- `symbol`: Export name (e.g., `parseExports`)
-- `type`: Export type (e.g., `function`, `class`, `const`, `type`)
-- `signature`: Display-facing function signature, truncated at 200 chars (e.g., `(source: string): Array<{...}>`)
-- `signatureRaw`: Extended capture up to 500 chars, stores unparsed text when regex fails
-- `lineNumber`: 1-indexed source line number of the export declaration
-
-**High-level trace modules** include:
-
-- `dependencies[]`: String array of moduleIds this module imports from
-- `dependents[]`: String array of moduleIds that import from this module
-- `skippedFiles[]`: Files that matched multiple module globs (configuration error indicator)
-
-### Consumption Patterns
-
-**Main agent** (before dispatch):
-
-- Read `traces/high-level.md` for module landscape and dependency graph
-- Use module information to inform routing and dispatch decisions
-- This is the Pre-Computed Summary Exception to delegation-first
-
-**Subagents** (implement, test, code-review, security, explore):
-
-- Receive relevant trace file paths in dispatch prompts
-- Read `traces/low-level/<module-id>.json` for module-specific structural detail
-- Match task file paths against `trace.config.json` module `fileGlobs` to find relevant traces
-- Check freshness via `isTraceStale(moduleId, config)` before trusting exact details
-
-**Graceful degradation**: When traces are unavailable (no traces directory, no config, no matching modules), all consumers proceed without trace context -- identical to pre-trace behavior. No error or warning produced.
-
-### Trace Scripts (synced via registry)
-
-| Script                       | Purpose                                     |
-| ---------------------------- | ------------------------------------------- |
-| `trace-generate.mjs`         | Generate all trace files from config        |
-| `lib/trace-utils.mjs`        | Shared utilities (config, staleness, globs) |
-| `lib/high-level-trace.mjs`   | High-level trace JSON/MD generation         |
-
-### Key Constraints
-
-- Regex-based parsing only (no AST) for portability
-- Trace files contain structural metadata only -- never source code, env values, or credentials
-- Trace output files are NOT synced via registry (each project generates its own)
-- Only trace scripts sync to consumer projects
-- `isTraceStale()` checks file modification time against configurable staleness threshold
 
 ## Structured Documentation System
 
-The structured documentation system provides machine-parseable YAML documentation that sits between low-level traces and high-level memory-bank content.
+The structured documentation system provides machine-parseable YAML documentation that summarizes stable module and workflow structure between source code and high-level memory-bank content.
 
 ### Three-Layer Documentation Model
 
 ```
-traces (file-level)  →  structured docs (module-level)  →  memory-bank (process-level)
+source code (file-level)  →  structured docs (module-level)  →  memory-bank (process-level)
 ```
 
 ### Key Locations

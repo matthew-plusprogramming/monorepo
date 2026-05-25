@@ -21,7 +21,7 @@ Verify that cross-boundary wiring is correct across all independently-created sy
 
 Uses a two-layer architecture (following the doc-audit pattern):
 
-1. **`flow-verify-checks.mjs`** (standalone script): Pre-computes trace-based wiring analysis, run by the orchestrating agent before dispatch
+1. **`flow-verify-checks.mjs`** (standalone script): Pre-computes source-based wiring analysis, run by the orchestrating agent before dispatch
 2. **`flow-verifier` agent** (read-only): Consumes pre-computed results, evaluates carry-forward, produces structured findings
 
 ## Usage
@@ -70,10 +70,9 @@ At `impl-verify` and `post-impl`, the dispatcher additionally passes `diff_base`
 
 Before beginning flow verification work, address these operational feasibility questions:
 
-1. Does `trace.config.json` exist for trace-based wiring analysis? (If not, Grep/Glob fallback will be used)
-2. Are low-level traces available and fresh for modified modules? (Stale traces trigger fallback)
-3. Does the spec group have a defined scope boundary for in-scope flow identification?
-4. Is the carry-forward file (`flow-findings.json`) accessible? (Missing is normal for first stage)
+1. Does the spec group have a defined scope boundary for in-scope flow identification?
+2. Is the carry-forward file (`flow-findings.json`) accessible? (Missing is normal for first stage)
+3. Are modified files discoverable from git history or the spec group directory?
 
 If any question cannot be answered from available context, surface it as a finding -- do not skip.
 
@@ -91,7 +90,7 @@ node .claude/scripts/flow-verify-checks.mjs --sg <spec-group-id> --stage impl-ve
 
 This produces `.claude/specs/groups/<sg>/.flow-verify-precomputed.json` with:
 
-- Trace-based wiring analysis (imports, exports, dependencies)
+- Source-based wiring analysis (imports, exports, event strings, config references)
 - Six wiring check results (routes, events, config, imports, handlers, middleware)
 - Coverage indicator (full/partial)
 - Unchecked files array (when caps exceeded)

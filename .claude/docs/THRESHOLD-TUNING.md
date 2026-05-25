@@ -19,7 +19,7 @@ Per-gate rationale: `.claude/prds/pipeline-efficiency/threshold-decisions.md` (a
 | Gate                  | `required_clean_passes` | `attestation_mode` | `hash_input_manifest`                                        | Relaxed |
 | --------------------- | ----------------------- | ------------------ | ------------------------------------------------------------ | ------- |
 | `unifier`             | 1                       | `content-hash`     | `.claude/specs/groups/<id>/{spec.md,requirements.md,manifest.json}` | YES     |
-| `completion-verifier` | 1                       | `content-hash`     | `manifest.json`, registry content, trace files               | YES     |
+| `completion-verifier` | 1                       | `content-hash`     | `manifest.json`, registry content               | YES     |
 | `code-review`         | 2                       | `content-hash`     | `git-diff:<branch-base>..HEAD` descriptor                    | No      |
 | `security`            | 2                       | `content-hash`     | `git-diff:<branch-base>..HEAD` descriptor                    | No      |
 | `investigation`       | 2                       | `none`             | N/A                                                          | N/A     |
@@ -122,7 +122,7 @@ Entries in `hash_input_manifest` are logical descriptors expanded at attestation
 
 - Literal paths: `.claude/specs/groups/<id>/spec.md`, `.claude/specs/groups/<id>/requirements.md`, `.claude/specs/groups/<id>/manifest.json`
 - Glob descriptors: `.claude/specs/groups/<id>/slices/*.md`
-- Synthetic descriptors: `git-diff:<branch-base>..HEAD`, `registry content`, `trace files`
+- Synthetic descriptors: `git-diff:<branch-base>..HEAD`, `registry content`
 
 Manifest expansion lives in `.claude/scripts/lib/hash-input-manifest.mjs`. `HashInputError` (missing file, git failure, unresolved placeholder) is trapped at `recordPass()` time to a no-op: missing content_hash falls back to consecutive counting.
 

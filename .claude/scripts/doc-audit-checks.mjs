@@ -248,14 +248,13 @@ function walkDir(dirPath, projectRoot, excludeSet, warnings) {
 // =============================================================================
 
 /**
- * Resolve doc-to-source mapping via three methods in priority order.
+ * Resolve doc-to-source mapping via frontmatter, then naming conventions.
  * @param {string} docPath - Relative doc path
  * @param {string} projectRoot - Project root
- * @param {object|null} traceConfig - Parsed trace.config.json
  * @param {string[]} warnings - Mutable array to collect warnings
  * @returns {{ method: string, sources: string[] }}
  */
-function resolveDocToSource(docPath, projectRoot, traceConfig, warnings) {
+function resolveDocToSource(docPath, projectRoot, warnings) {
   // Method 1: Explicit _source_modules frontmatter
   // Note: Frontmatter parsing uses regex rather than a full YAML parser.
   // Supported formats: inline array `_source_modules: [a, b]` and YAML list
@@ -292,19 +291,7 @@ function resolveDocToSource(docPath, projectRoot, traceConfig, warnings) {
     warnings.push(`[resolveDocToSource] Skipped frontmatter parsing for ${docPath}: ${err.message}`);
   }
 
-  // Method 2: Trace config fileToModule() matching
-  if (traceConfig && Array.isArray(traceConfig.modules)) {
-    const docBaseName = basename(docPath, extname(docPath)).toLowerCase();
-    for (const mod of traceConfig.modules) {
-      // Check if the doc name suggests a relationship with this module
-      const modNameLower = mod.id.toLowerCase();
-      if (docBaseName.includes(modNameLower) || modNameLower.includes(docBaseName)) {
-        return { method: 'trace_config', sources: [mod.id] };
-      }
-    }
-  }
-
-  // Method 3: Naming convention fallback
+  // Method 2: Naming convention fallback
   const docName = basename(docPath, extname(docPath)).toLowerCase();
   // Common patterns: HOOKS.md -> hooks, tech.context.md -> tech-context
   const normalizedName = docName.replace(/\./g, '-').replace(/_/g, '-');
@@ -489,17 +476,6 @@ async function main() {
     warnings.push('Git CLI not available -- staleness detection disabled for all files');
   }
 
-  // Load trace config for doc-to-source mapping (AC-1.9)
-  let traceConfig = null;
-  try {
-    const configPath = join(projectRoot, '.claude/traces/trace.config.json');
-    if (existsSync(configPath)) {
-      traceConfig = JSON.parse(readFileSync(configPath, 'utf-8'));
-    }
-  } catch (err) {
-    warnings.push(`[loadTraceConfig] trace.config.json not available -- falling back to naming conventions: ${err.message}`);
-  }
-
   // Discover doc files
   const docFiles = discoverDocFiles(projectRoot, args.paths, args.exclude, warnings);
 
@@ -507,7 +483,7 @@ async function main() {
   const stalenessResults = [];
   if (gitAvailable) {
     for (const docPath of docFiles) {
-      const mapping = resolveDocToSource(docPath, projectRoot, traceConfig, warnings);
+      const mapping = resolveDocToSource(docPath, projectRoot, warnings);
       const staleness = checkStaleness(docPath, mapping.sources, projectRoot, warnings);
 
       stalenessResults.push({

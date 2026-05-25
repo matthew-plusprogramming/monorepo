@@ -7,8 +7,8 @@
  *
  * Design notes:
  *   - We force vitest's JSON reporter via `--reporter=json` and direct it
- *     to a temp output file so stdout noise (trace generator warnings,
- *     progress output) does not contaminate the structured result.
+ *     to a temp output file so stdout noise does not contaminate the
+ *     structured result.
  *   - `suite.name` in the JSON report is an absolute path on the executing
  *     host; we convert it to a repo-relative path so the baseline entries
  *     are portable across developer checkouts.

@@ -12,7 +12,7 @@ The flow verifier fills this gap with continuous, stage-aware verification acros
 
 **Architecture**: Two-layer split (following the doc-audit pattern):
 
-1. **`flow-verify-checks.mjs`** -- standalone script run by the main agent (requires Bash). Performs trace parsing, git-based file discovery, regex source scanning, and outputs structured JSON.
+1. **`flow-verify-checks.mjs`** -- standalone script run by the main agent (requires Bash). Performs git-based file discovery, regex source scanning, and outputs structured JSON.
 2. **`flow-verifier` agent** -- read-only agent (tools: Read, Glob, Grep). Consumes pre-computed results, evaluates carry-forward, produces structured findings.
 
 ---
@@ -75,7 +75,7 @@ The impl-verify stage produces a gate decision that controls workflow progressio
 | **warn**  | No Critical, but High findings or partial coverage | Proceeds with human acknowledgment               |
 | **pass**  | Only Medium/Low findings with full coverage        | Proceeds directly to unifier                     |
 
-**Partial coverage rule**: When trace data is incomplete (stale traces, untraced files, fallback caps exceeded), the gate is capped at `warn` regardless of finding severity. This does not override `block`.
+**Partial coverage rule**: When source scanning is capped or incomplete, the gate is capped at `warn` regardless of finding severity. This does not override `block`.
 
 **Override**: When blocked, a human may override via `.claude/coordination/gate-override.json`:
 
@@ -118,7 +118,7 @@ PRD -> prd-review (5th critic) ->
       post-impl (coverage report) -> Code Review -> ...
 ```
 
-For large oneoff-spec work with internal slices, run the same stages against the full `spec.md`. If trace data is incomplete, the verifier uses Grep/Glob fallback (`coverage: "partial"`).
+For large oneoff-spec work with internal slices, run the same stages against the full `spec.md`. If source scanning is capped or incomplete, the verifier reports `coverage: "partial"`.
 
 Flow verifier is not dispatched for oneoff-vibe workflows.
 
@@ -176,7 +176,7 @@ node .claude/scripts/flow-verify-checks.mjs
 
 ### Fallback Behavior
 
-When trace data is unavailable (missing modules, stale traces), the script falls back to Grep/Glob-based source analysis, capped at 500 files and 120 seconds. Results are returned with `coverage: "partial"` and an `unchecked_files` array.
+Source analysis is capped at 500 files and 120 seconds. When the cap is hit, results are returned with `coverage: "partial"` and an `unchecked_files` array.
 
 ---
 
@@ -210,7 +210,7 @@ Findings surfaced at earlier stages (`prd-review`, `spec-review`) are **always r
 | Condition                                              | Outcome                                                                                                                     |
 | ------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------- |
 | `git diff --name-only <base>..HEAD` returns zero files | Trivial-pass; structured log entry `{ scope: "diff", diff_base, changed_files: 0, outcome: "trivial-pass" }`; NOT a failure |
-| Non-empty diff, no affected modules                    | Trivial-pass (diff outside traced fileGlobs); structured log                                                                |
+| Non-empty diff but no analyzable source files          | Trivial-pass; structured log                                                                                               |
 
 ### New-Symbol Degradation (NFR-10 Gate Condition)
 
@@ -242,7 +242,7 @@ node .claude/scripts/flow-verify-checks.mjs \
 /flow-verify --stage impl-verify --sg <spec-group-id> --scope diff
 ```
 
-Helper library: `.claude/scripts/lib/flow-verify-diff-scope.mjs` exports `resolveDiffScope({ base, stage })` returning `{ scope, changed_files, affected_modules, fallback }`. Consumers in `flow-verify-checks.mjs` filter findings to `affected_modules` before emitting. Module resolution uses `trace.config.json` `fileGlobs` (see TRACES.md § Consumer: Flow-Verifier Diff-Scope).
+Diff scope is handled by `flow-verify-checks.mjs` from changed files and carry-forward findings. It does not depend on precomputed module indexes.
 
 ---
 
@@ -251,7 +251,5 @@ Helper library: `.claude/scripts/lib/flow-verify-diff-scope.mjs` exports `resolv
 - `.claude/agents/flow-verifier.md` -- Agent definition
 - `.claude/skills/flow-verify/SKILL.md` -- Skill file with full parameter reference
 - `.claude/scripts/flow-verify-checks.mjs` -- Pre-computation script
-- `.claude/scripts/lib/flow-verify-diff-scope.mjs` -- Diff-scope resolver helper
 - `.claude/prds/flow-verifier/prd.md` -- PRD with motivation and success metrics
-- `.claude/docs/TRACES.md` -- Trace system (fileGlobs -> module mapping consumed by diff-scope)
 - `.claude/docs/DOC-AUDIT.md` -- Doc-audit system (analogous two-layer architecture)

@@ -75,7 +75,6 @@ export const SYNC_SCOPED_ROOTS = Object.freeze([
  * Paths are relative to the repo root (no leading slash).
  */
 export const EXCLUDED_ROOTS = Object.freeze([
-  '.claude/traces/',
   '.claude/locks/',
   '.claude/coordination/',
   '.claude/journal/',

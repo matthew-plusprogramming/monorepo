@@ -51,11 +51,6 @@ import {
   SOURCE_HASH_PREFIX,
 } from './lib/yaml-utils.mjs';
 
-import {
-  matchesGlob,
-  HIGH_LEVEL_TRACE_PATH,
-} from './lib/trace-utils.mjs';
-
 // =============================================================================
 // Constants
 // =============================================================================
@@ -65,6 +60,37 @@ const DECISION_STATUSES = ['proposed', 'accepted', 'deprecated', 'superseded'];
 
 /** Allowed runbook severities */
 const RUNBOOK_SEVERITIES = ['critical', 'high', 'medium', 'low'];
+
+function matchesGlob(filePath, pattern) {
+  let regexStr = '';
+  let i = 0;
+
+  while (i < pattern.length) {
+    const char = pattern[i];
+    if (char === '*') {
+      if (pattern[i + 1] === '*') {
+        if (pattern[i + 2] === '/') {
+          regexStr += '(.*/)?';
+          i += 3;
+        } else {
+          regexStr += '.*';
+          i += 2;
+        }
+      } else {
+        regexStr += '[^/]*';
+        i += 1;
+      }
+    } else if (char === '?') {
+      regexStr += '[^/]';
+      i += 1;
+    } else {
+      regexStr += char.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      i += 1;
+    }
+  }
+
+  return new RegExp(`^${regexStr}$`).test(filePath);
+}
 
 // =============================================================================
 // Result Types
@@ -735,7 +761,6 @@ function checkModuleGlobs(modules, projectRoot, filePath, result) {
     return;
   }
 
-  // INC-007: Use matchesGlob from trace-utils instead of local simpleGlobMatch
   for (const mod of modules) {
     if (!mod.path || typeof mod.path !== 'string') continue;
 
@@ -999,11 +1024,6 @@ export function validateAll(projectRoot) {
   // --- Freshness detection ---
   checkFreshness(docsDir, result);
 
-  // --- Trace cross-reference validation (REQ-017) ---
-  if (moduleNames.length > 0) {
-    validateTraceCrossReferences(moduleNames, projectRoot, archPath, result);
-  }
-
   // --- Path confinement for architecture module paths ---
   if (parsedDocs.architecture && Array.isArray(parsedDocs.architecture.modules)) {
     for (const mod of parsedDocs.architecture.modules) {
@@ -1028,77 +1048,6 @@ export function validateAll(projectRoot) {
   }
 
   return result;
-}
-
-// =============================================================================
-// Trace Cross-Reference Validation (M3: REQ-017)
-// =============================================================================
-
-/**
- * Validate that module names in architecture.yaml correspond to modules
- * present in the trace system.
- *
- * Task 3.4 (REQ-017): Reports modules referenced in docs but not found in
- * traces (error) and traced modules not referenced in docs (informational).
- * Skips silently if trace data is not available.
- *
- * @param {string[]} docsModuleNames - Module names from architecture.yaml
- * @param {string} projectRoot - Absolute project root path
- * @param {string} archPath - Path to architecture.yaml for error reporting
- * @param {ValidationResult} result
- */
-function validateTraceCrossReferences(docsModuleNames, projectRoot, archPath, result) {
-  // Load high-level trace JSON to get traced module list
-  let traceData;
-  try {
-    const tracePath = join(projectRoot, HIGH_LEVEL_TRACE_PATH);
-    if (!existsSync(tracePath)) {
-      // No trace data -- skip silently (trace integration is additive)
-      return;
-    }
-    const raw = readFileSync(tracePath, 'utf-8');
-    traceData = JSON.parse(raw);
-  } catch {
-    // Failed to read/parse trace data -- skip silently
-    return;
-  }
-
-  if (!traceData || !Array.isArray(traceData.modules)) {
-    return;
-  }
-
-  // Build sets for comparison
-  const tracedModuleIds = new Set(traceData.modules.map(m => m.id));
-  const tracedModuleNames = new Set(traceData.modules.map(m => m.name));
-  const docsModuleSet = new Set(docsModuleNames);
-
-  // Check for docs modules not found in traces
-  for (const docModule of docsModuleNames) {
-    if (!tracedModuleIds.has(docModule) && !tracedModuleNames.has(docModule)) {
-      addIssue(
-        result,
-        'warning',
-        'Trace cross-reference',
-        `Module "${docModule}" is defined in architecture.yaml but not found in trace data`,
-        archPath,
-        'modules',
-      );
-    }
-  }
-
-  // Check for traced modules not found in docs (informational)
-  for (const tracedModule of traceData.modules) {
-    if (!docsModuleSet.has(tracedModule.id) && !docsModuleSet.has(tracedModule.name)) {
-      addIssue(
-        result,
-        'info',
-        'Trace cross-reference',
-        `Traced module "${tracedModule.id}" (${tracedModule.name}) is not referenced in architecture.yaml`,
-        archPath,
-        'modules',
-      );
-    }
-  }
 }
 
 // =============================================================================

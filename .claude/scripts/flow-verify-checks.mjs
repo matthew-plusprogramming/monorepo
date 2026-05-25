@@ -4,9 +4,8 @@
  * Flow Verify Pre-Computation Script
  *
  * Standalone script run by the orchestrating agent (which has Bash access)
- * before dispatching the read-only flow-verifier agent. Performs trace-based
- * wiring analysis, six-category wiring checks, and Grep/Glob fallback when
- * traces are unavailable.
+ * before dispatching the read-only flow-verifier agent. Performs source-based
+ * wiring analysis and six-category wiring checks.
  *
  * Outputs structured JSON to .claude/specs/groups/<sg>/.flow-verify-precomputed.json
  * for the flow-verifier agent to consume via its Read tool.
@@ -28,7 +27,7 @@
  * Current contract summary: .claude/docs/FLOW-VERIFIER.md
  */
 
-import { existsSync, readFileSync, readlinkSync, writeFileSync, mkdirSync, readdirSync, statSync, lstatSync } from 'node:fs';
+import { existsSync, readFileSync, readlinkSync, writeFileSync, mkdirSync, readdirSync, lstatSync } from 'node:fs';
 import { join, resolve, relative, basename, dirname } from 'node:path';
 import { execFileSync } from 'node:child_process';
 
@@ -227,31 +226,6 @@ export function validateCarryForwardEntry(entry) {
   return { valid: errors.length === 0, errors };
 }
 
-/**
- * Validate trace data structure before consumption (AC-1.11).
- *
- * @param {object} traceData - Parsed trace JSON
- * @returns {{ valid: boolean, errors: string[] }}
- */
-export function validateTraceData(traceData) {
-  const errors = [];
-
-  if (!traceData || typeof traceData !== 'object') {
-    errors.push('Trace data is not an object');
-    return { valid: false, errors };
-  }
-
-  if (!traceData.moduleId || typeof traceData.moduleId !== 'string') {
-    errors.push('Missing or invalid moduleId');
-  }
-
-  if (!Array.isArray(traceData.files)) {
-    errors.push('Missing or invalid files array');
-  }
-
-  return { valid: errors.length === 0, errors };
-}
-
 // =============================================================================
 // Output Sanitization (AC-1.12, REQ-029)
 // =============================================================================
@@ -273,8 +247,6 @@ export function sanitizeYaml(text) {
 
 /**
  * Escape markdown special characters in a string (AC-1.12).
- * Follows sanitizeMarkdown() pattern from trace-utils.mjs.
- *
  * @param {string} text - Text to sanitize
  * @returns {string} Sanitized text
  */
@@ -300,138 +272,90 @@ export function sanitizeJson(text) {
 }
 
 // =============================================================================
-// Trace System Integration (AC-1.4, REQ-020)
+// Source Analysis
 // =============================================================================
 
-/**
- * Load trace config and utility functions.
- * Attempts to import from trace-utils.mjs for consistency.
- *
- * @param {string} projectRoot
- * @returns {{ config: object|null, fileToModule: Function|null, isTraceStale: Function|null }}
- */
-export function loadTraceSystem(projectRoot) {
-  const traceConfigPath = join(projectRoot, '.claude', 'traces', 'trace.config.json');
+const SOURCE_FILE_REGEX = /\.(?:ts|tsx|js|jsx|mjs|cjs)$/;
 
-  let config = null;
-  let fileToModuleFn = null;
-  let isTraceStaleFn = null;
+function parseSymbols(raw) {
+  return raw
+    .split(',')
+    .map(s => s.trim().replace(/\bas\b\s+\w+$/u, '').trim())
+    .filter(Boolean);
+}
 
-  try {
-    if (existsSync(traceConfigPath)) {
-      config = JSON.parse(readFileSync(traceConfigPath, 'utf8'));
+function analyzeSourceFile(filePath, projectRoot) {
+  const fullPath = resolve(projectRoot, filePath);
+  const content = readFileSync(fullPath, 'utf8');
+  const lines = content.split('\n');
+  const imports = [];
+  const exports = [];
+  const events = [];
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const importMatch = line.match(/import\s+(?:type\s+)?(?:\{([^}]+)\}|([\w*$]+))?\s*(?:from\s+)?['"]([^'"]+)['"]/u);
+    const requireMatch = line.match(/(?:const|let|var)\s+(?:\{([^}]+)\}|([\w$]+))\s*=\s*require\(['"]([^'"]+)['"]\)/u);
+    const matchedImport = importMatch || requireMatch;
+    if (matchedImport) {
+      imports.push({
+        source: matchedImport[3],
+        symbols: matchedImport[1] ? parseSymbols(matchedImport[1]) : (matchedImport[2] ? [matchedImport[2]] : []),
+      });
     }
-  } catch (err) {
-    // Graceful degradation: no trace config
-    return { config: null, fileToModule: null, isTraceStale: null, warning: `Failed to load trace config: ${err.message}` };
+
+    const exportDecl = line.match(/export\s+(?:async\s+)?(?:function|class|const|let|var)\s+([A-Za-z_$][\w$]*)/u);
+    const exportList = line.match(/export\s+\{([^}]+)\}/u);
+    if (exportDecl) {
+      exports.push({ symbol: exportDecl[1], lineNumber: i + 1 });
+    } else if (exportList) {
+      for (const symbol of parseSymbols(exportList[1])) {
+        exports.push({ symbol, lineNumber: i + 1 });
+      }
+    } else if (/export\s+default\b/u.test(line)) {
+      exports.push({ symbol: 'default', lineNumber: i + 1 });
+    }
+
+    const eventRegex = /\.(emit|on|once|addEventListener|removeEventListener)\(\s*['"]([^'"]+)['"]/gu;
+    let eventMatch;
+    while ((eventMatch = eventRegex.exec(line)) !== null) {
+      const method = eventMatch[1];
+      events.push({
+        type: method === 'emit' ? 'emit' : 'on',
+        eventName: eventMatch[2],
+        line: i + 1,
+      });
+    }
   }
 
-  // Build a local fileToModule implementation matching trace-utils.mjs
-  // Maps a file path to its owning module ID based on fileGlobs
-  fileToModuleFn = (filePath) => {
-    if (!config || !config.modules) return null;
-    for (const mod of config.modules) {
-      if (!mod.fileGlobs) continue;
-      for (const glob of mod.fileGlobs) {
-        if (matchesGlob(filePath, glob)) {
-          return mod.id;
-        }
-      }
-    }
-    return null;
-  };
+  return { filePath, imports, exports, events };
+}
 
-  // Build a local isTraceStale implementation
-  isTraceStaleFn = (moduleId) => {
-    const tracePath = join(projectRoot, '.claude', 'traces', 'low-level', `${moduleId}.json`);
+export function buildSourceAnalysis(filePaths, projectRoot) {
+  const files = [];
+  const skipped = [];
+
+  for (const filePath of filePaths) {
+    if (!SOURCE_FILE_REGEX.test(filePath)) {
+      skipped.push(filePath);
+      continue;
+    }
     try {
-      if (!existsSync(tracePath)) return true;
-      const traceStat = statSync(tracePath);
-      const traceAge = Date.now() - traceStat.mtimeMs;
-      // Consider stale if older than staleness threshold (default 24h)
-      const thresholdMs = (config.stalenessThresholdHours || 24) * 60 * 60 * 1000;
-      return traceAge > thresholdMs;
-    } catch {
-      // Intentional: if stat fails, treat trace as stale (safe default -- triggers re-generation)
-      return true;
-    }
-  };
-
-  return { config, fileToModule: fileToModuleFn, isTraceStale: isTraceStaleFn, warning: null };
-}
-
-/**
- * Simple glob matching function (consistent with trace-utils.mjs pattern).
- *
- * @param {string} filePath - Path to test
- * @param {string} pattern - Glob pattern
- * @returns {boolean}
- */
-function matchesGlob(filePath, pattern) {
-  const regexStr = globToRegex(pattern);
-  const regex = new RegExp(`^${regexStr}$`);
-  return regex.test(filePath);
-}
-
-/**
- * Convert glob pattern to regex (consistent with trace-utils.mjs).
- *
- * @param {string} pattern
- * @returns {string}
- */
-function globToRegex(pattern) {
-  let regexStr = '';
-  let i = 0;
-
-  while (i < pattern.length) {
-    const char = pattern[i];
-    if (char === '*') {
-      if (pattern[i + 1] === '*') {
-        if (pattern[i + 2] === '/') {
-          regexStr += '(.*/)?';
-          i += 3;
-        } else {
-          regexStr += '.*';
-          i += 2;
-        }
-      } else {
-        regexStr += '[^/]*';
-        i += 1;
+      if (!isPathSafe(filePath, projectRoot)) {
+        skipped.push(filePath);
+        continue;
       }
-    } else if (char === '?') {
-      regexStr += '[^/]';
-      i += 1;
-    } else {
-      regexStr += char.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      i += 1;
+      files.push(analyzeSourceFile(filePath, projectRoot));
+    } catch {
+      skipped.push(filePath);
     }
   }
 
-  return regexStr;
-}
-
-/**
- * Read low-level trace data for a module (AC-1.4).
- *
- * @param {string} moduleId - Module ID
- * @param {string} projectRoot
- * @returns {object|null} Parsed trace data or null
- */
-export function readModuleTrace(moduleId, projectRoot) {
-  const tracePath = join(projectRoot, '.claude', 'traces', 'low-level', `${moduleId}.json`);
-  try {
-    if (!existsSync(tracePath)) return null;
-    const data = JSON.parse(readFileSync(tracePath, 'utf8'));
-    const validation = validateTraceData(data);
-    if (!validation.valid) {
-      return null;
-    }
-    return data;
-  } catch {
-    // Intentional: graceful degradation when trace file is corrupt or unreadable.
-    // Caller falls back to Grep/Glob discovery when trace data is unavailable.
-    return null;
-  }
+  return {
+    moduleId: 'changed-files',
+    files,
+    skipped_files: skipped,
+  };
 }
 
 // =============================================================================
@@ -481,18 +405,18 @@ export function discoverModifiedFiles(specGroupId, projectRoot) {
  * Check for unregistered routes (B2, Practice 4.5 check #1).
  * Verify spec-declared endpoints have corresponding router mounts in source.
  *
- * @param {object[]} traceFiles - Array of trace file data with imports/exports
+ * @param {object[]} sourceAnalysisFiles - Array of source analysis data with imports/exports
  * @param {string} projectRoot
  * @returns {object[]} Array of findings
  */
-export function checkUnregisteredRoutes(traceFiles, projectRoot) {
+export function checkUnregisteredRoutes(sourceAnalysisFiles, projectRoot) {
   const findings = [];
   const routeDefinitions = [];
   const routeMounts = [];
 
-  for (const trace of traceFiles) {
-    if (!trace || !trace.files) continue;
-    for (const file of trace.files) {
+  for (const analysis of sourceAnalysisFiles) {
+    if (!analysis || !analysis.files) continue;
+    for (const file of analysis.files) {
       if (!file.exports) continue;
 
       // Look for route handler exports (common patterns)
@@ -554,18 +478,18 @@ export function checkUnregisteredRoutes(traceFiles, projectRoot) {
  * Check for mismatched event names (B3, Practice 4.5 check #2).
  * Verify publisher event strings match subscriber event strings.
  *
- * @param {object[]} traceFiles - Array of trace file data
+ * @param {object[]} sourceAnalysisFiles - Array of source analysis data
  * @param {string} projectRoot
  * @returns {object[]} Array of findings
  */
-export function checkMismatchedEvents(traceFiles, projectRoot) {
+export function checkMismatchedEvents(sourceAnalysisFiles, projectRoot) {
   const findings = [];
   const publishers = [];
   const subscribers = [];
 
-  for (const trace of traceFiles) {
-    if (!trace || !trace.files) continue;
-    for (const file of trace.files) {
+  for (const analysis of sourceAnalysisFiles) {
+    if (!analysis || !analysis.files) continue;
+    for (const file of analysis.files) {
       if (!file.events) continue;
       for (const event of file.events) {
         const entry = {
@@ -621,17 +545,17 @@ export function checkMismatchedEvents(traceFiles, projectRoot) {
  * Check for wrong config references (B4, Practice 4.5 check #3).
  * Verify all references to the same service use the same config function.
  *
- * @param {object[]} traceFiles - Array of trace file data
+ * @param {object[]} sourceAnalysisFiles - Array of source analysis data
  * @param {string} projectRoot
  * @returns {object[]} Array of findings
  */
-export function checkWrongConfig(traceFiles, projectRoot) {
+export function checkWrongConfig(sourceAnalysisFiles, projectRoot) {
   const findings = [];
   const configRefs = new Map(); // serviceName -> [{ file, symbol, line }]
 
-  for (const trace of traceFiles) {
-    if (!trace || !trace.files) continue;
-    for (const file of trace.files) {
+  for (const analysis of sourceAnalysisFiles) {
+    if (!analysis || !analysis.files) continue;
+    for (const file of analysis.files) {
       if (!file.imports) continue;
       for (const imp of file.imports) {
         const source = imp.source || '';
@@ -745,18 +669,18 @@ export function checkAssumptionConflicts(modifiedFiles, projectRoot) {
  * Check for disconnected handlers (B6).
  * Verify UI elements have event bindings or callbacks.
  *
- * @param {object[]} traceFiles - Array of trace file data
+ * @param {object[]} sourceAnalysisFiles - Array of source analysis data
  * @param {string} projectRoot
  * @returns {object[]} Array of findings
  */
-export function checkDisconnectedHandlers(traceFiles, projectRoot) {
+export function checkDisconnectedHandlers(sourceAnalysisFiles, projectRoot) {
   const findings = [];
   const handlerExports = [];
   const handlerImports = [];
 
-  for (const trace of traceFiles) {
-    if (!trace || !trace.files) continue;
-    for (const file of trace.files) {
+  for (const analysis of sourceAnalysisFiles) {
+    if (!analysis || !analysis.files) continue;
+    for (const file of analysis.files) {
       // Look for handler/callback exports
       if (file.exports) {
         for (const exp of file.exports) {
@@ -816,18 +740,18 @@ export function checkDisconnectedHandlers(traceFiles, projectRoot) {
  * Check for missing middleware (B7).
  * Verify request paths include required middleware.
  *
- * @param {object[]} traceFiles - Array of trace file data
+ * @param {object[]} sourceAnalysisFiles - Array of source analysis data
  * @param {string} projectRoot
  * @returns {object[]} Array of findings
  */
-export function checkMissingMiddleware(traceFiles, projectRoot) {
+export function checkMissingMiddleware(sourceAnalysisFiles, projectRoot) {
   const findings = [];
   const middlewareExports = [];
   const middlewareUsages = [];
 
-  for (const trace of traceFiles) {
-    if (!trace || !trace.files) continue;
-    for (const file of trace.files) {
+  for (const analysis of sourceAnalysisFiles) {
+    if (!analysis || !analysis.files) continue;
+    for (const file of analysis.files) {
       if (file.exports) {
         for (const exp of file.exports) {
           const symbol = exp.symbol || '';
@@ -884,18 +808,18 @@ export function checkMissingMiddleware(traceFiles, projectRoot) {
 /**
  * Check for missing imports (general import/dependency verification).
  *
- * @param {object[]} traceFiles - Array of trace file data
+ * @param {object[]} sourceAnalysisFiles - Array of source analysis data
  * @param {string} projectRoot
  * @returns {object[]} Array of findings
  */
-export function checkMissingImports(traceFiles, projectRoot) {
+export function checkMissingImports(sourceAnalysisFiles, projectRoot) {
   const findings = [];
   const allExports = new Map(); // filePath -> Set of exported symbols
   const allImports = []; // { file, source, symbols }
 
-  for (const trace of traceFiles) {
-    if (!trace || !trace.files) continue;
-    for (const file of trace.files) {
+  for (const analysis of sourceAnalysisFiles) {
+    if (!analysis || !analysis.files) continue;
+    for (const file of analysis.files) {
       if (file.exports) {
         if (!allExports.has(file.filePath)) {
           allExports.set(file.filePath, new Set());
@@ -1363,7 +1287,7 @@ export function findingModuleIds(finding, fileToModule) {
  * avoid silently dropping coverage.
  *
  * @param {object[]} findings - Current-pass findings
- * @param {string[]} affectedModules - Module IDs from `resolveDiffScope`
+ * @param {string[]} affectedModules - Module IDs from an optional diff-scope result
  * @param {Function} fileToModule - Maps file path → module ID
  * @returns {object[]} Filtered findings
  */
@@ -1371,8 +1295,8 @@ export function filterFindingsByAffectedModules(findings, affectedModules, fileT
   if (!Array.isArray(findings)) return [];
   if (!Array.isArray(affectedModules) || affectedModules.length === 0) {
     // SELF-RESOLVED(spec): AC2.1 scopes to affected modules; empty set
-    // means no diff → trivial-pass at caller layer already handled upstream
-    // (resolveDiffScope.fallback === 'none' with empty changed_files). Here
+    // means no diff -> trivial-pass at caller layer already handled upstream.
+    // Here
     // we match that semantic by returning empty findings.
     return [];
   }
@@ -1537,7 +1461,7 @@ export function applyDiffScopeFilter({ scope, diff_scope_result, findings }) {
  * (AC2.3 / NFR-10).
  *
  * This helper is symmetric with `detectNewBoundaryExport`, which scans raw
- * unified-diff text + uses the trace `fileToModule` resolver.
+ * unified-diff text and an optional file-to-module resolver.
  *
  * @param {object} params
  * @param {object} params.diff_scope_result
@@ -1575,17 +1499,17 @@ export function detectNewBoundarySymbol({ diff_scope_result, boundary_files }) {
  * Apply diff-scope filtering + new-boundary degradation + carry-forward
  * re-evaluation to a batch of findings (REQ-006 / AC2.1-AC2.4).
  *
- * Contract (matches `resolveDiffScope` output shape from as-001):
- *   diffScopeResult = { scope: 'diff'|'full', changed_files, affected_modules, fallback }
+ * Diff scope accepts an optional precomputed result:
+ *   diffScopeResult = { scope: 'diff'|'full', changed_files, affected_modules?, fallback }
  *
  * @param {object} params
  * @param {string} params.scope - Effective scope: 'full' | 'diff' | 'workstream' | 'post-merge'
- * @param {object|null} params.diffScopeResult - Output of `resolveDiffScope` (optional)
+ * @param {object|null} params.diffScopeResult - Optional precomputed diff-scope result
  * @param {object[]} params.findings - Current-pass findings
  * @param {object[]} params.carryForwardFindings - Prior-stage carry-forward entries
  * @param {string} params.stage
  * @param {string} params.projectRoot
- * @param {Function} params.fileToModule
+ * @param {Function|null} params.fileToModule
  * @returns {{ findings: object[], scope: string, newBoundaryDetected: object, scopeDegraded: boolean, warnings: string[] }}
  */
 export function applyDiffScope(params) {
@@ -1628,7 +1552,7 @@ export function applyDiffScope(params) {
   }
 
   // AC2.3 — new boundary export → degrade to full.
-  // Prefer diff-hunk text from resolveDiffScope if supplied; otherwise fetch via git.
+  // Prefer supplied diff-hunk text; otherwise fetch via git.
   const diffText = diffScopeResult?.diff_text
     || fetchDiffHunks(diffScopeResult?.base || 'HEAD~10', projectRoot);
   if (diffText) {
@@ -1653,6 +1577,17 @@ export function applyDiffScope(params) {
   const affectedModules = Array.isArray(diffScopeResult?.affected_modules)
     ? diffScopeResult.affected_modules
     : [];
+
+  if (typeof fileToModule !== 'function' || affectedModules.length === 0) {
+    warnings.push("diff scope has no module resolver; degrading to 'full'");
+    return {
+      findings: [...(findings || [])],
+      scope: 'full',
+      newBoundaryDetected,
+      scopeDegraded: true,
+      warnings,
+    };
+  }
 
   const filteredCurrent = filterFindingsByAffectedModules(
     findings || [],
@@ -1711,89 +1646,46 @@ export async function runFlowVerification(args) {
   const warnings = [];
   const startTime = Date.now();
 
-  // Step 1: Load trace system (AC-1.4)
-  const traceSystem = loadTraceSystem(projectRoot);
-  if (traceSystem.warning) {
-    warnings.push(traceSystem.warning);
-  }
-
-  // Step 2: Discover modified files
+  // Step 1: Discover modified files
   const modifiedFiles = discoverModifiedFiles(specGroupId, projectRoot);
 
-  // Step 3: Map files to trace modules (AC-1.4)
-  const moduleMap = new Map(); // moduleId -> files
-  const untracedFiles = [];
-
-  for (const file of modifiedFiles) {
-    if (!isPathSafe(file, projectRoot)) {
-      warnings.push(`Skipping unsafe path: ${file}`);
-      continue;
-    }
-
-    const moduleId = traceSystem.fileToModule ? traceSystem.fileToModule(file) : null;
-    if (moduleId) {
-      if (!moduleMap.has(moduleId)) moduleMap.set(moduleId, []);
-      moduleMap.get(moduleId).push(file);
-    } else {
-      untracedFiles.push(file); // AC-1.15: untraced files
-    }
-  }
-
-  // Step 4: Load trace data for each module (AC-1.4, AC-1.6)
-  const traceFiles = [];
-  const staleModules = [];
   let coverage = 'full';
 
-  for (const [moduleId] of moduleMap) {
-    const isStale = traceSystem.isTraceStale ? traceSystem.isTraceStale(moduleId) : true;
-    if (isStale) {
-      staleModules.push(moduleId);
-      coverage = 'partial';
-    } else {
-      const traceData = readModuleTrace(moduleId, projectRoot);
-      if (traceData) {
-        traceFiles.push(traceData);
-      } else {
-        staleModules.push(moduleId);
-        coverage = 'partial';
-      }
-    }
-  }
-
-  // AC-1.15: Mark as partial if untraced files exist
-  if (untracedFiles.length > 0) {
-    coverage = 'partial';
-    warnings.push(`${untracedFiles.length} file(s) have no trace module definition -- fallback analysis only`);
-  }
-
-  // AC-1.5: Enforce fallback caps when traces are unavailable (REQ-021)
+  // Enforce source-scan caps for very large diffs.
   let fallbackCapped = false;
   let fallbackFilesForScan = modifiedFiles;
 
-  if (coverage === 'partial') {
-    if (modifiedFiles.length > FALLBACK_MAX_FILES) {
-      fallbackCapped = true;
-      fallbackFilesForScan = modifiedFiles.slice(0, FALLBACK_MAX_FILES);
-      warnings.push(`Fallback file scan capped at ${FALLBACK_MAX_FILES} files (${modifiedFiles.length} total)`);
-    }
+  if (modifiedFiles.length > FALLBACK_MAX_FILES) {
+    fallbackCapped = true;
+    fallbackFilesForScan = modifiedFiles.slice(0, FALLBACK_MAX_FILES);
+    coverage = 'partial';
+    warnings.push(`Source file scan capped at ${FALLBACK_MAX_FILES} files (${modifiedFiles.length} total)`);
   }
 
-  // Step 5: Run wiring checks (Tasks B2-B7)
+  // Step 2: Build a lightweight source analysis snapshot.
+  const sourceAnalysis = buildSourceAnalysis(fallbackFilesForScan, projectRoot);
+  const sourceAnalysisFiles = [sourceAnalysis];
+
+  if (sourceAnalysis.skipped_files.length > 0) {
+    warnings.push(`${sourceAnalysis.skipped_files.length} file(s) skipped by source scanner`);
+  }
+
+  // Step 3: Run wiring checks (Tasks B2-B7)
   const allFindings = [];
   const fallbackDeadline = coverage === 'partial' ? startTime + FALLBACK_TIMEOUT_MS : Infinity;
 
   if (stage === 'impl-verify' || stage === 'post-impl') {
     // B2: Route registration
-    allFindings.push(...checkUnregisteredRoutes(traceFiles, projectRoot));
+    allFindings.push(...checkUnregisteredRoutes(sourceAnalysisFiles, projectRoot));
 
     // B3: Event name alignment
     if (Date.now() < fallbackDeadline) {
-      allFindings.push(...checkMismatchedEvents(traceFiles, projectRoot));
+      allFindings.push(...checkMismatchedEvents(sourceAnalysisFiles, projectRoot));
     }
 
     // B4: Config function consistency
     if (Date.now() < fallbackDeadline) {
-      allFindings.push(...checkWrongConfig(traceFiles, projectRoot));
+      allFindings.push(...checkWrongConfig(sourceAnalysisFiles, projectRoot));
     }
 
     // B5: Assumption conflict detection (uses fallback-capped file list)
@@ -1803,17 +1695,17 @@ export async function runFlowVerification(args) {
 
     // B6: Disconnected handlers
     if (Date.now() < fallbackDeadline) {
-      allFindings.push(...checkDisconnectedHandlers(traceFiles, projectRoot));
+      allFindings.push(...checkDisconnectedHandlers(sourceAnalysisFiles, projectRoot));
     }
 
     // B7: Missing middleware
     if (Date.now() < fallbackDeadline) {
-      allFindings.push(...checkMissingMiddleware(traceFiles, projectRoot));
+      allFindings.push(...checkMissingMiddleware(sourceAnalysisFiles, projectRoot));
     }
 
     // General: Missing imports
     if (Date.now() < fallbackDeadline) {
-      allFindings.push(...checkMissingImports(traceFiles, projectRoot));
+      allFindings.push(...checkMissingImports(sourceAnalysisFiles, projectRoot));
     }
 
     // AC-1.5: If fallback timeout was exceeded, mark partial and warn
@@ -1829,10 +1721,8 @@ export async function runFlowVerification(args) {
     coverage = 'partial';
   }
 
-  // Step 5.5: Apply diff-scope integration (REQ-006 / AC2.1-AC2.4).
-  // `args.diff_scope_result` is produced by `resolveDiffScope(...)` from
-  // `.claude/scripts/lib/flow-verify-diff-scope.mjs` (as-001 helper). When
-  // `scope === 'full'` (default) this is a no-op (AC2.4). When `scope === 'diff'`
+  // Step 5.5: Apply optional diff-scope integration (REQ-006 / AC2.1-AC2.4).
+  // When `scope === 'full'` (default) this is a no-op (AC2.4). When `scope === 'diff'`
   // we (a) filter findings to affected modules (AC2.1), (b) re-evaluate carry-
   // forward findings from prd-review / spec-review regardless of scope (AC2.2),
   // and (c) degrade to full scope on detection of a new boundary-crossing
@@ -1856,7 +1746,7 @@ export async function runFlowVerification(args) {
       carryForwardFindings,
       stage,
       projectRoot,
-      fileToModule: traceSystem.fileToModule,
+      fileToModule: null,
     });
 
     // Replace allFindings with scope-applied findings; carry forward metadata.
@@ -1889,10 +1779,9 @@ export async function runFlowVerification(args) {
     scope: effectiveScope,
     diff_scope: diffScopeMeta,
     modified_files: modifiedFiles,
-    trace_results: {
-      modules_checked: [...moduleMap.keys()],
-      stale_modules: staleModules,
-      untraced_files: untracedFiles,
+    source_scan_results: {
+      files_scanned: sourceAnalysis.files.map(file => file.filePath),
+      skipped_files: sourceAnalysis.skipped_files,
     },
     wiring_checks: {
       total_findings: allFindings.length,

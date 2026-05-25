@@ -13,8 +13,7 @@
  *   unifier                   1                      content-hash       .claude/specs/groups/<id>/spec.md,
  *                                                                       requirements.md, manifest.json,
  *                                                                       spec-linked docs
- *   completion-verifier       1                      content-hash       manifest.json, registry content,
- *                                                                       trace files
+ *   completion-verifier       1                      content-hash       manifest.json, registry content
  *   code-review               2                      content-hash       git-diff descriptor
  *   security                  2                      content-hash       git-diff descriptor
  *   investigation             2                      none               (rationale required)
@@ -75,7 +74,6 @@ const UNIFIER_HASH_INPUT_MANIFEST = Object.freeze([
 const COMPLETION_VERIFIER_HASH_INPUT_MANIFEST = Object.freeze([
   'manifest.json',
   'registry content',
-  'trace files',
 ]);
 
 /**

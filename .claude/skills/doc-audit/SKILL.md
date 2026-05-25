@@ -76,9 +76,8 @@ Comprehensive analysis including all quick scan checks plus:
 Before beginning audit work, address these operational feasibility questions:
 
 1. Is git CLI available for staleness detection? (If not, staleness checks will be skipped with warnings)
-2. Does `trace.config.json` exist for doc-to-source mapping? (If not, falls back to naming conventions)
-3. Are the known documentation directories populated? (Empty dirs produce informational findings, not errors)
-4. Is `.claude/audit-reports/` directory available for report persistence?
+2. Are the known documentation directories populated? (Empty dirs produce informational findings, not errors)
+3. Is `.claude/audit-reports/` directory available for report persistence?
 
 ## Execution Flow
 

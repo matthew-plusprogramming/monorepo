@@ -215,5 +215,7 @@ agents/ephemeral/*
 .claude/context/session.log
 !.claude/context/archive/
 .claude/.backups/
-.claude/coordination/trace-reads.json
+.claude/node_modules/
+.claude/package.json
+.claude/package-lock.json
 # metaclaude:end

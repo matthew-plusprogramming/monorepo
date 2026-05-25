@@ -8,7 +8,7 @@ Before escalating any question to the human, consult the four-tier assumption hi
 | ---- | --------- | ------------------------------------------------ | ---------------- | ---------- |
 | 1    | code      | Symbol exists, test proves it, schema defines it | Yes (1 line)     | Highest    |
 | 2    | spec      | Spec/PRD explicit statement                      | Yes (1 line)     |            |
-| 3    | memory    | Memory-bank, traces                              | No               |            |
+| 3    | memory    | Memory-bank                              | No               |            |
 | 4    | reasoning | Logical inference within domain                  | No               | Lowest     |
 
 Consult tiers in order (1 through 4). Use the answer from the highest-available tier.

@@ -154,7 +154,7 @@ All scripts live in `.claude/scripts/`.
 | `spec-schema-validate.mjs` | validates active spec frontmatter/schema, strict `e2e_skip`, and rationale enums |
 | `spec-validate.mjs` | validates active spec structure and e2e/env AC consistency; env-dependent AC scan warns without changing exit code |
 | `validate-convergence-fields.mjs` | validates active manifest convergence field names |
-| `docs-validate.mjs` | validates structured docs YAML and trace cross-references |
+| `docs-validate.mjs` | validates structured docs YAML and generated diagram hashes |
 | `validate-manifest.mjs` | explicit CLI validator for spec-group manifests |
 | `migrate-manifest.mjs` | one-shot manifest migration utility; writes conflicts to `.claude/coordination/migration-conflicts.json` |
 | `shape-lint-hook.mjs` | manual diagnostics only; no longer a live hook |
@@ -371,7 +371,6 @@ echo '{"tool_input":{"file_path":".claude/agents/test.md"}}' \
 
 - [WORKFLOW-ENFORCEMENT.md](WORKFLOW-ENFORCEMENT.md) - workflow DAG, checkpoints, overrides, kill switches, convergence, deployment verification
 - [ENFORCEMENT-RECOVERY.md](ENFORCEMENT-RECOVERY.md) - operator recovery procedures
-- [TRACES.md](TRACES.md) - trace generation, staleness, and import-graph fallback
 - [../agents/completion-verifier.md](../agents/completion-verifier.md) - completion verification behavior
 - [deployment-verification-contracts.md](deployment-verification-contracts.md) - build/deploy verification contracts
 - [AUDIT-LOG.md](AUDIT-LOG.md) - tamper-evident audit log, append path, verification, rotation, recovery

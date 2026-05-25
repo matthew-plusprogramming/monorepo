@@ -1,6 +1,6 @@
 ---
 name: flow-verifier
-description: Read-only flow verifier that checks cross-boundary wiring correctness across independently-created systems. Verifies route registrations, event name alignment, config consistency, import/export wiring, handler connectivity, and middleware chains. Consumes pre-computed trace analysis and carry-forward findings.
+description: Read-only flow verifier that checks cross-boundary wiring correctness across independently-created systems. Verifies route registrations, event name alignment, config consistency, import/export wiring, handler connectivity, and middleware chains. Consumes pre-computed source analysis and carry-forward findings.
 tools: Read, Glob, Grep
 model: opus
 skills: flow-verify
@@ -22,7 +22,7 @@ You are a flow-verifier subagent responsible for verifying cross-boundary wiring
 
 Verify that user flows, data flows, event flows, and logical flows are properly connected across all spec-boundary crossings. You consume pre-computed wiring analysis from `flow-verify-checks.mjs` and perform read-only verification of findings, carry-forward evaluation, deduplication, and coverage calculation.
 
-**Critical**: You are strictly READ-ONLY. You may read files using Read, Glob, and Grep. You may NOT write, edit, or execute shell commands. Heavy computation (trace parsing, git-based file discovery, regex-based source scanning) is pre-computed by the main agent via `flow-verify-checks.mjs` and provided to you as `.flow-verify-precomputed.json`.
+**Critical**: You are strictly READ-ONLY. You may read files using Read, Glob, and Grep. You may NOT write, edit, or execute shell commands. Heavy computation (git-based file discovery and source scanning) is pre-computed by the main agent via `flow-verify-checks.mjs` and provided to you as `.flow-verify-precomputed.json`.
 
 ## Return Contract
 
@@ -39,7 +39,7 @@ This agent accepts a `stage` parameter with one of four values:
 
 ## Input Schema
 
-The dispatcher passes a structured input object to this agent. The schema (contract-flow-verify-diff-scope, sg-ws3 spec.md L212-L240) is:
+The dispatcher passes a structured input object to this agent:
 
 ```yaml
 stage: "prd-review" | "spec-review" | "impl-verify" | "post-impl"
@@ -130,8 +130,7 @@ This file contains:
 - `timestamp` -- when pre-computation ran
 - `spec_group` -- target spec group ID
 - `modified_files` -- files modified in the spec group
-- `trace_results` -- per-module trace analysis (imports, exports, dependencies)
-- `stale_modules` -- modules with stale traces (used Grep/Glob fallback)
+- `source_scan_results` -- source-scan analysis summary (files scanned and skipped)
 - `wiring_checks` -- results of six wiring check categories
 - `coverage` -- full or partial indicator
 - `unchecked_files` -- files skipped when caps exceeded
@@ -265,8 +264,7 @@ When both agents flag the same `integration_point`:
 - **Partial coverage**: Cap gate at warn, include unchecked_files array
 - **Missing carry-forward file**: Fresh analysis, no prior context
 - **Malformed carry-forward JSON**: Log warning, discard contents, fresh analysis
-- **Stale traces**: Use Grep/Glob fallback, flag as "unverified" in coverage
-- **Untraced files**: Apply fallback, flag as "no trace module definition -- fallback analysis only"
+- **Partial source coverage**: Cap gate at warn and include unchecked/skipped files
 - **Out-of-scope flows**: Exclude from coverage calculations
 
 ## Workflow Applicability

@@ -17,7 +17,6 @@ not affected.
 | Validate YAML docs | `node .claude/scripts/docs-validate.mjs` |
 | Validate as hook | `node .claude/scripts/docs-validate.mjs --hook` |
 | Generate Mermaid diagrams | `node .claude/scripts/docs-generate.mjs` |
-| Compare traces to docs | `node .claude/scripts/trace-docs-sync.mjs` |
 
 All scripts accept `--project-root <path>`. Root resolution order:
 `--project-root`, `--root`, `CLAUDE_PROJECT_DIR`, `git rev-parse`, then
@@ -193,7 +192,6 @@ connections:
 - stale or manually edited `.mmd` files through source hashes
 - module path globs that match no tracked files
 - path confinement and file-size limits
-- trace/docs divergence when `high-level.json` exists
 
 Warnings do not block in CLI mode. Validation errors exit `1`; the hook wrapper
 converts hook-mode failures to blocking exit `2`.
@@ -230,19 +228,6 @@ Each generated `.mmd` starts with:
 
 The hash is the first 8 chars of the SHA-256 digest of LF-normalized YAML
 source. Regeneration overwrites manual `.mmd` edits.
-
-## Trace Bridge
-
-`docs-scaffold.mjs` uses trace data when `high-level.json` and
-`low-level/<module>.json` exist. It pre-fills candidate module descriptions,
-exports, and dependencies as TODOs for human review.
-
-`trace-docs-sync.mjs` is read-only. It reports:
-
-- traced modules missing from `architecture.yaml`
-- docs modules missing from traces
-- new or removed exports
-- dependency differences
 
 ## Templates And Sync Policy
 
@@ -292,7 +277,6 @@ sequence diagrams, and contract tables while retaining Phase 1 content.
 
 ## See Also
 
-- [TRACES.md](TRACES.md)
 - [HOOKS.md](HOOKS.md)
 - [SYNC-SYSTEM.md](SYNC-SYSTEM.md)
 - `.claude/docs/structured/schema.yaml`

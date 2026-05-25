@@ -111,7 +111,7 @@ minimal -> core-workflow -> full-workflow
 | --------------- | ----------------------------------------------------------------------------------------------------- |
 | `minimal`       | Core config, scripts, schemas, hooks, infrastructure, and base prompt.                                |
 | `core-workflow` | Adds active implement/test/unify agents, skills, templates, and docs.                                 |
-| `full-workflow` | Adds review, routing, docs, PRD, security, trace, structured-docs, and specialist workflow artifacts. |
+| `full-workflow` | Adds review, routing, docs, PRD, security, structured-docs, and specialist workflow artifacts. |
 
 Child bundles inherit parent artifacts. Put each artifact in the lowest bundle
 that needs it. A registered artifact that is not in a bundle, project
@@ -128,7 +128,7 @@ Per-project config:
       "excluded": ["scripts/workspace-eslint"],
       "protected": [".claude/settings.json"],
       "sync_overrides": {
-        "docs/traces": "agent-assisted"
+        "docs/structured-docs": "agent-assisted"
       }
     }
   }
@@ -299,8 +299,8 @@ Sync-scoped roots:
 Excluded roots:
 
 ```text
-.claude/traces/      .claude/locks/       .claude/coordination/
-.claude/journal/     .claude/specs/groups/ .claude/specs/archive/
+.claude/locks/       .claude/coordination/ .claude/journal/
+.claude/specs/groups/ .claude/specs/archive/
 .claude/prds/        .claude/context/     .claude/audit/
 .claude/scripts/archive/
 ```

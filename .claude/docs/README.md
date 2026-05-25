@@ -5,7 +5,6 @@ Technical reference docs. CLAUDE.md is the runtime preamble loaded every session
 ## Active systems
 
 - [HOOKS.md](HOOKS.md) — PreToolUse / PostToolUse / Stop hook reference
-- [TRACES.md](TRACES.md) — Pre-computed trace system (generation, querying, freshness)
 - [STRUCTURED-DOCS.md](STRUCTURED-DOCS.md) — YAML structured-docs registry (architecture, flows, glossary)
 - [SYNC-SYSTEM.md](SYNC-SYSTEM.md) — Metaclaude sync manager (distributes artifacts to consumer projects)
 - [SYNC-SYSTEM-INTERNALS.md](SYNC-SYSTEM-INTERNALS.md) — Sync internals (registry, hashes, bundles)
@@ -40,7 +39,3 @@ Technical reference docs. CLAUDE.md is the runtime preamble loaded every session
 - [CONFIG.md](CONFIG.md) — `.claude/config/` YAML schema reference
 - [PROMPTS.md](PROMPTS.md) — prompts directory and prompt-vs-skill distinction
 - [SCRIPT-TESTING.md](SCRIPT-TESTING.md) — vitest testing patterns for `.claude/scripts/`
-
-## Architecture
-
-- [architecture/trace-aware-dispatch.md](architecture/trace-aware-dispatch.md) — trace integration into the dispatch workflow

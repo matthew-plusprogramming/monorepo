@@ -28,7 +28,7 @@ The auditor never modifies documentation files. The completion-verifier remains 
 /doc-audit --scope full --level deep
 
 # Feature-scoped audit
-/doc-audit --scope feature --paths .claude/docs/HOOKS.md,.claude/docs/TRACES.md
+/doc-audit --scope feature --paths .claude/docs/HOOKS.md,.claude/docs/SYNC-SYSTEM.md
 
 # Spec-group-scoped audit
 /doc-audit --scope multi --spec-group sg-current-work
@@ -71,7 +71,7 @@ All quick scan checks plus:
 - Consolidation candidate identification (docs with heading/keyword overlap >= 50%)
 - Terminology consistency (cross-doc term usage)
 - Semantic staleness (described systems still exist)
-- Automation candidate identification (docs generatable from code/schemas/traces)
+- Automation candidate identification (docs generatable from code or schemas)
 - Schema compliance (structured YAML docs against schema)
 
 ---
@@ -265,11 +265,10 @@ This produces `.claude/audit-reports/.audit-precomputed.json` containing git-cor
 
 ### Doc-to-Source Mapping
 
-The system resolves each doc's source relationship using three methods in priority order:
+The system resolves each doc's source relationship using two methods in priority order:
 
 1. **Explicit frontmatter**: `_source_modules` field in YAML frontmatter (highest priority)
-2. **Trace config matching**: Doc path matched against module globs in `trace.config.json`
-3. **Naming convention**: Derived from doc filename patterns (e.g., `HOOKS.md` -> `.claude/scripts/lib/hooks.mjs`)
+2. **Naming convention**: Derived from doc filename patterns (e.g., `HOOKS.md` -> `.claude/scripts/lib/hooks.mjs`)
 
 If no method resolves, the doc is classified as orphan (age-based heuristics only).
 

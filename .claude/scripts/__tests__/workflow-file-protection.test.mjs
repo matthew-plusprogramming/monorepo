@@ -165,7 +165,7 @@ describe("AC-3.3: Allows writes to other files", () => {
 
   it("should exit 0 for other coordination files", async () => {
     // Arrange
-    const filePath = join(COORDINATION_DIR, "trace-reads.json");
+    const filePath = join(COORDINATION_DIR, "notes.json");
 
     // Act
     const result = await runHook(makeWriteStdin("test-session", filePath));

@@ -79,13 +79,13 @@ Using your Read, Glob, and Grep tools, perform additional checks:
 
 #### Deep Audit Checks (level: deep) -- all quick scan checks plus:
 
-5. **Code sample accuracy**: Verify code snippets reference real symbols (from trace data)
+5. **Code sample accuracy**: Verify code snippets reference real symbols when source context is available
 6. **CLI command validity**: Verify CLI commands in docs match `package.json` scripts
 7. **Coverage gap analysis**: Compare actual API surface (agents, skills, hooks, scripts, structured docs) against existing documentation
 8. **Consolidation candidates**: Identify doc pairs with shared heading count >= 3 OR keyword overlap >= 50% of section headings
 9. **Terminology consistency**: Check key terms used consistently across docs (referencing glossary.yaml if available)
 10. **Semantic staleness**: Verify systems/modules described in docs still exist
-11. **Automation candidates**: Flag docs whose content could be generated from code/schemas/traces
+11. **Automation candidates**: Flag docs whose content could be generated from code or schemas
 12. **Schema compliance**: Validate structured YAML docs against schema
 
 ### 3. Evaluate Document Lifecycle State
@@ -102,11 +102,10 @@ For each doc, evaluate the three-state lifecycle:
 
 ### 4. Resolve Doc-to-Source Mapping
 
-For each doc, resolve its source relationship using three methods in priority order:
+For each doc, resolve its source relationship using two methods in priority order:
 
 1. **Explicit `_source_modules` frontmatter** -- highest priority
-2. **Trace config `fileToModule()` matching** -- match doc path against module globs
-3. **Naming convention fallback** -- derive source from doc filename patterns
+2. **Naming convention fallback** -- derive source from doc filename patterns
 
 If no method resolves, classify as orphan (falls back to age-based heuristics).
 

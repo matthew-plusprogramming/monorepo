@@ -33,10 +33,6 @@ The main agent's context is a non-renewable resource. Subagents return structure
 
 For dispatch triggers, detailed examples, and context economics, see `.claude/memory-bank/delegation.guidelines.md`.
 
-### Trace Context
-
-Use `.claude/traces/high-level.md` when routing or dispatching work that touches `.claude/scripts`; it is optional orientation, not a session-start gate. Subagents may read relevant low-level `.json` or `.summary.json` sidecars when they need module/export context. Do not read `.calls.json` directly; use `.claude/scripts/trace-query.mjs` for call-graph detail. Trace data is advisory, so verify critical assumptions against source before irreversible decisions. If traces are absent or stale, proceed with normal source analysis.
-
 ---
 
 ## Core Operating Constraints
@@ -168,8 +164,6 @@ Load memory-bank files based on task context; this is the canonical agent-to-fil
 | `best-practices/{spec-authoring,ears-format}.md`                              | Spec or security requirements work / Spec-author, Security-reviewer |
 | `best-practices/{subagent-design,typescript}.md`                              | Subagent or TypeScript work / route, implement, spec, Implementer |
 | `self-answer-protocol.md`                                                     | All agent dispatches / all agents                             |
-| `traces/high-level.md` and `.json`                                            | Routing and dispatch planning / main agent, Route             |
-| `traces/low-level/*.json` or `.summary.json`                                  | Implementation, test, review, exploration / relevant subagents |
 
 ### Usage & Maintenance
 
