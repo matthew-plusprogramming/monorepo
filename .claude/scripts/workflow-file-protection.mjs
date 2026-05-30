@@ -558,9 +558,9 @@ export { classifyBashCommandIntentString };
  *   2. intent='read'       -> no block (return null).
  *   3. intent='write'      -> return { classification, firstBasename }
  *                            so caller can apply PPID exemption and block.
- *   4. intent='ambiguous'  -> no block. Ambiguous classifier results are
- *                            advisory only; only concrete protected-write
- *                            targets are blocked by this hook.
+ *   4. intent='ambiguous'  -> fail closed when the command text names a
+ *                            protected target. Ambiguous protected writes are
+ *                            still writes for enforcement purposes.
  *
  * A supplementary symlink-resolution pass (preserved from sec-cmdinj-a7c21e08)
  * runs AFTER the classifier in the write-intent branch only: if the classifier
@@ -585,7 +585,26 @@ function detectBashWriteToProtectedFile(command, claudeDir) {
     };
   }
 
-  if (classification.intent === 'ambiguous') return null;
+  if (classification.intent === 'ambiguous') {
+    const protectedName = findMentionedProtectedName(command);
+    if (protectedName) {
+      return {
+        firstBasename: protectedName,
+        classification: {
+          intent: 'write',
+          targets: [
+            {
+              basename: protectedName,
+              matchType: 'exact',
+              source: 'positional',
+            },
+          ],
+          reason: classification.reason,
+        },
+      };
+    }
+    return null;
+  }
 
   // intent='read' or 'write' with no targets: fall through to symlink scan
   // as defense-in-depth. The scan detects cases the classifier's basename-
@@ -662,6 +681,32 @@ function detectBashWriteToProtectedFile(command, claudeDir) {
     }
   }
 
+  return null;
+}
+
+/**
+ * Return the first protected exact basename or regex-backed pattern id named
+ * in a command string. Used only for classifier-ambiguous paths, where static
+ * analysis cannot prove safety but the command still references a protected
+ * enforcement artifact.
+ *
+ * @param {string} command
+ * @returns {string|null}
+ */
+function findMentionedProtectedName(command) {
+  for (const name of PROTECTED_FILENAMES) {
+    if (command.includes(name)) return name;
+  }
+  for (const entry of PROTECTED_FILENAME_PATTERNS) {
+    const stem = entry.pattern.source
+      .replace(/^\^/, '')
+      .replace(/\$$/, '')
+      .replace(/\\\./g, '.')
+      .replace(/\([^)]*\)\??/g, '')
+      .replace(/\\d\+?/g, '')
+      .replace(/[*+?]/g, '');
+    if (stem && command.includes(stem)) return entry.patternId;
+  }
   return null;
 }
 

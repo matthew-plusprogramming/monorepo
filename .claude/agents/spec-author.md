@@ -85,6 +85,32 @@ Include:
 - Auth/security requirements
 - Ordering, timeout, retry, or idempotency guarantees when relevant
 
+Use the `.claude/contracts/naming-conventions.md` naming conventions for
+contract ids and field names. For machine-readable contracts, use fenced
+`yaml:contract` blocks. Boundary-crossing specs need complete wire protocol
+contracts: endpoint/channel, payload shape, field values, error codes,
+security fields, and behavioral guarantees. Contract modifications are
+append-only unless a breaking change is explicitly called out; do not remove or
+type-change existing fields silently.
+
+When data model contracts define persistent entities, include an ERD or
+entity-relationship diagram note. When workflows define state transitions,
+include a state diagram or workflow diagram note.
+
+### 3b. Wiring Task Rule
+
+When files created or modified by the current spec introduce `init()`,
+`register()`, or module-initialization `set*()` methods, add a wiring task that
+names the entry-point file. Property setters or `set*()` methods without
+module initialization context do not trigger this task. Init/register methods
+in dependency files not created by the current spec do not trigger it.
+
+### 3c. Environment-Dependent Behavior
+
+If behavior depends on `NODE_ENV`, deployment environment, or another env
+conditional, require acceptance criteria for the default/unset env case and
+the configured env case.
+
 ### 4. Runtime Validation Marker
 
 Add this frontmatter only when static gates are insufficient:
@@ -107,17 +133,18 @@ Only set `e2e_skip: true` when the work fits one of the accepted rationale categ
 
 Otherwise leave E2E enabled.
 
-### 6. Amendment Mode
+### 6. Amendment Mode: Propagation Sweep
 
 When applying accepted findings from `/investigate` or `/challenge`, fix the corrected belief globally across the active spec group.
 
 For each accepted finding:
 
 1. State the canonical invariant being restored.
-2. Search for stale references.
-3. Update stale normative text.
+2. Build 3-8 targeted search terms and run `Grep` across spec artifacts.
+3. Update stale normative text in sections such as `Security Considerations`,
+   `Implementation Notes`, `Open Questions`, and `Decision & Work Log`.
 4. Leave historical references only when clearly marked historical.
-5. Record the sweep in `Decision & Work Log`.
+5. Record the sections changed in `Decision & Work Log`.
 
 ## Quality Bar
 

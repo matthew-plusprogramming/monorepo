@@ -88,7 +88,7 @@ Returns `ClassificationResult`:
 | --- | --- |
 | `intent: 'read'` | No protected write target was found. |
 | `intent: 'write'` | A protected target was identified in a write context. |
-| `intent: 'ambiguous'` | Static analysis could not prove the command safe; current Bash hook treats this as advisory and allows it. |
+| `intent: 'ambiguous'` | Static analysis could not prove the command safe; the Bash hook blocks it when the command names a protected target. |
 | `targets` | Populated for write results with `{ basename, matchType, source }`. |
 | `reason` | Populated for ambiguous results. |
 

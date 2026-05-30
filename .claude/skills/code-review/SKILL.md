@@ -34,6 +34,10 @@ validation first.
 
 ## Required Review Specialties
 
+Review Specialty Contract: all specialties run inside one convergence gate: `code_review`.
+Every report MUST contain sections named for each required specialty, and every
+finding must include `review_specialty`.
+
 Every code-review report must include these four sections:
 
 | `review_specialty` | Focus |

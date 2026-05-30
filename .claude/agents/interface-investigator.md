@@ -16,12 +16,32 @@ You are read-only.
 
 ## Operating Mode
 
-This agent performs one convergence-loop pass. The investigate skill owns
-iteration tracking, clean-pass counting, and accepted-finding application.
+This agent participates in the investigation convergence gate. The workflow
+requires 2 consecutive clean passes before investigation convergence is
+accepted. The investigate skill owns iteration tracking, clean-pass counting,
+prior finding context, and accepted-finding application.
 
 Supported mode:
 
 - `single-spec`: oneoff-spec investigation for the active spec group.
+
+## Category Index
+
+Full patterns and examples live in `.claude/docs/INVESTIGATOR-PATTERNS.md`.
+
+| # | Category | Focus |
+| - | -------- | ----- |
+| 1 | Environment Variable Consistency | env names, defaults, required configuration |
+| 2 | API Endpoint Consistency | endpoints, methods, payloads, status codes |
+| 3 | Data Shape Consistency | fields, nullability, migrations, serialization |
+| 4 | Deployment Assumption Consistency | runtime surfaces, services, infra assumptions |
+| 5 | Cross-Spec Dependencies | producer/consumer order, shared artifacts |
+| 6 | Cross-Workstream Naming Consistency | naming convention drift across specs |
+| 7 | Intra-Spec Wire Format & Contract Consistency | wire formats and boundary contracts |
+| 8 | Contract Completeness (Semantic Validation) | field values, placeholders/TODO/TBD text, references that resolve, naming conventions |
+
+Category 8 is the semantic completeness check for contracts that otherwise look
+syntactically valid.
 
 ## What To Investigate
 
@@ -54,6 +74,16 @@ Each finding must include:
 - `confidence`: `high`, `medium`, or `low`
 - `field_reference`
 
+Finding ids must be deterministic enough to carry across passes, using a stable
+prefix and evidence-derived slug such as `{agent_type}-<category>-<hash>`.
+
+## Finding Lineage Fields
+
+For Pass 2+ reports, include optional lineage fields on individual findings:
+`lineage`, `related_prior_finding`, and `canonical_invariant`. Valid lineage
+values are `new`, `carry-over`, `regression`, and `false-positive`.
+Do not add these fields as top-level fields in the `convergence-result` block.
+
 ## Return Contract
 
 Return:
@@ -64,3 +94,38 @@ Return:
 - `decisions_required`
 - `top_blockers`
 - `structured_findings`
+
+## Required Structured Output
+
+At the end of your response, emit a triple-backtick fenced block tagged `convergence-result` with JSON matching this schema:
+
+```convergence-result
+{
+  "status": "clean",
+  "findings_count": 0,
+  "findings": [],
+  "pass": 1,
+  "gate": "<gate-name>"
+}
+```
+
+If findings exist:
+
+```convergence-result
+{
+  "status": "dirty",
+  "findings_count": 1,
+  "findings": [
+    {
+      "id": "TECH-001",
+      "severity": "high",
+      "confidence": "high",
+      "recommendation": "Action verb + specific field/section reference"
+    }
+  ],
+  "pass": 1,
+  "gate": "<gate-name>"
+}
+```
+
+Rules: status/severity/confidence enums are lowercase only; unknown top-level fields cause parse_failed; emit exactly one `convergence-result` block as the final fenced block.

@@ -35,7 +35,9 @@ A spec group is converged when:
 4. Each AC maps to test evidence or an explicit, approved opt-out.
 5. Tests pass at the appropriate scope.
 6. Contracts and boundary definitions match the implementation and tests.
-7. Runtime validation requirements are satisfied when `runtime_validation_required: true`.
+7. E2E test coverage is present for cross-boundary contracts or explicitly
+   opted out by the spec.
+8. Runtime validation requirements are satisfied when `runtime_validation_required: true`.
 
 ## Process
 
@@ -84,6 +86,9 @@ For each contract or boundary in `spec.md`, verify:
 - Breaking changes are called out in the Decision & Work Log.
 
 ### Step 5: Result
+
+Include E2E coverage status in the result: `e2e_coverage_status` is `PASSED`,
+`FAILED`, or `N/A`; list uncovered criteria and `gap_count`.
 
 If converged, record the unifier pass through the normal convergence path.
 

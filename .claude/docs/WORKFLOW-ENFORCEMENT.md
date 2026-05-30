@@ -304,8 +304,8 @@ Convergence state lives in two stores:
 | Store | Scope | Holds | Main writers |
 | --- | --- | --- | --- |
 | `manifest.json:.convergence` | durable and persistent per spec group | durable booleans such as `<gate>_converged`, `<gate>_passed`, and `spec_complete` | `session-checkpoint.mjs update-convergence`, `complete-work`, spec/document writers |
-| `session.json:.work_items[work_id].convergence` | selected work-item state | `<gate>.clean_pass_count`, iteration counters, parse-failure counters, source provenance for one work item | `session-checkpoint.mjs update-convergence`, imported `recordPass()` |
-| `session.json:.convergence` | active-work compatibility mirror | copy of the selected work item's convergence counters for legacy readers | `start-work`, `switch-work`, `update-convergence`, imported `recordPass()` |
+| `session.json:.work_items[work_id].convergence` | session-scoped selected work-item state | `<gate>.clean_pass_count`, iteration counters, parse-failure counters, source provenance for one work item | `session-checkpoint.mjs update-convergence`, imported `recordPass()` |
+| `session.json:.convergence` | session-scoped active-work compatibility mirror | copy of the selected work item's convergence counters for legacy readers | `start-work`, `switch-work`, `update-convergence`, imported `recordPass()` |
 
 Work identity fields:
 

@@ -52,13 +52,7 @@
         },
         "workflow": {
           "type": "string",
-          "enum": [
-            "oneoff-vibe",
-            "oneoff-spec",
-            "orchestrator",
-            "refactor",
-            "journal-only"
-          ],
+          "enum": ["oneoff-vibe", "oneoff-spec", "refactor", "journal-only"],
           "description": "The workflow type determined by /route"
         },
         "current_phase": {
@@ -66,8 +60,6 @@
           "enum": [
             "prd_gathering",
             "spec_authoring",
-            "atomizing",
-            "enforcing",
             "investigating",
             "awaiting_approval",
             "auto_approval",
@@ -98,7 +90,7 @@
             },
             "result": {
               "type": "string",
-              "enum": ["pass", "fail", "blocked"]
+              "enum": ["pass", "fail", "blocked", "infra_blocked"]
             },
             "scenario_count": {
               "type": "integer",
@@ -122,6 +114,49 @@
             "recorded_at": {
               "type": "string",
               "format": "date-time"
+            },
+            "evidence": {
+              "type": "object",
+              "description": "Structured InfraBlockedEvidence payload. Required when result === 'infra_blocked'. See contract-infra-blocked-evidence in sg-manual-tester-infra-blocked-20260508/spec.md.",
+              "additionalProperties": false,
+              "properties": {
+                "timestamp": {
+                  "type": "string",
+                  "format": "date-time",
+                  "description": "ISO 8601 timestamp when the trigger fired."
+                },
+                "narrative": {
+                  "type": "string",
+                  "minLength": 10,
+                  "maxLength": 4096,
+                  "description": "Human-readable trigger description (>=10 chars, <=4096 chars per SEC-002)."
+                },
+                "exception_trace": {
+                  "type": "string",
+                  "maxLength": 16384,
+                  "description": "Optional: stack trace or transport-level error detail (<=16384 chars per SEC-002)."
+                },
+                "dispatch_id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Manual-tester dispatch id; counter key for the >=2-emission human-confirmation gate."
+                },
+                "session_id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Current session id; reset on session restart."
+                }
+              },
+              "required": [
+                "timestamp",
+                "narrative",
+                "dispatch_id",
+                "session_id"
+              ]
+            },
+            "dispatch_id": {
+              "type": "string",
+              "description": "Canonicalized dispatch_id (matches evidence.dispatch_id when both supplied). Required when result === 'infra_blocked'; optional otherwise."
             }
           },
           "required": [
@@ -132,6 +167,14 @@
             "fail_count",
             "recorded_at"
           ]
+        },
+        "dispatch_infra_blocked_count": {
+          "type": "object",
+          "description": "Counter map keyed by dispatch_id, scoped to the current phase. Incremented on each 'infra_blocked' record-manual-test-result write; deleted (not zeroed) when the workflow transitions out of the 'documenting' phase. Sole-writer: session-checkpoint.mjs (NFR-1).",
+          "additionalProperties": {
+            "type": "integer",
+            "minimum": 0
+          }
         }
       },
       "required": ["spec_group_id", "workflow", "current_phase", "objective"]
@@ -145,8 +188,6 @@
           "enum": [
             "prd_gathering",
             "spec_authoring",
-            "atomizing",
-            "enforcing",
             "investigating",
             "awaiting_approval",
             "auto_approval",
@@ -188,24 +229,6 @@
           "minimum": 0,
           "default": 0,
           "description": "Number of overrides used this session (shared cap with reset-enforcement, max 3)"
-        },
-        "atomic_specs_completed": {
-          "type": "array",
-          "items": {
-            "type": "string",
-            "pattern": "^as-[0-9]{3}(-[a-z0-9-]+)?$",
-            "description": "Atomic spec ID (as-NNN or as-NNN-slug)"
-          },
-          "description": "List of atomic spec IDs that have been completed"
-        },
-        "atomic_specs_pending": {
-          "type": "array",
-          "items": {
-            "type": "string",
-            "pattern": "^as-[0-9]{3}(-[a-z0-9-]+)?$",
-            "description": "Atomic spec ID (as-NNN or as-NNN-slug)"
-          },
-          "description": "List of atomic spec IDs still pending implementation"
         },
         "next_actions": {
           "type": "array",
@@ -296,7 +319,7 @@
         "type": "array",
         "items": {
           "type": "string",
-          "enum": ["pre-impl", "pre-test", "pre-orch"]
+          "enum": ["pre-impl"]
         }
       },
       "default": {}
@@ -404,6 +427,111 @@
         }
       },
       "required": ["detected"]
+    },
+    "pre_merge_verify": {
+      "type": "object",
+      "description": "sg-pre-merge-verify-20260508 / AS-6 / AC-7.1: Pre-merge-verify gate result. Sole-writer: session-checkpoint.mjs record-pre-merge-verify-result (NFR-2). Discriminated union on `status`. OPTIONAL at session root per DEC-009; pre-Item-B sessions read as absent. The closed 22-value `reason` enum is the canonical source per REQ-007 / NFR-12 — future values require PRD amendment.",
+      "additionalProperties": false,
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": ["passed", "failed", "skipped"],
+          "description": "Gate decision discriminator. AC-6.1..AC-6.4 Stop-hook composition: status='failed' sets preMergeBlocked=true; passed|skipped allow completion; missing or malformed status fails open."
+        },
+        "reason": {
+          "type": ["string", "null"],
+          "enum": [
+            "fixture_setup_failed",
+            "fixture_setup_failed_no_script",
+            "boot_failed",
+            "boot_failed_url_invalid",
+            "boot_failed_port_static",
+            "boot_failed_port_conflict",
+            "boot_failed_not_ready",
+            "boot_killed_clean",
+            "boot_killed_force",
+            "boot_kill_failed",
+            "health_check_failed",
+            "teardown_failed",
+            "teardown_skipped",
+            "teardown_orphan_kill_failed",
+            "no_contract_declared",
+            "no_manifest",
+            "no_routes_for_phase",
+            "no_service_name",
+            "vibe_mode_no_active_work",
+            "pre_merge_verify_lock_timeout",
+            "audit_chain_tamper_detected",
+            "config_invalid_timeout",
+            null
+          ],
+          "description": "Closed 22-value failure-reason vocabulary (REQ-007 / NFR-12). null only valid when status='passed' and no advisory present. Bucket map (NFR-13): INFRA_BLOCKED (10) | CODE_DEFECT (1) | ADVISORY (3) | SKIP (5) | SYSTEM_ERROR (3)."
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "description": "ISO 8601 timestamp when the result was recorded."
+        },
+        "audit_seq": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Monotonic audit-chain sequence at result-write time (NFR-22+SEC-107)."
+        },
+        "dispatch_id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Verifier dispatch_id (free-form opaque string; counter-map key in session.active_work.dispatch_infra_blocked_count[<dispatch_id>]). Optional."
+        },
+        "evidence_path": {
+          "type": "string",
+          "description": "Project-relative path under .claude/specs/groups/<sg>/evidence/ to structured trigger evidence."
+        },
+        "evidence": {
+          "type": ["object", "null"],
+          "description": "Optional inline structured trigger evidence (mirrors InfraBlockedEvidence shape when reason is in the INFRA_BLOCKED bucket)."
+        },
+        "quarantine_until_acknowledged": {
+          "type": "boolean",
+          "default": false,
+          "description": "When true, the next gate-dispatch HALTs at NFR-26 step 3. Set on teardown failure (NFR-25); cleared by clear-pre-merge-quarantine CLI or the next successful teardown."
+        },
+        "cumulative_ms": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Cumulative wall-clock duration for the gate run (NFR-19+SEC-108). Advisory-logged when > 300000ms; does NOT flip gate decision."
+        }
+      },
+      "required": ["status", "timestamp"],
+      "allOf": [
+        {
+          "if": {
+            "properties": { "status": { "const": "failed" } },
+            "required": ["status"]
+          },
+          "then": {
+            "properties": {
+              "reason": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "required": ["reason"]
+          }
+        }
+      ]
+    },
+    "audit": {
+      "type": "object",
+      "description": "sg-pre-merge-verify-20260508 / AS-6 / NFR-22+SEC-107: Monotonic audit-chain anchor. OPTIONAL at session root per DEC-009; pre-Item-B sessions read as absent and are migrated lazily on first recordAuditEvent call ({next_seq: 0}). Sole-writer: session-checkpoint.mjs recordAuditEvent (named export) and record-audit-event CLI; both share atomic read-assert-write logic.",
+      "additionalProperties": false,
+      "properties": {
+        "next_seq": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Next audit-chain sequence number to assign. First emission writes audit_seq=0. Subsequent assertions: new_seq === prior_seq + 1; non-monotonic detection emits audit_chain_tamper_detected."
+        }
+      },
+      "required": ["next_seq"]
     }
   },
   "$defs": {
@@ -420,8 +548,6 @@
           "enum": [
             "explore",
             "spec-author",
-            "atomizer",
-            "atomicity-enforcer",
             "interface-investigator",
             "implementer",
             "test-writer",
@@ -431,7 +557,6 @@
             "security-reviewer",
             "documenter",
             "refactorer",
-            "facilitator",
             "manual-tester",
             "prd-writer",
             "prd-critic",
@@ -449,9 +574,6 @@
           "type": "string",
           "enum": [
             "pre-implementation",
-            "pre-test",
-            "pre-review",
-            "pre-orchestration",
             "prd-review",
             "spec-review",
             "impl-verify",
@@ -486,11 +608,6 @@
           "type": ["string", "null"],
           "pattern": "^sg-[a-z0-9-]+$",
           "description": "Associated spec group if applicable"
-        },
-        "atomic_spec_id": {
-          "type": ["string", "null"],
-          "pattern": "^as-[0-9]{3}(-[a-z0-9-]+)?$",
-          "description": "Associated atomic spec if applicable"
         }
       },
       "required": [
@@ -579,22 +696,44 @@
           "enum": [
             "session_start",
             "session_resume",
+            "active_sessions_orphan_scan",
+            "audit_chain_repaired",
             "work_started",
+            "work_started_already_active",
+            "start_work_after_completion_audit",
             "phase_transition",
             "subagent_dispatched",
+            "subagent_dispatched_overwrite",
             "subagent_completed",
             "checkpoint_saved",
             "work_completed",
             "work_abandoned",
             "work_switched",
+            "worktree_rotated",
+            "workflow_overridden",
+            "dangling_active_work_cleared",
             "error_occurred",
             "override_skip",
             "reset_enforcement",
             "enforcement_level_change",
             "completion_checklist",
             "manual_test_result_recorded",
+            "manual_test_result_cleared",
+            "obligation_violation",
+            "pre_merge_verify_recorded",
+            "pre_merge_verify_quarantine_cleared",
+            "route_decision_recorded",
+            "shape_lint_async_mode_cleared",
+            "session_override_flip",
+            "subagent_type_mismatch_rejected",
+            "enforcement_compromised_triggered",
+            "test_writer_unlock_recorded",
+            "test_writer_unlock_refence",
             "convergence_update",
-            "convergence_pass_recorded"
+            "convergence_pass_recorded",
+            "convergence_recent_pass_preserved",
+            "convergence_manifest_seeded",
+            "convergence_force_reset"
           ],
           "description": "Type of event that occurred"
         },

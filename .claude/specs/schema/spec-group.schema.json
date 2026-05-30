@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "SpecGroup",
-  "description": "A collection of atomic specs tied to a PRD version, with two-dimensional state tracking",
+  "description": "A spec group tied to a PRD version, with two-dimensional state tracking",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -127,29 +127,6 @@
         }
       }
     },
-    "atomic_specs": {
-      "type": "object",
-      "description": "Atomic specs metadata",
-      "properties": {
-        "count": {
-          "type": "integer",
-          "minimum": 0
-        },
-        "coverage": {
-          "type": "string",
-          "description": "Percentage of requirements covered by atomic specs"
-        },
-        "enforcement_status": {
-          "type": "string",
-          "enum": ["not_run", "passing", "failing", "warnings"],
-          "description": "Last atomicity enforcement result"
-        },
-        "last_enforced": {
-          "type": "string",
-          "format": "date-time"
-        }
-      }
-    },
     "convergence": {
       "type": "object",
       "description": "Convergence gate status",
@@ -194,15 +171,13 @@
               "user",
               "human",
               "agent",
-              "atomizer",
               "implementer",
               "unifier",
-              "enforcer",
               "test-writer",
               "refactorer",
+              "session-checkpoint",
               "code-reviewer",
               "security-reviewer",
-              "facilitator",
               "interface-investigator",
               "completion-verifier"
             ]
@@ -237,24 +212,21 @@
           "format": "date-time",
           "description": "Timestamp of last persisted checkpoint"
         },
-        "last_atomic_spec": {
-          "type": "string",
-          "pattern": "^as-[0-9]{3}(-[a-z0-9-]+)?$",
-          "description": "ID of the last completed atomic spec"
-        },
         "checkpoint_phase": {
           "type": "string",
           "enum": [
             "prd_gathering",
             "spec_authoring",
-            "atomizing",
-            "enforcing",
             "investigating",
             "awaiting_approval",
+            "auto_approval",
+            "challenging",
             "implementing",
             "testing",
             "verifying",
             "reviewing",
+            "completion_verifying",
+            "documenting",
             "journaling",
             "complete"
           ],
@@ -282,7 +254,7 @@
     },
     "workflow": {
       "type": "string",
-      "description": "Optional workflow type that produced this spec group (e.g., oneoff-vibe, oneoff-spec, orchestrator, refactor, journal-only)."
+      "description": "Optional workflow type that produced this spec group (e.g., oneoff-vibe, oneoff-spec, refactor, journal-only)."
     },
     "target_codebase": {
       "type": "string",
@@ -308,7 +280,7 @@
     },
     "milestones": {
       "type": ["array", "object"],
-      "description": "Optional milestone breakdown (used by multi-milestone WorkstreamSpecs). Accepted as either an array of milestone objects or an object keyed by milestone id (e.g., {M1: {...}, M2: {...}}).",
+      "description": "Optional milestone breakdown for large specs. Accepted as either an array of milestone objects or an object keyed by milestone id (e.g., {M1: {...}, M2: {...}}).",
       "items": { "type": "object" }
     },
     "e2e_skip": {
@@ -326,20 +298,108 @@
       ],
       "description": "Required rationale when e2e_skip is true."
     },
+    "risk_tier": {
+      "type": "string",
+      "enum": [
+        "trust-bearing",
+        "user-visible",
+        "shared-library",
+        "local-feature",
+        "docs-prompt-metadata",
+        "mechanical-cleanup"
+      ],
+      "description": "Stop-hook risk tier for mandatory-dispatch requirements."
+    },
+    "runtime_validation_required": {
+      "type": "boolean",
+      "description": "If true, terminal Stop requires a passing manual-tester runtime validation result."
+    },
+    "runtime_validation_surface": {
+      "type": "string",
+      "enum": [
+        "plugin",
+        "mcp",
+        "connector",
+        "browser-extension",
+        "dynamic-tool-body",
+        "plugin-loader",
+        "other"
+      ],
+      "description": "Runtime-loaded surface that requires manual validation."
+    },
+    "runtime_validation_rationale": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Rationale for runtime_validation_required."
+    },
+    "pre_merge_verify_skip": {
+      "type": "boolean",
+      "description": "sg-pre-merge-verify-20260508 / AS-9 / REQ-010 / DEC-003: Opt out of mandatory pre-merge-verify Stop-hook gate for this spec group.",
+      "default": false
+    },
+    "pre_merge_verify_skip_rationale": {
+      "type": "string",
+      "minLength": 15,
+      "description": "sg-pre-merge-verify-20260508 / AS-9 / DEC-003: FREE-TEXT rationale (NOT an enum) when pre_merge_verify_skip is true; minimum 15 chars. Free-text because pre-merge-verify skip reasons are project-specific (e.g. 'no fixture-bootable target for this CLI-only project')."
+    },
     "spec_group": {
       "type": ["object", "string"],
-      "description": "Optional nested metadata block carried by some legacy/orchestrator manifests. Accepted as either a nested object or a string identifier (some legacy manifests carry it as a duplicate string identifier)."
+      "description": "Optional nested metadata block carried by some legacy manifests. Accepted as either a nested object or a string identifier (some legacy manifests carry it as a duplicate string identifier)."
     },
     "spec_mode": {
       "type": "string",
       "enum": ["feature", "bug-fix", "refactor"],
       "default": "feature",
-      "description": "Practice 2.4 bug-fix-mode signal (sg-pipeline-efficiency-ws2-practice-2.4 / AC-005.1, AC-005.2). Positive signal used by test-writer isolation hook and record-test-writer-unlock CLI to distinguish bug-fix workstreams from feature workstreams. Default `feature`; fail-closed to strict isolation when absent. Only `spec_mode: bug-fix` activates hybrid-mode eligibility."
+      "description": "Practice 2.4 bug-fix-mode signal (sg-pipeline-efficiency-ws2-practice-2.4 / AC-005.1, AC-005.2). Positive signal used by test-writer isolation hook and record-test-writer-unlock CLI to distinguish bug-fix specs from feature specs. Default `feature`; fail-closed to strict isolation when absent. Only `spec_mode: bug-fix` activates hybrid-mode eligibility."
     },
     "specs": {
       "type": "array",
-      "description": "Optional list of enumerated sub-specs (orchestrator-tier manifests).",
+      "description": "Optional legacy list of enumerated sub-specs.",
       "items": { "type": "object" }
     }
-  }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": { "pre_merge_verify_skip": { "const": true } },
+        "required": ["pre_merge_verify_skip"]
+      },
+      "then": {
+        "required": ["pre_merge_verify_skip_rationale"],
+        "properties": {
+          "pre_merge_verify_skip_rationale": {
+            "type": "string",
+            "minLength": 15
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "runtime_validation_required": { "const": true } },
+        "required": ["runtime_validation_required"]
+      },
+      "then": {
+        "required": ["runtime_validation_surface", "runtime_validation_rationale"],
+        "properties": {
+          "runtime_validation_surface": {
+            "type": "string",
+            "enum": [
+              "plugin",
+              "mcp",
+              "connector",
+              "browser-extension",
+              "dynamic-tool-body",
+              "plugin-loader",
+              "other"
+            ]
+          },
+          "runtime_validation_rationale": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    }
+  ]
 }

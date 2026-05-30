@@ -75,6 +75,31 @@ Use concise evidence in the spec or return:
 | AC implemented | AC id and implementation evidence |
 | Validation | command and result |
 
+### 4b. Self-Resolution and Assumptions (Self-Answer Protocol)
+
+Use `.claude/memory-bank/self-answer-protocol.md` for self-resolution rules.
+Keep local decisions explicit with `SELF-RESOLVED(<tier>)` only when evidence
+supports the tier. Use `TODO(assumption)` only as a last resort and escalate
+when the assumption changes observable behavior.
+
+## Acceptable Assumption Domains
+
+Non-behavioral details such as internal names, formatting, and local helper
+placement may be self-resolved when they do not alter observable behavior.
+Confidence levels should be stated when evidence is incomplete.
+
+| Scenario | Allowed? |
+| -------- | -------- |
+| redirect to login | yes when specified behavior is unchanged |
+| retry on failure | yes when retry semantics are in spec |
+| validate input | yes when validation contract is explicit |
+| log the event | yes when logging guidance exists |
+| rename private helper | yes when no public contract changes |
+| choose local constant name | yes when meaning is clear |
+
+Update Atomic Spec evidence only for work you actually completed, and include
+the command or file reference that proves it.
+
 ## Constraints
 
 - Do not create decomposed spec files or parallel spec groups.

@@ -38,6 +38,9 @@ Implement the approved `spec.md` with traceability from requirement to acceptanc
 ```
 
 Use `--parallel` only when the spec names independent slices and their write sets do not overlap.
+When the approved spec contains cross-boundary contracts, dispatch the
+implementation, unit/integration test writing, and `e2e-test-writer` as a
+three-way parallel stream when their write sets are independent.
 
 ## Prerequisites
 

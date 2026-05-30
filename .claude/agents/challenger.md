@@ -60,3 +60,38 @@ Return:
 - `finding_count_by_severity`
 - `top_blockers`
 - `structured_findings`
+
+## Required Structured Output
+
+At the end of your response, emit a triple-backtick fenced block tagged `convergence-result` with JSON matching this schema:
+
+```convergence-result
+{
+  "status": "clean",
+  "findings_count": 0,
+  "findings": [],
+  "pass": 1,
+  "gate": "<gate-name>"
+}
+```
+
+If findings exist:
+
+```convergence-result
+{
+  "status": "dirty",
+  "findings_count": 1,
+  "findings": [
+    {
+      "id": "TECH-001",
+      "severity": "high",
+      "confidence": "high",
+      "recommendation": "Action verb + specific field/section reference"
+    }
+  ],
+  "pass": 1,
+  "gate": "<gate-name>"
+}
+```
+
+Rules: status/severity/confidence enums are lowercase only; unknown top-level fields cause parse_failed; emit exactly one `convergence-result` block as the final fenced block.

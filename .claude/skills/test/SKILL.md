@@ -32,6 +32,8 @@ Write executable validation for `spec.md`. Tests verify behavior and contracts, 
 ```
 
 Use `--parallel` only for independent spec slices with separate test files or fixtures.
+For cross-boundary contracts, coordinate with `e2e-test-writer` as the third
+parallel stream so end-to-end coverage is authored from the spec contract.
 
 ## Prerequisites
 

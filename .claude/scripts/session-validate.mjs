@@ -60,9 +60,10 @@ const SCHEMA_PATH = join(CLAUDE_DIR, 'specs', 'schema', 'session.schema.json');
 // session.schema.json is verified by __tests__/enum-sync.test.mjs.
 
 /**
- * Valid event types from schema
+ * Fallback event types. The schema is the source of truth; main() replaces
+ * this from .claude/specs/schema/session.schema.json before validation.
  */
-const VALID_EVENT_TYPES = [
+let VALID_EVENT_TYPES = [
   'session_start',
   'session_resume',
   'work_started',
@@ -357,6 +358,22 @@ function main() {
   if (!existsSync(SCHEMA_PATH)) {
     console.error(`Schema file not found: ${SCHEMA_PATH}`);
     console.error('Cannot validate without schema.');
+    process.exit(1);
+  }
+
+  // Load schema enum so this validator cannot silently drift from the
+  // canonical session JSON Schema when new history writers are added.
+  try {
+    const schemaData = JSON.parse(readFileSync(SCHEMA_PATH, 'utf-8'));
+    const schemaEventTypes =
+      schemaData?.$defs?.history_entry?.properties?.event_type?.enum;
+    if (!Array.isArray(schemaEventTypes) || schemaEventTypes.length === 0) {
+      console.error('Schema event enum not found at $defs.history_entry.properties.event_type.enum');
+      process.exit(1);
+    }
+    VALID_EVENT_TYPES = schemaEventTypes;
+  } catch (err) {
+    console.error(`Error reading session schema: ${err.message}`);
     process.exit(1);
   }
 

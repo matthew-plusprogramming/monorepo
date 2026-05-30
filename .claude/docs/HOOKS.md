@@ -24,20 +24,20 @@ Claude Code sends hook input on stdin as JSON. File hooks read
 }
 ```
 
-| Variable | Availability | Purpose |
-| --- | --- | --- |
-| `CLAUDE_PROJECT_DIR` | All hooks | Project root directory |
-| `CLAUDE_CODE_REMOTE` | All hooks | Remote execution marker (`"true"` or unset) |
-| `CLAUDE_ENV_FILE` | SessionStart only | Path for persisting session env vars |
+| Variable             | Availability      | Purpose                                     |
+| -------------------- | ----------------- | ------------------------------------------- |
+| `CLAUDE_PROJECT_DIR` | All hooks         | Project root directory                      |
+| `CLAUDE_CODE_REMOTE` | All hooks         | Remote execution marker (`"true"` or unset) |
+| `CLAUDE_ENV_FILE`    | SessionStart only | Path for persisting session env vars        |
 
 ## Trigger Points
 
-| Hook Event | When Triggered | Matchers | Live Use |
-| --- | --- | --- | --- |
-| `PreToolUse` | Before tool execution | Agent, Write, Bash, Read, Edit\|Write | Workflow gates, protected-file gates, e2e isolation |
-| `PostToolUse` | After file edits/writes | `Edit\|Write` | Scoped file validation |
-| `SubagentStop` | When a subagent completes | (none) | Convergence evidence and dispatch accounting |
-| `Stop` | When the session ends | (none) | Completion blocking through Stop-hook JSON |
+| Hook Event     | When Triggered            | Matchers                              | Live Use                                            |
+| -------------- | ------------------------- | ------------------------------------- | --------------------------------------------------- |
+| `PreToolUse`   | Before tool execution     | Agent, Write, Bash, Read, Edit\|Write | Workflow gates, protected-file gates, e2e isolation |
+| `PostToolUse`  | After file edits/writes   | `Edit\|Write`                         | Scoped file validation                              |
+| `SubagentStop` | When a subagent completes | (none)                                | Convergence evidence and dispatch accounting        |
+| `Stop`         | When the session ends     | (none)                                | Completion blocking through Stop-hook JSON          |
 
 Do not model `PostToolUse` for `Agent`; Claude Code does not provide that
 post-completion surface. `dispatch-record-hook.mjs` exists because of this gap.
@@ -48,78 +48,78 @@ Live hook count: 17. No remaining live hook is legacy-only or advisory-only.
 Latency telemetry is not recorded in this repo, so latency cuts need separate
 measurement.
 
-| Hook ID | Event | Class | Scope | Blocking / Failure Mode |
-| --- | --- | --- | --- | --- |
-| `workflow-gate-enforcement` | PreToolUse | damage-prevention | enforced Agent dispatches | Blocks with exit 2; structural errors fail open; missing convergence fails closed |
-| `workflow-file-protection` | PreToolUse | damage-prevention | Write to protected enforcement files | Blocks with exit 2 |
-| `workflow-file-protection-bash` | PreToolUse | damage-prevention | Bash write intent for protected files | Blocks concrete protected writes with exit 2; ambiguous classifier results pass through |
-| `e2e-blackbox-enforcement-agent` | PreToolUse | damage-prevention | e2e-test-writer dispatch | Blocks implementation-bearing dispatches |
-| `e2e-blackbox-enforcement-read` | PreToolUse | damage-prevention | e2e-test-writer Read | Blocks reads outside allowlist |
-| `e2e-blackbox-enforcement-write` | PreToolUse | damage-prevention | e2e-test-writer Edit/Write | Blocks writes outside `tests/e2e/` |
-| `json-validate` | PostToolUse | lightweight validation | `*.json` | Blocks invalid JSON after writes |
-| `convergence-field-validate` | PostToolUse | state-integrity | active spec manifests | Blocks unknown convergence fields |
-| `template-validate` | PostToolUse | lightweight validation | `.claude/templates/*` | Blocks invalid templates |
-| `agent-frontmatter-validate` | PostToolUse | lightweight validation | `.claude/agents/*.md` | Blocks invalid agent frontmatter |
-| `skill-frontmatter-validate` | PostToolUse | lightweight validation | `.claude/skills/*/SKILL.md` | Blocks invalid skill frontmatter |
-| `spec-schema-validate` | PostToolUse | state-integrity | active spec markdown | Blocks schema/frontmatter violations |
-| `spec-validate` | PostToolUse | state-integrity | active spec markdown | Blocks structural/e2e/env AC violations |
-| `structured-docs-validate` | PostToolUse | lightweight validation | `.claude/docs/**/*.yaml` | Blocks structured-doc schema drift |
-| `convergence-pass-recorder` | SubagentStop | state-integrity | convergence agent completions | Fail-open; parse failures record streak-breaking evidence |
-| `dispatch-record-hook` | SubagentStop | state-integrity | subagent completion payloads | Fail-open; records through `session-checkpoint.mjs` |
-| `workflow-stop-enforcement` | Stop | damage-prevention | session completion | Blocks by stdout JSON; many structural errors fail open; runtime-validation specs require passing /manual-test evidence |
+| Hook ID                          | Event        | Class                  | Scope                                 | Blocking / Failure Mode                                                                                                 |
+| -------------------------------- | ------------ | ---------------------- | ------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `workflow-gate-enforcement`      | PreToolUse   | damage-prevention      | enforced Agent dispatches             | Blocks with exit 2; structural errors fail open; missing convergence fails closed                                       |
+| `workflow-file-protection`       | PreToolUse   | damage-prevention      | Write to protected enforcement files  | Blocks with exit 2                                                                                                      |
+| `workflow-file-protection-bash`  | PreToolUse   | damage-prevention      | Bash write intent for protected files | Blocks concrete protected writes with exit 2; ambiguous classifier results pass through                                 |
+| `e2e-blackbox-enforcement-agent` | PreToolUse   | damage-prevention      | e2e-test-writer dispatch              | Blocks implementation-bearing dispatches                                                                                |
+| `e2e-blackbox-enforcement-read`  | PreToolUse   | damage-prevention      | e2e-test-writer Read                  | Blocks reads outside allowlist                                                                                          |
+| `e2e-blackbox-enforcement-write` | PreToolUse   | damage-prevention      | e2e-test-writer Edit/Write            | Blocks writes outside `tests/e2e/`                                                                                      |
+| `json-validate`                  | PostToolUse  | lightweight validation | `*.json`                              | Blocks invalid JSON after writes                                                                                        |
+| `convergence-field-validate`     | PostToolUse  | state-integrity        | active spec manifests                 | Blocks unknown convergence fields                                                                                       |
+| `template-validate`              | PostToolUse  | lightweight validation | `.claude/templates/*`                 | Blocks invalid templates                                                                                                |
+| `agent-frontmatter-validate`     | PostToolUse  | lightweight validation | `.claude/agents/*.md`                 | Blocks invalid agent frontmatter                                                                                        |
+| `skill-frontmatter-validate`     | PostToolUse  | lightweight validation | `.claude/skills/*/SKILL.md`           | Blocks invalid skill frontmatter                                                                                        |
+| `spec-schema-validate`           | PostToolUse  | state-integrity        | active spec markdown                  | Blocks schema/frontmatter violations                                                                                    |
+| `spec-validate`                  | PostToolUse  | state-integrity        | active spec markdown                  | Blocks structural/e2e/env AC violations                                                                                 |
+| `structured-docs-validate`       | PostToolUse  | lightweight validation | `.claude/docs/**/*.yaml`              | Blocks structured-doc schema drift                                                                                      |
+| `convergence-pass-recorder`      | SubagentStop | state-integrity        | convergence agent completions         | Fail-open; parse failures record streak-breaking evidence                                                               |
+| `dispatch-record-hook`           | SubagentStop | state-integrity        | subagent completion payloads          | Fail-open; records through `session-checkpoint.mjs`                                                                     |
+| `workflow-stop-enforcement`      | Stop         | damage-prevention      | session completion                    | Blocks by stdout JSON; many structural errors fail open; runtime-validation specs require passing /manual-test evidence |
 
 ### PreToolUse Hooks (Agent)
 
-| Hook ID | Script | Purpose |
-| --- | --- | --- |
-| `workflow-gate-enforcement` | `workflow-gate-enforcement.mjs` | Blocks enforced subagent dispatch until workflow prerequisites are met |
-| `e2e-blackbox-enforcement-agent` | `e2e-blackbox-enforcement.mjs` | Blocks e2e-test-writer dispatches that include implementation paths |
+| Hook ID                          | Script                          | Purpose                                                                |
+| -------------------------------- | ------------------------------- | ---------------------------------------------------------------------- |
+| `workflow-gate-enforcement`      | `workflow-gate-enforcement.mjs` | Blocks enforced subagent dispatch until workflow prerequisites are met |
+| `e2e-blackbox-enforcement-agent` | `e2e-blackbox-enforcement.mjs`  | Blocks e2e-test-writer dispatches that include implementation paths    |
 
 ### PreToolUse Hooks (E2E Black-Box Enforcement)
 
 Practice 2.4 isolation is enforced at dispatch, read, and write surfaces so the
 `e2e-test-writer` can use specs/contracts but not implementation files.
 
-| Hook ID | Matcher | Script | Purpose |
-| --- | --- | --- | --- |
-| `e2e-blackbox-enforcement-agent` | `Agent` | `e2e-blackbox-enforcement.mjs` | Reject implementation-bearing dispatch |
-| `e2e-blackbox-enforcement-read` | `Read` | `e2e-blackbox-enforcement.mjs` | Reject implementation reads outside allowlist |
-| `e2e-blackbox-enforcement-write` | `Edit\|Write` | `e2e-blackbox-enforcement.mjs` | Reject writes outside `tests/e2e/` |
+| Hook ID                          | Matcher       | Script                         | Purpose                                       |
+| -------------------------------- | ------------- | ------------------------------ | --------------------------------------------- |
+| `e2e-blackbox-enforcement-agent` | `Agent`       | `e2e-blackbox-enforcement.mjs` | Reject implementation-bearing dispatch        |
+| `e2e-blackbox-enforcement-read`  | `Read`        | `e2e-blackbox-enforcement.mjs` | Reject implementation reads outside allowlist |
+| `e2e-blackbox-enforcement-write` | `Edit\|Write` | `e2e-blackbox-enforcement.mjs` | Reject writes outside `tests/e2e/`            |
 
 ### PreToolUse Hooks (Write / Bash - Enforcement File Protection)
 
-| Hook ID | Matcher | Script | Purpose |
-| --- | --- | --- | --- |
-| `workflow-file-protection` | `Write` | `workflow-file-protection.mjs` | Blocks direct writes to protected session, gate, kill-switch, and audit state |
-| `workflow-file-protection-bash` | `Bash` | `workflow-file-protection.mjs` | Blocks destructive shell write intent against protected files |
+| Hook ID                         | Matcher | Script                         | Purpose                                                                       |
+| ------------------------------- | ------- | ------------------------------ | ----------------------------------------------------------------------------- |
+| `workflow-file-protection`      | `Write` | `workflow-file-protection.mjs` | Blocks direct writes to protected session, gate, kill-switch, and audit state |
+| `workflow-file-protection-bash` | `Bash`  | `workflow-file-protection.mjs` | Blocks destructive shell write intent against protected files                 |
 
 ### PostToolUse Hooks (Edit|Write)
 
-| Hook ID | Pattern | Script | Purpose |
-| --- | --- | --- | --- |
-| `json-validate` | `*.json` | inline `JSON.parse` | JSON syntax validation |
-| `structured-docs-validate` | `.claude/docs/**/*.yaml` | `docs-validate.mjs --hook` | Structured docs schema and references |
-| `template-validate` | `.claude/templates/*` | `template-validate.mjs` | Template structure and placeholders |
-| `agent-frontmatter-validate` | `.claude/agents/*.md` | `validate-agent-frontmatter.mjs` | Agent frontmatter schema |
-| `skill-frontmatter-validate` | `.claude/skills/*/SKILL.md` | `validate-skill-frontmatter.mjs` | Canonical skill frontmatter schema |
-| `spec-schema-validate` | `.claude/specs/groups/**/*.md` | `spec-schema-validate.mjs` | Active spec frontmatter/schema checks |
-| `spec-validate` | `.claude/specs/groups/**/*.md` | `spec-validate.mjs` | Active spec structure, e2e opt-out, env AC checks |
-| `convergence-field-validate` | `.claude/specs/groups/**/manifest.json` | `validate-convergence-fields.mjs` | Canonical convergence field names |
+| Hook ID                      | Pattern                                 | Script                            | Purpose                                           |
+| ---------------------------- | --------------------------------------- | --------------------------------- | ------------------------------------------------- |
+| `json-validate`              | `*.json`                                | inline `JSON.parse`               | JSON syntax validation                            |
+| `structured-docs-validate`   | `.claude/docs/**/*.yaml`                | `docs-validate.mjs --hook`        | Structured docs schema and references             |
+| `template-validate`          | `.claude/templates/*`                   | `template-validate.mjs`           | Template structure and placeholders               |
+| `agent-frontmatter-validate` | `.claude/agents/*.md`                   | `validate-agent-frontmatter.mjs`  | Agent frontmatter schema                          |
+| `skill-frontmatter-validate` | `.claude/skills/*/SKILL.md`             | `validate-skill-frontmatter.mjs`  | Canonical skill frontmatter schema                |
+| `spec-schema-validate`       | `.claude/specs/groups/**/*.md`          | `spec-schema-validate.mjs`        | Active spec frontmatter/schema checks             |
+| `spec-validate`              | `.claude/specs/groups/**/*.md`          | `spec-validate.mjs`               | Active spec structure, e2e opt-out, env AC checks |
+| `convergence-field-validate` | `.claude/specs/groups/**/manifest.json` | `validate-convergence-fields.mjs` | Canonical convergence field names                 |
 
 Archived specs and worktree copies are not on the live edit-hook path unless a
 script is run explicitly.
 
 ### SubagentStop Hooks
 
-| Hook ID | Script | Purpose |
-| --- | --- | --- |
-| `convergence-pass-recorder` | `convergence-pass-recorder.mjs` | Records convergence pass evidence from trusted convergence agents |
-| `dispatch-record-hook` | `dispatch-record-hook.mjs` | Backfills Task-tool dispatch records through `session-checkpoint.mjs` |
+| Hook ID                     | Script                          | Purpose                                                               |
+| --------------------------- | ------------------------------- | --------------------------------------------------------------------- |
+| `convergence-pass-recorder` | `convergence-pass-recorder.mjs` | Records convergence pass evidence from trusted convergence agents     |
+| `dispatch-record-hook`      | `dispatch-record-hook.mjs`      | Backfills Task-tool dispatch records through `session-checkpoint.mjs` |
 
 ### Stop Hooks
 
-| Hook ID | Script | Purpose |
-| --- | --- | --- |
+| Hook ID                     | Script                          | Purpose                                                                                                                                |
+| --------------------------- | ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
 | `workflow-stop-enforcement` | `workflow-stop-enforcement.mjs` | Blocks completion when mandatory dispatches, runtime manual-test evidence, obligations, invariants, or deploy verification are missing |
 
 ## Hook Wrapper
@@ -146,22 +146,22 @@ still match nested copies.
 
 All scripts live in `.claude/scripts/`.
 
-| Script | Role |
-| --- | --- |
-| `validate-agent-frontmatter.mjs` | validates `name`, `description`, `tools`, `model`; accepts optional `skills` and `exit_validation` |
-| `validate-skill-frontmatter.mjs` | validates canonical skill `SKILL.md` frontmatter |
-| `template-validate.mjs` | validates template structure and placeholders |
-| `spec-schema-validate.mjs` | validates active spec frontmatter/schema, strict `e2e_skip`, and rationale enums |
-| `spec-validate.mjs` | validates active spec structure and e2e/env AC consistency; env-dependent AC scan warns without changing exit code |
-| `validate-convergence-fields.mjs` | validates active manifest convergence field names |
-| `docs-validate.mjs` | validates structured docs YAML and generated diagram hashes |
-| `validate-manifest.mjs` | explicit CLI validator for spec-group manifests |
-| `migrate-manifest.mjs` | one-shot manifest migration utility; writes conflicts to `.claude/coordination/migration-conflicts.json` |
-| `shape-lint-hook.mjs` | manual diagnostics only; no longer a live hook |
-| `manifest-post-edit-hook.mjs` | ad-hoc manifest wrapper only; no longer a live hook |
-| `import-graph-check.mjs` | completion-verifier utility for static import reachability |
-| `session-validate.mjs` | explicit CLI validation for `.claude/context/session.json` |
-| `session-checkpoint.mjs` | sole trusted writer for workflow/session state |
+| Script                            | Role                                                                                                               |
+| --------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `validate-agent-frontmatter.mjs`  | validates `name`, `description`, `tools`, `model`; accepts optional `skills` and `exit_validation`                 |
+| `validate-skill-frontmatter.mjs`  | validates canonical skill `SKILL.md` frontmatter                                                                   |
+| `template-validate.mjs`           | validates template structure and placeholders                                                                      |
+| `spec-schema-validate.mjs`        | validates active spec frontmatter/schema, strict `e2e_skip`, and rationale enums                                   |
+| `spec-validate.mjs`               | validates active spec structure and e2e/env AC consistency; env-dependent AC scan warns without changing exit code |
+| `validate-convergence-fields.mjs` | validates active manifest convergence field names                                                                  |
+| `docs-validate.mjs`               | validates structured docs YAML and generated diagram hashes                                                        |
+| `validate-manifest.mjs`           | explicit CLI validator for spec-group manifests                                                                    |
+| `migrate-manifest.mjs`            | one-shot manifest migration utility; writes conflicts to `.claude/coordination/migration-conflicts.json`           |
+| `shape-lint-hook.mjs`             | manual diagnostics only; no longer a live hook                                                                     |
+| `manifest-post-edit-hook.mjs`     | ad-hoc manifest wrapper only; no longer a live hook                                                                |
+| `import-graph-check.mjs`          | completion-verifier utility for static import reachability                                                         |
+| `session-validate.mjs`            | explicit CLI validation for `.claude/context/session.json`                                                         |
+| `session-checkpoint.mjs`          | sole trusted writer for workflow/session state                                                                     |
 
 `shape-lint-hook.mjs` still honors `.claude/coordination/shape-lint-disabled`,
 `DISABLE_SHAPE_LINT=1`, and `.claude/coordination/shape-lint-async-mode`.
@@ -257,14 +257,14 @@ Pipeline-efficiency governance is owned by
 [AUDIT-LOG-INSPECTION.md](AUDIT-LOG-INSPECTION.md), and
 [WORKTREE-CANON.md](WORKTREE-CANON.md). Hook-facing surfaces:
 
-| Surface | Canonical path | Hook interaction |
-| --- | --- | --- |
-| enforcement flag | `.claude/config/pipeline-efficiency-enforcement.json` | `FULL_BLOCK`; direct writes require signed-commit authorization (`git commit -S`) |
-| kill-switch sentinel | `.claude/coordination/pipeline-efficiency-disabled` | `FULL_BLOCK`; direct create/delete blocked |
-| genesis anchor | `.claude/audit/pipeline-efficiency-genesis.json` | `FULL_BLOCK`; protected audit root |
-| audit log | `.claude/audit/pipeline-efficiency-changes.log` | append-only protected write path plus chain verification |
-| session-override flow | `.claude/context/session.json` | written through `session-checkpoint.mjs` |
-| worktree pin | active repo root | enforced at hook entry and protected-file writes |
+| Surface               | Canonical path                                        | Hook interaction                                                                  |
+| --------------------- | ----------------------------------------------------- | --------------------------------------------------------------------------------- |
+| enforcement flag      | `.claude/config/pipeline-efficiency-enforcement.json` | `FULL_BLOCK`; direct writes require signed-commit authorization (`git commit -S`) |
+| kill-switch sentinel  | `.claude/coordination/pipeline-efficiency-disabled`   | `FULL_BLOCK`; direct create/delete blocked                                        |
+| genesis anchor        | `.claude/audit/pipeline-efficiency-genesis.json`      | `FULL_BLOCK`; protected audit root                                                |
+| audit log             | `.claude/audit/pipeline-efficiency-changes.log`       | append-only protected write path plus chain verification                          |
+| session-override flow | `.claude/context/session.json`                        | written through `session-checkpoint.mjs`                                          |
+| worktree pin          | active repo root                                      | enforced at hook entry and protected-file writes                                  |
 
 Audit event classes retained in the hook-facing contract: `flag_flip`,
 `test_writer_unlock`, `test_writer_unlock_refence`,
@@ -293,12 +293,12 @@ or file-target logic rejects symlink components, path escapes, env mutation,
 and case-FS mismatch before acting on sensitive state. Rejections surface as
 `WORKTREE_PATH_VIOLATION`.
 
-| Consumer | Check |
-| --- | --- |
-| `workflow-gate-enforcement.mjs` | env parity at hook entry |
-| `workflow-stop-enforcement.mjs` | env parity at hook entry |
-| `workflow-file-protection.mjs` | target containment before protected-file decision |
-| `validate-convergence-fields.mjs` | env parity before manifest-field validation |
+| Consumer                          | Check                                             |
+| --------------------------------- | ------------------------------------------------- |
+| `workflow-gate-enforcement.mjs`   | env parity at hook entry                          |
+| `workflow-stop-enforcement.mjs`   | env parity at hook entry                          |
+| `workflow-file-protection.mjs`    | target containment before protected-file decision |
+| `validate-convergence-fields.mjs` | env parity before manifest-field validation       |
 
 ## Status Obligation Enforcement
 
@@ -351,19 +351,19 @@ Sync merge rules for `.claude/settings.json`:
 
 ## Troubleshooting
 
-| Symptom | Check |
-| --- | --- |
-| Hook did not run | matcher in `.claude/settings.json`; wrapper pattern; script path |
-| File hook saw no file | stdin JSON shape; use `tool_input.file_path`, not env vars |
-| Wrapper match is surprising | root-scoped `.claude/...` ignores `.claude/worktrees/` copies |
-| Hook blocks unexpectedly | run the script directly with the target path and inspect stderr |
-| Stop hook loops | check re-entry sentinel, kill switch, and stdout JSON payload |
+| Symptom                     | Check                                                                |
+| --------------------------- | -------------------------------------------------------------------- |
+| Hook did not run            | matcher in `.claude/settings.json`; wrapper pattern; script path     |
+| File hook saw no file       | stdin JSON shape; use `tool_input.file_path`, not env vars           |
+| Wrapper match is surprising | root-scoped `.claude/...` ignores `.claude/worktrees/` copies        |
+| Hook blocks unexpectedly    | run the script directly with the target path and inspect stderr      |
+| Stop hook loops             | check re-entry sentinel, kill switch, and stdout JSON payload        |
 | Consumer sync changed hooks | compare `_source: "metaclaude"` entries; project hooks should remain |
 
 Minimal wrapper probe:
 
 ```bash
-echo '{"tool_input":{"file_path":".claude/agents/test.md"}}' \
+echo '{"tool_input":{"file_path":".claude/agents/test-writer.md"}}' \
   | node .claude/scripts/hook-wrapper.mjs '.claude/agents/*.md' 'echo {{file}}'
 ```
 
