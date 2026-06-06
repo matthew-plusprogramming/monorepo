@@ -273,17 +273,22 @@ Audit event classes retained in the hook-facing contract: `flag_flip`,
 
 ## compute-hashes post-impl -> pre-unify gate
 
-`compute-hashes.mjs --verify` runs at the post-implementation to pre-unify
-phase transition through `workflow-dag.mjs`. The gate is synchronous: drift
-aborts the transition before review or convergence recording can consume stale
-hashes. `compute-hashes --update` is the repair path.
+Artifact hash verification runs at the post-implementation to pre-unify phase
+transition through `workflow-dag.mjs`. Author checkouts run
+`compute-hashes.mjs --verify` against the full registry. Synced consumers do
+not receive that registry; when `compute-hashes.mjs` is absent,
+`workflow-dag.mjs` falls back to `consumer-hash-verify.mjs --verify` against
+the consumer-local `.claude/locks/<project>.lock.json`. The gate is
+synchronous: drift aborts the transition before review or convergence
+recording can consume stale hashes. `compute-hashes --update` is the author
+repair path; consumers are repaired by re-running metaclaude sync.
 
 Operational surfaces:
 
 - `COMPUTE_HASHES_DRIFT`: verification exited non-zero
 - `COMPUTE_HASHES_LOCK_TIMEOUT`: advisory lock could not be acquired
 - `.claude/coordination/compute-hashes.lock`: empty advisory lock marker
-- `.claude/audit/pipeline-efficiency-changes.log`: receives `compute_hashes` audit entries
+- `.claude/audit/pipeline-efficiency-changes.log`: receives `compute_hashes` audit entries from both verifier paths
 
 ## Worktree-canon integration points
 

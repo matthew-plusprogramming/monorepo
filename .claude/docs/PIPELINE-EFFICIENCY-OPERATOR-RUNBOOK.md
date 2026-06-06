@@ -21,7 +21,7 @@ as the operator map, not a second implementation history.
 | Worktree pin | `session.active_work.project_dir_pin` | `WORKTREE-CANON.md` |
 | Flow-verify diff scope | `node .claude/scripts/flow-verify-checks.mjs --stage impl-verify --scope diff ...` | `FLOW-VERIFIER.md` |
 | Legacy ID validation | `node .claude/scripts/validate-atomic-filenames.mjs <sg-dir>` | Archive-only compatibility utility |
-| Hash verification gate | `node .claude/scripts/compute-hashes.mjs --verify` | `HOOKS.md`, `AUDIT-LOG-INSPECTION.md` |
+| Hash verification gate | `compute-hashes.mjs --verify` in author repos; `consumer-hash-verify.mjs --verify` in synced consumers | `HOOKS.md`, `AUDIT-LOG-INSPECTION.md` |
 
 ## Enforcement Mode
 
@@ -188,9 +188,11 @@ normal operation should not invoke this path.
 
 ### Hash Verification Gate
 
-`compute-hashes.mjs --verify` runs at the post-implementation to pre-unify
-phase transition. Drift aborts the transition before downstream review or
-convergence recording. The repair path is:
+Artifact hash verification runs at the post-implementation to pre-unify phase
+transition. Author checkouts run `compute-hashes.mjs --verify`; synced
+consumers fall back to `consumer-hash-verify.mjs --verify` against their local
+sync lock when the author registry is absent. Drift aborts the transition
+before downstream review or convergence recording. The author repair path is:
 
 ```bash
 node .claude/scripts/compute-hashes.mjs --update
@@ -198,7 +200,8 @@ node .claude/scripts/compute-hashes.mjs --verify
 ```
 
 The gate uses `.claude/coordination/compute-hashes.lock` for advisory
-serialization and emits `compute_hashes` audit entries. See `HOOKS.md` and
+serialization on the author verifier path. Both verifier paths emit
+`compute_hashes` audit entries. See `HOOKS.md` and
 `AUDIT-LOG-INSPECTION.md`.
 
 ## Rollback

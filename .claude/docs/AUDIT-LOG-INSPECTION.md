@@ -182,7 +182,7 @@ Canonical 9 event classes:
 | `session_override_flip`      | `override-enforcement` + `baseline_override_force_release`                |
 | `worktree_path_violation`    | ws-3 worktree path violation (4 closed reasons; NFR-WORKTREE-CANON)       |
 | `sentinel_lifecycle`         | Kill-switch create / remove                                               |
-| `compute_hashes`             | ws-3 `compute-hashes.mjs --verify` invocation (post-impl → pre-unify)     |
+| `compute_hashes`             | ws-3 post-impl -> pre-unify hash verifier invocation                      |
 
 Note: `test_writer_unlock_refence` spelling is contractually fixed. Do NOT rename to `reference`.
 
@@ -250,7 +250,15 @@ Emission is best-effort during the violation itself — the violation surfaces t
 
 ### ws-3 `compute_hashes` Event Class
 
-Emitted by every `.claude/scripts/compute-hashes.mjs --verify` invocation in the post-impl → pre-unify phase-transition hook (`workflow-dag.mjs` `runComputeHashesGate`). Emission sits in a `finally` block so the entry lands on every exit path — including lock timeout and drift.
+Emitted by every post-impl -> pre-unify hash verification in
+`workflow-dag.mjs` `runComputeHashesGate`: author checkouts run
+`.claude/scripts/compute-hashes.mjs --verify`, while synced consumers fall back
+to `.claude/scripts/consumer-hash-verify.mjs --verify` against their local sync
+lock when the author registry is absent. Author-verifier emission sits in a
+`finally` block so the entry lands on every exit path, including lock timeout
+and drift. The consumer verifier emits the same event class after lock
+verification, with `hashes_count` set to the number of exact-sync lock entries
+checked.
 
 Payload shape (AC15.4 canonical, 6 named fields):
 

@@ -29,6 +29,8 @@ read, then provisions consumer-local runtime dependencies for synced
 
 - `.claude/scripts/compute-hashes.mjs`: CLI entry, gate orchestration,
   skip-gates audit, registry write.
+- `.claude/scripts/consumer-hash-verify.mjs`: consumer-local lock verifier used
+  by the post-impl -> pre-unify hash gate when the author registry is absent.
 - `.claude/scripts/metaclaude-cli.mjs`: consumer status, sync, verify, and
   sync-time warnings; also provisions `.claude/node_modules` for synced hook
   runtime imports.

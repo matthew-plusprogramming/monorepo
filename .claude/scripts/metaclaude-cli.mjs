@@ -179,20 +179,31 @@ function resolveProjectPath(
   return join(resolvedBase, projectName);
 }
 
+function getAuthorLockPath(projectName) {
+  return join(METACLAUDE_ROOT, '.claude', 'locks', `${projectName}.lock.json`);
+}
+
+function getConsumerLockPath(projectName, projectPath) {
+  return join(projectPath, '.claude', 'locks', `${projectName}.lock.json`);
+}
+
 function getLockPath(projectName, projectPath) {
   // Test-fixture convention: when projectPath is provided, look for a
   // consumer-local lock file first. Fall back to the authoritative author-side
   // lock if the consumer-local variant doesn't exist.
   if (projectPath) {
-    const consumerLock = join(
-      projectPath,
-      '.claude',
-      'locks',
-      `${projectName}.lock.json`,
-    );
+    const consumerLock = getConsumerLockPath(projectName, projectPath);
     if (existsSync(consumerLock)) return consumerLock;
   }
-  return join(METACLAUDE_ROOT, '.claude', 'locks', `${projectName}.lock.json`);
+  return getAuthorLockPath(projectName);
+}
+
+function saveProjectLock(projectName, projectPath, currentLockPath, lock) {
+  const lockPaths = new Set([currentLockPath, getAuthorLockPath(projectName)]);
+  if (projectPath) lockPaths.add(getConsumerLockPath(projectName, projectPath));
+  for (const lockPath of lockPaths) {
+    saveJson(lockPath, lock);
+  }
 }
 
 function resolveBundleArtifacts(registry, bundleName, resolved = new Set()) {
@@ -230,6 +241,104 @@ function getEffectiveSyncPolicy(registry, artifactPath, artifact) {
   const [category] = artifactPath.split('/');
   const categoryMeta = registry.artifacts[category];
   return artifact?._sync_policy || categoryMeta?._sync_policy;
+}
+
+function getEffectiveProjectSyncPolicy(
+  registry,
+  projectConfig,
+  artifactPath,
+  artifact,
+) {
+  return (
+    projectConfig.sync_overrides?.[artifactPath] ||
+    getEffectiveSyncPolicy(registry, artifactPath, artifact)
+  );
+}
+
+function buildLockEntry(
+  registry,
+  projectConfig,
+  artifactPath,
+  artifact,
+  hash,
+  installedAt = new Date().toISOString(),
+) {
+  const entry = {
+    version: artifact.version,
+    hash,
+    path: artifact.path,
+    target_path: artifact.target_path || artifact.path,
+    installed_at: installedAt,
+  };
+
+  const syncPolicy = getEffectiveProjectSyncPolicy(
+    registry,
+    projectConfig,
+    artifactPath,
+    artifact,
+  );
+  if (syncPolicy) entry.sync_policy = syncPolicy;
+  if (artifact.merge_strategy) entry.merge_strategy = artifact.merge_strategy;
+  if (artifact._sync === false) entry.sync = false;
+
+  return entry;
+}
+
+function refreshLockEntryMetadata(
+  lock,
+  registry,
+  projectConfig,
+  artifactPath,
+  artifact,
+) {
+  if (!lock.installed?.[artifactPath]) return;
+
+  const entry = lock.installed[artifactPath];
+  entry.path = artifact.path;
+  entry.target_path = artifact.target_path || artifact.path;
+
+  const syncPolicy = getEffectiveProjectSyncPolicy(
+    registry,
+    projectConfig,
+    artifactPath,
+    artifact,
+  );
+  if (syncPolicy) {
+    entry.sync_policy = syncPolicy;
+  } else {
+    delete entry.sync_policy;
+  }
+
+  if (artifact.merge_strategy) {
+    entry.merge_strategy = artifact.merge_strategy;
+  } else {
+    delete entry.merge_strategy;
+  }
+
+  if (artifact._sync === false) {
+    entry.sync = false;
+  } else {
+    delete entry.sync;
+  }
+}
+
+function refreshLockMetadataForTargetArtifacts(
+  lock,
+  registry,
+  projectConfig,
+  targetArtifacts,
+) {
+  for (const artifactPath of targetArtifacts) {
+    const artifact = getArtifact(registry, artifactPath);
+    if (!artifact) continue;
+    refreshLockEntryMetadata(
+      lock,
+      registry,
+      projectConfig,
+      artifactPath,
+      artifact,
+    );
+  }
 }
 
 function resolveTargetArtifactsForProject(registry, projectConfig, defaults) {
@@ -1403,6 +1512,9 @@ async function cmdSync(projectArg, options) {
       registry_version: registry.registry_version,
       installed: {},
     };
+    lock.lock_version = lock.lock_version || '1.0.0';
+    lock.project = projectName;
+    lock.installed = lock.installed || {};
 
     // Resolve target artifacts
     const bundleName = projectConfig.bundle || config.defaults?.bundle;
@@ -1486,12 +1598,13 @@ async function cmdSync(projectArg, options) {
         if (srcHash !== localHash) {
           if (options.ackDrift) {
             // Advance lock hash; leave consumer file untouched.
-            lock.installed[artifactPath] = {
-              version: artifact.version,
-              hash: srcHash,
-              path: artifact.path,
-              installed_at: new Date().toISOString(),
-            };
+            lock.installed[artifactPath] = buildLockEntry(
+              registry,
+              projectConfig,
+              artifactPath,
+              artifact,
+              srcHash,
+            );
             log(
               `  ⊕ ${artifactPath}: shadow-file divergence acknowledged (lock advanced, file unchanged)`,
               'cyan',
@@ -1547,12 +1660,13 @@ async function cmdSync(projectArg, options) {
         copyFileSync(sourceFile, pendingFile);
 
         // Update lock to record we've "seen" this upstream version
-        lock.installed[artifactPath] = {
-          version: artifact.version,
-          hash: srcHash,
-          path: artifact.path,
-          installed_at: new Date().toISOString(),
-        };
+        lock.installed[artifactPath] = buildLockEntry(
+          registry,
+          projectConfig,
+          artifactPath,
+          artifact,
+          srcHash,
+        );
 
         pendingMerges.push({
           artifact: artifactPath,
@@ -1581,8 +1695,12 @@ async function cmdSync(projectArg, options) {
       // Check for local modifications
       if (existsSync(targetFile) && lock.installed[artifactPath]) {
         const localHash = computeHash(readFileSync(targetFile, 'utf-8'));
+        const localDiffersFromLock =
+          localHash !== lock.installed[artifactPath].hash;
+        const localMatchesSource = localHash === sourceHash;
         if (
-          localHash !== lock.installed[artifactPath].hash &&
+          localDiffersFromLock &&
+          !localMatchesSource &&
           !options.force &&
           !options.resolveConflicts
         ) {
@@ -1600,7 +1718,8 @@ async function cmdSync(projectArg, options) {
             continue;
           }
         } else if (
-          localHash !== lock.installed[artifactPath].hash &&
+          localDiffersFromLock &&
+          !localMatchesSource &&
           options.resolveConflicts
         ) {
           // --resolve-conflicts: accept upstream version for conflicting artifacts
@@ -1642,12 +1761,13 @@ async function cmdSync(projectArg, options) {
       // sg-sync-registry-gaps AC-2.1: lock entries include `path` field so
       // consumers and auditors can inspect the source artifact path without
       // cross-referencing the registry.
-      lock.installed[artifactPath] = {
-        version: artifact.version,
-        hash: sourceHash,
-        path: artifact.path,
-        installed_at: new Date().toISOString(),
-      };
+      lock.installed[artifactPath] = buildLockEntry(
+        registry,
+        projectConfig,
+        artifactPath,
+        artifact,
+        sourceHash,
+      );
 
       log(`  ✓ ${artifactPath}: ${artifact.version}@${sourceHash}`, 'green');
       synced++;
@@ -1733,10 +1853,16 @@ async function cmdSync(projectArg, options) {
     }
 
     // Update lock metadata
+    refreshLockMetadataForTargetArtifacts(
+      lock,
+      registry,
+      projectConfig,
+      targetArtifacts,
+    );
     lock.synced_at = new Date().toISOString();
     lock.registry_version = registry.registry_version;
 
-    saveJson(lockPath, lock);
+    saveProjectLock(projectName, projectPath, lockPath, lock);
 
     const runtimeDepsResult = ensureConsumerRuntimeDependencies(
       projectPath,

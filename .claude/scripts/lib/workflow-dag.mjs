@@ -19,12 +19,15 @@
  */
 
 import { createHash } from 'node:crypto';
+import { existsSync } from 'node:fs';
 // sg-pipeline-efficiency-ws3-orchestrator-hygiene / as-016 / REQ-009 / AC16.1–AC16.3:
 // execFileSync is used synchronously by runComputeHashesGate() to invoke
-// `compute-hashes.mjs --verify` at the post-impl → pre-unify phase-transition
-// boundary. Synchronous semantics are load-bearing for the ordering contract
-// (AC16.3) — the throw path must run inline with the caller's stack so a
-// caller `process.exit(2)` aborts BEFORE any queued SubagentStop recorder.
+// the artifact hash verifier at the post-impl → pre-unify phase-transition
+// boundary. Author repos use `compute-hashes.mjs --verify`; consumer repos
+// without the author registry fall back to `consumer-hash-verify.mjs --verify`.
+// Synchronous semantics are load-bearing for the ordering contract (AC16.3) —
+// the throw path must run inline with the caller's stack so a caller
+// `process.exit(2)` aborts BEFORE any queued SubagentStop recorder.
 import { execFileSync as nodeExecFileSync } from 'node:child_process';
 // sg-pipeline-efficiency-ws3-orchestrator-hygiene / as-008 / REQ-007 / AC8.2:
 // Worktree env-parity enforcement wired at phase-transition validator entry.
@@ -698,6 +701,18 @@ export const COMPUTE_HASHES_VERIFY_FLAG = '--verify';
 export const COMPUTE_HASHES_DRIFT = 'COMPUTE_HASHES_DRIFT';
 
 /**
+ * Author-repo registry verifier CLI basename.
+ * @type {string}
+ */
+export const COMPUTE_HASHES_CLI_BASENAME = 'compute-hashes.mjs';
+
+/**
+ * Consumer-repo lock verifier CLI basename.
+ * @type {string}
+ */
+export const CONSUMER_HASH_VERIFY_CLI_BASENAME = 'consumer-hash-verify.mjs';
+
+/**
  * Decide whether the post-impl → pre-unify compute-hashes hook should fire
  * for a given (from, to) phase pair.
  *
@@ -722,11 +737,40 @@ export function shouldRunComputeHashesHook(fromPhase, toPhase, workflow) {
 }
 
 /**
- * Execute the compute-hashes drift verification at the post-impl → pre-unify
+ * Resolve the hash verifier CLI for this checkout.
+ *
+ * Author checkouts contain `.claude/scripts/compute-hashes.mjs` plus the full
+ * registry. Consumer checkouts only receive the lock snapshot, so they use the
+ * lock-based verifier when `compute-hashes.mjs` is absent.
+ *
+ * @param {object} [options]
+ * @param {string} [options.scriptsDir]
+ * @param {string} [options.computeHashesCli]
+ * @returns {{ cliPath: string, label: string }}
+ */
+export function resolveHashVerifierCli(options = {}) {
+  if (options.computeHashesCli) {
+    return { cliPath: options.computeHashesCli, label: 'compute-hashes' };
+  }
+
+  const scriptsDir = options.scriptsDir || defaultScriptsDir();
+  const computeHashesCli = `${scriptsDir}/${COMPUTE_HASHES_CLI_BASENAME}`;
+  if (existsSync(computeHashesCli)) {
+    return { cliPath: computeHashesCli, label: 'compute-hashes' };
+  }
+
+  return {
+    cliPath: `${scriptsDir}/${CONSUMER_HASH_VERIFY_CLI_BASENAME}`,
+    label: 'consumer-hash-verify',
+  };
+}
+
+/**
+ * Execute artifact hash verification at the post-impl → pre-unify
  * phase-transition boundary.
  *
  * Behavior:
- *   - Invokes `node <scriptsDir>/compute-hashes.mjs --verify` synchronously.
+ *   - Invokes `node <verifier>.mjs --verify` synchronously.
  *   - On exit 0 → returns `{ exitCode: 0, drift: false }`; caller may proceed
  *     to dispatch the unifier. The PostToolUse convergence-recorder is
  *     allowed to fire.
@@ -762,9 +806,7 @@ export function shouldRunComputeHashesHook(fromPhase, toPhase, workflow) {
  */
 export function runComputeHashesGate(options = {}) {
   const timeoutMs = typeof options.timeoutMs === 'number' ? options.timeoutMs : 60_000;
-  const cliPath = options.computeHashesCli
-    ? options.computeHashesCli
-    : `${options.scriptsDir || defaultScriptsDir()}/compute-hashes.mjs`;
+  const verifier = resolveHashVerifierCli(options);
 
   // Test-only override: allow tests to inject a fake execFileSync without
   // touching the production import graph.
@@ -772,7 +814,7 @@ export function runComputeHashesGate(options = {}) {
 
   let result;
   try {
-    result = execFn(process.execPath, [cliPath, COMPUTE_HASHES_VERIFY_FLAG], {
+    result = execFn(process.execPath, [verifier.cliPath, COMPUTE_HASHES_VERIFY_FLAG], {
       encoding: 'utf-8',
       timeout: timeoutMs,
       stdio: ['ignore', 'pipe', 'pipe'],
@@ -784,12 +826,14 @@ export function runComputeHashesGate(options = {}) {
     const stderr = typeof err.stderr === 'string' ? err.stderr : '';
     const stdout = typeof err.stdout === 'string' ? err.stdout : '';
     const wrapped = new Error(
-      `compute-hashes ${COMPUTE_HASHES_VERIFY_FLAG} exited ${exitCode} at ${COMPUTE_HASHES_HOOK_SOURCE_PHASE} → ${COMPUTE_HASHES_HOOK_TARGET_PHASE} hook`
+      `${verifier.label} ${COMPUTE_HASHES_VERIFY_FLAG} exited ${exitCode} at ${COMPUTE_HASHES_HOOK_SOURCE_PHASE} → ${COMPUTE_HASHES_HOOK_TARGET_PHASE} hook`
     );
     wrapped.code = COMPUTE_HASHES_DRIFT;
     wrapped.exitCode = exitCode;
     wrapped.stderr = stderr;
     wrapped.stdout = stdout;
+    wrapped.verifier = verifier.label;
+    wrapped.verifierPath = verifier.cliPath;
     wrapped.hookPhaseFrom = COMPUTE_HASHES_HOOK_SOURCE_PHASE;
     wrapped.hookPhaseTo = COMPUTE_HASHES_HOOK_TARGET_PHASE;
     throw wrapped;

@@ -269,7 +269,7 @@ Before merge, all workflow/risk-tier-required gates must pass. Per-gate threshol
 
 **Minimum-pruning floor (BIZ-002)**: At least one of `{unifier, code-review, security, completion-verifier}` must remain configured at `(required_clean_passes: 1, attestation_mode: "content-hash")` unless `.claude/prds/pipeline-efficiency/threshold-decisions.md` documents the zero-relax evidence required by `minimum-pruning-floor.mjs`.
 
-**compute-hashes gate ordering (REQ-009 / SC-9)**: Registry hash verification runs only at `post-impl -> pre-unify` / `testing -> verifying` via `node .claude/scripts/compute-hashes.mjs --verify`. Drift aborts before convergence recording; success lets unifier dispatch against fresh hashes. The advisory lock, error shapes, audit payloads, and secondary completion-verifier drift check are documented in `.claude/docs/HOOKS.md`.
+**compute-hashes gate ordering (REQ-009 / SC-9)**: Artifact hash verification runs only at `post-impl -> pre-unify` / `testing -> verifying`. Author checkouts run `node .claude/scripts/compute-hashes.mjs --verify`; synced consumers fall back to `node .claude/scripts/consumer-hash-verify.mjs --verify` against `.claude/locks/<project>.lock.json` when the author registry is not shipped. Drift aborts before convergence recording; success lets unifier dispatch against fresh hashes. The advisory lock, error shapes, audit payloads, and secondary completion-verifier drift check are documented in `.claude/docs/HOOKS.md`.
 
 ### Stop-hook Gates
 

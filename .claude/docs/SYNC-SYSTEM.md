@@ -44,7 +44,9 @@ node .claude/scripts/compute-hashes.mjs --update
 ```
 
 `--update` recomputes registry hashes and runs the sync validation gates before
-writing `.claude/metaclaude-registry.json`.
+writing `.claude/metaclaude-registry.json`. In synced consumer checkouts,
+`workflow-dag.mjs` uses `consumer-hash-verify.mjs --verify` when the author-only
+`compute-hashes.mjs` script is absent.
 
 ---
 
@@ -57,12 +59,15 @@ writing `.claude/metaclaude-registry.json`.
 | `.claude/locks/<project>.lock.json`      | Last synced artifact versions and hashes for each consumer.            |
 | `.claude/scripts/metaclaude-cli.mjs`     | Sync/status/verify/project-management CLI.                             |
 | `.claude/scripts/compute-hashes.mjs`     | Registry hash updater and validation-gate entry point.                 |
+| `.claude/scripts/consumer-hash-verify.mjs` | Consumer-local lock verifier used by the hash gate.                  |
 | `.claude/scripts/lib/sync-constants.mjs` | Code-owned bundle ancestry, roots, whitelist, and skip-gate constants. |
 | `<consumer>/.claude/node_modules/`       | Local runtime packages used by synced hooks/scripts. Gitignored.       |
 
 Not everything in the registry is synced. `compute-hashes.mjs` is hash-tracked
-with `_sync: false`; artifacts marked `_sync_policy: "never-sync"` are skipped;
-test files and fixtures are validated as leaves rather than shipped.
+with `_sync: false`; consumers receive `consumer-hash-verify.mjs` plus their
+own `.claude/locks/<project>.lock.json` snapshot instead. Artifacts marked
+`_sync_policy: "never-sync"` are skipped; test files and fixtures are validated
+as leaves rather than shipped.
 
 ---
 
@@ -166,6 +171,13 @@ Default behavior:
 | Local file differs from lock                         | Conflict unless `--force` or `--resolve-conflicts` is used. |
 | Artifact is protected                                | Skip overwrite and deletion.                                |
 | Source path fails containment                        | Skip artifact and report conflict/warning.                  |
+
+Every sync writes the resulting lock snapshot to both
+`metaclaude-assistant/.claude/locks/<project>.lock.json` and
+`<consumer>/.claude/locks/<project>.lock.json`. Lock entries include
+`target_path`, `sync_policy`, and `merge_strategy` when applicable so the
+consumer hash gate can exact-check normal synced artifacts while skipping
+local-owned or merge-managed entries.
 
 Special policies:
 
@@ -335,9 +347,11 @@ Artifact hashes are:
 createHash('sha256').update(content).digest('hex').slice(0, 8);
 ```
 
-Lock entries record `version`, `hash`, `path`, and `installed_at`. The sync CLI
-uses the lock to distinguish upstream updates from local modifications and to
-know which obsolete consumer files are safe to delete.
+Lock entries record `version`, `hash`, `path`, `target_path`, `installed_at`,
+and any applicable `sync_policy` or `merge_strategy`. The sync CLI uses the
+lock to distinguish upstream updates from local modifications and to know which
+obsolete consumer files are safe to delete. The consumer hash verifier uses the
+same lock to block stale exact-sync agents/scripts before unifier dispatch.
 
 `verify [project]` checks locked artifacts against consumer files. Merge-managed
 files are treated as merge-managed rather than exact source hash matches.
